@@ -4,6 +4,8 @@
 
 Forge code with local LLMs via Ollama, using a hierarchical multi-agent system inspired by Norse mythology. Like the legendary dwarf smith who forged Mjolnir, Sindri crafts your code through iterative refinement.
 
+> **⚠️ Status:** Active development - Core functionality working (hierarchical delegation, TUI, persistence). Some features are planned or partially implemented. See [STATUS.md](STATUS.md) for detailed implementation status.
+
 ## Features
 
 - 🏛️ **Hierarchical Multi-Agent System** - Specialized agents delegate tasks to experts
@@ -26,7 +28,7 @@ Forge code with local LLMs via Ollama, using a hierarchical multi-agent system i
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/sindri.git
+git clone https://github.com/Iormungand21/sindri.git
 cd sindri
 
 # Install with dev dependencies
@@ -168,16 +170,16 @@ See [CONFIGURATION.md](docs/CONFIGURATION.md) for full options.
 
 ### Commands
 
-| Command | Description |
-|---------|-------------|
-| `sindri run <task>` | Execute task with single agent |
-| `sindri orchestrate <task>` | Execute with hierarchical agents |
-| `sindri tui [task]` | Launch interactive terminal UI |
-| `sindri agents` | List all available agents |
-| `sindri sessions` | Show recent sessions |
-| `sindri recover` | List/recover interrupted sessions |
-| `sindri resume <id>` | Resume a session |
-| `sindri doctor` | Verify installation and config |
+| Command | Description | Status |
+|---------|-------------|--------|
+| `sindri run <task>` | Execute task with single agent | ✅ Working |
+| `sindri tui [task]` | Launch interactive terminal UI | ✅ Working |
+| `sindri orchestrate <task>` | Execute with hierarchical agents | 🚧 Planned |
+| `sindri agents` | List all available agents | 🚧 Planned |
+| `sindri sessions` | Show recent sessions | 🚧 Planned |
+| `sindri recover` | List/recover interrupted sessions | 🚧 Planned |
+| `sindri resume <id>` | Resume a session | 🚧 Planned |
+| `sindri doctor` | Verify installation and config | 🚧 Planned |
 
 ### Options
 
