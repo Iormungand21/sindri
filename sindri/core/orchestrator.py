@@ -1,0 +1,140 @@
+"""Main orchestrator for running hierarchical tasks."""
+
+import asyncio
+import structlog
+from pathlib import Path
+from typing import Optional
+
+from sindri.llm.client import OllamaClient
+from sindri.llm.manager import ModelManager
+from sindri.tools.registry import ToolRegistry
+from sindri.persistence.state import SessionState
+from sindri.core.tasks import Task, TaskStatus
+from sindri.core.scheduler import TaskScheduler
+from sindri.core.delegation import DelegationManager
+from sindri.core.hierarchical import HierarchicalAgentLoop
+from sindri.core.loop import LoopConfig
+from sindri.memory.system import MuninnMemory
+from sindri.memory.summarizer import ConversationSummarizer
+from sindri.core.events import EventBus, Event, EventType
+
+log = structlog.get_logger()
+
+
+class Orchestrator:
+    """Main orchestrator for hierarchical task execution."""
+
+    def __init__(
+        self,
+        client: OllamaClient = None,
+        config: LoopConfig = None,
+        total_vram_gb: float = 16.0,
+        enable_memory: bool = True,
+        event_bus: Optional[EventBus] = None
+    ):
+        self.client = client or OllamaClient()
+        self.config = config or LoopConfig()
+        self.event_bus = event_bus or EventBus()
+
+        # Initialize subsystems
+        self.model_manager = ModelManager(total_vram_gb=total_vram_gb)
+        self.scheduler = TaskScheduler(self.model_manager)
+        self.state = SessionState()
+        self.delegation = DelegationManager(self.scheduler, self.state)
+        self.tools = ToolRegistry.default()
+
+        # Initialize memory system if enabled
+        if enable_memory:
+            db_path = str(Path.home() / ".sindri" / "memory.db")
+            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+            self.memory = MuninnMemory(db_path)
+            self.summarizer = ConversationSummarizer(self.client)
+            log.info("memory_system_enabled", db_path=db_path)
+        else:
+            self.memory = None
+            self.summarizer = None
+
+        # Create hierarchical loop
+        self.loop = HierarchicalAgentLoop(
+            client=self.client,
+            tools=self.tools,
+            state=self.state,
+            scheduler=self.scheduler,
+            delegation=self.delegation,
+            config=self.config,
+            memory=self.memory,
+            summarizer=self.summarizer,
+            event_bus=self.event_bus
+        )
+
+        log.info("orchestrator_initialized", memory_enabled=enable_memory)
+
+    async def run(self, user_request: str) -> dict:
+        """Run a user request through the hierarchical system."""
+
+        log.info("orchestrator_started", request=user_request[:100])
+
+        # Create root task assigned to Brokkr (orchestrator)
+        root_task = Task(
+            description=user_request,
+            task_type="orchestration",
+            assigned_agent="brokkr",
+            priority=0
+        )
+
+        # Add to scheduler
+        self.scheduler.add_task(root_task)
+
+        # Execute task queue
+        while self.scheduler.has_work():
+            next_task = self.scheduler.get_next_task()
+
+            if next_task is None:
+                # No tasks ready - check if we're waiting
+                waiting_count = sum(
+                    1 for t in self.scheduler.tasks.values()
+                    if t.status == TaskStatus.WAITING
+                )
+
+                if waiting_count > 0:
+                    log.info("waiting_for_subtasks", count=waiting_count)
+                    await asyncio.sleep(0.5)
+                    continue
+                else:
+                    # No pending, no waiting - we're stuck
+                    log.warning("no_tasks_ready", pending=self.scheduler.get_pending_count())
+                    break
+
+            # Execute task
+            log.info("executing_task",
+                     task_id=next_task.id,
+                     agent=next_task.assigned_agent,
+                     description=next_task.description[:50])
+
+            result = await self.loop.run_task(next_task)
+
+            log.info("task_result",
+                     task_id=next_task.id,
+                     success=result.success,
+                     iterations=result.iterations)
+
+        # Check root task status
+        if root_task.status == TaskStatus.COMPLETE:
+            log.info("orchestrator_success", task_id=root_task.id)
+            return {
+                "success": True,
+                "task_id": root_task.id,
+                "result": root_task.result,
+                "subtasks": len(root_task.subtask_ids)
+            }
+        else:
+            log.error("orchestrator_failed",
+                      task_id=root_task.id,
+                      status=root_task.status.value,
+                      error=root_task.error)
+            return {
+                "success": False,
+                "task_id": root_task.id,
+                "status": root_task.status.value,
+                "error": root_task.error
+            }

@@ -1,0 +1,33 @@
+/* Sindri TUI Styles */
+
+Screen {
+    background: $surface;
+}
+
+Header {
+    dock: top;
+}
+
+Footer {
+    dock: bottom;
+}
+
+Horizontal {
+    height: 1fr;
+    width: 100%;
+}
+
+Tree#tasks {
+    width: 35%;
+    border-right: wide $primary;
+}
+
+RichLog#output {
+    width: 65%;
+}
+
+Input#input {
+    dock: bottom;
+    height: 3;
+    border: solid $accent;
+}
