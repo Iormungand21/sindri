@@ -978,6 +978,9 @@ cat quick_test.txt  # Should contain "system operational"
 
 **For Understanding the System:**
 - `STATUS.md` - This file - complete project status
+- `ROADMAP.md` - Feature roadmap and development plan ⭐ NEW
+- `ARCHITECTURE.md` - Technical design and patterns ⭐ NEW
+- `NAVIGATION.md` - Documentation guide (start here if lost) ⭐ NEW
 - `CLAUDE.md` - Project context and conventions
 - `README.md` - User-facing documentation
 

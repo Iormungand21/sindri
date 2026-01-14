@@ -166,6 +166,37 @@ refresh_rate_ms = 100
 
 See [CONFIGURATION.md](docs/CONFIGURATION.md) for full options.
 
+## Documentation
+
+### 📚 For Users
+
+**Getting Started:**
+- **[Quick Start](docs/QUICKSTART.md)** - Get running in 5 minutes
+- **[Agents Guide](docs/AGENTS.md)** - Understanding agents and when to use them
+- **[Configuration](docs/CONFIGURATION.md)** - Complete configuration reference
+- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
+
+**Task Guides:**
+- **[Code Generation](docs/guides/code-generation.md)** - Generate clean, production code
+- **[Testing](docs/guides/testing.md)** - Create comprehensive test suites
+- **[More guides](docs/guides/)** - Additional task-specific guides
+
+### 🔧 For Developers
+
+**Core Documentation:**
+- **[Architecture](ARCHITECTURE.md)** - System design and technical patterns
+- **[Roadmap](ROADMAP.md)** - Feature roadmap and development plan
+- **[Status](STATUS.md)** - Current implementation status
+- **[Contributing](CONTRIBUTING.md)** - How to contribute
+- **[API Reference](docs/API.md)** - Python API for programmatic use
+
+**Navigation:**
+- **[Documentation Guide](NAVIGATION.md)** - Find what you need quickly
+
+### 🤖 For AI Assistants
+
+- **[Claude Context](CLAUDE.md)** - Project context for Claude Code
+
 ## CLI Reference
 
 ### Commands
