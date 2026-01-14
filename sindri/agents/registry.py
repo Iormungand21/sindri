@@ -17,15 +17,15 @@ AGENTS: dict[str, AgentDefinition] = {
     # Core orchestration agents
     "brokkr": AgentDefinition(
         name="brokkr",
-        role="Master orchestrator - breaks down complex tasks",
+        role="Master orchestrator - handles simple tasks, delegates complex work",
         model="qwen2.5-coder:14b",  # Using available model
         system_prompt=BROKKR_PROMPT,
-        tools=["read_file", "delegate"],
+        tools=["read_file", "write_file", "edit_file", "shell", "delegate"],
         can_delegate=True,
-        delegate_to=["huginn", "mimir", "ratatoskr", "skald", "fenrir", "odin"],
+        delegate_to=["huginn", "mimir", "skald", "fenrir", "odin"],  # Removed ratatoskr - brokkr can handle simple tasks
         estimated_vram_gb=9.0,
         priority=0,
-        max_iterations=20,
+        max_iterations=15,  # Reduced since simple tasks won't take many iterations
     ),
 
     "huginn": AgentDefinition(

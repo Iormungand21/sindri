@@ -114,7 +114,8 @@ class HierarchicalAgentLoop:
             ))
 
             log.info("task_completed", task_id=task.id, iterations=result.iterations)
-        else:
+        elif task.status != TaskStatus.CANCELLED:
+            # Only mark as FAILED if not already CANCELLED
             task.status = TaskStatus.FAILED
             task.error = result.reason
             await self.delegation.child_failed(task)
@@ -123,6 +124,18 @@ class HierarchicalAgentLoop:
             self.event_bus.emit(Event(
                 type=EventType.TASK_STATUS_CHANGED,
                 data={"task_id": task.id, "status": TaskStatus.FAILED}
+            ))
+
+            # Emit error event for TUI
+            self.event_bus.emit(Event(
+                type=EventType.ERROR,
+                data={
+                    "task_id": task.id,
+                    "error": result.reason or "Task failed",
+                    "error_type": "task_failure",
+                    "agent": agent.name,
+                    "description": task.description[:100]
+                }
             ))
 
             log.error("task_failed",
@@ -135,13 +148,20 @@ class HierarchicalAgentLoop:
     async def _run_loop(self, task: Task, agent, task_tools: ToolRegistry) -> LoopResult:
         """Execute the agent loop for a task."""
 
-        session = await self.state.create_session(
-            task.description,
-            agent.model
-        )
-
-        # Store session_id on task for later retrieval
-        task.session_id = session.id
+        # Resume existing session if available, otherwise create new one
+        if task.session_id:
+            log.info("resuming_session", task_id=task.id, session_id=task.session_id)
+            session = await self.state.load_session(task.session_id)
+            if not session:
+                log.warning("session_not_found", session_id=task.session_id)
+                # Fallback: create new session
+                session = await self.state.create_session(task.description, agent.model)
+                task.session_id = session.id
+        else:
+            # Create new session for new task
+            log.info("creating_new_session", task_id=task.id)
+            session = await self.state.create_session(task.description, agent.model)
+            task.session_id = session.id
 
         # Index project if memory available and not yet indexed
         project_id = f"project_{os.getcwd().replace('/', '_')}"
@@ -156,6 +176,20 @@ class HierarchicalAgentLoop:
         tool_parser = ToolCallParser()
 
         for iteration in range(agent.max_iterations):
+            # Check for cancellation
+            if task.cancel_requested:
+                log.info("task_cancelled_in_loop", task_id=task.id, iteration=iteration + 1)
+                task.status = TaskStatus.CANCELLED
+                task.error = "Task cancelled by user"
+                self.event_bus.emit(Event(
+                    type=EventType.TASK_STATUS_CHANGED,
+                    data={"task_id": task.id, "status": TaskStatus.CANCELLED}
+                ))
+                return LoopResult(
+                    success=False,
+                    iterations=iteration + 1
+                )
+
             log.info("iteration_start",
                      task_id=task.id,
                      iteration=iteration + 1,
@@ -212,6 +246,20 @@ class HierarchicalAgentLoop:
                 messages=messages,
                 tools=task_tools.get_schemas()
             )
+
+            # Check for cancellation after LLM call (in case it was requested during call)
+            if task.cancel_requested:
+                log.info("task_cancelled_after_llm", task_id=task.id)
+                task.status = TaskStatus.CANCELLED
+                task.error = "Task cancelled by user"
+                self.event_bus.emit(Event(
+                    type=EventType.TASK_STATUS_CHANGED,
+                    data={"task_id": task.id, "status": TaskStatus.CANCELLED}
+                ))
+                return LoopResult(
+                    success=False,
+                    iterations=iteration + 1
+                )
 
             assistant_content = response.message.content
             log.info("llm_response",

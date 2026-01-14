@@ -20,6 +20,7 @@ STATUS_ICONS = {
     TaskStatus.COMPLETE: "✓",
     TaskStatus.FAILED: "✗",
     TaskStatus.BLOCKED: "⚠",
+    TaskStatus.CANCELLED: "⊗",
 }
 
 
@@ -52,11 +53,32 @@ class SindriApp(App):
         height: 3;
         border: tall $accent;
     }
+
+    /* Error styling for task tree */
+    Tree > .tree--label {
+        padding: 0 1;
+    }
+
+    .task-failed {
+        background: $error 20%;
+        color: $error;
+    }
+
+    .task-cancelled {
+        background: $warning 20%;
+        color: $warning;
+    }
+
+    .task-blocked {
+        background: $warning 20%;
+        color: $warning;
+    }
     """
 
     BINDINGS = [
         Binding("q", "quit", "Quit", priority=True),
         Binding("?", "help", "Help"),
+        Binding("ctrl+c", "cancel", "Cancel Task"),
     ]
 
     def __init__(self, task: Optional[str] = None, orchestrator=None, event_bus=None, **kwargs):
@@ -66,6 +88,8 @@ class SindriApp(App):
         self.event_bus = event_bus or EventBus()
         self._task_nodes = {}
         self._running_task = None
+        self._root_task_id = None  # Track root task for cancellation
+        self._task_errors = {}  # Track task errors for display
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
@@ -86,6 +110,7 @@ class SindriApp(App):
         output.write("")
         output.write("[dim]• Type a task in the input field below[/dim]")
         output.write("[dim]• Press Enter to submit[/dim]")
+        output.write("[dim]• Press Ctrl+C to cancel running task[/dim]")
         output.write("[dim]• Press q to quit, ? for help[/dim]")
 
         # Expand task tree
@@ -135,10 +160,28 @@ class SindriApp(App):
                 if task_id in self._task_nodes:
                     node = self._task_nodes[task_id]
                     old_label = str(node.label)
+
+                    # Update icon
                     for old_status, old_icon in STATUS_ICONS.items():
                         if f"[{old_icon}]" in old_label:
                             new_icon = STATUS_ICONS.get(status, "·")
-                            new_label = old_label.replace(f"[{old_icon}]", f"[{new_icon}]")
+                            base_label = old_label.replace(f"[{old_icon}]", "").strip()
+
+                            # Add error message if task failed/cancelled
+                            if status == TaskStatus.FAILED and task_id in self._task_errors:
+                                error_msg = self._task_errors[task_id]
+                                new_label = f"[bold red][{new_icon}] {base_label}[/bold red]\n[dim red]    ↳ {error_msg[:60]}[/dim red]"
+                            elif status == TaskStatus.CANCELLED:
+                                new_label = f"[yellow][{new_icon}] {base_label}[/yellow] [dim](cancelled)[/dim]"
+                            elif status == TaskStatus.BLOCKED:
+                                new_label = f"[yellow][{new_icon}] {base_label}[/yellow] [dim](blocked)[/dim]"
+                            elif status == TaskStatus.COMPLETE:
+                                new_label = f"[green][{new_icon}] {base_label}[/green]"
+                            elif status == TaskStatus.RUNNING:
+                                new_label = f"[cyan][{new_icon}] {base_label}[/cyan]"
+                            else:
+                                new_label = f"[{new_icon}] {base_label}"
+
                             node.set_label(new_label)
                             break
                     self.refresh()
@@ -162,9 +205,15 @@ class SindriApp(App):
                 name = data.get("name", "unknown")
                 success = data.get("success", True)
                 result = str(data.get("result", ""))[:200]
-                color = "green" if success else "red"
-                icon = "✓" if success else "✗"
-                output.write(f"\n[{color}]{icon} [Tool: {name}][/{color}] {result}")
+
+                if success:
+                    output.write(f"\n[green]✓ [Tool: {name}][/green] [dim]{result}[/dim]")
+                else:
+                    # Failed tool calls get prominent display
+                    output.write("")
+                    output.write(f"[bold red]✗ [Tool: {name}] FAILED[/bold red]")
+                    output.write(f"[red]   {result}[/red]")
+                    output.write("")
             except Exception as e:
                 self.log(f"Error in tool_called: {e}")
 
@@ -177,12 +226,38 @@ class SindriApp(App):
             except Exception as e:
                 self.log(f"Error in iteration_start: {e}")
 
+        def on_error(data):
+            try:
+                output = self.query_one("#output", RichLog)
+                task_id = data.get("task_id")
+                error_msg = data.get("error", "Unknown error")
+                error_type = data.get("error_type", "error")
+
+                # Store error for task tree display
+                if task_id:
+                    self._task_errors[task_id] = error_msg
+
+                # Display error prominently in output
+                output.write("")
+                output.write("[bold red]━━━ ERROR ━━━[/bold red]")
+                if task_id:
+                    output.write(f"[red]Task:[/red] {task_id}")
+                output.write(f"[red]Message:[/red] {error_msg}")
+                output.write("[bold red]━━━━━━━━━━━━━[/bold red]")
+                output.write("")
+
+                # Show notification
+                self.notify(f"Error: {error_msg[:50]}", severity="error", timeout=5)
+            except Exception as e:
+                self.log(f"Error in error handler: {e}")
+
         # Subscribe to events
         self.event_bus.subscribe(EventType.TASK_CREATED, on_task_created)
         self.event_bus.subscribe(EventType.TASK_STATUS_CHANGED, on_task_status)
         self.event_bus.subscribe(EventType.AGENT_OUTPUT, on_agent_output)
         self.event_bus.subscribe(EventType.TOOL_CALLED, on_tool_called)
         self.event_bus.subscribe(EventType.ITERATION_START, on_iteration_start)
+        self.event_bus.subscribe(EventType.ERROR, on_error)
 
     async def _run_task(self, task_description: str):
         """Run a task with the orchestrator."""
@@ -198,6 +273,9 @@ class SindriApp(App):
                 assigned_agent="brokkr",
                 priority=0
             )
+
+            # Store root task ID for cancellation
+            self._root_task_id = root_task.id
 
             self.event_bus.emit(Event(
                 type=EventType.TASK_CREATED,
@@ -220,10 +298,26 @@ class SindriApp(App):
             ))
 
             if result.get("success"):
-                output.write(f"\n[bold green]✓ Task completed successfully![/bold green]")
+                output.write("")
+                output.write("[bold green]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold green]")
+                output.write("[bold green]✓ Task completed successfully![/bold green]")
+                output.write("[bold green]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold green]")
+                output.write("")
             else:
                 error = result.get("error", "Unknown error")
-                output.write(f"\n[bold red]✗ Task failed: {error}[/bold red]")
+                task_output = result.get("output", "")
+
+                output.write("")
+                output.write("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+                output.write("[bold red]✗ Task Failed[/bold red]")
+                output.write(f"[red]Error:[/red] {error}")
+                if task_output:
+                    output.write(f"[dim]Output:[/dim] {task_output[:200]}")
+                output.write("[bold red]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold red]")
+                output.write("")
+
+                # Show persistent notification
+                self.notify(f"Task failed: {error[:50]}", severity="error", timeout=10)
 
         except Exception as e:
             output.write(f"\n[bold red]✗ Error: {str(e)}[/bold red]")
@@ -231,6 +325,7 @@ class SindriApp(App):
 
         finally:
             self._running_task = None
+            self._root_task_id = None
             # Re-enable input
             input_widget = self.query_one("#input", Input)
             input_widget.disabled = False
@@ -262,6 +357,24 @@ class SindriApp(App):
         task = event.value.strip()
         event.input.value = ""
         self._running_task = self.run_worker(self._run_task(task))
+
+    def action_cancel(self):
+        """Cancel the currently running task."""
+        if not self._root_task_id or not self.orchestrator:
+            self.notify("No task running", severity="warning")
+            return
+
+        if not self._running_task or self._running_task.done():
+            self.notify("No task to cancel", severity="warning")
+            return
+
+        output = self.query_one("#output", RichLog)
+        output.write("\n[bold yellow]⊗ Cancelling task...[/bold yellow]")
+
+        # Request cancellation
+        self.orchestrator.cancel_task(self._root_task_id)
+
+        self.notify("Task cancellation requested", severity="information")
 
     def action_help(self):
         """Show help screen."""

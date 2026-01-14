@@ -16,6 +16,7 @@ class TaskStatus(Enum):
     COMPLETE = "complete"
     FAILED = "failed"
     BLOCKED = "blocked"
+    CANCELLED = "cancelled"   # User cancelled task
 
 
 @dataclass
@@ -49,6 +50,9 @@ class Task:
     result: Optional[dict] = None
     error: Optional[str] = None
     session_id: Optional[str] = None  # Link to session for resuming
+
+    # Cancellation
+    cancel_requested: bool = False
 
     def add_subtask(self, subtask_id: str):
         """Add a subtask to this task."""

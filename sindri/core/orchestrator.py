@@ -69,6 +69,23 @@ class Orchestrator:
 
         log.info("orchestrator_initialized", memory_enabled=enable_memory)
 
+    def cancel_task(self, task_id: str):
+        """Request cancellation of a task and its subtasks."""
+        task = self.scheduler.tasks.get(task_id)
+        if task:
+            log.info("task_cancellation_requested", task_id=task_id)
+            task.cancel_requested = True
+
+            # Cancel all subtasks recursively
+            for subtask_id in task.subtask_ids:
+                self.cancel_task(subtask_id)
+
+    def cancel_all(self):
+        """Cancel all tasks in the scheduler."""
+        log.info("cancel_all_tasks_requested")
+        for task_id in list(self.scheduler.tasks.keys()):
+            self.cancel_task(task_id)
+
     async def run(self, user_request: str) -> dict:
         """Run a user request through the hierarchical system."""
 
@@ -87,6 +104,17 @@ class Orchestrator:
 
         # Execute task queue
         while self.scheduler.has_work():
+            # Check for cancellation
+            if root_task.cancel_requested:
+                log.info("orchestrator_cancelled", task_id=root_task.id)
+                root_task.status = TaskStatus.CANCELLED
+                return {
+                    "success": False,
+                    "task_id": root_task.id,
+                    "error": "Task cancelled by user",
+                    "output": "Task cancelled"
+                }
+
             next_task = self.scheduler.get_next_task()
 
             if next_task is None:
