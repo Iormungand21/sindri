@@ -37,43 +37,82 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (112/112 passing!)
+# Run all tests (150/150 passing!)
 .venv/bin/pytest tests/ -v
 
-# Run parallel execution tests specifically
-.venv/bin/pytest tests/test_parallel_execution.py -v
+# Run specific test suites
+.venv/bin/pytest tests/test_parallel_execution.py -v   # Phase 6.1 tests
+.venv/bin/pytest tests/test_model_caching.py -v        # Phase 6.2 tests
 
-# CLI Commands (Phase 5 - All Complete!)
+# CLI Commands
 .venv/bin/sindri agents              # List all agents
 .venv/bin/sindri sessions            # List recent sessions
-.venv/bin/sindri recover             # List recoverable sessions
-.venv/bin/sindri resume <id>         # Resume a session (supports short IDs!)
+.venv/bin/sindri doctor --verbose    # Check system health
 
-# Health check (shows GPU, models, database, etc.)
-.venv/bin/sindri doctor
-.venv/bin/sindri doctor --verbose
-
-# Test parallel orchestration (Phase 6.1 - NEW!)
-# Tasks that delegate to multiple agents will now run in parallel when VRAM allows
+# Test orchestration (with parallel execution + model caching)
 .venv/bin/sindri orchestrate "Create a Python function and write tests for it"
 
-# Test directory tools
-.venv/bin/sindri run "List all Python files in sindri/core"
-
-# Test TUI with VRAM gauge (shows real-time GPU memory usage)
+# Test TUI with VRAM gauge
 .venv/bin/sindri tui
 ```
 
 **For New Developer/Agent:**
-1. **Start here:** Read this STATUS.md section-by-section (current state, what works, what doesn't)
-2. **Context:** Check PROJECT_HANDOFF.md for comprehensive architecture overview
-3. **Next steps:** See ROADMAP.md for Phase 6.2 (Model Caching) - further performance gains
-4. **Verify setup:** Run commands above to ensure everything works
-5. **Tests:** All 112 tests should pass - this is your baseline
+1. **Start here:** Read this STATUS.md - current state, what works, what's next
+2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
+3. **Roadmap:** See ROADMAP.md for Phase 6.3 (Streaming) or Phase 7 (Intelligence)
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 150 tests should pass
+5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
 
 ---
 
-## 📊 Session Summary (2026-01-14 - Phase 6.1 Parallel Execution)
+## 📊 Session Summary (2026-01-14 - Phase 6.2 Model Caching)
+
+### ✅ Phase 6.2 Complete - Model Caching Implemented! 🎉
+
+**Implementation Time:** ~30 minutes
+
+**Core Changes:**
+
+1. **Enhanced LoadedModel** (`sindri/llm/manager.py`)
+   - Added `use_count: int` - Track how often model is used
+   - Added `load_time: float` - How long model took to load
+   - Added `loaded_at: float` - When model was loaded
+
+2. **CacheMetrics Class** (`sindri/llm/manager.py`)
+   - `hits` / `misses` / `evictions` counters
+   - `hit_rate` property - Cache effectiveness (0.0-1.0)
+   - `avg_load_time` property - Average load time
+   - `prewarm_count` - Pre-warming operations count
+
+3. **Pre-warming** (`sindri/llm/manager.py`)
+   - `pre_warm(model, vram)` - Load model in background
+   - `wait_for_prewarm(model)` - Block until loaded
+   - Background task tracking via `_prewarm_tasks`
+
+4. **Keep-warm Config** (`sindri/llm/manager.py`)
+   - `keep_warm: set[str]` - Models protected from eviction
+   - `add_keep_warm()` / `remove_keep_warm()` methods
+
+5. **Delegation Integration** (`sindri/core/delegation.py`)
+   - DelegationManager accepts `model_manager` parameter
+   - `delegate()` triggers `pre_warm()` for child agent's model
+
+**Files Modified:**
+- `sindri/llm/manager.py` (+150 lines) - Caching features
+- `sindri/core/delegation.py` (+15 lines) - Pre-warm integration
+- `sindri/core/orchestrator.py` (+5 lines) - Pass model_manager
+
+**Files Created:**
+- `tests/test_model_caching.py` (300 lines) - 25 comprehensive tests
+
+**Test Results:**
+- **Before:** 125/125 tests passing (100%)
+- **After:** 150/150 tests passing (100%) 🎉
+- **New Tests:** 25 model caching tests (all passing)
+
+---
+
+## 📊 Previous Session Summary (2026-01-14 - Phase 6.1 Parallel Execution)
 
 ### ✅ Phase 6.1 Complete - Parallel Task Execution Implemented! 🎉
 
