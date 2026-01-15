@@ -42,7 +42,12 @@ class Orchestrator:
         self.model_manager = ModelManager(total_vram_gb=total_vram_gb)
         self.scheduler = TaskScheduler(self.model_manager)
         self.state = SessionState()
-        self.delegation = DelegationManager(self.scheduler, self.state)
+        # Phase 6.2: Pass model_manager for pre-warming during delegation
+        self.delegation = DelegationManager(
+            self.scheduler,
+            self.state,
+            model_manager=self.model_manager
+        )
         self.tools = ToolRegistry.default(work_dir=work_dir)
 
         # Initialize memory system if enabled

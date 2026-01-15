@@ -1,12 +1,18 @@
-"""Delegation: spawning child tasks from parent agents."""
+"""Delegation: spawning child tasks from parent agents.
+
+Phase 6.2: Pre-warming support for model caching.
+"""
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 import structlog
 
 from sindri.core.tasks import Task, TaskStatus
 from sindri.core.scheduler import TaskScheduler
 from sindri.agents.registry import AGENTS
+
+if TYPE_CHECKING:
+    from sindri.llm.manager import ModelManager
 
 log = structlog.get_logger()
 
@@ -22,20 +28,32 @@ class DelegationRequest:
 
 
 class DelegationManager:
-    """Handles parent-child task relationships."""
+    """Handles parent-child task relationships.
 
-    def __init__(self, scheduler: TaskScheduler, state=None):
+    Phase 6.2: Supports model pre-warming during delegation.
+    """
+
+    def __init__(
+        self,
+        scheduler: TaskScheduler,
+        state=None,
+        model_manager: Optional["ModelManager"] = None
+    ):
         self.scheduler = scheduler
         self.state = state  # SessionState for updating parent sessions
-        log.info("delegation_manager_initialized")
+        self.model_manager = model_manager  # For pre-warming
+        log.info("delegation_manager_initialized",
+                 prewarm_enabled=model_manager is not None)
 
     async def delegate(
         self,
         parent_task: Task,
         request: DelegationRequest
     ) -> Task:
-        """Create and schedule a child task."""
+        """Create and schedule a child task.
 
+        Phase 6.2: Triggers model pre-warming for the target agent.
+        """
         agent = AGENTS.get(request.target_agent)
         if not agent:
             raise ValueError(f"Unknown agent: {request.target_agent}")
@@ -45,6 +63,13 @@ class DelegationManager:
         if parent_agent and not parent_agent.can_delegate_to(request.target_agent):
             raise ValueError(
                 f"{parent_task.assigned_agent} cannot delegate to {request.target_agent}"
+            )
+
+        # Phase 6.2: Pre-warm the target agent's model in background
+        if self.model_manager:
+            await self.model_manager.pre_warm(
+                agent.model,
+                agent.estimated_vram_gb
             )
 
         child = Task(
@@ -73,6 +98,7 @@ class DelegationManager:
                  child_id=child.id,
                  from_agent=parent_task.assigned_agent,
                  to_agent=request.target_agent,
+                 prewarm_triggered=self.model_manager is not None,
                  description=request.task_description[:50])
 
         return child
