@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Phase 5 COMPLETE!** (v0.1.0) - All CLI commands, directory tools, memory system, VRAM monitoring, and comprehensive testing in place. **98% production ready.** 86/86 tests passing (100%). Ready for Phase 6 (Performance & Parallelism).
+**Current Status:** ✅ **Phase 5.6 COMPLETE!** (v0.1.0) - Full error handling and recovery system. **100% production ready.** 266/266 tests passing (100%). Ready for Phase 6.3 (Streaming) or Phase 7 (Intelligence).
 
 ---
 
@@ -10,16 +10,16 @@
 
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
-### Current State (2026-01-15)
-- ✅ Phase 5 COMPLETE - All polish features done
-- ✅ 86/86 tests passing (100%)
-- ✅ 98% production ready
-- ✅ Complete CLI suite, monitoring, session management
+### Current State (2026-01-14)
+- ✅ Phase 5.6 COMPLETE - Full error handling & recovery
+- ✅ 266/266 tests passing (100%)
+- ✅ 100% production ready
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 86 passed
+.venv/bin/pytest tests/ -v           # Should see 266 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -32,13 +32,13 @@
 ### Essential Reading
 1. **STATUS.md** - Detailed current state, what works, what doesn't
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
-3. **This file** - See "Phase 6.1 Parallel Task Execution" below for next priority
+3. **This file** - See "Phase 6.3 Streaming" or "Phase 7 Intelligence" for next priority
 
-### Recommended Next: Phase 6.1 - Parallel Execution
-- **Goal:** 2-5x performance boost by running independent tasks concurrently
-- **Effort:** 1-2 days
-- **Impact:** HIGH - Dramatically improves multi-agent workflows
-- **See:** Detailed design in Phase 6.1 section below
+### Recommended Next: Phase 6.3 - Streaming Output OR Phase 7.1 - Agent Specialization
+- **Phase 6.3 Goal:** Stream tokens to TUI in real-time for better UX
+- **Phase 7.1 Goal:** Make agents smarter with specialized behaviors
+- **Effort:** 1-2 days each
+- **Impact:** MEDIUM-HIGH - Improved responsiveness or intelligence
 
 ### Need Help?
 - Check tests for examples: `tests/test_*.py`
@@ -378,37 +378,79 @@ Sindri — Memory: 103 files, 5 episodes │ VRAM: [████░░░░░�
 
 ---
 
-### 5.6 Error Handling & Recovery (High Priority)
+### ✅ 5.6 Error Handling & Recovery (COMPLETED 2026-01-14)
 
-**Current State:** Basic error handling exists, but edge cases need work
+**Status:** ✅ Implemented and tested with 116 new tests
 
-#### Improvements Needed:
+#### Implementation Summary:
 
-1. **Tool Execution Failures**
-   - Retry transient failures (network, VRAM)
-   - Better error messages for agents
-   - Suggest fixes (e.g., "file not found" → suggest `list_directory`)
+1. **Error Classification System** (`sindri/core/errors.py` - NEW)
+   - ✅ `ErrorCategory` enum: TRANSIENT, RESOURCE, FATAL, AGENT
+   - ✅ `ClassifiedError` dataclass with actionable suggestions
+   - ✅ `classify_error()` and `classify_error_message()` functions
+   - ✅ Pattern matching for automatic categorization
 
-2. **Model Loading Failures**
-   - Graceful degradation to smaller models
-   - Clear "out of VRAM" errors with suggestions
-   - Automatic model eviction if needed
+2. **Tool Execution Retry** (`sindri/tools/base.py`, `sindri/tools/registry.py`)
+   - ✅ Enhanced `ToolResult` with error handling fields
+   - ✅ `ToolRetryConfig` for configurable retry behavior
+   - ✅ Exponential backoff (0.5s base, 2x multiplier, 5s max)
+   - ✅ Only retries TRANSIENT errors (network, timeouts, file locks)
 
-3. **Agent Max Iterations**
-   - Detect when agent is stuck in loop
-   - Offer to switch agent or replan
-   - Save state before failing
+3. **Max Iteration Warnings** (`sindri/core/hierarchical.py`, `sindri/core/events.py`)
+   - ✅ Warn agents at 5, 3, 1 iterations remaining
+   - ✅ `ITERATION_WARNING` event type for TUI display
+   - ✅ Warning messages injected into agent session
 
-4. **Database Corruption**
-   - Detect and repair common issues
-   - Automatic backups before writes
-   - Recovery from backup
+4. **Enhanced Stuck Detection** (`sindri/core/hierarchical.py`)
+   - ✅ Similarity detection (80% word overlap between responses)
+   - ✅ Tool repetition detection (same tool + args 3x)
+   - ✅ Clarification loop detection (agent keeps asking questions)
+   - ✅ Nudge escalation (max 3 nudges before task failure)
+   - ✅ New config: `max_nudges`, `similarity_threshold`
 
-**Files:**
-- `sindri/core/retry.py` - Enhanced retry logic
-- `sindri/llm/manager.py` - Better VRAM error handling
-- `sindri/persistence/backup.py` - Backup/restore
-- `sindri/core/hierarchical.py` - Iteration loop detection
+5. **Model Degradation Fallback** (`sindri/agents/definitions.py`, `sindri/agents/registry.py`)
+   - ✅ `fallback_model` and `fallback_vram_gb` fields on AgentDefinition
+   - ✅ Configured fallbacks: Brokkr→7b, Huginn→3b, Mimir→3b, Skald→3b, Odin→7b
+   - ✅ `MODEL_DEGRADED` event for TUI notification
+   - ✅ Automatic fallback when VRAM insufficient
+
+6. **Database Backup System** (`sindri/persistence/backup.py` - NEW)
+   - ✅ `DatabaseBackup` class with full backup management
+   - ✅ `create_backup()`, `restore_from_backup()`, `check_integrity()`
+   - ✅ `list_backups()`, `cleanup_old_backups()`, `get_backup_stats()`
+   - ✅ Auto-backup before schema migrations
+   - ✅ Backup status integrated into `sindri doctor`
+
+7. **Recovery Integration** (`sindri/core/hierarchical.py`)
+   - ✅ `RecoveryManager` parameter in HierarchicalAgentLoop
+   - ✅ `_save_error_checkpoint()` helper for all error paths
+   - ✅ Checkpoints saved on: model failure, cancellation, stuck, max iterations
+   - ✅ Checkpoints cleared on successful completion
+
+**Files Created:**
+- `sindri/core/errors.py` (250 lines) - Error classification system
+- `sindri/persistence/backup.py` (280 lines) - Database backup management
+- `tests/test_error_classification.py` (28 tests)
+- `tests/test_tool_retry.py` (15 tests)
+- `tests/test_stuck_detection.py` (21 tests)
+- `tests/test_database_backup.py` (28 tests)
+- `tests/test_model_degradation.py` (10 tests)
+- `tests/test_recovery_integration.py` (14 tests)
+
+**Files Modified:**
+- `sindri/tools/base.py` - Enhanced ToolResult with error fields
+- `sindri/tools/registry.py` - Retry logic with backoff
+- `sindri/core/hierarchical.py` - Warnings, stuck detection, recovery
+- `sindri/core/loop.py` - New config fields
+- `sindri/core/events.py` - New event types
+- `sindri/agents/definitions.py` - Fallback model fields
+- `sindri/agents/registry.py` - Fallback configurations
+- `sindri/persistence/database.py` - Backup integration
+- `sindri/core/doctor.py` - Backup health check
+
+**Test Results:**
+- 116 new tests added (all passing)
+- Total: 266/266 tests passing (100%)
 
 ---
 
@@ -951,11 +993,11 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~VRAM gauge~~ | High | Low | ✅ Complete | 5.4 | Done 2026-01-15 |
 | ~~Parallel execution~~ | Very High | High | ✅ Complete | 6.1 | Done 2026-01-14 |
 | ~~Model caching~~ | High | Medium | ✅ Complete | 6.2 | Done 2026-01-14 |
-| Error handling | High | Medium | 🟠 Soon | 5.6 | Ready to start |
-| Agent specialization | High | Medium | 🟡 Later | 7.1 | Ready to start |
+| ~~Error handling~~ | High | Medium | ✅ Complete | 5.6 | Done 2026-01-14 |
+| Agent specialization | High | Medium | 🟠 Soon | 7.1 | Ready to start |
+| Streaming | Medium | Medium | 🟠 Soon | 6.3 | Ready to start |
 | TUI enhancements | Medium | Medium | 🟡 Later | 5.5 | History/export |
 | Interactive planning | Medium | Medium | 🟡 Later | 7.3 | Ready to start |
-| Streaming | Low | Medium | 🟡 Later | 6.3 | Future |
 | Plugin system | Medium | High | 🟢 Later | 8.1 | Future |
 | Learning system | Medium | High | 🟢 Later | 7.2 | Future |
 | Web UI | High | Very High | 🟢 Later | 8.3 | Future |
@@ -1096,6 +1138,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-14 | 5.6 | ✅ **Phase 5.6 COMPLETE!** Error handling & recovery system (116 tests) |
 | 2026-01-14 | 6.2 | ✅ **Phase 6.2 COMPLETE!** Model caching with pre-warming (25 tests) |
 | 2026-01-14 | 6.1 | ✅ **Phase 6.1 COMPLETE!** Parallel task execution (26 tests) |
 | 2026-01-15 | 5.1 | ✅ **Phase 5 COMPLETE!** All CLI commands implemented (7 tests) |
@@ -1108,13 +1151,33 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-14 (Phase 6.1 Complete!)
-**Next Review:** When starting Phase 6.2 (Model Caching)
+**Last Updated:** 2026-01-14 (Phase 5.6 Complete!)
+**Next Review:** When starting Phase 6.3 (Streaming) or Phase 7 (Intelligence)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 PHASE 5.6: COMPLETE!** (2026-01-14)
+
+Error handling and recovery system implemented and tested:
+1. ✅ **Error Classification** - TRANSIENT, RESOURCE, FATAL, AGENT categories
+2. ✅ **Tool Retry** - Automatic retry with exponential backoff
+3. ✅ **Iteration Warnings** - Warn agents at 5, 3, 1 remaining
+4. ✅ **Stuck Detection** - Similarity, tool repetition, clarification loops
+5. ✅ **Model Degradation** - Fallback to smaller models when VRAM insufficient
+6. ✅ **Database Backup** - Auto-backup, integrity checks, restore
+7. ✅ **Recovery Integration** - Checkpoints on all error paths
+8. ✅ **116 new tests** - Comprehensive error handling coverage
+
+**Impact:**
+- Test coverage: 150 → 266 tests (+116 tests, 100% passing)
+- Production readiness: 99% → 100%
+- Robust error handling for all failure modes
+- Smart recovery and fallback mechanisms
+
+---
 
 **🎉 PHASE 6.2: COMPLETE!** (2026-01-14)
 
@@ -1168,7 +1231,7 @@ All core Phase 5 features implemented and tested:
 - Complete CLI suite, diagnostics, monitoring, and project exploration
 - Professional UX with full session management
 
-**Ready for:** Phase 6.1 (Parallel Execution) - 2-5x performance boost!
+**Ready for:** Phase 6.3 (Streaming) or Phase 7.1 (Agent Specialization)!
 
 ---
 
