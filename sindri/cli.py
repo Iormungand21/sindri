@@ -273,6 +273,83 @@ def sessions():
 
 
 @cli.command()
+@click.argument("session_id")
+@click.argument("output", required=False, type=click.Path())
+@click.option("--no-metadata", is_flag=True, help="Exclude metadata section")
+@click.option("--no-timestamps", is_flag=True, help="Exclude timestamps from turns")
+def export(session_id: str, output: str = None, no_metadata: bool = False, no_timestamps: bool = False):
+    """Export a session to Markdown.
+
+    SESSION_ID can be the full UUID or first 8 characters.
+    OUTPUT is the output file path (default: auto-generated filename).
+
+    Examples:
+
+        sindri export abc12345
+
+        sindri export abc12345 my-session.md
+
+        sindri export abc12345 --no-metadata
+    """
+    from pathlib import Path
+    from sindri.persistence.export import MarkdownExporter, generate_export_filename
+
+    async def do_export():
+        state = SessionState()
+
+        # Resolve short session ID
+        full_session_id = session_id
+        if len(session_id) < 36:
+            all_sessions = await state.list_sessions(limit=100)
+            matching = [s for s in all_sessions if s["id"].startswith(session_id)]
+
+            if not matching:
+                console.print(f"[red]✗ No session found starting with {session_id}[/]")
+                console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
+                return False
+            elif len(matching) > 1:
+                console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
+                for m in matching:
+                    console.print(f"  • {m['id'][:8]} - {m['task'][:50]}")
+                console.print("[dim]Use more characters to be specific[/dim]")
+                return False
+
+            full_session_id = matching[0]["id"]
+
+        # Load the session
+        session = await state.load_session(full_session_id)
+
+        if not session:
+            console.print(f"[red]✗ Session {full_session_id} not found[/]")
+            return False
+
+        # Create exporter
+        exporter = MarkdownExporter(
+            include_timestamps=not no_timestamps,
+            include_metadata=not no_metadata
+        )
+
+        # Determine output path
+        if output:
+            output_path = Path(output)
+        else:
+            filename = generate_export_filename(session)
+            output_path = Path.cwd() / filename
+
+        # Export
+        exporter.export_to_file(session, output_path)
+
+        # Show success message
+        console.print(f"[green]✓ Exported session to {output_path}[/]")
+        console.print(f"[dim]Session: {session.task[:60]}...[/dim]")
+        console.print(f"[dim]Turns: {len(session.turns)} | Model: {session.model}[/dim]")
+
+        return True
+
+    asyncio.run(do_export())
+
+
+@cli.command()
 @click.argument("task", required=False)
 @click.option("--no-memory", is_flag=True, help="Disable memory system")
 @click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")

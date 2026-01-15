@@ -1,19 +1,29 @@
 # Sindri Project Status Report
-**Date:** 2026-01-15 (Phase 8.1 Complete!)
-**Session:** Phase 8.1 Plugin System - Full Implementation
+**Date:** 2026-01-15 (Phase 5.5 Conversation Export Complete!)
+**Session:** Phase 5.5 TUI Enhancements - Conversation Export
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 8.1 Complete! 🎉
-**Just Completed:** Plugin System ✓ (2026-01-15)
-**Test Status:** 487/487 tests, **487 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 5.5 Complete! 🎉
+**Just Completed:** Conversation Export ✓ (2026-01-15)
+**Test Status:** 515/515 tests, **515 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 8.3 (Web UI) or Phase 5.5 (TUI Enhancements)
+**Next Priority:** Phase 8.3 (Web UI) or remaining Phase 5.5 features (Task History, Metrics)
 
-**Key New Features (Phase 8.1 - Plugin System):**
+**Key New Features (Phase 5.5 - Conversation Export):**
+- **MarkdownExporter** - Export sessions to formatted Markdown documents
+- **CLI Command** - `sindri export <session_id> [output.md]` with short ID support
+- **TUI Integration** - Press `e` to export most recent completed session
+- **Metadata Section** - Task, model, duration, iterations, timestamps
+- **Conversation Formatting** - User/Assistant/Tool turns with timestamps
+- **Tool Call Display** - JSON code blocks for tool arguments
+- **Configurable Output** - `--no-metadata`, `--no-timestamps` options
+- **28 new tests** - Comprehensive export coverage
+
+**Previous Features (Phase 8.1 - Plugin System):**
 - **PluginLoader** - Auto-discovers tool plugins (*.py) and agent configs (*.toml)
 - **PluginValidator** - Safety validation (dangerous imports, eval, security checks)
 - **PluginManager** - Orchestrates discovery, validation, and registration
@@ -101,11 +111,12 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (487/487 passing!)
+# Run all tests (515/515 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_plugins.py -v                 # Phase 8.1 plugin tests (NEW!)
+.venv/bin/pytest tests/test_export.py -v                  # Phase 5.5 export tests (NEW!)
+.venv/bin/pytest tests/test_plugins.py -v                 # Phase 8.1 plugin tests
 .venv/bin/pytest tests/test_codebase_understanding.py -v  # Phase 7.4 codebase tests
 .venv/bin/pytest tests/test_learning.py -v                # Phase 7.2 learning tests
 .venv/bin/pytest tests/test_streaming.py -v               # Phase 6.3 streaming tests
@@ -123,30 +134,95 @@
 # CLI Commands
 .venv/bin/sindri agents              # List all agents
 .venv/bin/sindri sessions            # List recent sessions
+.venv/bin/sindri export <id>         # Export session to markdown (NEW!)
 .venv/bin/sindri doctor --verbose    # Check system health
-.venv/bin/sindri plugins list        # List installed plugins (NEW!)
-.venv/bin/sindri plugins dirs        # Show plugin directories (NEW!)
-.venv/bin/sindri plugins init --tool my_tool    # Create tool template (NEW!)
-.venv/bin/sindri plugins init --agent my_agent  # Create agent template (NEW!)
+.venv/bin/sindri plugins list        # List installed plugins
+.venv/bin/sindri plugins dirs        # Show plugin directories
+.venv/bin/sindri plugins init --tool my_tool    # Create tool template
+.venv/bin/sindri plugins init --agent my_agent  # Create agent template
 
 # Test orchestration (with parallel execution + model caching + learning + codebase understanding)
 .venv/bin/sindri orchestrate "Create a Python function and write tests for it"
 
-# Test TUI with VRAM gauge + pattern count
+# Test TUI with VRAM gauge + pattern count + export (press 'e')
 .venv/bin/sindri tui
 ```
 
 **For New Developer/Agent:**
 1. **Start here:** Read this STATUS.md - current state, what works, what's next
 2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
-3. **Roadmap:** See ROADMAP.md for Phase 8.2 (Agent Marketplace) or Phase 8.3 (Web UI)
-4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 487 tests should pass
+3. **Roadmap:** See ROADMAP.md for Phase 8.3 (Web UI) or remaining Phase 5.5 features
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 515 tests should pass
 5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
-6. **Plugin system:** Try `sindri plugins list` and `sindri plugins init --tool example`
+6. **Export sessions:** Try `sindri sessions` then `sindri export <session_id>`
 
 ---
 
-## 📊 Session Summary (2026-01-15 - Phase 8.1 Plugin System)
+## 📊 Session Summary (2026-01-15 - Phase 5.5 Conversation Export)
+
+### ✅ Phase 5.5 (Partial) Complete - Conversation Export Implemented! 🎉
+
+**Implementation Time:** ~1 hour
+
+**Core Changes:**
+
+1. **Export Module** (`sindri/persistence/export.py` - NEW)
+   - `MarkdownExporter` class for session-to-markdown conversion
+   - `generate_export_filename()` for auto-generating filenames
+   - Configurable metadata and timestamp inclusion
+   - Proper formatting of tool calls as JSON code blocks
+
+2. **CLI Command** (`sindri/cli.py`)
+   - `sindri export <session_id> [output.md]` - Export session to markdown
+   - Short session ID support (8+ characters)
+   - Ambiguous ID detection with helpful messages
+   - `--no-metadata` and `--no-timestamps` options
+
+3. **TUI Integration** (`sindri/tui/app.py`)
+   - Added `e` keybinding for export
+   - `action_export()` method exports most recent completed session
+   - Status notifications for success/failure
+
+4. **Markdown Format**
+   - Title and metadata section (task, model, duration, iterations)
+   - Conversation section with numbered turns
+   - Role display names (User, Assistant, Tool Result)
+   - Tool calls in JSON code blocks
+   - Footer with export timestamp
+
+**Files Created:**
+- `sindri/persistence/export.py` (210 lines) - MarkdownExporter
+- `tests/test_export.py` (450 lines) - 28 comprehensive tests
+
+**Files Modified:**
+- `sindri/cli.py` (+75 lines) - Export CLI command
+- `sindri/tui/app.py` (+40 lines) - Export keybinding and action
+
+**Test Results:**
+- **Before:** 487/487 tests passing (100%)
+- **After:** 515/515 tests passing (100%) 🎉
+- **New Tests:** 28 tests (all passing)
+
+**Example Usage:**
+```bash
+# List sessions
+sindri sessions
+
+# Export with short ID
+sindri export abc12345
+
+# Export with custom filename
+sindri export abc12345 my-session.md
+
+# Export without metadata
+sindri export abc12345 --no-metadata
+
+# Export in TUI: press 'e'
+```
+
+---
+
+## 📊 Previous Session Summary (2026-01-15 - Phase 8.1 Plugin System)
 
 ### ✅ Phase 8.1 Complete - Plugin System Implemented! 🎉
 

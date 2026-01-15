@@ -356,29 +356,58 @@ Sindri — Memory: 103 files, 5 episodes │ VRAM: [████░░░░░�
 
 ---
 
-### 5.5 TUI Enhancements (Medium Priority - Future)
+### 5.5 TUI Enhancements (Partial - Conversation Export COMPLETE)
 
-#### Task History Panel
+#### ✅ Conversation Export (COMPLETED 2026-01-15)
+
+**Status:** ✅ Implemented and tested with 28 new tests
+
+**Implementation Summary:**
+
+1. **Export Module** (`sindri/persistence/export.py` - NEW)
+   - ✅ `MarkdownExporter` class for session-to-markdown conversion
+   - ✅ `generate_export_filename()` for auto-generating filenames
+   - ✅ Configurable metadata and timestamp inclusion
+   - ✅ Proper formatting of tool calls as JSON code blocks
+
+2. **CLI Command** (`sindri/cli.py`)
+   - ✅ `sindri export <session_id> [output.md]` - Export session to markdown
+   - ✅ Short session ID support (8+ characters)
+   - ✅ Ambiguous ID detection with helpful messages
+   - ✅ `--no-metadata` and `--no-timestamps` options
+
+3. **TUI Integration** (`sindri/tui/app.py`)
+   - ✅ Added `e` keybinding for export
+   - ✅ `action_export()` method exports most recent completed session
+   - ✅ Status notifications for success/failure
+
+**Files Created:**
+- `sindri/persistence/export.py` (210 lines) - MarkdownExporter
+- `tests/test_export.py` (450 lines) - 28 comprehensive tests
+
+**Files Modified:**
+- `sindri/cli.py` (+75 lines) - Export CLI command
+- `sindri/tui/app.py` (+40 lines) - Export keybinding and action
+
+**Test Results:**
+- 28 new tests added (all passing)
+- Total: 515/515 tests passing (100%)
+
+#### Task History Panel (Future)
 - Show completed tasks in sidebar
 - Click to view conversation
 - Search/filter past tasks
 - Useful for "what did I ask for earlier?"
 
-#### Conversation Export
-- Right-click task → "Export as markdown"
-- Saves full agent dialogue with tool calls
-- Useful for debugging, sharing, documentation
-
-#### Performance Metrics
+#### Performance Metrics (Future)
 - Task duration, iteration count
 - Model load times
 - Tool execution times
 - Help identify bottlenecks
 
-**Files:**
-- `sindri/tui/widgets/history.py` - New widget
-- `sindri/tui/app.py` - Wire up new widgets
-- `sindri/tui/export.py` - Markdown export
+**Remaining Files:**
+- `sindri/tui/widgets/history.py` - New widget (future)
+- `sindri/tui/app.py` - Wire up new widgets (future)
 
 ---
 
@@ -1172,6 +1201,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 5.5 | ✅ **Phase 5.5 (Partial) COMPLETE!** Conversation export to Markdown (28 tests) |
 | 2026-01-15 | 8.1 | ✅ **Phase 8.1 COMPLETE!** Plugin system for user-defined tools and agents (39 tests) |
 | 2026-01-15 | 7.4 | ✅ **Phase 7.4 COMPLETE!** Codebase understanding system (41 tests) |
 | 2026-01-15 | 7.2 | ✅ **Phase 7.2 COMPLETE!** Learning from success pattern system (35 tests) |
@@ -1191,13 +1221,32 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-15 (Phase 7.4 Complete!)
-**Next Review:** When starting Phase 8.1 (Plugin System)
+**Last Updated:** 2026-01-15 (Phase 5.5 Conversation Export Complete!)
+**Next Review:** When starting Phase 8.3 (Web UI) or remaining Phase 5.5 features
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 PHASE 5.5: CONVERSATION EXPORT COMPLETE!** (2026-01-15)
+
+Markdown export for session documentation:
+1. ✅ **MarkdownExporter** - Export sessions to formatted Markdown documents
+2. ✅ **CLI Command** - `sindri export <session_id> [output.md]` with short ID support
+3. ✅ **TUI Integration** - Press `e` to export most recent completed session
+4. ✅ **Metadata Section** - Task, model, duration, iterations, timestamps
+5. ✅ **Conversation Formatting** - User/Assistant/Tool turns with timestamps
+6. ✅ **Tool Call Display** - JSON code blocks for tool arguments
+7. ✅ **28 new tests** - Comprehensive export coverage
+
+**Impact:**
+- Test coverage: 487 → 515 tests (+28 tests, 100% passing)
+- Users can export session conversations for documentation
+- Useful for debugging, sharing, and creating task records
+- TUI keybinding for quick export access
+
+---
 
 **🎉 PHASE 8.1: COMPLETE!** (2026-01-15)
 

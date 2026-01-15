@@ -80,6 +80,7 @@ class SindriApp(App):
         Binding("q", "quit", "Quit", priority=True),
         Binding("?", "help", "Help"),
         Binding("ctrl+c", "cancel", "Cancel Task"),
+        Binding("e", "export", "Export"),
     ]
 
     def __init__(self, task: Optional[str] = None, orchestrator=None, event_bus=None, **kwargs):
@@ -521,6 +522,47 @@ class SindriApp(App):
     def action_help(self):
         """Show help screen."""
         self.push_screen(HelpScreen())
+
+    def action_export(self):
+        """Export the most recent session to Markdown."""
+        from pathlib import Path
+        from sindri.persistence.state import SessionState
+        from sindri.persistence.export import MarkdownExporter, generate_export_filename
+
+        output = self.query_one("#output", RichLog)
+
+        async def do_export():
+            state = SessionState()
+            sessions = await state.list_sessions(limit=10)
+
+            # Find the most recent completed session
+            completed = [s for s in sessions if s["status"] == "completed"]
+
+            if not completed:
+                output.write("\n[yellow]⚠ No completed sessions to export[/yellow]")
+                self.notify("No completed sessions to export", severity="warning")
+                return
+
+            recent_session = completed[0]
+            session = await state.load_session(recent_session["id"])
+
+            if not session:
+                output.write("\n[red]✗ Failed to load session[/red]")
+                return
+
+            # Export to current directory
+            exporter = MarkdownExporter()
+            filename = generate_export_filename(session)
+            output_path = Path.cwd() / filename
+            exporter.export_to_file(session, output_path)
+
+            output.write(f"\n[green]✓ Exported session to {output_path}[/green]")
+            output.write(f"[dim]Task: {session.task[:60]}...[/dim]")
+            output.write(f"[dim]Turns: {len(session.turns)} | Model: {session.model}[/dim]")
+
+            self.notify(f"Exported to {filename}", severity="information")
+
+        self.run_worker(do_export())
 
 
 def run_tui(task: Optional[str] = None, orchestrator=None, event_bus=None):
