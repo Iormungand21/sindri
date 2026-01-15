@@ -65,6 +65,10 @@ sindri run "Write a binary search function" --model qwen2.5-coder:14b
 
 # Hierarchical orchestration (uses all agents)
 sindri orchestrate "Build a REST API for a todo list with tests"
+
+# Organize outputs in a specific directory
+sindri run "Generate utility functions" --work-dir ./output
+sindri orchestrate "Create a blog API" --work-dir ./my_project
 ```
 
 ### Interactive TUI
@@ -75,6 +79,9 @@ sindri tui
 
 # TUI with initial task
 sindri tui "Refactor the authentication module"
+
+# TUI with work directory for outputs
+sindri tui --work-dir ./my_project
 ```
 
 ### Crash Recovery

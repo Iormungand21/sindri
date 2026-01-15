@@ -1,6 +1,7 @@
 """Tool registry for Sindri."""
 
 import json
+from pathlib import Path
 from typing import Optional
 import structlog
 
@@ -14,13 +15,19 @@ log = structlog.get_logger()
 class ToolRegistry:
     """Manages available tools."""
 
-    def __init__(self):
+    def __init__(self, work_dir: Optional[Path] = None):
+        """Initialize registry with optional working directory.
+
+        Args:
+            work_dir: Working directory for file operations. None = current directory.
+        """
         self._tools: dict[str, Tool] = {}
+        self.work_dir = work_dir
 
     def register(self, tool: Tool):
         """Register a tool."""
         self._tools[tool.name] = tool
-        log.info("tool_registered", name=tool.name)
+        log.info("tool_registered", name=tool.name, work_dir=str(self.work_dir) if self.work_dir else None)
 
     def get_tool(self, name: str) -> Optional[Tool]:
         """Get a tool by name."""
@@ -68,11 +75,18 @@ class ToolRegistry:
             )
 
     @classmethod
-    def default(cls) -> "ToolRegistry":
-        """Create a registry with default tools."""
-        registry = cls()
-        registry.register(ReadFileTool())
-        registry.register(WriteFileTool())
-        registry.register(EditFileTool())
-        registry.register(ShellTool())
+    def default(cls, work_dir: Optional[Path] = None) -> "ToolRegistry":
+        """Create a registry with default tools.
+
+        Args:
+            work_dir: Working directory for file operations. None = current directory.
+
+        Returns:
+            ToolRegistry with default filesystem and shell tools registered.
+        """
+        registry = cls(work_dir=work_dir)
+        registry.register(ReadFileTool(work_dir=work_dir))
+        registry.register(WriteFileTool(work_dir=work_dir))
+        registry.register(EditFileTool(work_dir=work_dir))
+        registry.register(ShellTool(work_dir=work_dir))
         return registry

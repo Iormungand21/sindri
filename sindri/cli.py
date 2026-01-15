@@ -39,14 +39,20 @@ def cli():
 @click.argument("task")
 @click.option("--model", "-m", default="qwen2.5-coder:14b", help="Ollama model to use")
 @click.option("--max-iter", default=50, help="Maximum iterations")
-def run(task: str, model: str, max_iter: int):
+@click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")
+def run(task: str, model: str, max_iter: int, work_dir: str = None):
     """Run a task with Sindri."""
 
+    from pathlib import Path
+
     console.print(Panel(f"[bold blue]Task:[/] {task}", title="Sindri"))
+    if work_dir:
+        console.print(f"[dim]Working directory: {work_dir}[/dim]")
 
     async def execute():
         client = OllamaClient()
-        tools = ToolRegistry.default()
+        work_path = Path(work_dir).resolve() if work_dir else None
+        tools = ToolRegistry.default(work_dir=work_path)
         state = SessionState()
         config = LoopConfig(max_iterations=max_iter)
 
@@ -70,17 +76,23 @@ def run(task: str, model: str, max_iter: int):
 @click.argument("task")
 @click.option("--max-iter", default=30, help="Maximum iterations per agent")
 @click.option("--vram-gb", default=16.0, help="Total VRAM in GB")
-def orchestrate(task: str, max_iter: int, vram_gb: float):
+@click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")
+def orchestrate(task: str, max_iter: int, vram_gb: float, work_dir: str = None):
     """Run a task with hierarchical agents (Brokkr → Huginn/Mimir/Ratatoskr)."""
 
+    from pathlib import Path
+
     console.print(Panel(f"[bold blue]Task:[/] {task}", title="🔨 Sindri Orchestration"))
+    if work_dir:
+        console.print(f"[dim]Working directory: {work_dir}[/dim]")
 
     async def execute():
         from sindri.core.orchestrator import Orchestrator
         from sindri.core.loop import LoopConfig
 
         config = LoopConfig(max_iterations=max_iter)
-        orchestrator = Orchestrator(config=config, total_vram_gb=vram_gb)
+        work_path = Path(work_dir).resolve() if work_dir else None
+        orchestrator = Orchestrator(config=config, total_vram_gb=vram_gb, work_dir=work_path)
 
         with console.status("[bold green]Orchestrating..."):
             result = await orchestrator.run(task)
@@ -160,9 +172,11 @@ def sessions():
 @cli.command()
 @click.argument("task", required=False)
 @click.option("--no-memory", is_flag=True, help="Disable memory system")
-def tui(task: str = None, no_memory: bool = False):
+@click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")
+def tui(task: str = None, no_memory: bool = False, work_dir: str = None):
     """Launch the interactive TUI."""
 
+    from pathlib import Path
     from sindri.tui.app import run_tui
     from sindri.core.orchestrator import Orchestrator
     from sindri.core.events import EventBus
@@ -170,7 +184,8 @@ def tui(task: str = None, no_memory: bool = False):
     try:
         # Create shared event bus for TUI and orchestrator
         event_bus = EventBus()
-        orchestrator = Orchestrator(enable_memory=not no_memory, event_bus=event_bus)
+        work_path = Path(work_dir).resolve() if work_dir else None
+        orchestrator = Orchestrator(enable_memory=not no_memory, event_bus=event_bus, work_dir=work_path)
         run_tui(task=task, orchestrator=orchestrator, event_bus=event_bus)
     except Exception as e:
         console.print(f"[red]Error launching TUI: {str(e)}[/]")

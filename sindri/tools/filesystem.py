@@ -28,7 +28,7 @@ class ReadFileTool(Tool):
     async def execute(self, path: str) -> ToolResult:
         """Read file contents."""
         try:
-            file_path = Path(path).expanduser().resolve()
+            file_path = self._resolve_path(path)
 
             if not file_path.exists():
                 return ToolResult(
@@ -40,7 +40,7 @@ class ReadFileTool(Tool):
             async with aiofiles.open(file_path, "r") as f:
                 content = await f.read()
 
-            log.info("file_read", path=str(file_path), size=len(content))
+            log.info("file_read", path=str(file_path), size=len(content), work_dir=str(self.work_dir) if self.work_dir else None)
 
             return ToolResult(
                 success=True,
@@ -80,7 +80,7 @@ class WriteFileTool(Tool):
     async def execute(self, path: str, content: str) -> ToolResult:
         """Write content to file."""
         try:
-            file_path = Path(path).expanduser().resolve()
+            file_path = self._resolve_path(path)
 
             # Create parent directories if needed
             file_path.parent.mkdir(parents=True, exist_ok=True)
@@ -88,7 +88,7 @@ class WriteFileTool(Tool):
             async with aiofiles.open(file_path, "w") as f:
                 await f.write(content)
 
-            log.info("file_written", path=str(file_path), size=len(content))
+            log.info("file_written", path=str(file_path), size=len(content), work_dir=str(self.work_dir) if self.work_dir else None)
 
             return ToolResult(
                 success=True,
@@ -132,7 +132,7 @@ class EditFileTool(Tool):
     async def execute(self, path: str, old_text: str, new_text: str) -> ToolResult:
         """Edit file by replacing text."""
         try:
-            file_path = Path(path).expanduser().resolve()
+            file_path = self._resolve_path(path)
 
             if not file_path.exists():
                 return ToolResult(
@@ -158,7 +158,7 @@ class EditFileTool(Tool):
             async with aiofiles.open(file_path, "w") as f:
                 await f.write(new_content)
 
-            log.info("file_edited", path=str(file_path))
+            log.info("file_edited", path=str(file_path), work_dir=str(self.work_dir) if self.work_dir else None)
 
             return ToolResult(
                 success=True,

@@ -30,18 +30,20 @@ class Orchestrator:
         config: LoopConfig = None,
         total_vram_gb: float = 16.0,
         enable_memory: bool = True,
-        event_bus: Optional[EventBus] = None
+        event_bus: Optional[EventBus] = None,
+        work_dir: Optional[Path] = None
     ):
         self.client = client or OllamaClient()
         self.config = config or LoopConfig()
         self.event_bus = event_bus or EventBus()
+        self.work_dir = work_dir
 
         # Initialize subsystems
         self.model_manager = ModelManager(total_vram_gb=total_vram_gb)
         self.scheduler = TaskScheduler(self.model_manager)
         self.state = SessionState()
         self.delegation = DelegationManager(self.scheduler, self.state)
-        self.tools = ToolRegistry.default()
+        self.tools = ToolRegistry.default(work_dir=work_dir)
 
         # Initialize memory system if enabled
         if enable_memory:

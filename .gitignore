@@ -55,9 +55,18 @@ htmlcov/
 # Test artifacts (temporary test files)
 test.txt
 test_*.txt
+test_*.py
 hello.py
 hello.txt
 test_completion.txt
+
+# Common Sindri output patterns
+sindri_output/
+output/
+generated/
+*.generated.py
+*.generated.js
+*.generated.ts
 
 # Jupyter
 .ipynb_checkpoints

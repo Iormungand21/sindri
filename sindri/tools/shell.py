@@ -27,12 +27,13 @@ class ShellTool(Tool):
     async def execute(self, command: str) -> ToolResult:
         """Execute shell command."""
         try:
-            log.info("shell_execute", command=command)
+            log.info("shell_execute", command=command, work_dir=str(self.work_dir) if self.work_dir else None)
 
             process = await asyncio.create_subprocess_shell(
                 command,
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
+                cwd=str(self.work_dir) if self.work_dir else None
             )
 
             stdout, stderr = await process.communicate()

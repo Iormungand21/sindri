@@ -49,6 +49,7 @@ class SindriConfig(BaseModel):
     # Paths
     data_dir: Path = Field(default_factory=lambda: Path.home() / ".sindri")
     db_path: Optional[Path] = None  # Computed from data_dir if None
+    work_dir: Optional[Path] = None  # Working directory for file operations (None = cwd)
 
     # Ollama
     ollama_host: str = "http://localhost:11434"
@@ -93,6 +94,10 @@ class SindriConfig(BaseModel):
         # Ensure data_dir exists
         self.data_dir = Path(self.data_dir).expanduser()
         self.data_dir.mkdir(parents=True, exist_ok=True)
+
+        # Set work_dir to current directory if not provided
+        if self.work_dir is not None:
+            self.work_dir = Path(self.work_dir).expanduser().resolve()
 
     @classmethod
     def load(cls, path: Optional[str] = None) -> 'SindriConfig':
