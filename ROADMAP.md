@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Phase 5.5 Performance Metrics COMPLETE!** (v0.1.0) - Comprehensive performance tracking. **100% production ready.** 538/538 tests passing (100%). Ready for Phase 8.3 (Web UI) or Phase 5.5 Task History Panel.
+**Current Status:** ✅ **Phase 5.5 COMPLETE!** (v0.1.0) - All TUI enhancements done (metrics, export, history). **100% production ready.** 565/565 tests passing (100%). Ready for Phase 8.3 (Web UI).
 
 ---
 
@@ -11,19 +11,19 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ Phase 5.5 COMPLETE - Performance Metrics with time breakdown analysis
-- ✅ 538/538 tests passing (100%)
+- ✅ Phase 5.5 COMPLETE - TUI Enhancements (metrics, export, history panel)
+- ✅ 565/565 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 538 passed
+.venv/bin/pytest tests/ -v           # Should see 565 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
-.venv/bin/sindri tui                 # Launch TUI (Ctrl+C to exit)
+.venv/bin/sindri tui                 # Launch TUI (press 'h' for history, Ctrl+C to exit)
 
 # Test metrics (NEW!)
 .venv/bin/sindri metrics             # List sessions with metrics
@@ -397,11 +397,20 @@ Sindri — Memory: 103 files, 5 episodes │ VRAM: [████░░░░░�
 - 28 new tests added (all passing)
 - Total: 515/515 tests passing (100%)
 
-#### Task History Panel (Future)
-- Show completed tasks in sidebar
-- Click to view conversation
-- Search/filter past tasks
-- Useful for "what did I ask for earlier?"
+#### ✅ Task History Panel (COMPLETED 2026-01-15)
+- ✅ Show completed tasks in sidebar
+- ✅ Click to view session details
+- ✅ Status icons ([OK], [!!], [~~], [--])
+- ✅ Toggle with 'h' keybinding
+- ✅ Auto-loads on TUI launch
+- ✅ Responsive layout (tasks expand when hidden)
+
+**Implementation:**
+- `sindri/tui/widgets/history.py` (310 lines) - TaskHistoryPanel, SessionItem, SessionItemContent
+- `sindri/tui/app.py` (+60 lines) - History integration with toggle
+- `sindri/tui/widgets/__init__.py` (+5 lines) - Widget exports
+- `tests/test_history_panel.py` (500 lines) - 27 comprehensive tests
+- Total: 565/565 tests passing (100%)
 
 #### ✅ Performance Metrics (COMPLETED 2026-01-15)
 - ✅ Task duration, iteration count
@@ -416,9 +425,6 @@ Sindri — Memory: 103 files, 5 episodes │ VRAM: [████░░░░░�
 - `sindri/core/hierarchical.py` (+70 lines) - Metrics collection in loop
 - `tests/test_metrics.py` (450 lines) - 23 comprehensive tests
 - Total: 538/538 tests passing (100%)
-
-**Remaining Files:**
-- `sindri/tui/widgets/history.py` - New widget (future)
 
 ---
 
@@ -1073,7 +1079,7 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Learning system~~ | Medium | High | ✅ Complete | 7.2 | Done 2026-01-15 |
 | ~~Codebase understanding~~ | High | Medium | ✅ Complete | 7.4 | Done 2026-01-15 |
 | ~~Plugin system~~ | Medium | High | ✅ Complete | 8.1 | Done 2026-01-15 |
-| TUI enhancements | Medium | Medium | 🟡 Later | 5.5 | History/export |
+| ~~TUI enhancements~~ | Medium | Medium | ✅ Complete | 5.5 | Done 2026-01-15 |
 | Web UI | High | Very High | 🟢 Next | 8.3 | Future |
 
 ---

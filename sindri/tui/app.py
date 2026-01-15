@@ -3,11 +3,12 @@
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widgets import Footer, Input, Tree, RichLog
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from typing import Optional
 import asyncio
 
 from sindri.tui.widgets.header import SindriHeader
+from sindri.tui.widgets.history import TaskHistoryPanel, SessionSelected
 from sindri.tui.screens.help import HelpScreen
 from sindri.core.events import EventBus, EventType, Event
 from sindri.core.tasks import Task, TaskStatus
@@ -36,13 +37,30 @@ class SindriApp(App):
         background: $surface;
     }
 
-    Horizontal {
+    #main-container {
         height: 1fr;
     }
 
-    #tasks {
+    #left-pane {
         width: 35%;
         border-right: wide $primary;
+    }
+
+    #tasks {
+        height: 60%;
+        border-bottom: solid $primary;
+    }
+
+    #history-panel {
+        height: 40%;
+    }
+
+    #history-panel.hidden {
+        display: none;
+    }
+
+    #tasks.expanded {
+        height: 100%;
     }
 
     #output {
@@ -81,6 +99,7 @@ class SindriApp(App):
         Binding("?", "help", "Help"),
         Binding("ctrl+c", "cancel", "Cancel Task"),
         Binding("e", "export", "Export"),
+        Binding("h", "toggle_history", "History"),
     ]
 
     def __init__(self, task: Optional[str] = None, orchestrator=None, event_bus=None, **kwargs):
@@ -92,12 +111,15 @@ class SindriApp(App):
         self._running_task = None
         self._root_task_id = None  # Track root task for cancellation
         self._task_errors = {}  # Track task errors for display
+        self._history_visible = True  # Phase 5.5: History panel visibility
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
         yield SindriHeader()
-        with Horizontal():
-            yield Tree("📋 Tasks", id="tasks")
+        with Horizontal(id="main-container"):
+            with Vertical(id="left-pane"):
+                yield Tree("Tasks", id="tasks")
+                yield TaskHistoryPanel(id="history-panel")
             yield RichLog(highlight=True, markup=True, id="output")
         yield Input(placeholder="Enter task and press Enter...", id="input")
         yield Footer()
@@ -136,6 +158,7 @@ class SindriApp(App):
         output.write("[dim]• Type a task in the input field below[/dim]")
         output.write("[dim]• Press Enter to submit[/dim]")
         output.write("[dim]• Press Ctrl+C to cancel running task[/dim]")
+        output.write("[dim]• Press h to toggle history, e to export[/dim]")
         output.write("[dim]• Press q to quit, ? for help[/dim]")
 
         # Expand task tree
@@ -157,6 +180,17 @@ class SindriApp(App):
         # Run initial task if provided
         if self.initial_task and self.orchestrator:
             self.run_worker(self._run_task(self.initial_task))
+
+        # Phase 5.5: Load session history
+        self.run_worker(self._load_history())
+
+    async def _load_history(self):
+        """Load session history into the history panel."""
+        try:
+            history_panel = self.query_one("#history-panel", TaskHistoryPanel)
+            await history_panel.load_sessions(limit=20)
+        except Exception as e:
+            self.log(f"Error loading history: {e}")
 
     def _update_vram_stats(self):
         """Update VRAM stats in header."""
@@ -582,6 +616,42 @@ class SindriApp(App):
             self.notify(f"Exported to {filename}", severity="information")
 
         self.run_worker(do_export())
+
+    def action_toggle_history(self):
+        """Toggle visibility of the history panel."""
+        try:
+            history_panel = self.query_one("#history-panel", TaskHistoryPanel)
+            tasks_tree = self.query_one("#tasks", Tree)
+
+            self._history_visible = not self._history_visible
+
+            if self._history_visible:
+                history_panel.remove_class("hidden")
+                tasks_tree.remove_class("expanded")
+                self.notify("History panel shown", severity="information")
+                # Refresh history when shown
+                self.run_worker(self._load_history())
+            else:
+                history_panel.add_class("hidden")
+                tasks_tree.add_class("expanded")
+                self.notify("History panel hidden", severity="information")
+
+        except Exception as e:
+            self.log(f"Error toggling history: {e}")
+
+    def on_session_selected(self, message: SessionSelected):
+        """Handle session selection from history panel."""
+        output = self.query_one("#output", RichLog)
+
+        output.write("")
+        output.write(f"[bold cyan]━━━ Session Selected ━━━[/bold cyan]")
+        output.write(f"[dim]ID:[/dim] {message.session_id[:16]}...")
+        output.write(f"[dim]Task:[/dim] {message.task[:60]}...")
+        output.write("")
+        output.write("[dim]Use 'sindri export <id>' to export this session[/dim]")
+        output.write("[bold cyan]━━━━━━━━━━━━━━━━━━━━━━━━[/bold cyan]")
+
+        self.notify(f"Session: {message.task[:30]}...", severity="information")
 
 
 def run_tui(task: Optional[str] = None, orchestrator=None, event_bus=None):
