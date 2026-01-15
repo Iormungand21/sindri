@@ -8,19 +8,73 @@ import structlog
 
 log = structlog.get_logger()
 
+# Current schema version for migration tracking
+SCHEMA_VERSION = 1
+
 
 class Database:
     """Manages SQLite database connection and schema."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, db_path: Optional[Path] = None, auto_backup: bool = True):
+        """Initialize database manager.
+
+        Args:
+            db_path: Path to the database file. Defaults to ~/.sindri/sindri.db
+            auto_backup: Create backup before schema changes (default True)
+        """
         if db_path is None:
             db_path = Path.home() / ".sindri" / "sindri.db"
 
         self.db_path = db_path
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.auto_backup = auto_backup
+        self._backup_manager = None
+
+    @property
+    def backup_manager(self):
+        """Lazy-load backup manager."""
+        if self._backup_manager is None:
+            from sindri.persistence.backup import DatabaseBackup
+            self._backup_manager = DatabaseBackup(self.db_path)
+        return self._backup_manager
+
+    async def _get_schema_version(self, db: aiosqlite.Connection) -> int:
+        """Get current schema version from database."""
+        try:
+            async with db.execute("PRAGMA user_version") as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else 0
+        except Exception:
+            return 0
+
+    async def _set_schema_version(self, db: aiosqlite.Connection, version: int):
+        """Set schema version in database."""
+        await db.execute(f"PRAGMA user_version = {version}")
 
     async def initialize(self):
-        """Create database schema if it doesn't exist."""
+        """Create database schema if it doesn't exist.
+
+        Creates auto-backup before schema changes if database exists
+        and auto_backup is enabled.
+        """
+        # Check if we need to create backup before schema changes
+        needs_migration = False
+        if self.db_path.exists() and self.auto_backup:
+            try:
+                async with aiosqlite.connect(self.db_path) as db:
+                    current_version = await self._get_schema_version(db)
+                    needs_migration = current_version < SCHEMA_VERSION
+            except Exception as e:
+                log.warning("schema_version_check_failed", error=str(e))
+
+        # Create backup before migration
+        if needs_migration:
+            try:
+                await self.backup_manager.create_backup(reason="pre_migration")
+                log.info("pre_migration_backup_created")
+            except Exception as e:
+                log.warning("pre_migration_backup_failed", error=str(e))
+                # Continue with migration anyway
 
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute("""
@@ -51,6 +105,9 @@ class Database:
                 CREATE INDEX IF NOT EXISTS idx_turns_session
                 ON turns(session_id)
             """)
+
+            # Update schema version
+            await self._set_schema_version(db, SCHEMA_VERSION)
 
             await db.commit()
 

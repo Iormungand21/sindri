@@ -28,6 +28,10 @@ class AgentDefinition:
     priority: int = 1                   # Lower = higher priority
     max_iterations: int = 30
 
+    # Phase 5.6: Model degradation fallback
+    fallback_model: Optional[str] = None      # Smaller model to use if primary fails
+    fallback_vram_gb: Optional[float] = None  # VRAM requirement for fallback model
+
     def can_delegate_to(self, agent_name: str) -> bool:
         """Check if this agent can delegate to the specified agent."""
         return self.can_delegate and agent_name in self.delegate_to

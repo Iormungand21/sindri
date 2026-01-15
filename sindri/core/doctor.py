@@ -195,6 +195,58 @@ def check_gpu_vram() -> HealthCheck:
     )
 
 
+def check_backup() -> HealthCheck:
+    """Check backup status and health."""
+    try:
+        from sindri.persistence.backup import DatabaseBackup
+
+        backup_mgr = DatabaseBackup()
+        stats = backup_mgr.get_backup_stats()
+
+        if stats["count"] == 0:
+            return HealthCheck(
+                name="Backups",
+                passed=True,
+                message="No backups yet",
+                details="Backups will be created automatically before migrations"
+            )
+
+        # Format size
+        total_mb = stats["total_size_bytes"] / (1024 * 1024)
+        if total_mb < 1:
+            size_str = f"{stats['total_size_bytes'] / 1024:.1f} KB"
+        else:
+            size_str = f"{total_mb:.1f} MB"
+
+        # Format age of newest backup
+        if stats["newest"]:
+            from datetime import datetime
+            age = datetime.now() - stats["newest"]
+            if age.days > 0:
+                age_str = f"{age.days}d ago"
+            elif age.seconds > 3600:
+                age_str = f"{age.seconds // 3600}h ago"
+            else:
+                age_str = f"{age.seconds // 60}m ago"
+        else:
+            age_str = "unknown"
+
+        return HealthCheck(
+            name="Backups",
+            passed=True,
+            message=f"{stats['count']} backups ({size_str})",
+            details=f"Latest: {age_str}"
+        )
+
+    except Exception as e:
+        return HealthCheck(
+            name="Backups",
+            passed=True,  # Non-critical check
+            message=f"Could not check: {str(e)}",
+            details=None
+        )
+
+
 def check_database() -> HealthCheck:
     """Check database integrity."""
     try:
@@ -384,6 +436,7 @@ def get_all_checks(config_path: Optional[str] = None) -> Dict:
         "python": check_python_version(),
         "config": check_config(config_path),
         "database": check_database(),
+        "backups": check_backup(),
         "gpu": check_gpu_vram(),
     }
 

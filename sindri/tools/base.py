@@ -2,16 +2,34 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from pathlib import Path
+
+if TYPE_CHECKING:
+    from sindri.core.errors import ErrorCategory
 
 
 @dataclass
 class ToolResult:
+    """Result from tool execution.
+
+    Attributes:
+        success: Whether the tool executed successfully
+        output: Tool output (empty string on failure)
+        error: Error message if failed
+        metadata: Additional metadata (returncode, size, etc.)
+        error_category: Classification of error type (transient, fatal, etc.)
+        suggestion: Actionable suggestion for fixing the error
+        retries_attempted: Number of retry attempts made before this result
+    """
     success: bool
     output: str
     error: Optional[str] = None
     metadata: dict = field(default_factory=dict)
+    # Error handling fields (Phase 5.6)
+    error_category: Optional["ErrorCategory"] = None
+    suggestion: Optional[str] = None
+    retries_attempted: int = 0
 
 
 class Tool(ABC):

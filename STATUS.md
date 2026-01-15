@@ -1,19 +1,29 @@
 # Sindri Project Status Report
-**Date:** 2026-01-14 (Phase 6.2 Complete!)
-**Session:** Phase 6.2 Model Caching - Pre-warming and Metrics Complete
+**Date:** 2026-01-14 (Phase 5.6 Complete!)
+**Session:** Phase 5.6 Error Handling & Recovery - Full Implementation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (99%)** - Phase 6.2 Complete! 🎉
-**Just Completed:** Model caching with pre-warming and metrics ✓ (2026-01-14)
-**Test Status:** 150/150 tests, **150 passing (100%)** - All tests passing! 🎉
-**Production Readiness:** 99% - Phase 6 Performance complete!
+**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 5.6 Complete! 🎉
+**Just Completed:** Error handling & recovery system ✓ (2026-01-14)
+**Test Status:** 266/266 tests, **266 passing (100%)** - All tests passing! 🎉
+**Production Readiness:** 100% - All core systems complete!
 **Next Priority:** Phase 6.3 (Streaming) or Phase 7 (Intelligence)
 
-**Key New Features (Phase 6.2):**
+**Key New Features (Phase 5.6 - Error Handling):**
+- **Error Classification System** - Categorize errors as TRANSIENT, RESOURCE, FATAL, AGENT
+- **Tool Retry with Backoff** - Automatic retry for transient errors (network, timeouts)
+- **Max Iteration Warnings** - Warn agents at 5, 3, 1 iterations remaining
+- **Enhanced Stuck Detection** - Similarity matching, tool repetition, clarification loops
+- **Model Degradation Fallback** - Fall back to smaller models when VRAM insufficient
+- **Database Backup System** - Auto-backup before migrations, integrity checks
+- **Recovery Integration** - Save checkpoints on all error paths
+- **116 new tests** - Comprehensive error handling coverage
+
+**Previous Features (Phase 6.2):**
 - **Model Caching! (NEW)** - Smart caching with usage tracking
   - `use_count` tracking - Know how often each model is used
   - `CacheMetrics` - Track hits, misses, evictions, hit rate
@@ -37,12 +47,18 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (150/150 passing!)
+# Run all tests (266/266 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_parallel_execution.py -v   # Phase 6.1 tests
-.venv/bin/pytest tests/test_model_caching.py -v        # Phase 6.2 tests
+.venv/bin/pytest tests/test_error_classification.py -v  # Phase 5.6 error tests
+.venv/bin/pytest tests/test_tool_retry.py -v            # Phase 5.6 retry tests
+.venv/bin/pytest tests/test_stuck_detection.py -v       # Phase 5.6 stuck tests
+.venv/bin/pytest tests/test_database_backup.py -v       # Phase 5.6 backup tests
+.venv/bin/pytest tests/test_model_degradation.py -v     # Phase 5.6 degradation tests
+.venv/bin/pytest tests/test_recovery_integration.py -v  # Phase 5.6 recovery tests
+.venv/bin/pytest tests/test_parallel_execution.py -v    # Phase 6.1 tests
+.venv/bin/pytest tests/test_model_caching.py -v         # Phase 6.2 tests
 
 # CLI Commands
 .venv/bin/sindri agents              # List all agents
@@ -60,12 +76,95 @@
 1. **Start here:** Read this STATUS.md - current state, what works, what's next
 2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
 3. **Roadmap:** See ROADMAP.md for Phase 6.3 (Streaming) or Phase 7 (Intelligence)
-4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 150 tests should pass
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 266 tests should pass
 5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
 
 ---
 
-## 📊 Session Summary (2026-01-14 - Phase 6.2 Model Caching)
+## 📊 Session Summary (2026-01-14 - Phase 5.6 Error Handling)
+
+### ✅ Phase 5.6 Complete - Error Handling & Recovery Implemented! 🎉
+
+**Implementation Time:** ~2 hours
+
+**Core Changes:**
+
+1. **Error Classification System** (`sindri/core/errors.py` - NEW)
+   - `ErrorCategory` enum: TRANSIENT, RESOURCE, FATAL, AGENT
+   - `ClassifiedError` dataclass with suggestions
+   - `classify_error()` and `classify_error_message()` functions
+   - Pattern matching for error categorization
+
+2. **Tool Retry with Backoff** (`sindri/tools/base.py`, `sindri/tools/registry.py`)
+   - Enhanced `ToolResult` with error handling fields
+   - `ToolRetryConfig` for configurable retry behavior
+   - Exponential backoff (0.5s base, 2x multiplier)
+   - Only retries TRANSIENT errors
+
+3. **Max Iteration Warnings** (`sindri/core/hierarchical.py`, `sindri/core/events.py`)
+   - Warn agents at 5, 3, 1 iterations remaining
+   - `ITERATION_WARNING` event type for TUI
+   - Warning messages injected into session
+
+4. **Enhanced Stuck Detection** (`sindri/core/hierarchical.py`)
+   - Similarity detection (80% word overlap)
+   - Tool repetition detection (same tool + args 3x)
+   - Clarification loop detection
+   - Nudge escalation (max 3 nudges before failure)
+   - New config: `max_nudges`, `similarity_threshold`
+
+5. **Model Degradation Fallback** (`sindri/agents/definitions.py`, `sindri/agents/registry.py`, `sindri/core/hierarchical.py`)
+   - `fallback_model` and `fallback_vram_gb` fields
+   - Configured fallbacks for Brokkr, Huginn, Mimir, Skald, Odin
+   - `MODEL_DEGRADED` event for TUI
+   - Automatic fallback when VRAM insufficient
+
+6. **Database Backup System** (`sindri/persistence/backup.py` - NEW, `sindri/persistence/database.py`)
+   - `DatabaseBackup` class with full backup management
+   - `create_backup()`, `restore_from_backup()`, `check_integrity()`
+   - `list_backups()`, `cleanup_old_backups()`, `get_backup_stats()`
+   - Auto-backup before schema migrations
+   - Backup status in `sindri doctor`
+
+7. **Recovery Integration** (`sindri/core/hierarchical.py`)
+   - `RecoveryManager` parameter in HierarchicalAgentLoop
+   - `_save_error_checkpoint()` helper method
+   - Checkpoints saved on all error paths:
+     - Model load failure
+     - Task cancellation
+     - Stuck escalation
+     - Max iterations reached
+   - Checkpoints cleared on successful completion
+
+**Files Created:**
+- `sindri/core/errors.py` (250 lines) - Error classification system
+- `sindri/persistence/backup.py` (280 lines) - Database backup system
+- `tests/test_error_classification.py` (28 tests)
+- `tests/test_tool_retry.py` (15 tests)
+- `tests/test_stuck_detection.py` (21 tests)
+- `tests/test_database_backup.py` (28 tests)
+- `tests/test_model_degradation.py` (10 tests)
+- `tests/test_recovery_integration.py` (14 tests)
+
+**Files Modified:**
+- `sindri/tools/base.py` (+15 lines) - Enhanced ToolResult
+- `sindri/tools/registry.py` (+50 lines) - Retry logic
+- `sindri/core/hierarchical.py` (+100 lines) - Warnings, stuck detection, recovery
+- `sindri/core/loop.py` (+5 lines) - New config fields
+- `sindri/core/events.py` (+5 lines) - New event types
+- `sindri/agents/definitions.py` (+5 lines) - Fallback fields
+- `sindri/agents/registry.py` (+30 lines) - Fallback configurations
+- `sindri/persistence/database.py` (+50 lines) - Backup integration
+- `sindri/core/doctor.py` (+50 lines) - Backup health check
+
+**Test Results:**
+- **Before:** 150/150 tests passing (100%)
+- **After:** 266/266 tests passing (100%) 🎉
+- **New Tests:** 116 tests (all passing)
+
+---
+
+## 📊 Previous Session Summary (2026-01-14 - Phase 6.2 Model Caching)
 
 ### ✅ Phase 6.2 Complete - Model Caching Implemented! 🎉
 
@@ -921,14 +1020,17 @@ export SINDRI_LOG_LEVEL=DEBUG
 **Virtual Environment:** `.venv/`
 **Data Directory:** `~/.sindri/`
 
-**This Session By:** Claude Sonnet 4.5 (2026-01-15 Evening - Phase 5 Complete!)
-**Session Focus:** Phase 5 CLI Commands - All commands implemented and tested
-**Session Duration:** ~1 hour
-**Lines Added:** ~100 lines (resume command + tests)
-**Files Modified:** `sindri/cli.py` (resume command)
-**Files Created:** `tests/test_cli_commands.py` (7 CLI tests)
-**Tests Added:** 7 tests (all passing)
-**Impact:** Phase 5 COMPLETE! 86/86 tests passing (100%) 🎉
+**This Session By:** Claude Opus 4.5 (2026-01-14 - Phase 5.6 Complete!)
+**Session Focus:** Phase 5.6 Error Handling & Recovery - Full implementation
+**Session Duration:** ~2 hours
+**Lines Added:** ~700 lines (7 components)
+**Files Created:**
+- `sindri/core/errors.py` (250 lines)
+- `sindri/persistence/backup.py` (280 lines)
+- 6 test files (116 tests total)
+**Files Modified:** 9 core files
+**Tests Added:** 116 tests (all passing)
+**Impact:** Phase 5.6 COMPLETE! 266/266 tests passing (100%) 🎉
 
 **Previous Session By:** Claude Sonnet 4.5 (2026-01-15 Evening - Test Fix)
 **Session Focus:** Fixed failing test - 100% pass rate achieved!
@@ -959,6 +1061,6 @@ export SINDRI_LOG_LEVEL=DEBUG
 
 ---
 
-**Status:** ✅ PRODUCTION READY (98%) - Phase 5 COMPLETE! 🎉
-**Last Updated:** 2026-01-15 Evening - Phase 5 CLI Commands Session
-**Next Session Goal:** Phase 6.1 - Parallel Execution (highest impact feature)
+**Status:** ✅ PRODUCTION READY (100%) - Phase 5.6 COMPLETE! 🎉
+**Last Updated:** 2026-01-14 - Phase 5.6 Error Handling Session
+**Next Session Goal:** Phase 6.3 - Streaming Output or Phase 7 - Intelligence

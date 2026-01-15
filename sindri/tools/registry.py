@@ -1,6 +1,8 @@
 """Tool registry for Sindri."""
 
+import asyncio
 import json
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 import structlog
@@ -14,21 +16,41 @@ from sindri.tools.filesystem import (
     ReadTreeTool,
 )
 from sindri.tools.shell import ShellTool
+from sindri.core.errors import (
+    ErrorCategory,
+    classify_error,
+    classify_error_message,
+)
 
 log = structlog.get_logger()
 
 
-class ToolRegistry:
-    """Manages available tools."""
+@dataclass
+class ToolRetryConfig:
+    """Configuration for tool execution retry behavior."""
+    max_attempts: int = 3
+    base_delay: float = 0.5
+    max_delay: float = 5.0
+    exponential_base: float = 2.0
 
-    def __init__(self, work_dir: Optional[Path] = None):
-        """Initialize registry with optional working directory.
+
+class ToolRegistry:
+    """Manages available tools with retry support."""
+
+    def __init__(
+        self,
+        work_dir: Optional[Path] = None,
+        retry_config: Optional[ToolRetryConfig] = None
+    ):
+        """Initialize registry with optional working directory and retry config.
 
         Args:
             work_dir: Working directory for file operations. None = current directory.
+            retry_config: Retry configuration for transient failures.
         """
         self._tools: dict[str, Tool] = {}
         self.work_dir = work_dir
+        self.retry_config = retry_config or ToolRetryConfig()
 
     def register(self, tool: Tool):
         """Register a tool."""
@@ -44,15 +66,24 @@ class ToolRegistry:
         return [tool.get_schema() for tool in self._tools.values()]
 
     async def execute(self, name: str, arguments: dict | str) -> ToolResult:
-        """Execute a tool by name."""
+        """Execute a tool by name with automatic retry for transient errors.
 
+        Args:
+            name: Tool name to execute
+            arguments: Tool arguments (dict or JSON string)
+
+        Returns:
+            ToolResult with execution result and error classification
+        """
         tool = self.get_tool(name)
         if not tool:
             log.error("tool_not_found", name=name)
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Tool not found: {name}"
+                error=f"Tool not found: {name}",
+                error_category=ErrorCategory.FATAL,
+                suggestion="Check tool name spelling or available tools"
             )
 
         # Parse arguments if they're a JSON string
@@ -64,20 +95,119 @@ class ToolRegistry:
                 return ToolResult(
                     success=False,
                     output="",
-                    error=f"Failed to parse tool arguments: {str(e)}"
+                    error=f"Failed to parse tool arguments: {str(e)}",
+                    error_category=ErrorCategory.FATAL,
+                    suggestion="Check JSON syntax in arguments"
                 )
 
         log.info("tool_execute", name=name, args=arguments)
 
-        try:
-            result = await tool.execute(**arguments)
-            return result
-        except Exception as e:
-            log.error("tool_execution_error", name=name, error=str(e))
+        # Execute with retry for transient errors
+        last_result: Optional[ToolResult] = None
+        last_exception: Optional[Exception] = None
+
+        for attempt in range(self.retry_config.max_attempts):
+            try:
+                result = await tool.execute(**arguments)
+
+                if result.success:
+                    # Success - return with retry count
+                    result.retries_attempted = attempt
+                    return result
+
+                # Tool returned failure - classify and maybe retry
+                classified = classify_error_message(result.error or "Unknown error")
+                result.error_category = classified.category
+                result.suggestion = classified.suggestion
+                result.retries_attempted = attempt
+
+                if not classified.retryable:
+                    # Fatal error - don't retry
+                    return result
+
+                # Transient error - retry if not exhausted
+                last_result = result
+                if attempt < self.retry_config.max_attempts - 1:
+                    delay = min(
+                        self.retry_config.base_delay * (self.retry_config.exponential_base ** attempt),
+                        self.retry_config.max_delay
+                    )
+                    log.warning(
+                        "tool_retry",
+                        tool=name,
+                        attempt=attempt + 1,
+                        max_attempts=self.retry_config.max_attempts,
+                        delay=delay,
+                        error=result.error
+                    )
+                    await asyncio.sleep(delay)
+
+            except Exception as e:
+                # Exception during execution - classify
+                classified = classify_error(e)
+                last_exception = e
+
+                if not classified.retryable:
+                    # Fatal exception - return immediately
+                    log.error("tool_execution_error", name=name, error=str(e), category=classified.category.value)
+                    return ToolResult(
+                        success=False,
+                        output="",
+                        error=f"Tool execution failed: {str(e)}",
+                        error_category=classified.category,
+                        suggestion=classified.suggestion,
+                        retries_attempted=attempt
+                    )
+
+                # Transient exception - retry if not exhausted
+                if attempt < self.retry_config.max_attempts - 1:
+                    delay = min(
+                        self.retry_config.base_delay * (self.retry_config.exponential_base ** attempt),
+                        self.retry_config.max_delay
+                    )
+                    log.warning(
+                        "tool_retry_exception",
+                        tool=name,
+                        attempt=attempt + 1,
+                        max_attempts=self.retry_config.max_attempts,
+                        delay=delay,
+                        error=str(e)
+                    )
+                    await asyncio.sleep(delay)
+
+        # Exhausted retries
+        if last_result:
+            log.error(
+                "tool_retry_exhausted",
+                tool=name,
+                attempts=self.retry_config.max_attempts,
+                error=last_result.error
+            )
+            return last_result
+        elif last_exception:
+            classified = classify_error(last_exception)
+            log.error(
+                "tool_retry_exhausted",
+                tool=name,
+                attempts=self.retry_config.max_attempts,
+                error=str(last_exception)
+            )
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Tool execution failed: {str(e)}"
+                error=f"Tool execution failed after {self.retry_config.max_attempts} attempts: {str(last_exception)}",
+                error_category=classified.category,
+                suggestion=classified.suggestion,
+                retries_attempted=self.retry_config.max_attempts - 1
+            )
+        else:
+            # Should never happen
+            return ToolResult(
+                success=False,
+                output="",
+                error="Tool execution failed unexpectedly",
+                error_category=ErrorCategory.FATAL,
+                retries_attempted=self.retry_config.max_attempts - 1
             )
 
     @classmethod

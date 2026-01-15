@@ -23,6 +23,9 @@ class EventType(Enum):
     # Phase 6.1: New event types for parallel execution
     PARALLEL_BATCH_START = auto()
     PARALLEL_BATCH_END = auto()
+    # Phase 5.6: New event types for error handling
+    ITERATION_WARNING = auto()  # Warn agent about remaining iterations
+    MODEL_DEGRADED = auto()     # Agent falling back to smaller model
 
 
 @dataclass

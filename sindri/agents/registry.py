@@ -26,6 +26,9 @@ AGENTS: dict[str, AgentDefinition] = {
         estimated_vram_gb=9.0,
         priority=0,
         max_iterations=15,  # Reduced since simple tasks won't take many iterations
+        # Phase 5.6: Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5-coder:7b",
+        fallback_vram_gb=5.0,
     ),
 
     "huginn": AgentDefinition(
@@ -39,6 +42,9 @@ AGENTS: dict[str, AgentDefinition] = {
         estimated_vram_gb=5.0,
         priority=1,
         max_iterations=30,
+        # Phase 5.6: Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
     ),
 
     "mimir": AgentDefinition(
@@ -51,6 +57,9 @@ AGENTS: dict[str, AgentDefinition] = {
         estimated_vram_gb=5.0,
         priority=1,
         max_iterations=20,
+        # Phase 5.6: Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
     ),
 
     "ratatoskr": AgentDefinition(
@@ -63,6 +72,7 @@ AGENTS: dict[str, AgentDefinition] = {
         estimated_vram_gb=3.0,
         priority=2,
         max_iterations=10,
+        # No fallback - already the smallest model
     ),
 
     # Specialized agents
@@ -76,6 +86,9 @@ AGENTS: dict[str, AgentDefinition] = {
         estimated_vram_gb=5.0,
         priority=1,
         max_iterations=25,
+        # Phase 5.6: Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
     ),
 
     "fenrir": AgentDefinition(
@@ -88,6 +101,7 @@ AGENTS: dict[str, AgentDefinition] = {
         estimated_vram_gb=5.0,
         priority=1,
         max_iterations=20,
+        # No fallback - sqlcoder is specialized, no smaller equivalent
     ),
 
     "odin": AgentDefinition(
@@ -102,6 +116,9 @@ AGENTS: dict[str, AgentDefinition] = {
         priority=0,
         max_iterations=15,
         temperature=0.7,  # Higher temp for creative thinking
+        # Phase 5.6: Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5-coder:7b",
+        fallback_vram_gb=5.0,
     ),
 }
 

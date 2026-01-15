@@ -15,6 +15,7 @@ from sindri.core.context import ContextBuilder
 from sindri.core.tasks import Task, TaskStatus
 from sindri.core.scheduler import TaskScheduler
 from sindri.core.delegation import DelegationManager
+from sindri.core.recovery import RecoveryManager
 from sindri.agents.registry import AGENTS
 from sindri.memory.system import MuninnMemory
 from sindri.memory.summarizer import ConversationSummarizer
@@ -37,7 +38,8 @@ class HierarchicalAgentLoop:
         config: LoopConfig = None,
         memory: Optional[MuninnMemory] = None,
         summarizer: Optional[ConversationSummarizer] = None,
-        event_bus: Optional[EventBus] = None
+        event_bus: Optional[EventBus] = None,
+        recovery: Optional[RecoveryManager] = None
     ):
         self.client = client
         self.tools = tools
@@ -49,6 +51,7 @@ class HierarchicalAgentLoop:
         self.memory = memory
         self.summarizer = summarizer
         self.event_bus = event_bus or EventBus()
+        self.recovery = recovery  # Phase 5.6: Recovery manager for error checkpoints
         self._indexed_projects = set()  # Track indexed projects
 
     async def run_task(self, task: Task) -> LoopResult:
@@ -62,15 +65,59 @@ class HierarchicalAgentLoop:
                 reason=f"Unknown agent: {task.assigned_agent}"
             )
 
-        # Ensure model is loaded
+        # Ensure model is loaded (Phase 5.6: with fallback support)
         loaded = await self.scheduler.model_manager.ensure_loaded(
             agent.model, agent.estimated_vram_gb
         )
+
+        # Phase 5.6: Try fallback model if primary fails and fallback is available
+        active_model = agent.model
+        if not loaded and agent.fallback_model:
+            log.warning("model_degradation_attempt",
+                       task_id=task.id,
+                       agent=agent.name,
+                       primary_model=agent.model,
+                       fallback_model=agent.fallback_model)
+
+            loaded = await self.scheduler.model_manager.ensure_loaded(
+                agent.fallback_model, agent.fallback_vram_gb or 3.0
+            )
+
+            if loaded:
+                active_model = agent.fallback_model
+                log.info("model_degradation_success",
+                        task_id=task.id,
+                        agent=agent.name,
+                        using_model=active_model)
+
+                # Emit degradation event for TUI
+                self.event_bus.emit(Event(
+                    type=EventType.MODEL_DEGRADED,
+                    data={
+                        "task_id": task.id,
+                        "agent": agent.name,
+                        "primary_model": agent.model,
+                        "fallback_model": agent.fallback_model,
+                        "reason": "insufficient_vram"
+                    },
+                    task_id=task.id
+                ))
+
         if not loaded:
+            fallback_info = f" (fallback {agent.fallback_model} also failed)" if agent.fallback_model else ""
+            error_reason = f"Could not load model {agent.model}{fallback_info}"
+
+            # Phase 5.6: Save checkpoint on model load failure
+            self._save_error_checkpoint(
+                task=task,
+                error_reason=error_reason,
+                error_context={"model": agent.model, "fallback_model": agent.fallback_model}
+            )
+
             return LoopResult(
                 success=False,
                 iterations=0,
-                reason=f"Could not load model {agent.model}"
+                reason=error_reason
             )
 
         task.status = TaskStatus.RUNNING
@@ -99,13 +146,17 @@ class HierarchicalAgentLoop:
                 if tool:
                     task_tools.register(tool)
 
-        result = await self._run_loop(task, agent, task_tools)
+        result = await self._run_loop(task, agent, task_tools, active_model=active_model)
 
         if result.success:
             task.status = TaskStatus.COMPLETE
             task.completed_at = datetime.now()
             task.result = {"output": result.final_output}
             await self.delegation.child_completed(task)
+
+            # Phase 5.6: Clear checkpoint on successful completion
+            if self.recovery:
+                self.recovery.clear_checkpoint(task.id)
 
             # Emit completion event
             self.event_bus.emit(Event(
@@ -145,17 +196,33 @@ class HierarchicalAgentLoop:
 
         return result
 
-    async def _run_loop(self, task: Task, agent, task_tools: ToolRegistry) -> LoopResult:
-        """Execute the agent loop for a task."""
+    async def _run_loop(
+        self,
+        task: Task,
+        agent,
+        task_tools: ToolRegistry,
+        active_model: str = None
+    ) -> LoopResult:
+        """Execute the agent loop for a task.
+
+        Args:
+            task: The task to execute
+            agent: Agent definition
+            task_tools: Tool registry for this task
+            active_model: Model to use (may differ from agent.model if degraded)
+        """
+        # Phase 5.6: Use active_model if provided, otherwise agent.model
+        model_to_use = active_model or agent.model
 
         # Resume existing session if available, otherwise create new one
+        # Note: Use model_to_use for session (may be fallback model)
         if task.session_id:
-            log.info("resuming_session", task_id=task.id, session_id=task.session_id)
+            log.info("resuming_session", task_id=task.id, session_id=task.session_id, model=model_to_use)
             session = await self.state.load_session(task.session_id)
             if not session:
                 log.warning("session_not_found", session_id=task.session_id)
                 # Fallback: create new session
-                session = await self.state.create_session(task.description, agent.model)
+                session = await self.state.create_session(task.description, model_to_use)
                 task.session_id = session.id
         else:
             # Create new session for new task
@@ -172,6 +239,8 @@ class HierarchicalAgentLoop:
             log.info("project_indexed", files=indexed, project_id=project_id)
 
         recent_responses = []
+        tool_call_history = []  # Phase 5.6: Track tool calls for repetition detection
+        nudge_count = 0         # Phase 5.6: Track nudges for escalation
         completion_detector = CompletionDetector(self.config.completion_marker)
         tool_parser = ToolCallParser()
 
@@ -185,10 +254,51 @@ class HierarchicalAgentLoop:
                     type=EventType.TASK_STATUS_CHANGED,
                     data={"task_id": task.id, "status": TaskStatus.CANCELLED}
                 ))
+
+                # Phase 5.6: Save checkpoint on cancellation
+                self._save_error_checkpoint(
+                    task=task,
+                    error_reason="cancelled_by_user",
+                    session_id=session.id if session else None,
+                    iteration=iteration + 1
+                )
+
                 return LoopResult(
                     success=False,
                     iterations=iteration + 1
                 )
+
+            # Phase 5.6: Warn agent about remaining iterations
+            iterations_remaining = agent.max_iterations - iteration
+            if iterations_remaining in [5, 3, 1]:
+                if iterations_remaining == 1:
+                    warning_msg = (
+                        "WARNING: This is your FINAL iteration. "
+                        "Please complete the task or summarize what you've accomplished and what remains."
+                    )
+                else:
+                    warning_msg = (
+                        f"WARNING: Only {iterations_remaining} iterations remaining. "
+                        "Please prioritize completing the task or marking blockers."
+                    )
+
+                log.warning("iteration_warning",
+                           task_id=task.id,
+                           remaining=iterations_remaining)
+
+                # Emit warning event for TUI
+                self.event_bus.emit(Event(
+                    type=EventType.ITERATION_WARNING,
+                    data={
+                        "task_id": task.id,
+                        "remaining": iterations_remaining,
+                        "message": warning_msg
+                    },
+                    task_id=task.id
+                ))
+
+                # Inject warning into session so agent sees it
+                session.add_turn("system", warning_msg)
 
             log.info("iteration_start",
                      task_id=task.id,
@@ -240,9 +350,9 @@ class HierarchicalAgentLoop:
                     task_tools.get_schemas()
                 )
 
-            # Call LLM
+            # Call LLM (Phase 5.6: use model_to_use for potential fallback)
             response = await self.client.chat(
-                model=agent.model,
+                model=model_to_use,
                 messages=messages,
                 tools=task_tools.get_schemas()
             )
@@ -256,6 +366,15 @@ class HierarchicalAgentLoop:
                     type=EventType.TASK_STATUS_CHANGED,
                     data={"task_id": task.id, "status": TaskStatus.CANCELLED}
                 ))
+
+                # Phase 5.6: Save checkpoint on cancellation
+                self._save_error_checkpoint(
+                    task=task,
+                    error_reason="cancelled_after_llm",
+                    session_id=session.id,
+                    iteration=iteration + 1
+                )
+
                 return LoopResult(
                     success=False,
                     iterations=iteration + 1
@@ -324,6 +443,12 @@ class HierarchicalAgentLoop:
                     "tool": call.function.name,
                     "result": result.output if result.success else f"ERROR: {result.error}"
                 })
+
+                # Phase 5.6: Track tool calls for stuck detection
+                args_hash = hash(str(call.function.arguments))
+                tool_call_history.append((call.function.name, args_hash))
+                if len(tool_call_history) > 10:  # Keep only recent history
+                    tool_call_history.pop(0)
 
                 log.info("tool_executed",
                          task_id=task.id,
@@ -431,16 +556,75 @@ class HierarchicalAgentLoop:
                                task_id=task.id,
                                message="Agent marked complete but tools were just executed - continuing")
 
-            # Check stuck
+            # Check stuck (Phase 5.6: Enhanced detection with escalation)
             recent_responses.append(assistant_content)
             if len(recent_responses) > self.config.stuck_threshold:
                 recent_responses.pop(0)
 
-            if self._is_stuck(recent_responses):
-                log.warning("stuck_detected", task_id=task.id)
-                session.add_turn("user", "You seem stuck. Try a different approach or ask for clarification.")
+            is_stuck, stuck_reason = self._is_stuck(recent_responses, tool_call_history)
+            if is_stuck:
+                nudge_count += 1
+                log.warning("stuck_detected",
+                           task_id=task.id,
+                           reason=stuck_reason,
+                           nudge_count=nudge_count,
+                           max_nudges=self.config.max_nudges)
+
+                # Check if we should escalate (fail) instead of nudging
+                if nudge_count >= self.config.max_nudges:
+                    # Emit error event for TUI
+                    self.event_bus.emit(Event(
+                        type=EventType.ERROR,
+                        data={
+                            "task_id": task.id,
+                            "error_type": "agent_stuck",
+                            "reason": stuck_reason,
+                            "nudge_count": nudge_count,
+                            "suggestion": "Consider switching agent or replanning the task"
+                        },
+                        task_id=task.id
+                    ))
+
+                    task.status = TaskStatus.FAILED
+                    task.error = f"Agent stuck after {nudge_count} nudges (reason: {stuck_reason})"
+
+                    # Phase 5.6: Save checkpoint on stuck escalation
+                    self._save_error_checkpoint(
+                        task=task,
+                        error_reason=f"stuck_after_nudges:{stuck_reason}",
+                        session_id=session.id,
+                        iteration=iteration + 1,
+                        error_context={"nudge_count": nudge_count, "stuck_reason": stuck_reason}
+                    )
+
+                    return LoopResult(
+                        success=False,
+                        iterations=iteration + 1,
+                        reason=f"stuck_after_nudges:{stuck_reason}"
+                    )
+
+                # Generate context-specific nudge message
+                nudge_messages = {
+                    "exact_repeat": "You're repeating the same response. Try a different approach or use a different tool.",
+                    "high_similarity": "Your responses are very similar. Consider breaking down the problem differently.",
+                    "repeated_tool_calls": "You're calling the same tool repeatedly with the same arguments. Check if it's working or try something else.",
+                    "clarification_loop": "You've asked for clarification multiple times. Please proceed with your best interpretation of the task."
+                }
+                nudge_msg = nudge_messages.get(stuck_reason, "You seem stuck. Try a different approach.")
+                nudge_msg += f" ({self.config.max_nudges - nudge_count} nudge(s) remaining before task fails)"
+
+                session.add_turn("user", nudge_msg)
                 recent_responses.clear()
                 continue
+
+        # Phase 5.6: Save checkpoint when max iterations reached
+        self._save_error_checkpoint(
+            task=task,
+            error_reason="max_iterations_reached",
+            session_id=session.id,
+            iteration=agent.max_iterations,
+            error_context={"max_iterations": agent.max_iterations}
+        )
 
         return LoopResult(
             success=False,
@@ -493,11 +677,93 @@ class HierarchicalAgentLoop:
 
         return messages
 
-    def _is_stuck(self, responses: list[str]) -> bool:
-        """Detect if we're getting the same response repeatedly."""
+    def _is_stuck(self, responses: list[str], tool_history: list[tuple] = None) -> tuple[bool, str]:
+        """Enhanced stuck detection with multiple heuristics.
+
+        Phase 5.6: Improved detection beyond exact string matching.
+
+        Args:
+            responses: Recent assistant responses
+            tool_history: Recent tool calls as (name, args_hash) tuples
+
+        Returns:
+            (is_stuck: bool, reason: str) - reason explains why stuck
+        """
         if len(responses) < self.config.stuck_threshold:
+            return False, ""
+
+        recent = responses[-self.config.stuck_threshold:]
+
+        # 1. Exact match detection (existing behavior)
+        if len(set(recent)) == 1:
+            return True, "exact_repeat"
+
+        # 2. High similarity detection (word overlap)
+        if self._high_similarity(recent):
+            return True, "high_similarity"
+
+        # 3. Tool call repetition (same tool with same args 3+ times)
+        if tool_history and self._repeated_tool_calls(tool_history):
+            return True, "repeated_tool_calls"
+
+        # 4. Clarification loop (agent keeps asking for clarification)
+        clarification_patterns = [
+            "what would you like",
+            "please clarify",
+            "could you specify",
+            "can you provide more",
+            "i need more information",
+            "please provide",
+        ]
+        if all(any(p in r.lower() for p in clarification_patterns) for r in recent):
+            return True, "clarification_loop"
+
+        return False, ""
+
+    def _high_similarity(self, responses: list[str]) -> bool:
+        """Check if responses have high word overlap (>80%).
+
+        Args:
+            responses: List of response strings
+
+        Returns:
+            True if all responses are highly similar
+        """
+        if len(responses) < 2:
             return False
-        return len(set(responses)) == 1
+
+        # Tokenize into words
+        word_sets = [set(r.lower().split()) for r in responses]
+
+        # Remove very common words that don't indicate real similarity
+        common_words = {"the", "a", "an", "is", "are", "to", "for", "and", "or", "i"}
+        word_sets = [words - common_words for words in word_sets]
+
+        # Check overlap between consecutive responses
+        base = word_sets[0]
+        for other in word_sets[1:]:
+            if not base or not other:
+                return False
+            overlap = len(base & other) / max(len(base | other), 1)
+            if overlap < self.config.similarity_threshold:
+                return False
+
+        return True
+
+    def _repeated_tool_calls(self, tool_history: list[tuple]) -> bool:
+        """Check if the same tool is called with same args repeatedly.
+
+        Args:
+            tool_history: List of (tool_name, args_hash) tuples
+
+        Returns:
+            True if same tool call repeated 3+ times consecutively
+        """
+        if len(tool_history) < 3:
+            return False
+
+        recent = tool_history[-3:]
+        return len(set(recent)) == 1
 
     def _validate_completion(self, session, task, final_response: str) -> bool:
         """Validate that a completion marker is legitimate.
@@ -576,3 +842,53 @@ class HierarchicalAgentLoop:
             "role": "system",
             "content": full_prompt
         }
+
+    def _save_error_checkpoint(
+        self,
+        task: Task,
+        error_reason: str,
+        session_id: str = None,
+        iteration: int = 0,
+        error_context: dict = None
+    ):
+        """Save checkpoint on error for recovery.
+
+        Phase 5.6: Save state when errors occur for crash recovery.
+
+        Args:
+            task: The task that failed
+            error_reason: Why the task failed
+            session_id: Session ID if available
+            iteration: Current iteration number
+            error_context: Additional error context
+        """
+        if not self.recovery:
+            return
+
+        try:
+            checkpoint_data = {
+                "task": {
+                    "id": task.id,
+                    "description": task.description,
+                    "assigned_agent": task.assigned_agent,
+                    "parent_id": task.parent_id,
+                    "context": task.context
+                },
+                "error": {
+                    "reason": error_reason,
+                    "context": error_context or {}
+                },
+                "session_id": session_id,
+                "iterations": iteration,
+                "timestamp": datetime.now().isoformat()
+            }
+
+            self.recovery.save_checkpoint(task.id, checkpoint_data)
+            log.info("error_checkpoint_saved",
+                    task_id=task.id,
+                    error_reason=error_reason)
+
+        except Exception as e:
+            log.warning("error_checkpoint_failed",
+                       task_id=task.id,
+                       error=str(e))

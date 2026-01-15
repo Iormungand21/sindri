@@ -25,6 +25,9 @@ class LoopConfig:
     completion_marker: str = "<sindri:complete/>"
     stuck_threshold: int = 3
     checkpoint_interval: int = 5
+    # Phase 5.6: Enhanced stuck detection
+    max_nudges: int = 3  # Maximum nudges before escalating to failure
+    similarity_threshold: float = 0.8  # Word overlap ratio for similarity detection
 
 
 @dataclass
