@@ -1,19 +1,29 @@
 # Sindri Project Status Report
-**Date:** 2026-01-15 (Phase 7.4 Complete!)
-**Session:** Phase 7.4 Codebase Understanding - Full Implementation
+**Date:** 2026-01-15 (Phase 8.1 Complete!)
+**Session:** Phase 8.1 Plugin System - Full Implementation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 7.4 Complete! 🎉
-**Just Completed:** Codebase Understanding system ✓ (2026-01-15)
-**Test Status:** 448/448 tests, **448 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 8.1 Complete! 🎉
+**Just Completed:** Plugin System ✓ (2026-01-15)
+**Test Status:** 487/487 tests, **487 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 8.1 (Plugin System) or Phase 8.2 (Agent Marketplace)
+**Next Priority:** Phase 8.2 (Agent Marketplace) or Phase 8.3 (Web UI)
 
-**Key New Features (Phase 7.4 - Codebase Understanding):**
+**Key New Features (Phase 8.1 - Plugin System):**
+- **PluginLoader** - Auto-discovers tool plugins (*.py) and agent configs (*.toml)
+- **PluginValidator** - Safety validation (dangerous imports, eval, security checks)
+- **PluginManager** - Orchestrates discovery, validation, and registration
+- **Custom Tools** - Python classes extending Tool base class
+- **Custom Agents** - TOML config files for agent definitions with prompts
+- **CLI Commands** - `sindri plugins list`, `sindri plugins validate`, `sindri plugins init`
+- **Template Generation** - Create tool/agent templates with `sindri plugins init --tool/--agent`
+- **39 new tests** - Comprehensive plugin system coverage
+
+**Previous Features (Phase 7.4 - Codebase Understanding):**
 - **DependencyAnalyzer** - Parse imports, build dependency graphs, detect circular deps
 - **ArchitectureDetector** - Detect patterns (layered, modular, MVC), frameworks, project types
 - **StyleAnalyzer** - Extract coding conventions, docstring style, type hints, formatters
@@ -91,11 +101,12 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (448/448 passing!)
+# Run all tests (487/487 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_codebase_understanding.py -v  # Phase 7.4 codebase tests (NEW!)
+.venv/bin/pytest tests/test_plugins.py -v                 # Phase 8.1 plugin tests (NEW!)
+.venv/bin/pytest tests/test_codebase_understanding.py -v  # Phase 7.4 codebase tests
 .venv/bin/pytest tests/test_learning.py -v                # Phase 7.2 learning tests
 .venv/bin/pytest tests/test_streaming.py -v               # Phase 6.3 streaming tests
 .venv/bin/pytest tests/test_planning.py -v                # Phase 7.3 planning tests
@@ -113,6 +124,10 @@
 .venv/bin/sindri agents              # List all agents
 .venv/bin/sindri sessions            # List recent sessions
 .venv/bin/sindri doctor --verbose    # Check system health
+.venv/bin/sindri plugins list        # List installed plugins (NEW!)
+.venv/bin/sindri plugins dirs        # Show plugin directories (NEW!)
+.venv/bin/sindri plugins init --tool my_tool    # Create tool template (NEW!)
+.venv/bin/sindri plugins init --agent my_agent  # Create agent template (NEW!)
 
 # Test orchestration (with parallel execution + model caching + learning + codebase understanding)
 .venv/bin/sindri orchestrate "Create a Python function and write tests for it"
@@ -124,13 +139,83 @@
 **For New Developer/Agent:**
 1. **Start here:** Read this STATUS.md - current state, what works, what's next
 2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
-3. **Roadmap:** See ROADMAP.md for Phase 8.1 (Plugin System) or Phase 8.2 (Agent Marketplace)
-4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 448 tests should pass
+3. **Roadmap:** See ROADMAP.md for Phase 8.2 (Agent Marketplace) or Phase 8.3 (Web UI)
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 487 tests should pass
 5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
+6. **Plugin system:** Try `sindri plugins list` and `sindri plugins init --tool example`
 
 ---
 
-## 📊 Session Summary (2026-01-15 - Phase 7.4 Codebase Understanding)
+## 📊 Session Summary (2026-01-15 - Phase 8.1 Plugin System)
+
+### ✅ Phase 8.1 Complete - Plugin System Implemented! 🎉
+
+**Implementation Time:** ~1.5 hours
+
+**Core Changes:**
+
+1. **Plugin Module** (`sindri/plugins/` - NEW)
+   - `__init__.py` - Module exports and documentation
+   - `loader.py` - Plugin discovery from filesystem (*.py tools, *.toml agents)
+   - `validator.py` - Safety validation (dangerous imports, eval, security patterns)
+   - `manager.py` - Orchestrates discovery, validation, registration
+
+2. **Key Classes**
+   - `PluginLoader` - Discovers plugins from ~/.sindri/plugins/ and ~/.sindri/agents/
+   - `PluginValidator` - Validates plugins for safety (blocks subprocess, pickle, eval, etc.)
+   - `PluginManager` - Full lifecycle management (discover → validate → register)
+   - `PluginInfo` - Metadata about discovered plugins
+   - `ValidationResult` - Detailed validation results with errors/warnings
+
+3. **Custom Tool Support**
+   - Python files extending `Tool` base class
+   - Auto-discovery of Tool subclasses via AST parsing
+   - Dynamic module loading with safety checks
+   - Work directory support for plugin tools
+
+4. **Custom Agent Support**
+   - TOML configuration files for agent definitions
+   - Support for external prompt files
+   - All AgentDefinition fields configurable
+   - Delegation and fallback model support
+
+5. **CLI Commands**
+   - `sindri plugins list` - List installed plugins with status
+   - `sindri plugins validate <path>` - Validate a plugin file
+   - `sindri plugins init --tool <name>` - Create tool template
+   - `sindri plugins init --agent <name>` - Create agent template
+   - `sindri plugins dirs` - Show plugin directories
+
+6. **Safety Features**
+   - Blocks dangerous imports: subprocess, socket, pickle, ctypes, etc.
+   - Detects dangerous calls: eval, exec, compile, __import__
+   - Warns about direct file access (prefer Sindri tools)
+   - Name conflict detection with existing tools/agents
+   - Strict mode treats warnings as errors
+
+**Files Created:**
+- `sindri/plugins/__init__.py` (50 lines) - Module exports
+- `sindri/plugins/loader.py` (320 lines) - Plugin discovery
+- `sindri/plugins/validator.py` (350 lines) - Safety validation
+- `sindri/plugins/manager.py` (280 lines) - Lifecycle management
+- `tests/test_plugins.py` (900 lines) - 39 comprehensive tests
+
+**Files Modified:**
+- `sindri/cli.py` (+180 lines) - Plugin CLI commands
+- `pyproject.toml` (+1 line) - Added toml dependency
+
+**Test Results:**
+- **Before:** 448/448 tests passing (100%)
+- **After:** 487/487 tests passing (100%) 🎉
+- **New Tests:** 39 tests (all passing)
+
+**Plugin Locations:**
+- Tools: `~/.sindri/plugins/*.py`
+- Agents: `~/.sindri/agents/*.toml`
+
+---
+
+## 📊 Previous Session Summary (2026-01-15 - Phase 7.4 Codebase Understanding)
 
 ### ✅ Phase 7.4 Complete - Codebase Understanding Implemented! 🎉
 
@@ -1288,27 +1373,27 @@ export SINDRI_LOG_LEVEL=DEBUG
 **Project Location:** `/home/ryan/projects/sindri`
 **Virtual Environment:** `.venv/`
 **Data Directory:** `~/.sindri/`
+**Plugin Directories:** `~/.sindri/plugins/` and `~/.sindri/agents/`
 
-**This Session By:** Claude Opus 4.5 (2026-01-15 - Phase 7.4 Complete!)
-**Session Focus:** Phase 7.4 Codebase Understanding - Full implementation
+**This Session By:** Claude Opus 4.5 (2026-01-15 - Phase 8.1 Complete!)
+**Session Focus:** Phase 8.1 Plugin System - Full implementation
 **Session Duration:** ~1.5 hours
-**Lines Added:** ~2100 lines
+**Lines Added:** ~2000 lines
 **Files Created:**
-- `sindri/analysis/__init__.py` (20 lines) - Module exports
-- `sindri/analysis/results.py` (380 lines) - Data models
-- `sindri/analysis/dependencies.py` (280 lines) - Dependency analyzer
-- `sindri/analysis/architecture.py` (300 lines) - Architecture detector
-- `sindri/analysis/style.py` (320 lines) - Style analyzer
-- `sindri/memory/codebase.py` (350 lines) - Storage and coordinator
-- `tests/test_codebase_understanding.py` (700 lines, 41 tests)
+- `sindri/plugins/__init__.py` (50 lines) - Module exports
+- `sindri/plugins/loader.py` (320 lines) - Plugin discovery
+- `sindri/plugins/validator.py` (350 lines) - Safety validation
+- `sindri/plugins/manager.py` (280 lines) - Lifecycle management
+- `tests/test_plugins.py` (900 lines, 39 tests)
 **Files Modified:**
-- `sindri/memory/system.py` - Five-tier memory integration
-**Tests Added:** 41 tests (all passing)
-**Impact:** Phase 7.4 COMPLETE! 448/448 tests passing (100%) 🎉
+- `sindri/cli.py` (+180 lines) - Plugin CLI commands
+- `pyproject.toml` (+1 line) - Added toml dependency
+**Tests Added:** 39 tests (all passing)
+**Impact:** Phase 8.1 COMPLETE! 487/487 tests passing (100%) 🎉
 
-**Previous Session By:** Claude Opus 4.5 (2026-01-15 - Phase 7.2 Complete!)
-**Session Focus:** Phase 7.2 Learning from Success - Full implementation
-**Impact:** 407/407 tests passing (100%)
+**Previous Session By:** Claude Opus 4.5 (2026-01-15 - Phase 7.4 Complete!)
+**Session Focus:** Phase 7.4 Codebase Understanding - Full implementation
+**Impact:** 448/448 tests passing (100%)
 
 **Earlier Sessions (2026-01-14):**
 - Phase 7.3 Interactive Planning (~1 hour, 28 tests)
@@ -1338,6 +1423,6 @@ export SINDRI_LOG_LEVEL=DEBUG
 
 ---
 
-**Status:** ✅ PRODUCTION READY (100%) - Phase 7.4 COMPLETE! 🎉
-**Last Updated:** 2026-01-15 - Phase 7.4 Codebase Understanding Session
-**Next Session Goal:** Phase 8.1 - Plugin System or Phase 8.2 - Agent Marketplace
+**Status:** ✅ PRODUCTION READY (100%) - Phase 8.1 COMPLETE! 🎉
+**Last Updated:** 2026-01-15 - Phase 8.1 Plugin System Session
+**Next Session Goal:** Phase 8.2 - Agent Marketplace or Phase 8.3 - Web UI

@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Phase 7.4 COMPLETE!** (v0.1.0) - Codebase understanding system. **100% production ready.** 448/448 tests passing (100%). Ready for Phase 8.1 (Plugin System) or Phase 8.2 (Agent Marketplace).
+**Current Status:** ✅ **Phase 8.1 COMPLETE!** (v0.1.0) - Plugin system for extensibility. **100% production ready.** 487/487 tests passing (100%). Ready for Phase 8.2 (Agent Marketplace) or Phase 8.3 (Web UI).
 
 ---
 
@@ -11,19 +11,24 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ Phase 7.4 COMPLETE - Codebase understanding (dependency, architecture, style analysis)
-- ✅ 448/448 tests passing (100%)
+- ✅ Phase 8.1 COMPLETE - Plugin system for user-defined tools and agents
+- ✅ 487/487 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 448 passed
+.venv/bin/pytest tests/ -v           # Should see 487 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
 .venv/bin/sindri tui                 # Launch TUI (Ctrl+C to exit)
+
+# Test plugins (NEW!)
+.venv/bin/sindri plugins list        # List installed plugins
+.venv/bin/sindri plugins dirs        # Show plugin directories
+.venv/bin/sindri plugins init --tool my_tool  # Create tool template
 
 # Test a simple task
 .venv/bin/sindri run "Create test.txt with hello"
@@ -32,12 +37,12 @@
 ### Essential Reading
 1. **STATUS.md** - Detailed current state, what works, what doesn't
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
-3. **This file** - See "Phase 8.1 Plugin System" for next priority
+3. **This file** - See "Phase 8.2 Agent Marketplace" for next priority
 
-### Recommended Next: Phase 8.1 - Plugin System
-- **Phase 8.1 Goal:** User-defined tools and agents via plugin system
-- **Effort:** 1-2 days
-- **Impact:** HIGH - Extensibility for custom workflows
+### Recommended Next: Phase 8.2 - Agent Marketplace
+- **Phase 8.2 Goal:** Share and discover community plugins
+- **Effort:** 2-3 days
+- **Impact:** MEDIUM - Community plugin ecosystem
 
 ### Need Help?
 - Check tests for examples: `tests/test_*.py`
@@ -808,58 +813,83 @@ After: Parallel = 20s (2x faster, shared model = 5GB total)
 ## Phase 8: Extensibility & Platform 🔧
 **Goal:** Make Sindri customizable and shareable
 
-### 8.1 Plugin System (High Priority)
+### ✅ 8.1 Plugin System (COMPLETED 2026-01-15)
+
+**Status:** ✅ Implemented and tested with 39 new tests
 
 **Concept:** Users can add custom tools and agents without modifying Sindri
 
-#### Plugin Structure:
+#### Implementation Summary:
+
+**PluginLoader** (`sindri/plugins/loader.py`):
+- ✅ Auto-discovers plugins from `~/.sindri/plugins/*.py` and `~/.sindri/agents/*.toml`
+- ✅ AST-based Tool class detection
+- ✅ Dynamic module loading
+- ✅ TOML agent config parsing
+
+**PluginValidator** (`sindri/plugins/validator.py`):
+- ✅ Dangerous import detection (subprocess, pickle, socket, etc.)
+- ✅ Dangerous call detection (eval, exec, compile)
+- ✅ Name conflict checking
+- ✅ Model availability warnings
+- ✅ Strict mode (warnings as errors)
+
+**PluginManager** (`sindri/plugins/manager.py`):
+- ✅ Full lifecycle: discover → validate → register
+- ✅ Tool registration with ToolRegistry
+- ✅ Agent registration with AGENTS dict
+- ✅ State tracking (discovered, validated, loaded, failed)
+
+**CLI Commands** (`sindri/cli.py`):
+- ✅ `sindri plugins list` - List installed plugins
+- ✅ `sindri plugins validate <path>` - Validate a plugin
+- ✅ `sindri plugins init --tool <name>` - Create tool template
+- ✅ `sindri plugins init --agent <name>` - Create agent template
+- ✅ `sindri plugins dirs` - Show plugin directories
+
+#### Example Tool Plugin:
 
 ```python
-# ~/.sindri/plugins/my_plugin.py
-from sindri.tools import Tool, ToolResult
+# ~/.sindri/plugins/my_tool.py
+from sindri.tools.base import Tool, ToolResult
 
 class MyCustomTool(Tool):
-    @property
-    def schema(self):
-        return {
-            "name": "my_tool",
-            "description": "Does something custom",
-            "parameters": {...}
-        }
+    name = "my_tool"
+    description = "Does something custom"
+    parameters = {
+        "type": "object",
+        "properties": {"input": {"type": "string"}}
+    }
 
-    async def execute(self, **params) -> ToolResult:
-        # Custom logic
-        return ToolResult(success=True, output="...")
-
-# Auto-discovered and registered
+    async def execute(self, input: str, **kwargs) -> ToolResult:
+        return ToolResult(success=True, output=f"Result: {input}")
 ```
 
-#### Custom Agents:
+#### Example Agent Config:
 
 ```toml
-# ~/.sindri/agents/my_agent.toml
+# ~/.sindri/agents/thor.toml
 [agent]
 name = "thor"
 role = "Performance Optimizer"
 model = "qwen2.5-coder:14b"
-tools = ["read_file", "write_file", "my_tool"]
+tools = ["read_file", "write_file", "shell"]
 max_iterations = 30
 
 [prompt]
-file = "thor_prompt.txt"
+content = "You are Thor, the performance optimizer..."
 ```
 
-**Discovery:**
-- Scan `~/.sindri/plugins/` on startup
-- Validate plugin structure
-- Register tools/agents dynamically
-- Handle errors gracefully
+**Files Created:**
+- `sindri/plugins/__init__.py` (50 lines)
+- `sindri/plugins/loader.py` (320 lines)
+- `sindri/plugins/validator.py` (350 lines)
+- `sindri/plugins/manager.py` (280 lines)
+- `tests/test_plugins.py` (900 lines, 39 tests)
 
-**Files:**
-- `sindri/plugins/loader.py` - Plugin discovery
-- `sindri/plugins/validator.py` - Plugin validation
-- `sindri/plugins/api.py` - Plugin API documentation
-- Documentation: `docs/PLUGINS.md`
+**Test Results:**
+- 39 new tests added (all passing)
+- Total: 487/487 tests passing (100%)
 
 ---
 
@@ -1031,8 +1061,9 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Interactive planning~~ | Medium | Medium | ✅ Complete | 7.3 | Done 2026-01-14 |
 | ~~Learning system~~ | Medium | High | ✅ Complete | 7.2 | Done 2026-01-15 |
 | ~~Codebase understanding~~ | High | Medium | ✅ Complete | 7.4 | Done 2026-01-15 |
+| ~~Plugin system~~ | Medium | High | ✅ Complete | 8.1 | Done 2026-01-15 |
 | TUI enhancements | Medium | Medium | 🟡 Later | 5.5 | History/export |
-| Plugin system | Medium | High | 🟢 Next | 8.1 | Future |
+| Agent Marketplace | Medium | High | 🟢 Next | 8.2 | Future |
 | Web UI | High | Very High | 🟢 Later | 8.3 | Future |
 
 ---
@@ -1171,6 +1202,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 8.1 | ✅ **Phase 8.1 COMPLETE!** Plugin system for user-defined tools and agents (39 tests) |
 | 2026-01-15 | 7.4 | ✅ **Phase 7.4 COMPLETE!** Codebase understanding system (41 tests) |
 | 2026-01-15 | 7.2 | ✅ **Phase 7.2 COMPLETE!** Learning from success pattern system (35 tests) |
 | 2026-01-14 | 7.3 | ✅ **Phase 7.3 COMPLETE!** Interactive planning with execution plans (28 tests) |
@@ -1196,6 +1228,25 @@ All high-impact, low-effort improvements completed!
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 PHASE 8.1: COMPLETE!** (2026-01-15)
+
+Plugin system for extensibility:
+1. ✅ **PluginLoader** - Auto-discover tools (*.py) and agents (*.toml) from ~/.sindri/
+2. ✅ **PluginValidator** - Safety checks (blocks eval, subprocess, pickle, etc.)
+3. ✅ **PluginManager** - Full lifecycle management (discover → validate → register)
+4. ✅ **Custom Tools** - Python classes extending Tool base class
+5. ✅ **Custom Agents** - TOML config files with agent definitions
+6. ✅ **CLI Commands** - list, validate, init --tool/--agent, dirs
+7. ✅ **39 new tests** - Comprehensive plugin system coverage
+
+**Impact:**
+- Test coverage: 448 → 487 tests (+39 tests, 100% passing)
+- Users can extend Sindri without modifying core code
+- Safe plugin execution with security validation
+- Template generation for easy plugin creation
+
+---
 
 **🎉 PHASE 7.4: COMPLETE!** (2026-01-15)
 

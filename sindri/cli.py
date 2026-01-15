@@ -454,5 +454,332 @@ def _print_check(num: int, check):
             console.print(f"   [dim]{line}[/dim]")
 
 
+@cli.group()
+def plugins():
+    """Manage Sindri plugins."""
+    pass
+
+
+@plugins.command("list")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def plugins_list(verbose: bool = False):
+    """List installed plugins."""
+    from pathlib import Path
+    from rich.table import Table
+    from sindri.plugins import PluginManager, PluginType, PluginState
+
+    manager = PluginManager()
+
+    # Ensure directories exist
+    manager.ensure_directories()
+
+    # Discover plugins
+    manager.discover()
+
+    # Validate all
+    from sindri.agents.registry import AGENTS
+    from sindri.tools.registry import ToolRegistry
+
+    existing_tools = set(ToolRegistry.default()._tools.keys())
+    existing_agents = set(AGENTS.keys())
+
+    manager.validate_all(existing_tools=existing_tools, existing_agents=existing_agents)
+
+    plugins = manager.get_all_plugins()
+
+    if not plugins:
+        console.print("[yellow]No plugins found.[/yellow]")
+        console.print(f"\n[dim]Plugin directory: {manager.plugin_dir}[/dim]")
+        console.print(f"[dim]Agent config directory: {manager.agent_dir}[/dim]")
+        console.print("\n[dim]Create plugins in these directories to extend Sindri.[/dim]")
+        return
+
+    # Group by type
+    tools = [p for p in plugins if p.info.type == PluginType.TOOL]
+    agents = [p for p in plugins if p.info.type == PluginType.AGENT]
+
+    # Tool plugins table
+    if tools:
+        table = Table(title="🔧 Tool Plugins", show_header=True, header_style="bold cyan")
+        table.add_column("Name", style="cyan", width=20)
+        table.add_column("Status", width=12)
+        table.add_column("Description", width=40)
+        if verbose:
+            table.add_column("Path", style="dim", width=30)
+
+        for p in tools:
+            status_color = "green" if p.state == PluginState.VALIDATED else "red"
+            status_text = p.state.name.lower()
+
+            row = [
+                p.info.name,
+                f"[{status_color}]{status_text}[/{status_color}]",
+                p.info.description[:40] if p.info.description else "",
+            ]
+            if verbose:
+                row.append(str(p.info.path))
+
+            table.add_row(*row)
+
+        console.print(table)
+        console.print()
+
+    # Agent plugins table
+    if agents:
+        table = Table(title="🤖 Agent Plugins", show_header=True, header_style="bold magenta")
+        table.add_column("Name", style="magenta", width=15)
+        table.add_column("Status", width=12)
+        table.add_column("Model", style="yellow", width=25)
+        table.add_column("Role", width=35)
+        if verbose:
+            table.add_column("Path", style="dim", width=30)
+
+        for p in agents:
+            status_color = "green" if p.state == PluginState.VALIDATED else "red"
+            status_text = p.state.name.lower()
+
+            model = ""
+            role = ""
+            if p.info.agent_config:
+                model = p.info.agent_config.get("model", "")
+                role = p.info.agent_config.get("role", "")
+
+            row = [
+                p.info.name,
+                f"[{status_color}]{status_text}[/{status_color}]",
+                model,
+                role[:35] if role else "",
+            ]
+            if verbose:
+                row.append(str(p.info.path))
+
+            table.add_row(*row)
+
+        console.print(table)
+
+    # Show failed plugins
+    failed = manager.get_failed_plugins()
+    if failed:
+        console.print("\n[bold red]Failed Plugins:[/bold red]")
+        for p in failed:
+            console.print(f"  ✗ {p.info.name}: {p.error}")
+
+    # Summary
+    counts = manager.get_plugin_count()
+    console.print(f"\n[dim]Total: {len(plugins)} plugins ({counts.get('VALIDATED', 0)} validated, {counts.get('FAILED', 0)} failed)[/dim]")
+
+
+@plugins.command("validate")
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--strict", is_flag=True, help="Treat warnings as errors")
+def plugins_validate(path: str, strict: bool = False):
+    """Validate a plugin file."""
+    from pathlib import Path
+    from sindri.plugins.validator import validate_plugin_file
+    from sindri.agents.registry import AGENTS
+    from sindri.tools.registry import ToolRegistry
+
+    plugin_path = Path(path)
+    console.print(f"[bold]Validating plugin: {plugin_path.name}[/bold]\n")
+
+    existing_tools = set(ToolRegistry.default()._tools.keys())
+    existing_agents = set(AGENTS.keys())
+
+    result = validate_plugin_file(
+        plugin_path,
+        existing_tools=existing_tools,
+        existing_agents=existing_agents,
+        strict=strict
+    )
+
+    # Show errors
+    if result.errors:
+        console.print("[bold red]Errors:[/bold red]")
+        for error_type, message in result.errors:
+            console.print(f"  ✗ {message}")
+        console.print()
+
+    # Show warnings
+    if result.warnings:
+        console.print("[bold yellow]Warnings:[/bold yellow]")
+        for warning in result.warnings:
+            console.print(f"  ⚠ {warning}")
+        console.print()
+
+    # Show info
+    if result.info:
+        console.print("[bold blue]Info:[/bold blue]")
+        for info in result.info:
+            console.print(f"  ℹ {info}")
+        console.print()
+
+    # Overall result
+    if result.valid:
+        console.print("[bold green]✓ Plugin is valid![/bold green]")
+    else:
+        console.print("[bold red]✗ Plugin validation failed[/bold red]")
+
+
+@plugins.command("init")
+@click.option("--tool", is_flag=True, help="Create a tool plugin template")
+@click.option("--agent", is_flag=True, help="Create an agent config template")
+@click.argument("name", required=False)
+def plugins_init(tool: bool, agent: bool, name: str = None):
+    """Create a plugin template."""
+    from pathlib import Path
+    from sindri.plugins import PluginManager
+
+    manager = PluginManager()
+    manager.ensure_directories()
+
+    if not tool and not agent:
+        console.print("[yellow]Specify --tool or --agent to create a template[/yellow]")
+        console.print("\nExamples:")
+        console.print("  sindri plugins init --tool my_tool")
+        console.print("  sindri plugins init --agent my_agent")
+        return
+
+    if tool:
+        plugin_name = name or "example_tool"
+        plugin_path = manager.plugin_dir / f"{plugin_name}.py"
+
+        if plugin_path.exists():
+            console.print(f"[red]File already exists: {plugin_path}[/red]")
+            return
+
+        template = f'''"""Example tool plugin for Sindri.
+
+This is a template for creating custom tools.
+"""
+
+__version__ = "0.1.0"
+__author__ = "Your Name"
+
+from sindri.tools.base import Tool, ToolResult
+
+
+class {plugin_name.title().replace("_", "")}Tool(Tool):
+    """A custom tool that does something useful."""
+
+    name = "{plugin_name}"
+    description = "Description of what this tool does"
+    parameters = {{
+        "type": "object",
+        "properties": {{
+            "input": {{
+                "type": "string",
+                "description": "The input to process"
+            }}
+        }},
+        "required": ["input"]
+    }}
+
+    async def execute(self, input: str, **kwargs) -> ToolResult:
+        """Execute the tool.
+
+        Args:
+            input: The input to process
+
+        Returns:
+            ToolResult with success status and output
+        """
+        try:
+            # Your tool logic here
+            result = f"Processed: {{input}}"
+
+            return ToolResult(
+                success=True,
+                output=result
+            )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                output="",
+                error=str(e)
+            )
+'''
+        plugin_path.write_text(template)
+        console.print(f"[green]✓ Created tool template: {plugin_path}[/green]")
+        console.print(f"\n[dim]Edit the file to implement your custom tool.[/dim]")
+
+    if agent:
+        agent_name = name or "example_agent"
+        agent_path = manager.agent_dir / f"{agent_name}.toml"
+
+        if agent_path.exists():
+            console.print(f"[red]File already exists: {agent_path}[/red]")
+            return
+
+        template = f'''# Custom agent configuration for Sindri
+# See documentation for all available options
+
+[metadata]
+version = "0.1.0"
+author = "Your Name"
+
+[agent]
+name = "{agent_name}"
+role = "Description of the agent's role"
+model = "qwen2.5-coder:7b"
+tools = ["read_file", "write_file", "shell"]
+max_iterations = 30
+estimated_vram_gb = 5.0
+temperature = 0.3
+
+# Optional delegation settings
+can_delegate = false
+delegate_to = []
+
+# Optional fallback model
+# fallback_model = "qwen2.5:3b-instruct-q8_0"
+# fallback_vram_gb = 3.0
+
+[prompt]
+content = """You are {agent_name}, a specialized agent for Sindri.
+
+Your role is to... (describe the agent's purpose and behavior)
+
+Guidelines:
+1. Be concise and focused
+2. Use the available tools effectively
+3. Report results clearly
+
+When your task is complete, include <sindri:complete/> in your response.
+"""
+'''
+        agent_path.write_text(template)
+        console.print(f"[green]✓ Created agent template: {agent_path}[/green]")
+        console.print(f"\n[dim]Edit the file to customize your agent.[/dim]")
+
+
+@plugins.command("dirs")
+def plugins_dirs():
+    """Show plugin directories."""
+    from sindri.plugins import PluginManager
+
+    manager = PluginManager()
+
+    console.print("[bold]Plugin Directories:[/bold]\n")
+    console.print(f"  📂 Tool plugins:  {manager.plugin_dir}")
+    console.print(f"  📂 Agent configs: {manager.agent_dir}")
+
+    # Show if directories exist
+    tool_exists = manager.plugin_dir.exists()
+    agent_exists = manager.agent_dir.exists()
+
+    console.print()
+    if tool_exists:
+        tool_count = len(list(manager.plugin_dir.glob("*.py")))
+        console.print(f"  [green]✓[/green] Tool directory exists ({tool_count} .py files)")
+    else:
+        console.print(f"  [yellow]⚠[/yellow] Tool directory doesn't exist (run 'sindri plugins init' to create)")
+
+    if agent_exists:
+        agent_count = len(list(manager.agent_dir.glob("*.toml")))
+        console.print(f"  [green]✓[/green] Agent directory exists ({agent_count} .toml files)")
+    else:
+        console.print(f"  [yellow]⚠[/yellow] Agent directory doesn't exist (run 'sindri plugins init' to create)")
+
+
 if __name__ == "__main__":
     cli()
