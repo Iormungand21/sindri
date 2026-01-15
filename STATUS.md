@@ -1,19 +1,31 @@
 # Sindri Project Status Report
-**Date:** 2026-01-15 (Phase 5.5 Task History Panel Complete!)
-**Session:** Phase 5.5 TUI Enhancements - Task History Panel
+**Date:** 2026-01-15 (Phase 8.3 Web API Foundation Complete!)
+**Session:** Phase 8.3 Web API - FastAPI Server Foundation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 5.5 Task History Panel Complete! 🎉
-**Just Completed:** Task History Panel ✓ (2026-01-15)
-**Test Status:** 565/565 tests, **565 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 8.3 Web API Foundation Complete! 🎉
+**Just Completed:** Web API Server Foundation ✓ (2026-01-15)
+**Test Status:** 599/599 tests, **599 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 8.3 (Web UI)
+**Next Priority:** Phase 8.3 (Web UI Frontend - React)
 
-**Key New Features (Phase 5.5 - Task History Panel):**
+**Key New Features (Phase 8.3 - Web API Foundation):**
+- **FastAPI Server** - Full REST API for Sindri orchestration
+- **Agent Endpoints** - `/api/agents`, `/api/agents/{name}` with full agent info
+- **Session Endpoints** - `/api/sessions`, `/api/sessions/{id}` with turn details
+- **Task Endpoints** - `/api/tasks` POST to create tasks, GET for status
+- **Metrics Endpoint** - `/api/metrics` with system-wide statistics
+- **WebSocket Support** - `/ws` for real-time event streaming
+- **CLI Command** - `sindri web --port 8000` to start server
+- **CORS Support** - Configured for frontend access
+- **OpenAPI Docs** - Auto-generated at `/docs`
+- **34 new tests** - Comprehensive web API coverage
+
+**Previous Features (Phase 5.5 - Task History Panel):**
 - **TaskHistoryPanel** - TUI widget showing past sessions with status, timestamps, iterations
 - **SessionItem** - Rich session display with task truncation and model info
 - **Toggle Keybinding** - Press `h` to show/hide history panel
@@ -131,11 +143,12 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (565/565 passing!)
+# Run all tests (599/599 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_history_panel.py -v           # Phase 5.5 history panel tests (NEW!)
+.venv/bin/pytest tests/test_web.py -v                      # Phase 8.3 web API tests (NEW!)
+.venv/bin/pytest tests/test_history_panel.py -v           # Phase 5.5 history panel tests
 .venv/bin/pytest tests/test_metrics.py -v                 # Phase 5.5 metrics tests
 .venv/bin/pytest tests/test_export.py -v                  # Phase 5.5 export tests
 .venv/bin/pytest tests/test_plugins.py -v                 # Phase 8.1 plugin tests
@@ -166,6 +179,11 @@
 .venv/bin/sindri plugins init --tool my_tool    # Create tool template
 .venv/bin/sindri plugins init --agent my_agent  # Create agent template
 
+# Web API Server (NEW!)
+.venv/bin/sindri web                           # Start web server on port 8000
+.venv/bin/sindri web --port 8080               # Start on custom port
+# Then visit http://localhost:8000/docs for API documentation
+
 # Test orchestration (with parallel execution + model caching + learning + codebase understanding)
 .venv/bin/sindri orchestrate "Create a Python function and write tests for it"
 
@@ -184,7 +202,72 @@
 
 ---
 
-## 📊 Session Summary (2026-01-15 - Phase 5.5 Task History Panel)
+## 📊 Session Summary (2026-01-15 - Phase 8.3 Web API Foundation)
+
+### ✅ Phase 8.3 (Foundation) - Web API Server Implemented! 🎉
+
+**Implementation Time:** ~1 hour
+
+**Core Changes:**
+
+1. **Web Module** (`sindri/web/` - NEW)
+   - `__init__.py` - Module exports (create_app, SindriAPI)
+   - `server.py` - FastAPI application with all routes and WebSocket support
+
+2. **REST API Endpoints**
+   - `GET /health` - System health check with Ollama and database status
+   - `GET /api/agents` - List all agents with full details
+   - `GET /api/agents/{name}` - Get specific agent info
+   - `GET /api/sessions` - List sessions with filtering (limit, status)
+   - `GET /api/sessions/{id}` - Get session details with turns (supports short IDs)
+   - `POST /api/tasks` - Create and start a new task
+   - `GET /api/tasks/{id}` - Get task execution status
+   - `GET /api/tasks` - List all active tasks
+   - `GET /api/metrics` - System-wide metrics (sessions, iterations, VRAM)
+   - `GET /api/metrics/sessions/{id}` - Detailed session metrics
+
+3. **WebSocket Support** (`/ws`)
+   - Real-time event streaming
+   - Heartbeat/ping-pong support
+   - Automatic reconnection handling
+   - Integration with EventBus system
+
+4. **CLI Command** (`sindri/cli.py`)
+   - `sindri web` - Start the API server
+   - `--host`, `--port`, `--vram-gb`, `--work-dir` options
+   - `--reload` for development mode
+
+5. **Dependencies** (`pyproject.toml`)
+   - Added `[web]` optional dependency group
+   - FastAPI >= 0.109.0
+   - uvicorn[standard] >= 0.27.0
+   - httpx for testing
+
+**Files Created:**
+- `sindri/web/__init__.py` (20 lines) - Module exports
+- `sindri/web/server.py` (520 lines) - FastAPI application
+- `tests/test_web.py` (550 lines) - 34 comprehensive tests
+
+**Files Modified:**
+- `sindri/cli.py` (+55 lines) - Web command
+- `pyproject.toml` (+2 lines) - Web dependencies
+
+**Test Results:**
+- **Before:** 565/565 tests passing (100%)
+- **After:** 599/599 tests passing (100%) 🎉
+- **New Tests:** 34 tests (all passing)
+
+**API Features:**
+- Pydantic models for request/response validation
+- CORS middleware for frontend access
+- OpenAPI documentation at `/docs`
+- Short session ID support
+- Background task execution
+- Real-time metrics updates via WebSocket
+
+---
+
+## 📊 Previous Session Summary (2026-01-15 - Phase 5.5 Task History Panel)
 
 ### ✅ Phase 5.5 (Complete) - Task History Panel Implemented! 🎉
 

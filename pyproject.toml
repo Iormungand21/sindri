@@ -18,8 +18,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "ruff", "mypy"]
+dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "httpx"]
 tui = ["textual>=0.89.0"]
+web = ["fastapi>=0.109.0", "uvicorn[standard]>=0.27.0"]
 
 [project.scripts]
 sindri = "sindri.cli:cli"

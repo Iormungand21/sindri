@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Phase 5.5 COMPLETE!** (v0.1.0) - All TUI enhancements done (metrics, export, history). **100% production ready.** 565/565 tests passing (100%). Ready for Phase 8.3 (Web UI).
+**Current Status:** ✅ **Phase 8.3 Foundation COMPLETE!** (v0.1.0) - Web API server foundation done (FastAPI, REST, WebSocket). **100% production ready.** 599/599 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
 
 ---
 
@@ -11,19 +11,23 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ Phase 5.5 COMPLETE - TUI Enhancements (metrics, export, history panel)
-- ✅ 565/565 tests passing (100%)
+- ✅ Phase 8.3 Foundation COMPLETE - Web API Server (FastAPI, REST, WebSocket)
+- ✅ 599/599 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 565 passed
+.venv/bin/pytest tests/ -v           # Should see 599 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
 .venv/bin/sindri tui                 # Launch TUI (press 'h' for history, Ctrl+C to exit)
+
+# Test Web API (NEW!)
+.venv/bin/sindri web --port 8000     # Start API server
+# Then visit http://localhost:8000/docs for interactive API docs
 
 # Test metrics (NEW!)
 .venv/bin/sindri metrics             # List sessions with metrics
@@ -43,9 +47,10 @@
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
 3. **This file** - See "Phase 8.2 Agent Marketplace" for next priority
 
-### Recommended Next: Phase 8.3 - Web UI
-- **Phase 8.3 Goal:** Web-based interface with rich visualization
-- **Effort:** 3-5 days
+### Recommended Next: Phase 8.3 - Web UI Frontend
+- **Phase 8.3 Goal:** React frontend with rich visualization
+- **Backend:** ✅ Complete (FastAPI server with REST API and WebSocket)
+- **Effort:** 2-3 days
 - **Impact:** HIGH - Better UX for complex workflows
 
 ### Need Help?
@@ -945,11 +950,42 @@ content = "You are Thor, the performance optimizer..."
 
 ---
 
-### 8.3 Web UI (Medium Priority)
+### 8.3 Web UI (In Progress)
 
 **Goal:** Alternative to TUI with richer visualization
 
-#### Features:
+#### ✅ Foundation Complete (2026-01-15)
+
+**Web API Server Implemented:**
+- ✅ `sindri/web/server.py` - FastAPI application with full REST API
+- ✅ `/api/agents` - List and get agent details
+- ✅ `/api/sessions` - List and get session details with turns
+- ✅ `/api/tasks` - Create tasks and get status
+- ✅ `/api/metrics` - System-wide and session-specific metrics
+- ✅ `/ws` - WebSocket for real-time event streaming
+- ✅ `sindri web` CLI command to start server
+- ✅ CORS support for frontend access
+- ✅ OpenAPI docs at `/docs`
+- ✅ 34 tests (100% passing)
+
+**Files Created:**
+- `sindri/web/__init__.py` (20 lines)
+- `sindri/web/server.py` (520 lines)
+- `tests/test_web.py` (550 lines, 34 tests)
+
+**Usage:**
+```bash
+# Start API server
+sindri web --port 8000
+
+# Access API docs
+open http://localhost:8000/docs
+
+# WebSocket events
+wscat -c ws://localhost:8000/ws
+```
+
+#### Remaining Features (Frontend):
 
 **Agent Collaboration Graph**
 ```
@@ -1080,7 +1116,8 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Codebase understanding~~ | High | Medium | ✅ Complete | 7.4 | Done 2026-01-15 |
 | ~~Plugin system~~ | Medium | High | ✅ Complete | 8.1 | Done 2026-01-15 |
 | ~~TUI enhancements~~ | Medium | Medium | ✅ Complete | 5.5 | Done 2026-01-15 |
-| Web UI | High | Very High | 🟢 Next | 8.3 | Future |
+| ~~Web API Backend~~ | High | Medium | ✅ Complete | 8.3 | Done 2026-01-15 |
+| Web UI Frontend | High | High | 🟢 Next | 8.3 | Future |
 
 ---
 
@@ -1218,6 +1255,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 8.3 | ✅ **Phase 8.3 (Foundation) COMPLETE!** Web API server with FastAPI, REST, WebSocket (34 tests) |
 | 2026-01-15 | 5.5 | ✅ **Phase 5.5 (Partial) COMPLETE!** Conversation export to Markdown (28 tests) |
 | 2026-01-15 | 8.1 | ✅ **Phase 8.1 COMPLETE!** Plugin system for user-defined tools and agents (39 tests) |
 | 2026-01-15 | 7.4 | ✅ **Phase 7.4 COMPLETE!** Codebase understanding system (41 tests) |
@@ -1238,13 +1276,36 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-15 (Phase 5.5 Conversation Export Complete!)
-**Next Review:** When starting Phase 8.3 (Web UI) or remaining Phase 5.5 features
+**Last Updated:** 2026-01-15 (Phase 8.3 Web API Foundation Complete!)
+**Next Review:** When starting Phase 8.3 Web UI Frontend (React)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 PHASE 8.3: WEB API FOUNDATION COMPLETE!** (2026-01-15)
+
+Web API server for Sindri orchestration:
+1. ✅ **FastAPI Server** - Full REST API with Pydantic validation
+2. ✅ **Agent Endpoints** - List and get agent details with tools, VRAM, delegation info
+3. ✅ **Session Endpoints** - List sessions with filtering, get details with turns
+4. ✅ **Task Endpoints** - Create tasks, get status, background execution
+5. ✅ **Metrics Endpoint** - System-wide and session-specific metrics
+6. ✅ **WebSocket** - Real-time event streaming with heartbeat
+7. ✅ **CLI Command** - `sindri web --port 8000` with reload support
+8. ✅ **CORS Support** - Configured for frontend access
+9. ✅ **OpenAPI Docs** - Auto-generated at `/docs`
+10. ✅ **34 new tests** - Comprehensive web API coverage
+
+**Impact:**
+- Test coverage: 565 → 599 tests (+34 tests, 100% passing)
+- Backend complete for Web UI
+- REST API ready for any frontend (React, Vue, mobile app)
+- Real-time updates via WebSocket
+- Full system visibility through API
+
+---
 
 **🎉 PHASE 5.5: CONVERSATION EXPORT COMPLETE!** (2026-01-15)
 

@@ -1058,5 +1058,66 @@ def plugins_dirs():
         console.print(f"  [yellow]⚠[/yellow] Agent directory doesn't exist (run 'sindri plugins init' to create)")
 
 
+@cli.command()
+@click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
+@click.option("--port", "-p", default=8000, help="Port to listen on")
+@click.option("--vram-gb", default=16.0, help="Total VRAM in GB")
+@click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")
+@click.option("--reload", is_flag=True, help="Enable auto-reload for development")
+def web(host: str, port: int, vram_gb: float, work_dir: str = None, reload: bool = False):
+    """Start the Sindri Web API server.
+
+    The Web API provides:
+    - REST endpoints for agents, sessions, tasks, metrics
+    - WebSocket for real-time event streaming
+    - CORS support for frontend access
+
+    Example:
+        sindri web --port 8080
+
+    Then visit http://localhost:8080/docs for API documentation.
+    """
+    try:
+        import uvicorn
+        from fastapi import FastAPI
+    except ImportError:
+        console.print("[red]✗ Web dependencies not installed[/red]")
+        console.print("[dim]Install with: pip install sindri[web][/dim]")
+        return
+
+    from pathlib import Path
+
+    console.print(Panel(
+        f"[bold blue]Sindri Web API[/bold blue]\n\n"
+        f"Host: {host}\n"
+        f"Port: {port}\n"
+        f"VRAM: {vram_gb}GB",
+        title="🌐 Starting Server"
+    ))
+
+    work_path = Path(work_dir).resolve() if work_dir else None
+
+    console.print(f"\n[dim]API docs: http://{host}:{port}/docs[/dim]")
+    console.print(f"[dim]WebSocket: ws://{host}:{port}/ws[/dim]\n")
+
+    # Run server
+    from sindri.web import create_app
+
+    if reload:
+        # Development mode with auto-reload
+        uvicorn.run(
+            "sindri.web:create_app",
+            host=host,
+            port=port,
+            reload=True,
+            factory=True,
+            log_level="info"
+        )
+    else:
+        # Production mode
+        app = create_app(vram_gb=vram_gb, work_dir=work_path)
+        uvicorn.run(app, host=host, port=port, log_level="info")
+
+
 if __name__ == "__main__":
     cli()
