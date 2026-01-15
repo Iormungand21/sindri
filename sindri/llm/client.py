@@ -1,8 +1,8 @@
 """Async Ollama client wrapper."""
 
 import ollama
-from dataclasses import dataclass
-from typing import AsyncIterator, Optional
+from dataclasses import dataclass, field
+from typing import AsyncIterator, Optional, Callable
 import structlog
 
 log = structlog.get_logger()
@@ -20,6 +20,27 @@ class Response:
     message: Message
     model: str
     done: bool
+
+
+@dataclass
+class StreamingResponse:
+    """Response from streaming chat, accumulated over time."""
+    content: str = ""
+    tool_calls: Optional[list] = None
+    model: str = ""
+    done: bool = False
+
+    def to_response(self) -> Response:
+        """Convert to a standard Response object."""
+        return Response(
+            message=Message(
+                role="assistant",
+                content=self.content,
+                tool_calls=self.tool_calls
+            ),
+            model=self.model,
+            done=self.done
+        )
 
 
 class OllamaClient:
@@ -79,6 +100,61 @@ class OllamaClient:
         ):
             if chunk.get("message", {}).get("content"):
                 yield chunk["message"]["content"]
+
+    async def chat_stream(
+        self,
+        model: str,
+        messages: list[dict],
+        tools: list[dict] = None,
+        on_token: Optional[Callable[[str], None]] = None
+    ) -> StreamingResponse:
+        """Stream chat response with tool support.
+
+        Args:
+            model: Model name to use
+            messages: Conversation messages
+            tools: Tool definitions (optional)
+            on_token: Callback called for each token (optional)
+
+        Returns:
+            StreamingResponse with accumulated content and tool calls
+        """
+        kwargs = {
+            "model": model,
+            "messages": messages,
+            "stream": True
+        }
+        if tools:
+            kwargs["tools"] = tools
+
+        log.info("ollama_stream_request", model=model, num_messages=len(messages))
+
+        result = StreamingResponse(model=model)
+
+        async for chunk in await self._async_client.chat(**kwargs):
+            # Accumulate content
+            token = chunk.get("message", {}).get("content", "")
+            if token:
+                result.content += token
+                if on_token:
+                    on_token(token)
+
+            # Check for tool calls (usually in final chunk)
+            tool_calls = chunk.get("message", {}).get("tool_calls")
+            if tool_calls:
+                result.tool_calls = tool_calls
+
+            # Check if done
+            if chunk.get("done", False):
+                result.done = True
+                result.model = chunk.get("model", model)
+
+        log.info("ollama_stream_complete",
+                 model=model,
+                 content_length=len(result.content),
+                 has_tool_calls=result.tool_calls is not None)
+
+        return result
 
     def list_models(self) -> list[str]:
         """List available models."""

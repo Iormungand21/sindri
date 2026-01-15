@@ -1,19 +1,27 @@
 # Sindri Project Status Report
-**Date:** 2026-01-14 (Phase 7.1 Complete!)
-**Session:** Phase 7.1 Enhanced Agent Specialization - Full Implementation
+**Date:** 2026-01-14 (Phase 6.3 Complete!)
+**Session:** Phase 6.3 Streaming Output - Full Implementation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 7.1 Complete! 🎉
-**Just Completed:** Enhanced agent specialization ✓ (2026-01-14)
-**Test Status:** 309/309 tests, **309 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 6.3 Complete! 🎉
+**Just Completed:** Streaming output with real-time token display ✓ (2026-01-14)
+**Test Status:** 344/344 tests, **344 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 6.3 (Streaming) or Phase 7.2 (Learning from Success)
+**Next Priority:** Phase 7.2 (Learning from Success) or Phase 7.3 (Interactive Planning)
 
-**Key New Features (Phase 7.1 - Enhanced Agent Specialization):**
+**Key New Features (Phase 6.3 - Streaming Output):**
+- **OllamaClient.chat_stream()** - Streaming chat with tool support and callbacks
+- **StreamingBuffer** - Intelligent tool call detection from streamed text
+- **STREAMING_TOKEN events** - Real-time token emission for TUI display
+- **HierarchicalAgentLoop streaming mode** - Enabled by default, falls back gracefully
+- **TUI streaming handlers** - Display tokens as they arrive for responsive UX
+- **35 new tests** - Comprehensive streaming coverage
+
+**Previous Features (Phase 7.1 - Enhanced Agent Specialization):**
 - **Huginn (Coder)** - Python/TypeScript best practices, type hints, async patterns, refactoring
 - **Mimir (Reviewer)** - OWASP security patterns, code smell detection, review checklists
 - **Skald (Tester)** - pytest fixtures, mocking patterns, parametrized tests, edge case guidance
@@ -55,11 +63,12 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (309/309 passing!)
+# Run all tests (344/344 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_agent_specialization.py -v  # Phase 7.1 agent tests (NEW!)
+.venv/bin/pytest tests/test_streaming.py -v             # Phase 6.3 streaming tests (NEW!)
+.venv/bin/pytest tests/test_agent_specialization.py -v  # Phase 7.1 agent tests
 .venv/bin/pytest tests/test_error_classification.py -v  # Phase 5.6 error tests
 .venv/bin/pytest tests/test_tool_retry.py -v            # Phase 5.6 retry tests
 .venv/bin/pytest tests/test_stuck_detection.py -v       # Phase 5.6 stuck tests
@@ -84,13 +93,72 @@
 **For New Developer/Agent:**
 1. **Start here:** Read this STATUS.md - current state, what works, what's next
 2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
-3. **Roadmap:** See ROADMAP.md for Phase 6.3 (Streaming) or Phase 7 (Intelligence)
-4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 266 tests should pass
+3. **Roadmap:** See ROADMAP.md for Phase 7.2 (Learning) or Phase 7.3 (Interactive Planning)
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 344 tests should pass
 5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
 
 ---
 
-## 📊 Session Summary (2026-01-14 - Phase 7.1 Agent Specialization)
+## 📊 Session Summary (2026-01-14 - Phase 6.3 Streaming Output)
+
+### ✅ Phase 6.3 Complete - Streaming Output Implemented! 🎉
+
+**Implementation Time:** ~1 hour
+
+**Core Changes:**
+
+1. **OllamaClient Streaming** (`sindri/llm/client.py`)
+   - `StreamingResponse` dataclass for accumulated streaming data
+   - `chat_stream()` method with async iteration and `on_token` callback
+   - Native tool call capture from final streaming chunk
+   - Conversion to standard `Response` via `to_response()`
+
+2. **StreamingBuffer** (`sindri/llm/streaming.py` - NEW)
+   - Intelligent tool call detection from streamed text
+   - Pattern matching for JSON, markdown, and XML tool formats
+   - JSON depth tracking for complete object detection
+   - Support for multiple consecutive tool calls
+   - `get_display_content()` for clean output
+
+3. **Event System** (`sindri/core/events.py`)
+   - `STREAMING_START` - Signals streaming response beginning
+   - `STREAMING_TOKEN` - Individual token for real-time display
+   - `STREAMING_END` - Signals streaming response completion
+
+4. **LoopConfig Streaming** (`sindri/core/loop.py`)
+   - `streaming: bool = True` - Enabled by default
+   - Can be disabled with `streaming=False`
+
+5. **HierarchicalAgentLoop Integration** (`sindri/core/hierarchical.py`)
+   - `_call_llm_streaming()` method for streaming LLM calls
+   - Emits STREAMING_* events for TUI
+   - Graceful fallback to non-streaming on errors
+   - Conditional AGENT_OUTPUT emission (only when not streaming)
+
+6. **TUI Streaming Handlers** (`sindri/tui/app.py`)
+   - `on_streaming_start` - Display agent header
+   - `on_streaming_token` - Append token without newline
+   - `on_streaming_end` - Finalize output with newline
+
+**Files Created:**
+- `sindri/llm/streaming.py` (200 lines) - StreamingBuffer for tool detection
+- `tests/test_streaming.py` (560 lines) - 35 comprehensive tests
+
+**Files Modified:**
+- `sindri/llm/client.py` (+70 lines) - StreamingResponse and chat_stream()
+- `sindri/core/events.py` (+3 lines) - New streaming event types
+- `sindri/core/loop.py` (+1 line) - streaming config option
+- `sindri/core/hierarchical.py` (+90 lines) - Streaming LLM call method
+- `sindri/tui/app.py` (+30 lines) - Streaming event handlers
+
+**Test Results:**
+- **Before:** 309/309 tests passing (100%)
+- **After:** 344/344 tests passing (100%) 🎉
+- **New Tests:** 35 tests (all passing)
+
+---
+
+## 📊 Previous Session Summary (2026-01-14 - Phase 7.1 Agent Specialization)
 
 ### ✅ Phase 7.1 Complete - Enhanced Agent Specialization Implemented! 🎉
 
@@ -1081,18 +1149,23 @@ export SINDRI_LOG_LEVEL=DEBUG
 **Virtual Environment:** `.venv/`
 **Data Directory:** `~/.sindri/`
 
-**This Session By:** Claude Opus 4.5 (2026-01-14 - Phase 7.1 Complete!)
-**Session Focus:** Phase 7.1 Enhanced Agent Specialization - Full implementation
-**Session Duration:** ~45 minutes
-**Lines Added:** ~850 lines (enhanced prompts)
+**This Session By:** Claude Opus 4.5 (2026-01-14 - Phase 6.3 Complete!)
+**Session Focus:** Phase 6.3 Streaming Output - Full implementation
+**Session Duration:** ~1 hour
+**Lines Added:** ~400 lines
 **Files Created:**
-- `tests/test_agent_specialization.py` (300 lines, 43 tests)
+- `sindri/llm/streaming.py` (200 lines) - StreamingBuffer
+- `tests/test_streaming.py` (560 lines, 35 tests)
 **Files Modified:**
-- `sindri/agents/prompts.py` (+850 lines of specialized patterns)
-**Tests Added:** 43 tests (all passing)
-**Impact:** Phase 7.1 COMPLETE! 309/309 tests passing (100%) 🎉
+- `sindri/llm/client.py` - StreamingResponse and chat_stream()
+- `sindri/core/events.py` - New streaming event types
+- `sindri/core/loop.py` - streaming config option
+- `sindri/core/hierarchical.py` - Streaming LLM integration
+- `sindri/tui/app.py` - Streaming event handlers
+**Tests Added:** 35 tests (all passing)
+**Impact:** Phase 6.3 COMPLETE! 344/344 tests passing (100%) 🎉
 
-**Previous Session By:** Claude Sonnet 4.5 (2026-01-15 Evening - Test Fix)
+**Previous Session By:** Claude Opus 4.5 (2026-01-14 - Phase 7.1 Complete!)
 **Session Focus:** Fixed failing test - 100% pass rate achieved!
 **Session Duration:** ~5 minutes
 **Impact:** 79/79 tests passing (100%)
@@ -1103,24 +1176,24 @@ export SINDRI_LOG_LEVEL=DEBUG
 
 **For Next Developer/Agent:**
 1. Run `sindri doctor --verbose` to check system health
-2. Run `pytest tests/ -v` to verify 309/309 pass rate 🎉
+2. Run `pytest tests/ -v` to verify 344/344 pass rate 🎉
 3. Try all CLI commands:
    - `sindri agents`
    - `sindri sessions`
    - `sindri recover`
    - `sindri resume <id>` (use short ID from sessions!)
-4. Review ROADMAP.md for Phase 6.3 or Phase 7.2 priorities
+4. Review ROADMAP.md for Phase 7.2 or Phase 7.3 priorities
 5. Check PROJECT_HANDOFF.md for detailed context
-6. **Recommended Next:** Phase 6.3 (Streaming) or Phase 7.2 (Learning from Success)
+6. **Recommended Next:** Phase 7.2 (Learning from Success) or Phase 7.3 (Interactive Planning)
 
 **Questions?** Check documentation:
-- ROADMAP.md - Feature roadmap (updated with Phase 5 complete)
+- ROADMAP.md - Feature roadmap (updated with Phase 6.3 complete)
 - CLAUDE.md - Project context
 - TOOLS_AND_MODELS_ANALYSIS.md - Tools/models guide
 - PROJECT_HANDOFF.md - Comprehensive handoff doc
 
 ---
 
-**Status:** ✅ PRODUCTION READY (100%) - Phase 7.1 COMPLETE! 🎉
-**Last Updated:** 2026-01-14 - Phase 7.1 Agent Specialization Session
-**Next Session Goal:** Phase 6.3 - Streaming Output or Phase 7.2 - Learning from Success
+**Status:** ✅ PRODUCTION READY (100%) - Phase 6.3 COMPLETE! 🎉
+**Last Updated:** 2026-01-14 - Phase 6.3 Streaming Output Session
+**Next Session Goal:** Phase 7.2 - Learning from Success or Phase 7.3 - Interactive Planning

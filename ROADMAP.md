@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Phase 7.1 COMPLETE!** (v0.1.0) - Enhanced agent specialization with domain expertise. **100% production ready.** 309/309 tests passing (100%). Ready for Phase 6.3 (Streaming) or Phase 7.2 (Learning).
+**Current Status:** ✅ **Phase 6.3 COMPLETE!** (v0.1.0) - Streaming output with real-time token display. **100% production ready.** 344/344 tests passing (100%). Ready for Phase 7.2 (Learning) or Phase 7.3 (Interactive Planning).
 
 ---
 
@@ -11,15 +11,15 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-14)
-- ✅ Phase 7.1 COMPLETE - Enhanced agent specialization with domain expertise
-- ✅ 309/309 tests passing (100%)
+- ✅ Phase 6.3 COMPLETE - Streaming output with real-time token display
+- ✅ 344/344 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, smart agents
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 309 passed
+.venv/bin/pytest tests/ -v           # Should see 344 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -32,13 +32,13 @@
 ### Essential Reading
 1. **STATUS.md** - Detailed current state, what works, what doesn't
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
-3. **This file** - See "Phase 6.3 Streaming" or "Phase 7.2 Learning" for next priority
+3. **This file** - See "Phase 7.2 Learning" or "Phase 7.3 Interactive Planning" for next priority
 
-### Recommended Next: Phase 6.3 - Streaming Output OR Phase 7.2 - Learning from Success
-- **Phase 6.3 Goal:** Stream tokens to TUI in real-time for better UX
+### Recommended Next: Phase 7.2 - Learning from Success OR Phase 7.3 - Interactive Planning
 - **Phase 7.2 Goal:** Store successful patterns and recall them for future tasks
+- **Phase 7.3 Goal:** Show execution plan and get user approval before running
 - **Effort:** 1-2 days each
-- **Impact:** MEDIUM-HIGH - Improved responsiveness or continuous learning
+- **Impact:** MEDIUM-HIGH - Continuous learning or user control
 
 ### Need Help?
 - Check tests for examples: `tests/test_*.py`
@@ -564,26 +564,47 @@ After: Parallel = 20s (2x faster, shared model = 5GB total)
 
 ---
 
-### 6.3 Streaming Responses (Low Priority)
+### ✅ 6.3 Streaming Responses (COMPLETED 2026-01-14)
 
-**Current:** Wait for full response before displaying
+**Status:** ✅ Implemented and tested with 35 new tests
 
-**Improvement:** Stream tokens to TUI in real-time
+#### Implementation Summary:
 
-**Benefits:**
-- Feels more responsive
-- See agent "thinking" live
-- Early cancellation possible
+**OllamaClient Streaming** (`sindri/llm/client.py`):
+- ✅ `StreamingResponse` dataclass for accumulated data
+- ✅ `chat_stream()` method with `on_token` callback
+- ✅ Native tool call capture from streaming
+- ✅ Conversion to standard `Response` via `to_response()`
 
-**Implementation:**
-- `OllamaClient.chat_stream()` - Generator-based API
-- TUI updates on each token
-- Buffer for tool call parsing
+**StreamingBuffer** (`sindri/llm/streaming.py` - NEW):
+- ✅ Intelligent tool call detection from text patterns
+- ✅ JSON, markdown, and XML tool format support
+- ✅ JSON depth tracking for complete objects
+- ✅ Multiple consecutive tool calls support
+- ✅ `get_display_content()` for clean output
 
-**Files:**
-- `sindri/llm/client.py` - Add streaming methods
-- `sindri/core/hierarchical.py` - Use streaming in loop
-- `sindri/tui/widgets/output.py` - Live token display
+**Event System** (`sindri/core/events.py`):
+- ✅ `STREAMING_START` - Beginning of streaming response
+- ✅ `STREAMING_TOKEN` - Individual token emission
+- ✅ `STREAMING_END` - Completion of streaming
+
+**Loop Integration** (`sindri/core/hierarchical.py`):
+- ✅ `_call_llm_streaming()` method
+- ✅ STREAMING_* event emission
+- ✅ Graceful fallback on errors
+- ✅ Conditional AGENT_OUTPUT (only when not streaming)
+
+**TUI Handlers** (`sindri/tui/app.py`):
+- ✅ `on_streaming_start` - Agent header display
+- ✅ `on_streaming_token` - Real-time token append
+- ✅ `on_streaming_end` - Output finalization
+
+**Configuration** (`sindri/core/loop.py`):
+- ✅ `streaming: bool = True` - Enabled by default
+
+**Test Coverage:**
+- `tests/test_streaming.py`: 35/35 tests passing ✅
+- Total tests: 344/344 passing (100%)
 
 ---
 
@@ -1000,7 +1021,7 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Model caching~~ | High | Medium | ✅ Complete | 6.2 | Done 2026-01-14 |
 | ~~Error handling~~ | High | Medium | ✅ Complete | 5.6 | Done 2026-01-14 |
 | ~~Agent specialization~~ | High | Medium | ✅ Complete | 7.1 | Done 2026-01-14 |
-| Streaming | Medium | Medium | 🟠 Soon | 6.3 | Ready to start |
+| ~~Streaming~~ | Medium | Medium | ✅ Complete | 6.3 | Done 2026-01-14 |
 | TUI enhancements | Medium | Medium | 🟡 Later | 5.5 | History/export |
 | Interactive planning | Medium | Medium | 🟡 Later | 7.3 | Ready to start |
 | Plugin system | Medium | High | 🟢 Later | 8.1 | Future |
@@ -1143,6 +1164,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-14 | 6.3 | ✅ **Phase 6.3 COMPLETE!** Streaming output with real-time tokens (35 tests) |
 | 2026-01-14 | 7.1 | ✅ **Phase 7.1 COMPLETE!** Enhanced agent specialization (43 tests) |
 | 2026-01-14 | 5.6 | ✅ **Phase 5.6 COMPLETE!** Error handling & recovery system (116 tests) |
 | 2026-01-14 | 6.2 | ✅ **Phase 6.2 COMPLETE!** Model caching with pre-warming (25 tests) |
@@ -1157,13 +1179,30 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-14 (Phase 7.1 Complete!)
-**Next Review:** When starting Phase 6.3 (Streaming) or Phase 7.2 (Learning)
+**Last Updated:** 2026-01-14 (Phase 6.3 Complete!)
+**Next Review:** When starting Phase 7.2 (Learning) or Phase 7.3 (Interactive Planning)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 PHASE 6.3: COMPLETE!** (2026-01-14)
+
+Streaming output with real-time token display:
+1. ✅ **OllamaClient.chat_stream()** - Streaming chat with callbacks
+2. ✅ **StreamingBuffer** - Tool call detection from text
+3. ✅ **STREAMING_* events** - Real-time token emission
+4. ✅ **HierarchicalAgentLoop streaming** - Enabled by default
+5. ✅ **TUI streaming handlers** - Display tokens as they arrive
+6. ✅ **35 new tests** - Comprehensive streaming coverage
+
+**Impact:**
+- Test coverage: 309 → 344 tests (+35 tests, 100% passing)
+- Real-time token display for responsive UX
+- Graceful fallback to non-streaming when needed
+
+---
 
 **🎉 PHASE 7.1: COMPLETE!** (2026-01-14)
 

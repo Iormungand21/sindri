@@ -26,6 +26,10 @@ class EventType(Enum):
     # Phase 5.6: New event types for error handling
     ITERATION_WARNING = auto()  # Warn agent about remaining iterations
     MODEL_DEGRADED = auto()     # Agent falling back to smaller model
+    # Phase 6.3: Streaming output
+    STREAMING_TOKEN = auto()    # Individual token during streaming response
+    STREAMING_START = auto()    # Streaming response started
+    STREAMING_END = auto()      # Streaming response completed
 
 
 @dataclass

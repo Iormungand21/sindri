@@ -6,6 +6,7 @@ import structlog
 
 from sindri.llm.client import OllamaClient
 from sindri.llm.tool_parser import ToolCallParser
+from sindri.llm.streaming import StreamingBuffer
 from sindri.tools.registry import ToolRegistry
 from sindri.tools.delegation import DelegateTool
 from sindri.persistence.state import SessionState
@@ -351,11 +352,22 @@ class HierarchicalAgentLoop:
                 )
 
             # Call LLM (Phase 5.6: use model_to_use for potential fallback)
-            response = await self.client.chat(
-                model=model_to_use,
-                messages=messages,
-                tools=task_tools.get_schemas()
-            )
+            # Phase 6.3: Support streaming mode
+            if self.config.streaming:
+                response, assistant_content = await self._call_llm_streaming(
+                    model=model_to_use,
+                    messages=messages,
+                    tools=task_tools.get_schemas(),
+                    task=task,
+                    agent=agent
+                )
+            else:
+                response = await self.client.chat(
+                    model=model_to_use,
+                    messages=messages,
+                    tools=task_tools.get_schemas()
+                )
+                assistant_content = response.message.content
 
             # Check for cancellation after LLM call (in case it was requested during call)
             if task.cancel_requested:
@@ -380,21 +392,22 @@ class HierarchicalAgentLoop:
                     iterations=iteration + 1
                 )
 
-            assistant_content = response.message.content
+            # assistant_content is already set by streaming or non-streaming path
             log.info("llm_response",
                      task_id=task.id,
-                     content=assistant_content[:200],
+                     content=assistant_content[:200] if assistant_content else "",
                      has_tool_calls=response.message.tool_calls is not None)
 
-            # Emit agent output event
-            self.event_bus.emit(Event(
-                type=EventType.AGENT_OUTPUT,
-                data={
-                    "task_id": task.id,
-                    "agent": agent.name,
-                    "text": assistant_content
-                }
-            ))
+            # Emit agent output event (only if not streaming - streaming emits tokens directly)
+            if not self.config.streaming:
+                self.event_bus.emit(Event(
+                    type=EventType.AGENT_OUTPUT,
+                    data={
+                        "task_id": task.id,
+                        "agent": agent.name,
+                        "text": assistant_content
+                    }
+                ))
 
             # Execute tool calls FIRST (before checking completion)
             # This ensures tools are executed even if agent prematurely marks complete
@@ -631,6 +644,110 @@ class HierarchicalAgentLoop:
             iterations=agent.max_iterations,
             reason="max_iterations_reached"
         )
+
+    async def _call_llm_streaming(
+        self,
+        model: str,
+        messages: list[dict],
+        tools: list[dict],
+        task: Task,
+        agent
+    ) -> tuple:
+        """Call LLM with streaming, emitting tokens to event bus.
+
+        Phase 6.3: Enables real-time token display in TUI.
+
+        Args:
+            model: Model to use
+            messages: Conversation messages
+            tools: Tool schemas
+            task: Current task
+            agent: Agent definition
+
+        Returns:
+            (Response, content) - Response object and full content string
+        """
+        streaming_buffer = StreamingBuffer()
+
+        # Emit streaming start event
+        self.event_bus.emit(Event(
+            type=EventType.STREAMING_START,
+            data={
+                "task_id": task.id,
+                "agent": agent.name,
+                "model": model
+            },
+            task_id=task.id
+        ))
+
+        def on_token(token: str):
+            """Callback for each token."""
+            displayable, is_tool = streaming_buffer.add_token(token)
+
+            # Only emit displayable tokens (not tool call JSON)
+            if displayable and not is_tool:
+                self.event_bus.emit(Event(
+                    type=EventType.STREAMING_TOKEN,
+                    data={
+                        "task_id": task.id,
+                        "agent": agent.name,
+                        "token": displayable
+                    },
+                    task_id=task.id
+                ))
+
+        try:
+            # Use streaming chat
+            streaming_response = await self.client.chat_stream(
+                model=model,
+                messages=messages,
+                tools=tools,
+                on_token=on_token
+            )
+
+            # Convert to standard Response
+            response = streaming_response.to_response()
+
+            # Emit streaming end event
+            self.event_bus.emit(Event(
+                type=EventType.STREAMING_END,
+                data={
+                    "task_id": task.id,
+                    "agent": agent.name,
+                    "content_length": len(streaming_response.content)
+                },
+                task_id=task.id
+            ))
+
+            # Check for tool calls detected from text (if not native)
+            if not response.message.tool_calls:
+                detected_calls = streaming_buffer.get_tool_calls()
+                if detected_calls:
+                    # Convert to the expected format
+                    class CallWrapper:
+                        def __init__(self, name, arguments):
+                            self.function = type('obj', (object,), {
+                                'name': name,
+                                'arguments': arguments
+                            })()
+
+                    # Note: We don't modify response.message.tool_calls as it's
+                    # already handled by ToolCallParser later in the flow
+                    log.info("streaming_detected_tool_calls",
+                            task_id=task.id,
+                            count=len(detected_calls))
+
+            return response, streaming_response.content
+
+        except Exception as e:
+            log.error("streaming_error", task_id=task.id, error=str(e))
+            # Fallback to non-streaming
+            response = await self.client.chat(
+                model=model,
+                messages=messages,
+                tools=tools
+            )
+            return response, response.message.content
 
     def _build_messages(
         self,

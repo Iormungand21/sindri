@@ -293,6 +293,37 @@ class SindriApp(App):
             except Exception as e:
                 self.log(f"Error in error handler: {e}")
 
+        # Phase 6.3: Streaming token handlers
+        def on_streaming_start(data):
+            """Handle start of streaming response."""
+            try:
+                output = self.query_one("#output", RichLog)
+                agent = data.get("agent", "unknown")
+                output.write(f"\n[bold blue][{agent}][/bold blue] ", end="")
+            except Exception as e:
+                self.log(f"Error in streaming_start: {e}")
+
+        def on_streaming_token(data):
+            """Handle individual streaming token."""
+            try:
+                output = self.query_one("#output", RichLog)
+                token = data.get("token", "")
+                if token:
+                    # Write token without newline for streaming effect
+                    # Note: RichLog.write() adds newline, so we use write with end=""
+                    output.write(token, end="")
+            except Exception as e:
+                self.log(f"Error in streaming_token: {e}")
+
+        def on_streaming_end(data):
+            """Handle end of streaming response."""
+            try:
+                output = self.query_one("#output", RichLog)
+                # Add newline after streaming is complete
+                output.write("")
+            except Exception as e:
+                self.log(f"Error in streaming_end: {e}")
+
         # Subscribe to events
         self.event_bus.subscribe(EventType.TASK_CREATED, on_task_created)
         self.event_bus.subscribe(EventType.TASK_STATUS_CHANGED, on_task_status)
@@ -300,6 +331,10 @@ class SindriApp(App):
         self.event_bus.subscribe(EventType.TOOL_CALLED, on_tool_called)
         self.event_bus.subscribe(EventType.ITERATION_START, on_iteration_start)
         self.event_bus.subscribe(EventType.ERROR, on_error)
+        # Phase 6.3: Streaming events
+        self.event_bus.subscribe(EventType.STREAMING_START, on_streaming_start)
+        self.event_bus.subscribe(EventType.STREAMING_TOKEN, on_streaming_token)
+        self.event_bus.subscribe(EventType.STREAMING_END, on_streaming_end)
 
     async def _run_task(self, task_description: str):
         """Run a task with the orchestrator."""

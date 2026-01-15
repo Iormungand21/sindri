@@ -28,6 +28,8 @@ class LoopConfig:
     # Phase 5.6: Enhanced stuck detection
     max_nudges: int = 3  # Maximum nudges before escalating to failure
     similarity_threshold: float = 0.8  # Word overlap ratio for similarity detection
+    # Phase 6.3: Streaming output
+    streaming: bool = True  # Enable streaming responses by default
 
 
 @dataclass
