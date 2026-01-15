@@ -479,6 +479,26 @@ class HierarchicalAgentLoop:
                     }
                 ))
 
+                # Phase 7.3: Emit PLAN_PROPOSED event for propose_plan tool
+                if call.function.name == "propose_plan" and result.success:
+                    plan_data = result.metadata.get("plan", {})
+                    self.event_bus.emit(Event(
+                        type=EventType.PLAN_PROPOSED,
+                        data={
+                            "task_id": task.id,
+                            "agent": agent.name,
+                            "plan": plan_data,
+                            "formatted": result.output,
+                            "step_count": result.metadata.get("step_count", 0),
+                            "agents": result.metadata.get("agents", []),
+                            "estimated_vram_gb": result.metadata.get("estimated_vram_gb", 0)
+                        },
+                        task_id=task.id
+                    ))
+                    log.info("plan_proposed",
+                            task_id=task.id,
+                            steps=result.metadata.get("step_count", 0))
+
                 # If delegation occurred, pause this task
                 if call.function.name == "delegate" and result.success:
                     log.info("delegation_in_progress",

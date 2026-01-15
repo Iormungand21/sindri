@@ -336,6 +336,48 @@ class SindriApp(App):
         self.event_bus.subscribe(EventType.STREAMING_TOKEN, on_streaming_token)
         self.event_bus.subscribe(EventType.STREAMING_END, on_streaming_end)
 
+        # Phase 7.3: Planning events
+        def on_plan_proposed(data):
+            """Handle plan proposal event."""
+            try:
+                output = self.query_one("#output", RichLog)
+                formatted_plan = data.get("formatted", "")
+                step_count = data.get("step_count", 0)
+                agents = data.get("agents", [])
+                vram = data.get("estimated_vram_gb", 0)
+
+                output.write("")
+                output.write("[bold magenta]━━━ EXECUTION PLAN ━━━[/bold magenta]")
+                output.write("")
+
+                # Parse and display the plan nicely
+                for line in formatted_plan.split("\n"):
+                    if line.startswith("Plan:"):
+                        output.write(f"[bold]{line}[/bold]")
+                    elif line.strip().startswith(tuple("123456789")):
+                        # Step line - highlight agent name
+                        output.write(f"[cyan]{line}[/cyan]")
+                    elif "Tools:" in line:
+                        output.write(f"[dim]{line}[/dim]")
+                    elif "Estimated VRAM:" in line or "Rationale:" in line:
+                        output.write(f"[yellow]{line}[/yellow]")
+                    elif "Risks:" in line:
+                        output.write(f"[red]{line}[/red]")
+                    elif line.strip().startswith("-"):
+                        output.write(f"[dim red]{line}[/dim red]")
+                    else:
+                        output.write(line)
+
+                output.write("")
+                output.write(f"[dim]Steps: {step_count} | Agents: {', '.join(agents)} | VRAM: ~{vram:.1f}GB[/dim]")
+                output.write("[bold magenta]━━━━━━━━━━━━━━━━━━━━━━[/bold magenta]")
+                output.write("")
+
+            except Exception as e:
+                self.log(f"Error in plan_proposed: {e}")
+
+        self.event_bus.subscribe(EventType.PLAN_PROPOSED, on_plan_proposed)
+
     async def _run_task(self, task_description: str):
         """Run a task with the orchestrator."""
         output = self.query_one("#output", RichLog)

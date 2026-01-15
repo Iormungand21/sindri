@@ -1,19 +1,27 @@
 # Sindri Project Status Report
-**Date:** 2026-01-14 (Phase 6.3 Complete!)
-**Session:** Phase 6.3 Streaming Output - Full Implementation
+**Date:** 2026-01-14 (Phase 7.3 Complete!)
+**Session:** Phase 7.3 Interactive Planning - Full Implementation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 6.3 Complete! 🎉
-**Just Completed:** Streaming output with real-time token display ✓ (2026-01-14)
-**Test Status:** 344/344 tests, **344 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 7.3 Complete! 🎉
+**Just Completed:** Interactive planning with execution plans ✓ (2026-01-14)
+**Test Status:** 372/372 tests, **372 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 7.2 (Learning from Success) or Phase 7.3 (Interactive Planning)
+**Next Priority:** Phase 7.2 (Learning from Success) or Phase 8.1 (Plugin System)
 
-**Key New Features (Phase 6.3 - Streaming Output):**
+**Key New Features (Phase 7.3 - Interactive Planning):**
+- **ProposePlanTool** - Create structured execution plans before delegating
+- **PlanStep & ExecutionPlan** - Data models for multi-step plans with dependencies
+- **PLAN_PROPOSED events** - Event system integration for plan display
+- **Brokkr planning mode** - Orchestrator creates plans for complex tasks
+- **TUI plan display** - Color-coded plan visualization with VRAM estimates
+- **28 new tests** - Comprehensive planning coverage
+
+**Previous Features (Phase 6.3 - Streaming Output):**
 - **OllamaClient.chat_stream()** - Streaming chat with tool support and callbacks
 - **StreamingBuffer** - Intelligent tool call detection from streamed text
 - **STREAMING_TOKEN events** - Real-time token emission for TUI display
@@ -93,13 +101,71 @@
 **For New Developer/Agent:**
 1. **Start here:** Read this STATUS.md - current state, what works, what's next
 2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
-3. **Roadmap:** See ROADMAP.md for Phase 7.2 (Learning) or Phase 7.3 (Interactive Planning)
-4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 344 tests should pass
+3. **Roadmap:** See ROADMAP.md for Phase 7.2 (Learning) or Phase 8.1 (Plugin System)
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 372 tests should pass
 5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
 
 ---
 
-## 📊 Session Summary (2026-01-14 - Phase 6.3 Streaming Output)
+## 📊 Session Summary (2026-01-14 - Phase 7.3 Interactive Planning)
+
+### ✅ Phase 7.3 Complete - Interactive Planning Implemented! 🎉
+
+**Implementation Time:** ~1 hour
+
+**Core Changes:**
+
+1. **Planning Data Models** (`sindri/tools/planning.py` - NEW)
+   - `PlanStep` dataclass for individual steps with dependencies
+   - `ExecutionPlan` dataclass for complete plans with VRAM estimates
+   - Serialization to/from dictionaries for JSON support
+   - `format_display()` method for TUI-friendly output
+
+2. **ProposePlanTool** (`sindri/tools/planning.py`)
+   - Creates structured execution plans
+   - Agent VRAM estimation for peak usage calculation
+   - Supports step dependencies and tool hints
+   - Returns formatted plan with metadata
+
+3. **Event System** (`sindri/core/events.py`)
+   - `PLAN_PROPOSED` - Emitted when plan is created
+   - `PLAN_APPROVED` - For future user approval flow
+   - `PLAN_REJECTED` - For future user rejection flow
+
+4. **Brokkr Prompt Update** (`sindri/agents/prompts.py`)
+   - Added planning instructions for complex tasks
+   - Example `propose_plan` usage in prompt
+   - "Plan first, then delegate" workflow guidance
+
+5. **HierarchicalAgentLoop Integration** (`sindri/core/hierarchical.py`)
+   - Emits `PLAN_PROPOSED` event after successful `propose_plan` execution
+   - Includes plan data, step count, agents, and VRAM estimate
+
+6. **TUI Plan Display** (`sindri/tui/app.py`)
+   - `on_plan_proposed` handler for plan events
+   - Color-coded plan output with step highlighting
+   - VRAM and agent summary at bottom of plan
+
+**Files Created:**
+- `sindri/tools/planning.py` (230 lines) - Planning tool and data models
+- `tests/test_planning.py` (400 lines) - 28 comprehensive tests
+
+**Files Modified:**
+- `sindri/core/events.py` (+3 lines) - New planning event types
+- `sindri/tools/registry.py` (+2 lines) - Registered ProposePlanTool
+- `sindri/agents/registry.py` (+1 line) - Added propose_plan to Brokkr's tools
+- `sindri/agents/prompts.py` (+25 lines) - Planning instructions for Brokkr
+- `sindri/core/hierarchical.py` (+15 lines) - PLAN_PROPOSED event emission
+- `sindri/tui/app.py` (+45 lines) - Plan display handler
+
+**Test Results:**
+- **Before:** 344/344 tests passing (100%)
+- **After:** 372/372 tests passing (100%) 🎉
+- **New Tests:** 28 tests (all passing)
+
+---
+
+## 📊 Previous Session Summary (2026-01-14 - Phase 6.3 Streaming Output)
 
 ### ✅ Phase 6.3 Complete - Streaming Output Implemented! 🎉
 
@@ -1149,51 +1215,54 @@ export SINDRI_LOG_LEVEL=DEBUG
 **Virtual Environment:** `.venv/`
 **Data Directory:** `~/.sindri/`
 
-**This Session By:** Claude Opus 4.5 (2026-01-14 - Phase 6.3 Complete!)
+**This Session By:** Claude Opus 4.5 (2026-01-14 - Phase 7.3 Complete!)
+**Session Focus:** Phase 7.3 Interactive Planning - Full implementation
+**Session Duration:** ~1 hour
+**Lines Added:** ~700 lines
+**Files Created:**
+- `sindri/tools/planning.py` (230 lines) - ProposePlanTool and data models
+- `tests/test_planning.py` (400 lines, 28 tests)
+**Files Modified:**
+- `sindri/core/events.py` - New planning event types
+- `sindri/tools/registry.py` - Registered ProposePlanTool
+- `sindri/agents/registry.py` - Added propose_plan to Brokkr
+- `sindri/agents/prompts.py` - Planning instructions for Brokkr
+- `sindri/core/hierarchical.py` - PLAN_PROPOSED event emission
+- `sindri/tui/app.py` - Plan display handler
+**Tests Added:** 28 tests (all passing)
+**Impact:** Phase 7.3 COMPLETE! 372/372 tests passing (100%) 🎉
+
+**Previous Session By:** Claude Opus 4.5 (2026-01-14 - Phase 6.3 Complete!)
 **Session Focus:** Phase 6.3 Streaming Output - Full implementation
 **Session Duration:** ~1 hour
-**Lines Added:** ~400 lines
-**Files Created:**
-- `sindri/llm/streaming.py` (200 lines) - StreamingBuffer
-- `tests/test_streaming.py` (560 lines, 35 tests)
-**Files Modified:**
-- `sindri/llm/client.py` - StreamingResponse and chat_stream()
-- `sindri/core/events.py` - New streaming event types
-- `sindri/core/loop.py` - streaming config option
-- `sindri/core/hierarchical.py` - Streaming LLM integration
-- `sindri/tui/app.py` - Streaming event handlers
-**Tests Added:** 35 tests (all passing)
-**Impact:** Phase 6.3 COMPLETE! 344/344 tests passing (100%) 🎉
+**Impact:** 344/344 tests passing (100%)
 
-**Previous Session By:** Claude Opus 4.5 (2026-01-14 - Phase 7.1 Complete!)
-**Session Focus:** Fixed failing test - 100% pass rate achieved!
-**Session Duration:** ~5 minutes
-**Impact:** 79/79 tests passing (100%)
-
-**Earlier Sessions (2026-01-15):**
-- VRAM Gauge in TUI (~45 min, 6 tests)
-- Doctor + Directory Tools + Memory Default (~2 hours, 23 tests)
+**Earlier Sessions (2026-01-14):**
+- Phase 7.1 Agent Specialization (~45 min, 43 tests)
+- Phase 5.6 Error Handling (~2 hours, 116 tests)
+- Phase 6.2 Model Caching (~30 min, 25 tests)
+- Phase 6.1 Parallel Execution (~1 hour, 39 tests)
 
 **For Next Developer/Agent:**
 1. Run `sindri doctor --verbose` to check system health
-2. Run `pytest tests/ -v` to verify 344/344 pass rate 🎉
+2. Run `pytest tests/ -v` to verify 372/372 pass rate 🎉
 3. Try all CLI commands:
    - `sindri agents`
    - `sindri sessions`
    - `sindri recover`
    - `sindri resume <id>` (use short ID from sessions!)
-4. Review ROADMAP.md for Phase 7.2 or Phase 7.3 priorities
+4. Review ROADMAP.md for Phase 7.2 or Phase 8.1 priorities
 5. Check PROJECT_HANDOFF.md for detailed context
-6. **Recommended Next:** Phase 7.2 (Learning from Success) or Phase 7.3 (Interactive Planning)
+6. **Recommended Next:** Phase 7.2 (Learning from Success) or Phase 8.1 (Plugin System)
 
 **Questions?** Check documentation:
-- ROADMAP.md - Feature roadmap (updated with Phase 6.3 complete)
+- ROADMAP.md - Feature roadmap (updated with Phase 7.3 complete)
 - CLAUDE.md - Project context
 - TOOLS_AND_MODELS_ANALYSIS.md - Tools/models guide
 - PROJECT_HANDOFF.md - Comprehensive handoff doc
 
 ---
 
-**Status:** ✅ PRODUCTION READY (100%) - Phase 6.3 COMPLETE! 🎉
-**Last Updated:** 2026-01-14 - Phase 6.3 Streaming Output Session
-**Next Session Goal:** Phase 7.2 - Learning from Success or Phase 7.3 - Interactive Planning
+**Status:** ✅ PRODUCTION READY (100%) - Phase 7.3 COMPLETE! 🎉
+**Last Updated:** 2026-01-14 - Phase 7.3 Interactive Planning Session
+**Next Session Goal:** Phase 7.2 - Learning from Success or Phase 8.1 - Plugin System

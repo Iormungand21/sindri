@@ -16,6 +16,7 @@ from sindri.tools.filesystem import (
     ReadTreeTool,
 )
 from sindri.tools.shell import ShellTool
+from sindri.tools.planning import ProposePlanTool
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -227,4 +228,5 @@ class ToolRegistry:
         registry.register(ListDirectoryTool(work_dir=work_dir))
         registry.register(ReadTreeTool(work_dir=work_dir))
         registry.register(ShellTool(work_dir=work_dir))
+        registry.register(ProposePlanTool(work_dir=work_dir))
         return registry

@@ -30,6 +30,10 @@ class EventType(Enum):
     STREAMING_TOKEN = auto()    # Individual token during streaming response
     STREAMING_START = auto()    # Streaming response started
     STREAMING_END = auto()      # Streaming response completed
+    # Phase 7.3: Interactive planning
+    PLAN_PROPOSED = auto()      # Execution plan created
+    PLAN_APPROVED = auto()      # User approved the plan
+    PLAN_REJECTED = auto()      # User rejected the plan
 
 
 @dataclass
