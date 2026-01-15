@@ -78,17 +78,60 @@ class AgentLoop:
             assistant_content = response.message.content
             log.info("llm_response", content=assistant_content[:200], has_tool_calls=response.message.tool_calls is not None)
 
-            # 3. Check completion
-            if self.completion.is_complete(assistant_content):
-                await self.state.complete_session(session.id)
-                return LoopResult(
-                    success=True,
-                    iterations=iteration + 1,
-                    reason="completion_marker",
-                    final_output=assistant_content
-                )
+            # 3. Execute tool calls FIRST (before checking completion)
+            # This ensures tools execute even if agent prematurely marks complete
+            tool_results = []
+            calls_to_execute = []
 
-            # 4. Check stuck
+            # Check for native tool calls first
+            if response.message.tool_calls:
+                log.info("tool_calls_detected", count=len(response.message.tool_calls))
+                calls_to_execute = response.message.tool_calls
+            else:
+                # Try parsing tool calls from text
+                from sindri.llm.tool_parser import ToolCallParser
+                parser = ToolCallParser()
+                parsed_calls = parser.parse(assistant_content)
+                if parsed_calls:
+                    log.info("parsed_tool_calls_from_text", count=len(parsed_calls))
+                    # Convert to native format
+                    class CallWrapper:
+                        def __init__(self, name, arguments):
+                            self.function = type('obj', (object,), {
+                                'name': name,
+                                'arguments': arguments
+                            })()
+                    calls_to_execute = [CallWrapper(c.name, c.arguments) for c in parsed_calls]
+
+            # Execute all tool calls
+            for call in calls_to_execute:
+                log.info("executing_tool", tool=call.function.name, args=call.function.arguments)
+                result = await self.tools.execute(
+                    call.function.name,
+                    call.function.arguments
+                )
+                tool_results.append({
+                    "tool": call.function.name,
+                    "result": result.output if result.success else f"ERROR: {result.error}"
+                })
+                log.info("tool_executed", tool=call.function.name, success=result.success)
+
+            # 4. Check completion (after tool execution)
+            if self.completion.is_complete(assistant_content):
+                # Only complete if no tools were just executed
+                if not tool_results:
+                    await self.state.complete_session(session.id)
+                    return LoopResult(
+                        success=True,
+                        iterations=iteration + 1,
+                        reason="completion_marker",
+                        final_output=assistant_content
+                    )
+                else:
+                    # Tools executed - continue to show agent the results
+                    log.warning("completion_marker_with_tools", message="Agent marked complete but tools executed - continuing")
+
+            # 5. Check stuck
             recent_responses.append(assistant_content)
             if len(recent_responses) > self.config.stuck_threshold:
                 recent_responses.pop(0)
@@ -99,22 +142,6 @@ class AgentLoop:
                 session.add_turn("user", "You seem stuck. Try a different approach or ask for clarification.")
                 recent_responses.clear()
                 continue
-
-            # 5. Execute tool calls
-            tool_results = []
-            if response.message.tool_calls:
-                log.info("tool_calls_detected", count=len(response.message.tool_calls))
-                for call in response.message.tool_calls:
-                    log.info("executing_tool", tool=call.function.name, args=call.function.arguments)
-                    result = await self.tools.execute(
-                        call.function.name,
-                        call.function.arguments
-                    )
-                    tool_results.append({
-                        "tool": call.function.name,
-                        "result": result.output if result.success else f"ERROR: {result.error}"
-                    })
-                    log.info("tool_executed", tool=call.function.name, success=result.success)
 
             # 6. Update session
             session.add_turn("assistant", assistant_content, tool_calls=response.message.tool_calls)

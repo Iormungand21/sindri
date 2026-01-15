@@ -47,8 +47,14 @@ DELEGATION RULES:
 
 ═══════════════════════════════════════════════════════════════════
 
-COMPLETION:
-When task is done (either by you or delegated child), output: <sindri:complete/>
+IMPORTANT - TOOL EXECUTION FLOW:
+1. Call tools (write_file, read_file, edit_file, shell, or delegate)
+2. **WAIT FOR TOOL RESULTS** - Do NOT mark complete yet!
+3. Review the tool results in the next iteration
+4. ONLY THEN output: <sindri:complete/>
+
+NEVER output <sindri:complete/> in the same message as tool calls!
+The system executes tools between iterations - you must wait for results first.
 
 Be efficient. Most tasks are simpler than they appear.
 """

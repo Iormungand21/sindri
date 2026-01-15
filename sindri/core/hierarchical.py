@@ -277,58 +277,14 @@ class HierarchicalAgentLoop:
                 }
             ))
 
-            # Check completion
-            if completion_detector.is_complete(assistant_content):
-                await self.state.complete_session(session.id)
-
-                # Store episode if memory available
-                if self.memory and self.summarizer:
-                    try:
-                        # Summarize the conversation
-                        conversation = [
-                            {"role": turn.role, "content": turn.content}
-                            for turn in session.turns
-                        ]
-                        summary = await self.summarizer.summarize(task.description, conversation)
-
-                        # Store episode
-                        self.memory.store_episode(
-                            project_id=project_id,
-                            event_type="task_complete",
-                            content=summary,
-                            metadata={
-                                "task_id": task.id,
-                                "agent": agent.name,
-                                "iterations": iteration + 1
-                            }
-                        )
-                        log.info("episode_stored", task_id=task.id)
-                    except Exception as e:
-                        log.warning("episode_storage_failed", error=str(e))
-
-                return LoopResult(
-                    success=True,
-                    iterations=iteration + 1,
-                    reason="completion_marker",
-                    final_output=assistant_content
-                )
-
-            # Check stuck
-            recent_responses.append(assistant_content)
-            if len(recent_responses) > self.config.stuck_threshold:
-                recent_responses.pop(0)
-
-            if self._is_stuck(recent_responses):
-                log.warning("stuck_detected", task_id=task.id)
-                session.add_turn("user", "You seem stuck. Try a different approach or ask for clarification.")
-                recent_responses.clear()
-                continue
-
-            # Execute tool calls (native or parsed from text)
+            # Execute tool calls FIRST (before checking completion)
+            # This ensures tools are executed even if agent prematurely marks complete
             tool_results = []
             calls_to_execute = []
 
             # Check for native tool calls first
+            log.info("tool_check", native_tool_calls=response.message.tool_calls,
+                     content_has_json="{" in assistant_content)
             if response.message.tool_calls:
                 log.info("native_tool_calls_detected",
                          task_id=task.id,
@@ -336,7 +292,9 @@ class HierarchicalAgentLoop:
                 calls_to_execute = response.message.tool_calls
             else:
                 # Try parsing tool calls from text
+                log.info("attempting_tool_parse", content_preview=assistant_content[:200])
                 parsed_calls = tool_parser.parse(assistant_content)
+                log.info("parse_result", parsed_count=len(parsed_calls) if parsed_calls else 0)
                 if parsed_calls:
                     log.info("parsed_tool_calls_from_text",
                              task_id=task.id,
@@ -388,7 +346,26 @@ class HierarchicalAgentLoop:
                     log.info("delegation_in_progress",
                              task_id=task.id,
                              pausing="waiting for child")
-                    # Task will resume when child completes
+
+                    # Update session with delegation result
+                    session.add_turn("assistant", assistant_content, tool_calls=response.message.tool_calls)
+                    if tool_results:
+                        session.add_turn("tool", str(tool_results))
+                    session.iterations = iteration + 1
+                    await self.state.save_session(session)
+
+                    # RETURN from loop - parent will resume when child completes
+                    # (DelegationManager sets parent status to WAITING and will
+                    # set it back to PENDING + re-add to queue when child finishes)
+                    log.info("parent_paused_for_delegation",
+                            task_id=task.id,
+                            iterations=iteration + 1)
+                    return LoopResult(
+                        success=None,  # Not complete yet, waiting for child
+                        iterations=iteration + 1,
+                        reason="delegation_waiting",
+                        final_output="Waiting for delegated child task to complete"
+                    )
 
             # Update session
             session.add_turn("assistant", assistant_content, tool_calls=response.message.tool_calls)
@@ -399,6 +376,71 @@ class HierarchicalAgentLoop:
             session.iterations = iteration + 1
             if iteration % self.config.checkpoint_interval == 0:
                 await self.state.save_session(session)
+
+            # NOW check completion (after tools executed)
+            if completion_detector.is_complete(assistant_content):
+                # Only complete if no tools were just executed (tools need results first)
+                if not tool_results:
+                    # Validate that completion is legitimate (work was actually done)
+                    if self._validate_completion(session, task, assistant_content):
+                        await self.state.complete_session(session.id)
+
+                        # Store episode if memory available
+                        if self.memory and self.summarizer:
+                            try:
+                                # Summarize the conversation
+                                conversation = [
+                                    {"role": turn.role, "content": turn.content}
+                                    for turn in session.turns
+                                ]
+                                summary = await self.summarizer.summarize(task.description, conversation)
+
+                                # Store episode
+                                self.memory.store_episode(
+                                    project_id=project_id,
+                                    event_type="task_complete",
+                                    content=summary,
+                                    metadata={
+                                        "task_id": task.id,
+                                        "agent": agent.name,
+                                        "iterations": iteration + 1
+                                    }
+                                )
+                                log.info("episode_stored", task_id=task.id)
+                            except Exception as e:
+                                log.warning("episode_storage_failed", error=str(e))
+
+                        return LoopResult(
+                            success=True,
+                            iterations=iteration + 1,
+                            reason="completion_marker",
+                            final_output=assistant_content
+                        )
+                    else:
+                        # Completion marker found but validation failed
+                        log.warning("invalid_completion_rejected",
+                                   task_id=task.id,
+                                   reason="No evidence of work done",
+                                   message="Agent marked complete but validation failed - continuing")
+                        session.add_turn("user",
+                                       "You marked the task complete, but I don't see evidence that you performed the requested work. Please actually complete the task before marking it done.")
+                else:
+                    # Tools were executed - agent marked complete prematurely
+                    # Continue to next iteration to let agent see tool results
+                    log.warning("completion_marker_with_tools",
+                               task_id=task.id,
+                               message="Agent marked complete but tools were just executed - continuing")
+
+            # Check stuck
+            recent_responses.append(assistant_content)
+            if len(recent_responses) > self.config.stuck_threshold:
+                recent_responses.pop(0)
+
+            if self._is_stuck(recent_responses):
+                log.warning("stuck_detected", task_id=task.id)
+                session.add_turn("user", "You seem stuck. Try a different approach or ask for clarification.")
+                recent_responses.clear()
+                continue
 
         return LoopResult(
             success=False,
@@ -456,6 +498,55 @@ class HierarchicalAgentLoop:
         if len(responses) < self.config.stuck_threshold:
             return False
         return len(set(responses)) == 1
+
+    def _validate_completion(self, session, task, final_response: str) -> bool:
+        """Validate that a completion marker is legitimate.
+
+        Returns True if the agent actually did work, False if it's a false completion.
+        """
+        # Check 1: Were any tools executed during this session?
+        tool_turns = [turn for turn in session.turns if turn.role == "tool"]
+        if tool_turns:
+            log.info("completion_validation_passed",
+                    reason="tools_executed",
+                    tool_count=len(tool_turns))
+            return True
+
+        # Check 2: Is there substantive output in the final response?
+        # (More than just the completion marker)
+        response_without_marker = final_response.replace("<sindri:complete/>", "").strip()
+        if len(response_without_marker) > 100:
+            log.info("completion_validation_passed",
+                    reason="substantive_output",
+                    output_length=len(response_without_marker))
+            return True
+
+        # Check 3: For action-oriented tasks, require evidence of action
+        action_keywords = [
+            "create", "write", "edit", "modify", "update", "delete", "remove",
+            "implement", "build", "refactor", "review", "analyze", "fix"
+        ]
+        task_lower = task.description.lower()
+        requires_action = any(keyword in task_lower for keyword in action_keywords)
+
+        if requires_action:
+            log.warning("completion_validation_failed",
+                       reason="action_required_but_no_tools",
+                       task_preview=task.description[:100])
+            return False
+
+        # Check 4: Very short sessions (< 3 turns) with no tools are suspicious
+        if len(session.turns) < 3 and not tool_turns:
+            log.warning("completion_validation_failed",
+                       reason="suspiciously_short_session",
+                       turn_count=len(session.turns))
+            return False
+
+        # If none of the above checks failed, accept completion
+        log.info("completion_validation_passed",
+                reason="default",
+                turn_count=len(session.turns))
+        return True
 
     def _build_system_message(
         self,
