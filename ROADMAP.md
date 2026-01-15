@@ -39,10 +39,10 @@
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
 3. **This file** - See "Phase 8.2 Agent Marketplace" for next priority
 
-### Recommended Next: Phase 8.2 - Agent Marketplace
-- **Phase 8.2 Goal:** Share and discover community plugins
-- **Effort:** 2-3 days
-- **Impact:** MEDIUM - Community plugin ecosystem
+### Recommended Next: Phase 8.3 - Web UI
+- **Phase 8.3 Goal:** Web-based interface with rich visualization
+- **Effort:** 3-5 days
+- **Impact:** HIGH - Better UX for complex workflows
 
 ### Need Help?
 - Check tests for examples: `tests/test_*.py`
@@ -893,38 +893,9 @@ content = "You are Thor, the performance optimizer..."
 
 ---
 
-### 8.2 Agent Marketplace (Low Priority)
+### ~~8.2 Agent Marketplace~~ (SKIPPED)
 
-**Concept:** Share and discover community agents/tools
-
-#### Features:
-
-**CLI Integration:**
-```bash
-# Browse available plugins
-sindri plugins search "testing"
-
-# Install plugin
-sindri plugins install community/playwright-tool
-
-# List installed
-sindri plugins list
-
-# Update all
-sindri plugins update
-```
-
-**Plugin Repository:**
-- GitHub-based (like Homebrew)
-- Versioned plugins
-- Community ratings/reviews
-- Security scanning
-
-**Plugin Manager** (`sindri/plugins/manager.py`):
-- Install/uninstall
-- Dependency resolution
-- Version pinning
-- Automatic updates
+**Status:** ❌ Not planned - User preference to skip community marketplace features.
 
 ---
 
@@ -1063,8 +1034,7 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Codebase understanding~~ | High | Medium | ✅ Complete | 7.4 | Done 2026-01-15 |
 | ~~Plugin system~~ | Medium | High | ✅ Complete | 8.1 | Done 2026-01-15 |
 | TUI enhancements | Medium | Medium | 🟡 Later | 5.5 | History/export |
-| Agent Marketplace | Medium | High | 🟢 Next | 8.2 | Future |
-| Web UI | High | Very High | 🟢 Later | 8.3 | Future |
+| Web UI | High | Very High | 🟢 Next | 8.3 | Future |
 
 ---
 

@@ -11,7 +11,7 @@
 **Just Completed:** Plugin System ✓ (2026-01-15)
 **Test Status:** 487/487 tests, **487 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 8.2 (Agent Marketplace) or Phase 8.3 (Web UI)
+**Next Priority:** Phase 8.3 (Web UI) or Phase 5.5 (TUI Enhancements)
 
 **Key New Features (Phase 8.1 - Plugin System):**
 - **PluginLoader** - Auto-discovers tool plugins (*.py) and agent configs (*.toml)
@@ -1425,4 +1425,4 @@ export SINDRI_LOG_LEVEL=DEBUG
 
 **Status:** ✅ PRODUCTION READY (100%) - Phase 8.1 COMPLETE! 🎉
 **Last Updated:** 2026-01-15 - Phase 8.1 Plugin System Session
-**Next Session Goal:** Phase 8.2 - Agent Marketplace or Phase 8.3 - Web UI
+**Next Session Goal:** Phase 8.3 - Web UI or Phase 5.5 - TUI Enhancements
