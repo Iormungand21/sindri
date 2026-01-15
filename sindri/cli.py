@@ -273,6 +273,206 @@ def sessions():
 
 
 @cli.command()
+@click.argument("session_id", required=False)
+@click.option("--aggregate", "-a", is_flag=True, help="Show aggregate statistics across all sessions")
+@click.option("--tools", "-t", is_flag=True, help="Show tool breakdown")
+@click.option("--limit", "-l", default=10, help="Number of sessions to list")
+def metrics(session_id: str = None, aggregate: bool = False, tools: bool = False, limit: int = 10):
+    """View performance metrics for sessions.
+
+    Without arguments, lists recent sessions with their metrics.
+    With SESSION_ID, shows detailed metrics for that session.
+
+    Examples:
+
+        sindri metrics                  # List recent sessions
+
+        sindri metrics abc12345         # Detailed metrics for session
+
+        sindri metrics -a               # Aggregate stats
+
+        sindri metrics abc12345 -t      # Show tool breakdown
+    """
+    from rich.table import Table
+    from sindri.persistence.metrics import MetricsStore, SessionMetrics
+
+    async def show_metrics():
+        store = MetricsStore()
+
+        if aggregate:
+            # Show aggregate statistics
+            stats = await store.get_aggregate_stats()
+
+            console.print("[bold]📊 Aggregate Metrics[/]\n")
+
+            if stats["total_sessions"] == 0:
+                console.print("[yellow]No metrics recorded yet[/]")
+                console.print("[dim]Run some tasks to collect metrics[/dim]")
+                return
+
+            table = Table(show_header=False, box=None)
+            table.add_column("Stat", style="dim")
+            table.add_column("Value", style="bold")
+
+            # Format duration
+            total_secs = stats["total_duration_seconds"]
+            if total_secs > 3600:
+                duration_str = f"{total_secs / 3600:.1f} hours"
+            elif total_secs > 60:
+                duration_str = f"{total_secs / 60:.1f} minutes"
+            else:
+                duration_str = f"{total_secs:.1f} seconds"
+
+            avg_secs = stats["avg_duration_seconds"]
+            if avg_secs > 60:
+                avg_str = f"{avg_secs / 60:.1f} min"
+            else:
+                avg_str = f"{avg_secs:.1f}s"
+
+            table.add_row("Total Sessions", str(stats["total_sessions"]))
+            table.add_row("Total Time", duration_str)
+            table.add_row("Avg Session", avg_str)
+            table.add_row("Total Iterations", str(stats["total_iterations"]))
+            table.add_row("Avg Iterations", f"{stats['avg_iterations']:.1f}")
+            table.add_row("Total Tool Calls", str(stats["total_tool_executions"]))
+
+            console.print(table)
+            return
+
+        if session_id:
+            # Show detailed metrics for a specific session
+            # Resolve short session ID
+            full_session_id = session_id
+            if len(session_id) < 36:
+                all_sessions = await store.list_metrics(limit=100)
+                matching = [s for s in all_sessions if s["session_id"].startswith(session_id)]
+
+                if not matching:
+                    console.print(f"[red]✗ No metrics found for session {session_id}[/]")
+                    console.print("[dim]Use 'sindri metrics' to list sessions with metrics[/dim]")
+                    return
+                elif len(matching) > 1:
+                    console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
+                    for m in matching:
+                        console.print(f"  • {m['session_id'][:8]} - {m['task'][:50]}")
+                    return
+
+                full_session_id = matching[0]["session_id"]
+
+            # Load full metrics
+            metrics = await store.load_metrics(full_session_id)
+
+            if not metrics:
+                console.print(f"[red]✗ No metrics found for {full_session_id}[/]")
+                return
+
+            # Show summary
+            summary = metrics.get_summary()
+            console.print(f"[bold]📊 Metrics: {full_session_id[:8]}[/]\n")
+            console.print(f"[dim]Task:[/] {metrics.task_description[:80]}")
+            console.print(f"[dim]Model:[/] {metrics.model_name}")
+            console.print(f"[dim]Status:[/] {metrics.status}")
+            console.print()
+
+            # Time breakdown
+            console.print("[bold]⏱ Time Breakdown:[/]")
+            time_table = Table(show_header=False, box=None)
+            time_table.add_column("Category", style="dim")
+            time_table.add_column("Time", style="bold")
+
+            time_table.add_row("Total Duration", summary["duration_formatted"])
+            time_table.add_row("LLM Inference", f"{summary['time_breakdown']['llm_inference']:.2f}s")
+            time_table.add_row("Tool Execution", f"{summary['time_breakdown']['tool_execution']:.2f}s")
+            time_table.add_row("Model Loading", f"{summary['time_breakdown']['model_loading']:.2f}s")
+
+            console.print(time_table)
+            console.print()
+
+            # Iteration summary
+            console.print("[bold]🔄 Iterations:[/]")
+            console.print(f"  Total: {summary['total_iterations']}")
+            console.print(f"  Avg Time: {summary['avg_iteration_time']:.2f}s")
+            console.print()
+
+            # Tool summary
+            console.print("[bold]🔧 Tools:[/]")
+            console.print(f"  Total Calls: {summary['total_tool_executions']}")
+
+            if tools:
+                # Show detailed tool breakdown
+                console.print()
+                breakdown = metrics.get_tool_breakdown()
+                if breakdown:
+                    tool_table = Table()
+                    tool_table.add_column("Tool")
+                    tool_table.add_column("Calls", justify="right")
+                    tool_table.add_column("Total Time", justify="right")
+                    tool_table.add_column("Avg Time", justify="right")
+                    tool_table.add_column("Success Rate", justify="right")
+
+                    for tool_name, data in sorted(breakdown.items(), key=lambda x: x[1]["count"], reverse=True):
+                        success_rate = data["successes"] / data["count"] * 100 if data["count"] > 0 else 0
+                        success_color = "green" if success_rate == 100 else ("yellow" if success_rate >= 50 else "red")
+                        tool_table.add_row(
+                            tool_name,
+                            str(data["count"]),
+                            f"{data['total_time']:.2f}s",
+                            f"{data['avg_time']:.3f}s",
+                            f"[{success_color}]{success_rate:.0f}%[/{success_color}]"
+                        )
+
+                    console.print(tool_table)
+                else:
+                    console.print("[dim]  No tools executed[/dim]")
+
+            return
+
+        # List recent sessions with metrics
+        sessions = await store.list_metrics(limit=limit)
+
+        if not sessions:
+            console.print("[yellow]No metrics found[/]")
+            console.print("[dim]Run some tasks to collect metrics[/dim]")
+            return
+
+        console.print("[bold]📊 Recent Session Metrics[/]\n")
+
+        table = Table()
+        table.add_column("Session")
+        table.add_column("Task")
+        table.add_column("Duration", justify="right")
+        table.add_column("Iterations", justify="right")
+        table.add_column("Tools", justify="right")
+        table.add_column("Status")
+
+        for s in sessions:
+            # Format duration
+            secs = s["duration_seconds"]
+            if secs > 60:
+                duration_str = f"{secs / 60:.1f}m"
+            else:
+                duration_str = f"{secs:.1f}s"
+
+            status_color = "green" if s["status"] == "completed" else "yellow"
+            status_short = "✓" if s["status"] == "completed" else "●"
+
+            table.add_row(
+                s["session_id"][:8],
+                s["task"][:40] + "..." if len(s["task"]) > 40 else s["task"],
+                duration_str,
+                str(s["total_iterations"]),
+                str(s["total_tool_executions"]),
+                f"[{status_color}]{status_short}[/{status_color}]"
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Use 'sindri metrics <session_id>' for details[/dim]")
+        console.print("[dim]Use 'sindri metrics -a' for aggregate statistics[/dim]")
+
+    asyncio.run(show_metrics())
+
+
+@cli.command()
 @click.argument("session_id")
 @click.argument("output", required=False, type=click.Path())
 @click.option("--no-metadata", is_flag=True, help="Exclude metadata section")

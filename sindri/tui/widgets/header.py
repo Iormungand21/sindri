@@ -1,4 +1,7 @@
-"""Custom header widget with VRAM gauge."""
+"""Custom header widget with VRAM gauge and task metrics.
+
+Phase 5.5: Added task duration and iteration display.
+"""
 
 from textual.widgets import Static
 from textual.reactive import reactive
@@ -6,11 +9,14 @@ from rich.text import Text
 
 
 class SindriHeader(Static):
-    """Custom header with VRAM usage gauge."""
+    """Custom header with VRAM usage gauge and task metrics."""
 
     vram_used = reactive(0.0)
     vram_total = reactive(16.0)
     loaded_models = reactive([])
+    # Phase 5.5: Task metrics
+    task_duration = reactive(0.0)  # Current task duration in seconds
+    current_iteration = reactive(0)  # Current iteration number
 
     DEFAULT_CSS = """
     SindriHeader {
@@ -76,6 +82,23 @@ class SindriHeader(Static):
                 models_count = len(self.loaded_models)
                 text.append(f" ({models_count} model{'s' if models_count != 1 else ''})", style="dim cyan")
 
+        # Phase 5.5: Show task metrics if running
+        if self.task_duration > 0 or self.current_iteration > 0:
+            text.append(" │ ", style="dim")
+            if self.current_iteration > 0:
+                text.append(f"Iter {self.current_iteration}", style="bold cyan")
+                text.append(" ", style="dim")
+
+            # Format duration
+            if self.task_duration >= 60:
+                mins = int(self.task_duration // 60)
+                secs = int(self.task_duration % 60)
+                duration_str = f"{mins}m{secs}s"
+            else:
+                duration_str = f"{self.task_duration:.1f}s"
+
+            text.append(f"⏱ {duration_str}", style="yellow")
+
         return text
 
     def update_vram(self, used: float, total: float, loaded_models: list[str]):
@@ -83,3 +106,20 @@ class SindriHeader(Static):
         self.vram_used = used
         self.vram_total = total
         self.loaded_models = loaded_models
+
+    def update_task_metrics(self, duration: float, iteration: int):
+        """Update task metrics display.
+
+        Phase 5.5: Called from TUI app on METRICS_UPDATED events.
+
+        Args:
+            duration: Task duration in seconds
+            iteration: Current iteration number
+        """
+        self.task_duration = duration
+        self.current_iteration = iteration
+
+    def reset_task_metrics(self):
+        """Reset task metrics when task completes or is cleared."""
+        self.task_duration = 0.0
+        self.current_iteration = 0

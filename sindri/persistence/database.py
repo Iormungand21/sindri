@@ -9,7 +9,8 @@ import structlog
 log = structlog.get_logger()
 
 # Current schema version for migration tracking
-SCHEMA_VERSION = 1
+# Version 2: Added session_metrics table for performance tracking
+SCHEMA_VERSION = 2
 
 
 class Database:
@@ -104,6 +105,20 @@ class Database:
             await db.execute("""
                 CREATE INDEX IF NOT EXISTS idx_turns_session
                 ON turns(session_id)
+            """)
+
+            # Phase 5.5: Performance metrics table
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS session_metrics (
+                    session_id TEXT PRIMARY KEY,
+                    metrics_json TEXT NOT NULL,
+                    duration_seconds REAL,
+                    total_iterations INTEGER DEFAULT 0,
+                    total_tool_executions INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
             """)
 
             # Update schema version

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 import os
+import time
 import structlog
 
 from sindri.llm.client import OllamaClient
@@ -10,6 +11,7 @@ from sindri.llm.streaming import StreamingBuffer
 from sindri.tools.registry import ToolRegistry
 from sindri.tools.delegation import DelegateTool
 from sindri.persistence.state import SessionState
+from sindri.persistence.metrics import MetricsCollector, MetricsStore, SessionMetrics
 from sindri.core.loop import LoopConfig, LoopResult
 from sindri.core.completion import CompletionDetector
 from sindri.core.context import ContextBuilder
@@ -40,7 +42,8 @@ class HierarchicalAgentLoop:
         memory: Optional[MuninnMemory] = None,
         summarizer: Optional[ConversationSummarizer] = None,
         event_bus: Optional[EventBus] = None,
-        recovery: Optional[RecoveryManager] = None
+        recovery: Optional[RecoveryManager] = None,
+        enable_metrics: bool = True  # Phase 5.5: Performance metrics
     ):
         self.client = client
         self.tools = tools
@@ -54,6 +57,10 @@ class HierarchicalAgentLoop:
         self.event_bus = event_bus or EventBus()
         self.recovery = recovery  # Phase 5.6: Recovery manager for error checkpoints
         self._indexed_projects = set()  # Track indexed projects
+        # Phase 5.5: Performance metrics
+        self.enable_metrics = enable_metrics
+        self._metrics_store = MetricsStore() if enable_metrics else None
+        self._metrics_collectors: dict[str, MetricsCollector] = {}  # Per-session collectors
 
     async def run_task(self, task: Task) -> LoopResult:
         """Run a specific task with its assigned agent."""
@@ -239,6 +246,25 @@ class HierarchicalAgentLoop:
             self._indexed_projects.add(project_id)
             log.info("project_indexed", files=indexed, project_id=project_id)
 
+        # Phase 5.5: Initialize metrics collector for this session
+        metrics_collector = None
+        if self.enable_metrics:
+            metrics_collector = MetricsCollector(
+                session_id=session.id,
+                task_description=task.description,
+                model_name=model_to_use
+            )
+            self._metrics_collectors[session.id] = metrics_collector
+            # Start task tracking
+            metrics_collector.start_task(
+                task_id=task.id,
+                description=task.description,
+                agent_name=agent.name,
+                model_name=model_to_use,
+                model_load_time=0.0  # TODO: Track actual model load time
+            )
+            log.debug("metrics_collector_initialized", session_id=session.id)
+
         recent_responses = []
         tool_call_history = []  # Phase 5.6: Track tool calls for repetition detection
         nudge_count = 0         # Phase 5.6: Track nudges for escalation
@@ -315,6 +341,15 @@ class HierarchicalAgentLoop:
                     "agent": agent.name
                 }
             ))
+
+            # Phase 5.5: Start iteration timing
+            iteration_start_time = time.time()
+            if metrics_collector:
+                metrics_collector.start_iteration(
+                    iteration_number=iteration + 1,
+                    agent_name=agent.name,
+                    model_name=model_to_use
+                )
 
             # Build messages with memory-augmented context if available
             if self.memory:
@@ -447,10 +482,24 @@ class HierarchicalAgentLoop:
                          tool=call.function.name,
                          args=call.function.arguments)
 
+                # Phase 5.5: Track tool execution timing
+                tool_start_time = time.time()
+
                 result = await task_tools.execute(
                     call.function.name,
                     call.function.arguments
                 )
+
+                # Phase 5.5: Record tool execution metrics
+                tool_end_time = time.time()
+                if metrics_collector:
+                    metrics_collector.record_tool_execution(
+                        tool_name=call.function.name,
+                        start_time=tool_start_time,
+                        end_time=tool_end_time,
+                        success=result.success,
+                        arguments=call.function.arguments if isinstance(call.function.arguments, dict) else None
+                    )
 
                 tool_results.append({
                     "tool": call.function.name,
@@ -535,6 +584,21 @@ class HierarchicalAgentLoop:
             if iteration % self.config.checkpoint_interval == 0:
                 await self.state.save_session(session)
 
+            # Phase 5.5: End iteration timing
+            if metrics_collector:
+                metrics_collector.end_iteration()
+                # Emit metrics update event for TUI
+                self.event_bus.emit(Event(
+                    type=EventType.METRICS_UPDATED,
+                    data={
+                        "task_id": task.id,
+                        "session_id": session.id,
+                        "iteration": iteration + 1,
+                        "duration_seconds": metrics_collector.get_session_duration()
+                    },
+                    task_id=task.id
+                ))
+
             # NOW check completion (after tools executed)
             if completion_detector.is_complete(assistant_content):
                 # Only complete if no tools were just executed (tools need results first)
@@ -599,6 +663,20 @@ class HierarchicalAgentLoop:
                             except Exception as e:
                                 log.warning("episode_storage_failed", error=str(e))
 
+                        # Phase 5.5: Save session metrics on successful completion
+                        if metrics_collector and self._metrics_store:
+                            try:
+                                metrics_collector.end_task(status="completed")
+                                metrics_collector.end_session(status="completed")
+                                await self._metrics_store.save_metrics(
+                                    metrics_collector.get_metrics()
+                                )
+                                log.info("session_metrics_saved",
+                                        session_id=session.id,
+                                        duration=metrics_collector.get_session_duration())
+                            except Exception as e:
+                                log.warning("metrics_save_failed", error=str(e))
+
                         return LoopResult(
                             success=True,
                             iterations=iteration + 1,
@@ -661,6 +739,17 @@ class HierarchicalAgentLoop:
                         error_context={"nudge_count": nudge_count, "stuck_reason": stuck_reason}
                     )
 
+                    # Phase 5.5: Save session metrics on stuck failure
+                    if metrics_collector and self._metrics_store:
+                        try:
+                            metrics_collector.end_task(status="failed_stuck")
+                            metrics_collector.end_session(status="failed")
+                            await self._metrics_store.save_metrics(
+                                metrics_collector.get_metrics()
+                            )
+                        except Exception as e:
+                            log.warning("metrics_save_failed", error=str(e))
+
                     return LoopResult(
                         success=False,
                         iterations=iteration + 1,
@@ -689,6 +778,17 @@ class HierarchicalAgentLoop:
             iteration=agent.max_iterations,
             error_context={"max_iterations": agent.max_iterations}
         )
+
+        # Phase 5.5: Save session metrics on max iterations
+        if metrics_collector and self._metrics_store:
+            try:
+                metrics_collector.end_task(status="max_iterations")
+                metrics_collector.end_session(status="max_iterations")
+                await self._metrics_store.save_metrics(
+                    metrics_collector.get_metrics()
+                )
+            except Exception as e:
+                log.warning("metrics_save_failed", error=str(e))
 
         return LoopResult(
             success=False,

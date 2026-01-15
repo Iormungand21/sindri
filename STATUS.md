@@ -1,19 +1,29 @@
 # Sindri Project Status Report
-**Date:** 2026-01-15 (Phase 5.5 Conversation Export Complete!)
-**Session:** Phase 5.5 TUI Enhancements - Conversation Export
+**Date:** 2026-01-15 (Phase 5.5 Performance Metrics Complete!)
+**Session:** Phase 5.5 TUI Enhancements - Performance Metrics
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 5.5 Complete! 🎉
-**Just Completed:** Conversation Export ✓ (2026-01-15)
-**Test Status:** 515/515 tests, **515 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 5.5 Performance Metrics Complete! 🎉
+**Just Completed:** Performance Metrics ✓ (2026-01-15)
+**Test Status:** 538/538 tests, **538 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 8.3 (Web UI) or remaining Phase 5.5 features (Task History, Metrics)
+**Next Priority:** Phase 8.3 (Web UI) or remaining Phase 5.5 features (Task History Panel)
 
-**Key New Features (Phase 5.5 - Conversation Export):**
+**Key New Features (Phase 5.5 - Performance Metrics):**
+- **MetricsCollector** - Collects timing data during task execution
+- **SessionMetrics** - Detailed metrics with task/iteration/tool timing breakdown
+- **MetricsStore** - SQLite persistence for session metrics
+- **CLI Command** - `sindri metrics [session_id]` with aggregate stats support
+- **TUI Integration** - Real-time duration and iteration display in header
+- **Time Breakdown** - LLM inference vs tool execution vs model loading
+- **Tool Analysis** - Success rates, execution counts, average times per tool
+- **23 new tests** - Comprehensive metrics coverage
+
+**Previous Features (Phase 5.5 - Conversation Export):**
 - **MarkdownExporter** - Export sessions to formatted Markdown documents
 - **CLI Command** - `sindri export <session_id> [output.md]` with short ID support
 - **TUI Integration** - Press `e` to export most recent completed session
@@ -111,11 +121,12 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (515/515 passing!)
+# Run all tests (538/538 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_export.py -v                  # Phase 5.5 export tests (NEW!)
+.venv/bin/pytest tests/test_metrics.py -v                 # Phase 5.5 metrics tests (NEW!)
+.venv/bin/pytest tests/test_export.py -v                  # Phase 5.5 export tests
 .venv/bin/pytest tests/test_plugins.py -v                 # Phase 8.1 plugin tests
 .venv/bin/pytest tests/test_codebase_understanding.py -v  # Phase 7.4 codebase tests
 .venv/bin/pytest tests/test_learning.py -v                # Phase 7.2 learning tests
@@ -134,7 +145,10 @@
 # CLI Commands
 .venv/bin/sindri agents              # List all agents
 .venv/bin/sindri sessions            # List recent sessions
-.venv/bin/sindri export <id>         # Export session to markdown (NEW!)
+.venv/bin/sindri metrics             # View performance metrics (NEW!)
+.venv/bin/sindri metrics <id>        # Detailed metrics for session
+.venv/bin/sindri metrics -a          # Aggregate statistics
+.venv/bin/sindri export <id>         # Export session to markdown
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri plugins list        # List installed plugins
 .venv/bin/sindri plugins dirs        # Show plugin directories
@@ -152,13 +166,92 @@
 1. **Start here:** Read this STATUS.md - current state, what works, what's next
 2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
 3. **Roadmap:** See ROADMAP.md for Phase 8.3 (Web UI) or remaining Phase 5.5 features
-4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 515 tests should pass
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 538 tests should pass
 5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
-6. **Export sessions:** Try `sindri sessions` then `sindri export <session_id>`
+6. **View metrics:** Try `sindri metrics` then `sindri metrics <session_id> -t`
 
 ---
 
-## 📊 Session Summary (2026-01-15 - Phase 5.5 Conversation Export)
+## 📊 Session Summary (2026-01-15 - Phase 5.5 Performance Metrics)
+
+### ✅ Phase 5.5 (Partial) Complete - Performance Metrics Implemented! 🎉
+
+**Implementation Time:** ~1 hour
+
+**Core Changes:**
+
+1. **Metrics Data Models** (`sindri/persistence/metrics.py` - NEW)
+   - `ToolExecutionMetrics` - Individual tool timing data
+   - `IterationMetrics` - Per-iteration timing with tool breakdown
+   - `TaskMetrics` - Aggregate task-level metrics
+   - `SessionMetrics` - Full session metrics with serialization
+   - `MetricsCollector` - Collects timing during execution
+   - `MetricsStore` - SQLite persistence for metrics
+
+2. **Database Schema** (`sindri/persistence/database.py`)
+   - New `session_metrics` table for storing metrics JSON
+   - Schema version bumped to 2
+   - Indexes for efficient queries
+
+3. **Core Loop Integration** (`sindri/core/hierarchical.py`)
+   - Metrics collection initialized per session
+   - Iteration timing tracked (start/end)
+   - Tool execution timing recorded
+   - Metrics saved on task completion (success/failure)
+   - `METRICS_UPDATED` event for TUI display
+
+4. **Event System** (`sindri/core/events.py`)
+   - New `METRICS_UPDATED` event type for real-time updates
+
+5. **CLI Command** (`sindri/cli.py`)
+   - `sindri metrics` - List sessions with metrics summary
+   - `sindri metrics <session_id>` - Detailed session metrics
+   - `sindri metrics -a` - Aggregate statistics
+   - `sindri metrics <id> -t` - Tool breakdown analysis
+   - Short session ID support
+
+6. **TUI Integration** (`sindri/tui/widgets/header.py`, `sindri/tui/app.py`)
+   - Real-time iteration counter in header
+   - Task duration display (updates per iteration)
+   - Auto-reset on task completion
+
+**Files Created:**
+- `sindri/persistence/metrics.py` (520 lines) - Metrics data models and storage
+- `tests/test_metrics.py` (450 lines) - 23 comprehensive tests
+
+**Files Modified:**
+- `sindri/persistence/database.py` (+15 lines) - Metrics table
+- `sindri/core/events.py` (+1 line) - METRICS_UPDATED event
+- `sindri/core/hierarchical.py` (+70 lines) - Metrics collection integration
+- `sindri/tui/widgets/header.py` (+40 lines) - Task metrics display
+- `sindri/tui/app.py` (+20 lines) - Metrics event handler
+- `sindri/cli.py` (+200 lines) - Metrics CLI command
+
+**Test Results:**
+- **Before:** 515/515 tests passing (100%)
+- **After:** 538/538 tests passing (100%) 🎉
+- **New Tests:** 23 tests (all passing)
+
+**Example Usage:**
+```bash
+# List sessions with metrics
+sindri metrics
+
+# View detailed session metrics
+sindri metrics abc12345
+
+# View with tool breakdown
+sindri metrics abc12345 -t
+
+# View aggregate statistics
+sindri metrics -a
+
+# TUI shows real-time: Iter 5 ⏱ 23.4s
+```
+
+---
+
+## 📊 Previous Session Summary (2026-01-15 - Phase 5.5 Conversation Export)
 
 ### ✅ Phase 5.5 (Partial) Complete - Conversation Export Implemented! 🎉
 

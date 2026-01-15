@@ -36,6 +36,8 @@ class EventType(Enum):
     PLAN_REJECTED = auto()      # User rejected the plan
     # Phase 7.2: Learning from success
     PATTERN_LEARNED = auto()    # New pattern extracted from successful task
+    # Phase 5.5: Performance metrics
+    METRICS_UPDATED = auto()    # Real-time metrics update for TUI
 
 
 @dataclass

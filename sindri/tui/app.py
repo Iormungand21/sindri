@@ -402,6 +402,19 @@ class SindriApp(App):
 
         self.event_bus.subscribe(EventType.PATTERN_LEARNED, on_pattern_learned)
 
+        # Phase 5.5: Metrics update events
+        def on_metrics_updated(data):
+            """Handle metrics update event for real-time display."""
+            try:
+                header = self.query_one(SindriHeader)
+                duration = data.get("duration_seconds", 0.0)
+                iteration = data.get("iteration", 0)
+                header.update_task_metrics(duration, iteration)
+            except Exception as e:
+                self.log(f"Error in metrics_updated: {e}")
+
+        self.event_bus.subscribe(EventType.METRICS_UPDATED, on_metrics_updated)
+
     async def _run_task(self, task_description: str):
         """Run a task with the orchestrator."""
         output = self.query_one("#output", RichLog)
@@ -469,6 +482,12 @@ class SindriApp(App):
         finally:
             self._running_task = None
             self._root_task_id = None
+            # Phase 5.5: Reset task metrics display
+            try:
+                header = self.query_one(SindriHeader)
+                header.reset_task_metrics()
+            except Exception:
+                pass  # Header might not exist during shutdown
             # Re-enable input
             input_widget = self.query_one("#input", Input)
             input_widget.disabled = False

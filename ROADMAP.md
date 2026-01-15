@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Phase 8.1 COMPLETE!** (v0.1.0) - Plugin system for extensibility. **100% production ready.** 487/487 tests passing (100%). Ready for Phase 8.2 (Agent Marketplace) or Phase 8.3 (Web UI).
+**Current Status:** ✅ **Phase 5.5 Performance Metrics COMPLETE!** (v0.1.0) - Comprehensive performance tracking. **100% production ready.** 538/538 tests passing (100%). Ready for Phase 8.3 (Web UI) or Phase 5.5 Task History Panel.
 
 ---
 
@@ -11,24 +11,28 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ Phase 8.1 COMPLETE - Plugin system for user-defined tools and agents
-- ✅ 487/487 tests passing (100%)
+- ✅ Phase 5.5 COMPLETE - Performance Metrics with time breakdown analysis
+- ✅ 538/538 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 487 passed
+.venv/bin/pytest tests/ -v           # Should see 538 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
 .venv/bin/sindri tui                 # Launch TUI (Ctrl+C to exit)
 
-# Test plugins (NEW!)
+# Test metrics (NEW!)
+.venv/bin/sindri metrics             # List sessions with metrics
+.venv/bin/sindri metrics -a          # Aggregate statistics
+.venv/bin/sindri metrics <id> -t     # Tool breakdown analysis
+
+# Test plugins
 .venv/bin/sindri plugins list        # List installed plugins
 .venv/bin/sindri plugins dirs        # Show plugin directories
-.venv/bin/sindri plugins init --tool my_tool  # Create tool template
 
 # Test a simple task
 .venv/bin/sindri run "Create test.txt with hello"
@@ -399,15 +403,22 @@ Sindri — Memory: 103 files, 5 episodes │ VRAM: [████░░░░░�
 - Search/filter past tasks
 - Useful for "what did I ask for earlier?"
 
-#### Performance Metrics (Future)
-- Task duration, iteration count
-- Model load times
-- Tool execution times
-- Help identify bottlenecks
+#### ✅ Performance Metrics (COMPLETED 2026-01-15)
+- ✅ Task duration, iteration count
+- ✅ Model load times
+- ✅ Tool execution times
+- ✅ Help identify bottlenecks
+
+**Implementation:**
+- `sindri/persistence/metrics.py` (520 lines) - MetricsCollector, SessionMetrics, MetricsStore
+- `sindri/cli.py` (+200 lines) - `sindri metrics` command with aggregate stats
+- `sindri/tui/widgets/header.py` (+40 lines) - Real-time iteration and duration display
+- `sindri/core/hierarchical.py` (+70 lines) - Metrics collection in loop
+- `tests/test_metrics.py` (450 lines) - 23 comprehensive tests
+- Total: 538/538 tests passing (100%)
 
 **Remaining Files:**
 - `sindri/tui/widgets/history.py` - New widget (future)
-- `sindri/tui/app.py` - Wire up new widgets (future)
 
 ---
 
