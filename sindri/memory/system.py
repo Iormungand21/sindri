@@ -1,14 +1,19 @@
 """Unified memory system - Muninn, Odin's raven of memory."""
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, List, TYPE_CHECKING
 import tiktoken
 import structlog
 
 from sindri.memory.episodic import EpisodicMemory
 from sindri.memory.semantic import SemanticMemory
 from sindri.memory.embedder import LocalEmbedder
+from sindri.memory.patterns import PatternStore, Pattern
+from sindri.memory.learner import PatternLearner, LearningConfig
 from sindri.persistence.vectors import VectorStore
+
+if TYPE_CHECKING:
+    from sindri.core.tasks import Task
 
 log = structlog.get_logger()
 
@@ -18,17 +23,20 @@ class MemoryConfig:
     """Configuration for memory system."""
     episodic_limit: int = 5
     semantic_limit: int = 10
+    pattern_limit: int = 3  # Max patterns to include in context
     max_context_tokens: int = 16384
     working_memory_ratio: float = 0.6  # 60% for conversation
+    enable_learning: bool = True  # Whether to learn from completions
 
 
 class MuninnMemory:
     """The complete memory system - Odin's raven of memory.
 
-    Three-tier architecture:
+    Four-tier architecture:
     - Working: Immediate context (recent conversation)
     - Episodic: Project history (past tasks/decisions)
     - Semantic: Codebase index (code embeddings)
+    - Patterns: Learned successful approaches (Phase 7.2)
     """
 
     def __init__(
@@ -42,7 +50,17 @@ class MuninnMemory:
         self.episodic = EpisodicMemory(db_path, self.embedder)
         self.semantic = SemanticMemory(self.vectors, self.embedder)
         self._tokenizer = tiktoken.get_encoding("cl100k_base")
-        log.info("muninn_memory_initialized", db_path=db_path)
+
+        # Phase 7.2: Pattern learning system
+        self.patterns = PatternStore(db_path)
+        self.learner = PatternLearner(
+            self.patterns,
+            LearningConfig()
+        ) if self.config.enable_learning else None
+
+        log.info("muninn_memory_initialized",
+                db_path=db_path,
+                learning_enabled=self.config.enable_learning)
 
     def build_context(
         self,
@@ -53,22 +71,43 @@ class MuninnMemory:
     ) -> list[dict]:
         """Build complete context for an agent invocation.
 
-        Allocates token budget across three memory tiers:
-        - 60% working memory (recent conversation)
+        Allocates token budget across four memory tiers:
+        - 55% working memory (recent conversation)
         - 20% episodic memory (past tasks)
         - 20% semantic memory (codebase)
+        - 5% patterns (learned approaches)
         """
 
         max_tokens = max_tokens or self.config.max_context_tokens
 
-        # Budget allocation
-        working_budget = int(max_tokens * self.config.working_memory_ratio)
+        # Budget allocation (adjusted for patterns)
+        working_budget = int(max_tokens * 0.55)
         episodic_budget = int(max_tokens * 0.2)
         semantic_budget = int(max_tokens * 0.2)
+        pattern_budget = int(max_tokens * 0.05)
 
         context_parts = []
 
-        # 1. Semantic memory (codebase context)
+        # 1. Pattern suggestions (learned approaches) - Phase 7.2
+        try:
+            if self.learner:
+                suggestions = self.learner.suggest_patterns(
+                    task_description=current_task,
+                    project_id=project_id,
+                    limit=self.config.pattern_limit
+                )
+                if suggestions:
+                    pattern_text = self._format_patterns(suggestions)
+                    pattern_text = self._truncate_to_tokens(pattern_text, pattern_budget)
+                    context_parts.append({
+                        "role": "user",
+                        "content": f"[Learned patterns for similar tasks]\n{pattern_text}"
+                    })
+                    log.debug("pattern_context_added", patterns=len(suggestions))
+        except Exception as e:
+            log.warning("pattern_context_failed", error=str(e))
+
+        # 2. Semantic memory (codebase context)
         try:
             semantic_results = self.semantic.search(
                 namespace=project_id,
@@ -86,7 +125,7 @@ class MuninnMemory:
         except Exception as e:
             log.warning("semantic_context_failed", error=str(e))
 
-        # 2. Episodic memory (past decisions)
+        # 3. Episodic memory (past decisions)
         try:
             episodes = self.episodic.retrieve_relevant(
                 project_id=project_id,
@@ -104,7 +143,7 @@ class MuninnMemory:
         except Exception as e:
             log.warning("episodic_context_failed", error=str(e))
 
-        # 3. Working memory (recent conversation)
+        # 4. Working memory (recent conversation)
         working_conv = self._fit_conversation(conversation, working_budget)
         log.debug(
             "context_built",
@@ -113,6 +152,13 @@ class MuninnMemory:
         )
 
         return context_parts + working_conv
+
+    def _format_patterns(self, suggestions: list) -> str:
+        """Format pattern suggestions for context."""
+        parts = []
+        for pattern, suggestion_text in suggestions:
+            parts.append(suggestion_text)
+        return "\n\n".join(parts)
 
     def _format_semantic(self, results: list[tuple[str, dict, float]]) -> str:
         """Format semantic search results."""
@@ -183,3 +229,57 @@ class MuninnMemory:
         """Clear all memory for a project."""
         self.semantic.clear_index(project_id)
         log.info("project_memory_cleared", project_id=project_id)
+
+    # Phase 7.2: Pattern learning methods
+
+    def learn_from_completion(
+        self,
+        task: "Task",
+        iterations: int,
+        tool_calls: List[str],
+        final_output: str,
+        session_turns: Optional[List[dict]] = None
+    ) -> Optional[int]:
+        """Learn a pattern from a successful task completion.
+
+        Args:
+            task: The completed task
+            iterations: Number of iterations taken
+            tool_calls: List of tool names called during execution
+            final_output: The final output/result
+            session_turns: Optional conversation history
+
+        Returns:
+            Pattern ID if learned, None if learning disabled or skipped
+        """
+        if not self.learner:
+            return None
+
+        return self.learner.learn_from_completion(
+            task=task,
+            iterations=iterations,
+            tool_calls=tool_calls,
+            final_output=final_output,
+            session_turns=session_turns
+        )
+
+    def get_pattern_count(self) -> int:
+        """Get the total number of learned patterns.
+
+        Returns:
+            Number of patterns stored
+        """
+        return self.patterns.get_pattern_count()
+
+    def get_learning_stats(self) -> dict:
+        """Get statistics about the learning system.
+
+        Returns:
+            Dict with pattern counts, contexts, agents, etc.
+        """
+        if not self.learner:
+            return {"learning_enabled": False}
+
+        stats = self.learner.get_stats()
+        stats["learning_enabled"] = True
+        return stats

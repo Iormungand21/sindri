@@ -117,13 +117,14 @@ class SindriApp(App):
                 memory = self.orchestrator.memory
                 indexed_files = memory.semantic.get_indexed_file_count()
                 episodes_count = memory.episodic.get_episode_count()
+                pattern_count = memory.get_pattern_count()
 
-                output.write(f"[dim]📚 Memory: {indexed_files} files indexed, {episodes_count} episodes[/dim]")
+                output.write(f"[dim]📚 Memory: {indexed_files} files, {episodes_count} episodes, {pattern_count} patterns[/dim]")
                 output.write("")
 
                 # Update subtitle in header
                 header = self.query_one(SindriHeader)
-                self.sub_title = f"Memory: {indexed_files} files, {episodes_count} episodes"
+                self.sub_title = f"Memory: {indexed_files} files, {episodes_count} episodes, {pattern_count} patterns"
             except Exception as e:
                 output.write(f"[dim yellow]⚠ Memory system available (stats unavailable: {e})[/dim yellow]")
                 output.write("")
@@ -377,6 +378,28 @@ class SindriApp(App):
                 self.log(f"Error in plan_proposed: {e}")
 
         self.event_bus.subscribe(EventType.PLAN_PROPOSED, on_plan_proposed)
+
+        # Phase 7.2: Pattern learning events
+        def on_pattern_learned(data):
+            """Handle pattern learned event."""
+            try:
+                output = self.query_one("#output", RichLog)
+                pattern_id = data.get("pattern_id", "?")
+                agent = data.get("agent", "unknown")
+                iterations = data.get("iterations", 0)
+                tools = data.get("tools", [])
+
+                # Display a subtle notification about learning
+                tool_str = ", ".join(tools[:3]) if tools else "no tools"
+                if len(tools) > 3:
+                    tool_str += f" +{len(tools) - 3}"
+
+                output.write(f"[dim green]📚 Pattern learned (#{pattern_id}) - "
+                           f"{agent} in {iterations} iterations, tools: {tool_str}[/dim green]")
+            except Exception as e:
+                self.log(f"Error in pattern_learned: {e}")
+
+        self.event_bus.subscribe(EventType.PATTERN_LEARNED, on_pattern_learned)
 
     async def _run_task(self, task_description: str):
         """Run a task with the orchestrator."""

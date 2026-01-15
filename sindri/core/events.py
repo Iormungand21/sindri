@@ -34,6 +34,8 @@ class EventType(Enum):
     PLAN_PROPOSED = auto()      # Execution plan created
     PLAN_APPROVED = auto()      # User approved the plan
     PLAN_REJECTED = auto()      # User rejected the plan
+    # Phase 7.2: Learning from success
+    PATTERN_LEARNED = auto()    # New pattern extracted from successful task
 
 
 @dataclass

@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Phase 7.3 COMPLETE!** (v0.1.0) - Interactive planning with execution plans. **100% production ready.** 372/372 tests passing (100%). Ready for Phase 7.2 (Learning) or Phase 8.1 (Plugin System).
+**Current Status:** ✅ **Phase 7.2 COMPLETE!** (v0.1.0) - Learning from success pattern system. **100% production ready.** 407/407 tests passing (100%). Ready for Phase 8.1 (Plugin System) or Phase 7.4 (Codebase Understanding).
 
 ---
 
@@ -10,16 +10,16 @@
 
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
-### Current State (2026-01-14)
-- ✅ Phase 7.3 COMPLETE - Interactive planning with execution plans
-- ✅ 372/372 tests passing (100%)
+### Current State (2026-01-15)
+- ✅ Phase 7.2 COMPLETE - Learning from success pattern system
+- ✅ 407/407 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 372 passed
+.venv/bin/pytest tests/ -v           # Should see 407 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -32,13 +32,13 @@
 ### Essential Reading
 1. **STATUS.md** - Detailed current state, what works, what doesn't
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
-3. **This file** - See "Phase 7.2 Learning" or "Phase 8.1 Plugin System" for next priority
+3. **This file** - See "Phase 8.1 Plugin System" or "Phase 7.4 Codebase Understanding" for next priority
 
-### Recommended Next: Phase 7.2 - Learning from Success OR Phase 8.1 - Plugin System
-- **Phase 7.2 Goal:** Store successful patterns and recall them for future tasks
+### Recommended Next: Phase 8.1 - Plugin System OR Phase 7.4 - Codebase Understanding
 - **Phase 8.1 Goal:** User-defined tools and agents via plugin system
+- **Phase 7.4 Goal:** Deep project structure analysis (dependencies, architecture detection)
 - **Effort:** 1-2 days each
-- **Impact:** MEDIUM-HIGH - Continuous learning or extensibility
+- **Impact:** HIGH - Extensibility or better project understanding
 
 ### Need Help?
 - Check tests for examples: `tests/test_*.py`
@@ -660,51 +660,53 @@ After: Parallel = 20s (2x faster, shared model = 5GB total)
 
 ---
 
-### 7.2 Learning from Success (Medium Priority)
+### ✅ 7.2 Learning from Success (COMPLETED 2026-01-15)
 
-**Concept:** Store successful patterns and recall them
+**Status:** ✅ Implemented and tested with 35 new tests
 
-#### What to Learn:
+#### Implementation Summary:
 
-**Successful Completions**
-- Track tasks that completed in few iterations
-- Extract the approach/pattern used
-- Store in episodic memory with high relevance
+**Pattern Data Model** (`sindri/memory/patterns.py`):
+- ✅ `Pattern` dataclass with context, keywords, tool sequences, metrics
+- ✅ `PatternStore` class for SQLite-backed storage
+- ✅ Keyword matching via `matches_task()` method
+- ✅ Serialization to/from dictionaries
 
-**Common Patterns**
-- File structure conventions (models/, views/, tests/)
-- Code patterns (factory, singleton, etc.)
-- Tool sequences (read → edit → shell test)
+**Pattern Learning** (`sindri/memory/learner.py`):
+- ✅ `PatternLearner` extracts patterns from completions
+- ✅ `LearningConfig` for tunable efficiency thresholds
+- ✅ Context inference (testing, code_generation, refactoring, review, etc.)
+- ✅ Keyword extraction with stop word filtering
+- ✅ Tool sequence extraction with deduplication
+- ✅ Pattern suggestions for new tasks
 
-**Project Conventions**
-- Naming conventions (snake_case, camelCase)
-- Import styles (absolute vs relative)
-- Test locations (tests/ vs **/*_test.py)
+**Memory System Integration** (`sindri/memory/system.py`):
+- ✅ `MuninnMemory` now has `patterns` and `learner` attributes
+- ✅ `build_context()` includes pattern suggestions (5% token budget)
+- ✅ `learn_from_completion()` hooks into hierarchical loop
+- ✅ `get_pattern_count()` and `get_learning_stats()` methods
 
-#### Storage:
+**Event System** (`sindri/core/events.py`):
+- ✅ `PATTERN_LEARNED` event type for TUI notification
 
-**Pattern Database** (`~/.sindri/patterns.db`):
-```sql
-CREATE TABLE patterns (
-    id TEXT PRIMARY KEY,
-    name TEXT,
-    description TEXT,
-    context TEXT,  -- When to use
-    example TEXT,  -- Code snippet
-    success_count INTEGER,
-    last_used TIMESTAMP
-);
-```
+**TUI Integration** (`sindri/tui/app.py`):
+- ✅ Pattern count shown in memory stats header
+- ✅ `on_pattern_learned` handler for event display
 
-**Memory Integration**:
-- Semantic search retrieves relevant patterns
-- Inject into agent context: "Similar tasks succeeded using..."
-- Agents can reference patterns explicitly
+**Files Created:**
+- `sindri/memory/patterns.py` (290 lines) - Pattern storage system
+- `sindri/memory/learner.py` (320 lines) - Pattern learning logic
+- `tests/test_learning.py` (470 lines) - 35 comprehensive tests
 
-**Files:**
-- `sindri/memory/patterns.py` - Pattern storage/retrieval
-- `sindri/memory/learner.py` - Extract patterns from completions
-- `sindri/persistence/patterns.db` - Pattern database
+**Files Modified:**
+- `sindri/memory/system.py` - Pattern integration
+- `sindri/core/hierarchical.py` - Learn from completions
+- `sindri/core/events.py` - PATTERN_LEARNED event
+- `sindri/tui/app.py` - Pattern display
+
+**Test Results:**
+- 35 new tests added (all passing)
+- Total: 407/407 tests passing (100%)
 
 ---
 
@@ -1024,9 +1026,10 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Agent specialization~~ | High | Medium | ✅ Complete | 7.1 | Done 2026-01-14 |
 | ~~Streaming~~ | Medium | Medium | ✅ Complete | 6.3 | Done 2026-01-14 |
 | ~~Interactive planning~~ | Medium | Medium | ✅ Complete | 7.3 | Done 2026-01-14 |
+| ~~Learning system~~ | Medium | High | ✅ Complete | 7.2 | Done 2026-01-15 |
 | TUI enhancements | Medium | Medium | 🟡 Later | 5.5 | History/export |
-| Plugin system | Medium | High | 🟢 Later | 8.1 | Future |
-| Learning system | Medium | High | 🟢 Later | 7.2 | Future |
+| Plugin system | Medium | High | 🟢 Next | 8.1 | Future |
+| Codebase understanding | High | Medium | 🟢 Next | 7.4 | Future |
 | Web UI | High | Very High | 🟢 Later | 8.3 | Future |
 
 ---
@@ -1165,6 +1168,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 7.2 | ✅ **Phase 7.2 COMPLETE!** Learning from success pattern system (35 tests) |
 | 2026-01-14 | 7.3 | ✅ **Phase 7.3 COMPLETE!** Interactive planning with execution plans (28 tests) |
 | 2026-01-14 | 6.3 | ✅ **Phase 6.3 COMPLETE!** Streaming output with real-time tokens (35 tests) |
 | 2026-01-14 | 7.1 | ✅ **Phase 7.1 COMPLETE!** Enhanced agent specialization (43 tests) |
@@ -1181,13 +1185,32 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-14 (Phase 7.3 Complete!)
-**Next Review:** When starting Phase 7.2 (Learning) or Phase 8.1 (Plugin System)
+**Last Updated:** 2026-01-15 (Phase 7.2 Complete!)
+**Next Review:** When starting Phase 8.1 (Plugin System) or Phase 7.4 (Codebase Understanding)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 PHASE 7.2: COMPLETE!** (2026-01-15)
+
+Learning from success pattern system:
+1. ✅ **PatternStore** - SQLite-backed storage for learned patterns
+2. ✅ **PatternLearner** - Extracts patterns from successful completions
+3. ✅ **Pattern class** - Context, keywords, tool sequences, metrics
+4. ✅ **Context inference** - Auto-categorize tasks (testing, refactoring, etc.)
+5. ✅ **Pattern suggestions** - Inject patterns into agent context
+6. ✅ **PATTERN_LEARNED event** - TUI notification
+7. ✅ **35 new tests** - Comprehensive learning coverage
+
+**Impact:**
+- Test coverage: 372 → 407 tests (+35 tests, 100% passing)
+- Agents now learn from successful completions
+- Pattern suggestions improve future task performance
+- Memory system is now four-tier (working, episodic, semantic, patterns)
+
+---
 
 **🎉 PHASE 7.3: COMPLETE!** (2026-01-14)
 

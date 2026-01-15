@@ -565,6 +565,37 @@ class HierarchicalAgentLoop:
                                     }
                                 )
                                 log.info("episode_stored", task_id=task.id)
+
+                                # Phase 7.2: Learn pattern from successful completion
+                                try:
+                                    tool_names = [name for name, _ in tool_call_history]
+                                    pattern_id = self.memory.learn_from_completion(
+                                        task=task,
+                                        iterations=iteration + 1,
+                                        tool_calls=tool_names,
+                                        final_output=assistant_content,
+                                        session_turns=conversation
+                                    )
+                                    if pattern_id:
+                                        log.info("pattern_learned",
+                                                task_id=task.id,
+                                                pattern_id=pattern_id)
+
+                                        # Emit pattern learned event for TUI
+                                        self.event_bus.emit(Event(
+                                            type=EventType.PATTERN_LEARNED,
+                                            data={
+                                                "task_id": task.id,
+                                                "pattern_id": pattern_id,
+                                                "agent": agent.name,
+                                                "iterations": iteration + 1,
+                                                "tools": tool_names
+                                            },
+                                            task_id=task.id
+                                        ))
+                                except Exception as e:
+                                    log.warning("pattern_learning_failed", error=str(e))
+
                             except Exception as e:
                                 log.warning("episode_storage_failed", error=str(e))
 
