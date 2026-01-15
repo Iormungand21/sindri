@@ -88,10 +88,20 @@ class Orchestrator:
         for task_id in list(self.scheduler.tasks.keys()):
             self.cancel_task(task_id)
 
-    async def run(self, user_request: str) -> dict:
-        """Run a user request through the hierarchical system."""
+    async def run(self, user_request: str, parallel: bool = True) -> dict:
+        """Run a user request through the hierarchical system.
 
-        log.info("orchestrator_started", request=user_request[:100])
+        Args:
+            user_request: The task to execute.
+            parallel: If True, execute independent tasks concurrently (Phase 6.1).
+                     If False, use sequential execution (legacy behavior).
+
+        Returns:
+            Dict with success status, task_id, result, and subtask count.
+        """
+        log.info("orchestrator_started",
+                 request=user_request[:100],
+                 parallel=parallel)
 
         # Create root task assigned to Brokkr (orchestrator)
         root_task = Task(
@@ -117,36 +127,18 @@ class Orchestrator:
                     "output": "Task cancelled"
                 }
 
-            next_task = self.scheduler.get_next_task()
+            if parallel:
+                # Phase 6.1: Parallel execution
+                result = await self._run_parallel_batch()
+            else:
+                # Legacy sequential execution
+                result = await self._run_sequential()
 
-            if next_task is None:
-                # No tasks ready - check if we're waiting
-                waiting_count = sum(
-                    1 for t in self.scheduler.tasks.values()
-                    if t.status == TaskStatus.WAITING
-                )
-
-                if waiting_count > 0:
-                    log.info("waiting_for_subtasks", count=waiting_count)
-                    await asyncio.sleep(0.5)
-                    continue
-                else:
-                    # No pending, no waiting - we're stuck
-                    log.warning("no_tasks_ready", pending=self.scheduler.get_pending_count())
-                    break
-
-            # Execute task
-            log.info("executing_task",
-                     task_id=next_task.id,
-                     agent=next_task.assigned_agent,
-                     description=next_task.description[:50])
-
-            result = await self.loop.run_task(next_task)
-
-            log.info("task_result",
-                     task_id=next_task.id,
-                     success=result.success,
-                     iterations=result.iterations)
+            if result == "waiting":
+                await asyncio.sleep(0.5)
+                continue
+            elif result == "stuck":
+                break
 
         # Check root task status
         if root_task.status == TaskStatus.COMPLETE:
@@ -168,3 +160,107 @@ class Orchestrator:
                 "status": root_task.status.value,
                 "error": root_task.error
             }
+
+    async def _run_parallel_batch(self) -> str:
+        """Execute a batch of tasks in parallel.
+
+        Returns:
+            "ok" if tasks were executed,
+            "waiting" if waiting on subtasks,
+            "stuck" if no progress possible.
+        """
+        # Get batch of ready tasks
+        batch = self.scheduler.get_ready_batch()
+
+        if not batch:
+            # No tasks ready - check if we're waiting
+            waiting_count = sum(
+                1 for t in self.scheduler.tasks.values()
+                if t.status == TaskStatus.WAITING
+            )
+
+            if waiting_count > 0:
+                log.info("waiting_for_subtasks", count=waiting_count)
+                return "waiting"
+            else:
+                log.warning("no_tasks_ready",
+                            pending=self.scheduler.get_pending_count())
+                return "stuck"
+
+        if len(batch) == 1:
+            # Single task - run directly
+            task = batch[0]
+            log.info("executing_task",
+                     task_id=task.id,
+                     agent=task.assigned_agent,
+                     description=task.description[:50])
+            result = await self.loop.run_task(task)
+            log.info("task_result",
+                     task_id=task.id,
+                     success=result.success,
+                     iterations=result.iterations)
+        else:
+            # Multiple tasks - run in parallel
+            log.info("executing_parallel_batch",
+                     task_count=len(batch),
+                     tasks=[t.id for t in batch])
+
+            # Execute all tasks concurrently
+            results = await asyncio.gather(
+                *[self.loop.run_task(task) for task in batch],
+                return_exceptions=True
+            )
+
+            # Log results
+            for task, result in zip(batch, results):
+                if isinstance(result, Exception):
+                    log.error("task_exception",
+                              task_id=task.id,
+                              error=str(result))
+                    task.status = TaskStatus.FAILED
+                    task.error = str(result)
+                else:
+                    log.info("task_result",
+                             task_id=task.id,
+                             success=result.success,
+                             iterations=result.iterations)
+
+        return "ok"
+
+    async def _run_sequential(self) -> str:
+        """Execute tasks sequentially (legacy behavior).
+
+        Returns:
+            "ok" if a task was executed,
+            "waiting" if waiting on subtasks,
+            "stuck" if no progress possible.
+        """
+        next_task = self.scheduler.get_next_task()
+
+        if next_task is None:
+            waiting_count = sum(
+                1 for t in self.scheduler.tasks.values()
+                if t.status == TaskStatus.WAITING
+            )
+
+            if waiting_count > 0:
+                log.info("waiting_for_subtasks", count=waiting_count)
+                return "waiting"
+            else:
+                log.warning("no_tasks_ready",
+                            pending=self.scheduler.get_pending_count())
+                return "stuck"
+
+        log.info("executing_task",
+                 task_id=next_task.id,
+                 agent=next_task.assigned_agent,
+                 description=next_task.description[:50])
+
+        result = await self.loop.run_task(next_task)
+
+        log.info("task_result",
+                 task_id=next_task.id,
+                 success=result.success,
+                 iterations=result.iterations)
+
+        return "ok"

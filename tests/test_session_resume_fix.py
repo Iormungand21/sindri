@@ -158,9 +158,18 @@ async def test_task_with_session_id_resumes_session():
     state.load_session.assert_called_once_with("existing-session-id")
     state.create_session.assert_not_called()
 
-    # Verify the session has the conversation history
-    assert len(existing_session.turns) == 3
-    assert existing_session.turns[-1].content == "Child completed successfully!"
+    # Verify the session has the conversation history preserved
+    # Should have: 3 original turns + 1 new assistant response = 4 total
+    assert len(existing_session.turns) == 4
+
+    # Verify original 3 turns are still there
+    assert existing_session.turns[0].content == "Original request"
+    assert existing_session.turns[1].content == "I'll delegate this"
+    assert existing_session.turns[2].content == "Child completed successfully!"
+
+    # Verify new turn was added from the loop
+    assert existing_session.turns[3].content == "Great! Task done <done/>"
+    assert existing_session.turns[3].role == "assistant"
 
 
 @pytest.mark.asyncio

@@ -52,13 +52,14 @@ htmlcov/
 *.db
 *.db-journal
 
-# Test artifacts (temporary test files)
+# Test artifacts (temporary test files in root, not tests/ directory)
 test.txt
 test_*.txt
-test_*.py
+/test_*.py
 hello.py
 hello.txt
 test_completion.txt
+!tests/
 
 # Common Sindri output patterns
 sindri_output/

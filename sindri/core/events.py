@@ -1,6 +1,7 @@
 """Event system for orchestrator-to-TUI communication."""
 
-from dataclasses import dataclass
+import time
+from dataclasses import dataclass, field
 from typing import Callable, Any, Optional
 from enum import Enum, auto
 import structlog
@@ -19,13 +20,21 @@ class EventType(Enum):
     ERROR = auto()
     ITERATION_START = auto()
     ITERATION_END = auto()
+    # Phase 6.1: New event types for parallel execution
+    PARALLEL_BATCH_START = auto()
+    PARALLEL_BATCH_END = auto()
 
 
 @dataclass
 class Event:
-    """An event with type and data."""
+    """An event with type, data, and timestamp for ordering.
+
+    Phase 6.1: Added timestamp for coherent event ordering during parallel execution.
+    """
     type: EventType
     data: Any
+    timestamp: float = field(default_factory=time.time)  # For ordering parallel events
+    task_id: Optional[str] = None  # For filtering events by task
 
 
 class EventBus:

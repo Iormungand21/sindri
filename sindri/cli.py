@@ -76,8 +76,9 @@ def run(task: str, model: str, max_iter: int, work_dir: str = None):
 @click.argument("task")
 @click.option("--max-iter", default=30, help="Maximum iterations per agent")
 @click.option("--vram-gb", default=16.0, help="Total VRAM in GB")
+@click.option("--no-memory", is_flag=True, help="Disable memory system")
 @click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")
-def orchestrate(task: str, max_iter: int, vram_gb: float, work_dir: str = None):
+def orchestrate(task: str, max_iter: int, vram_gb: float, no_memory: bool, work_dir: str = None):
     """Run a task with hierarchical agents (Brokkr → Huginn/Mimir/Ratatoskr)."""
 
     from pathlib import Path
@@ -92,7 +93,18 @@ def orchestrate(task: str, max_iter: int, vram_gb: float, work_dir: str = None):
 
         config = LoopConfig(max_iterations=max_iter)
         work_path = Path(work_dir).resolve() if work_dir else None
-        orchestrator = Orchestrator(config=config, total_vram_gb=vram_gb, work_dir=work_path)
+        enable_memory = not no_memory
+
+        # Show memory status
+        if enable_memory:
+            console.print("[dim]📚 Memory system enabled[/dim]")
+
+        orchestrator = Orchestrator(
+            config=config,
+            total_vram_gb=vram_gb,
+            enable_memory=enable_memory,
+            work_dir=work_path
+        )
 
         with console.status("[bold green]Orchestrating..."):
             result = await orchestrator.run(task)
@@ -114,10 +126,101 @@ def orchestrate(task: str, max_iter: int, vram_gb: float, work_dir: str = None):
 
 @cli.command()
 @click.argument("session_id")
-def resume(session_id: str):
+@click.option("--max-iter", default=30, help="Maximum iterations per agent")
+@click.option("--vram-gb", default=16.0, help="Total VRAM in GB")
+def resume(session_id: str, max_iter: int, vram_gb: float):
     """Resume an interrupted session."""
-    console.print(f"Resuming session {session_id}...")
-    # TODO: Implement resume logic
+
+    async def execute_resume():
+        from sindri.core.orchestrator import Orchestrator
+        from sindri.core.tasks import Task
+        from sindri.core.loop import LoopConfig
+        from sindri.persistence.state import SessionState
+
+        # Load the session to verify it exists
+        state = SessionState()
+
+        # If session_id is short (8 chars), search for matching full ID
+        full_session_id = session_id
+        if len(session_id) == 8:
+            # Search for sessions starting with this prefix
+            all_sessions = await state.list_sessions(limit=100)
+            matching = [s for s in all_sessions if s["id"].startswith(session_id)]
+
+            if not matching:
+                console.print(f"[red]✗ No session found starting with {session_id}[/]")
+                console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
+                return
+            elif len(matching) > 1:
+                console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
+                for m in matching:
+                    console.print(f"  • {m['id'][:8]} - {m['task'][:50]}")
+                console.print("[dim]Use the full session ID to be specific[/dim]")
+                return
+
+            full_session_id = matching[0]["id"]
+            console.print(f"[dim]Using session: {full_session_id}[/dim]")
+
+        session = await state.load_session(full_session_id)
+
+        if not session:
+            console.print(f"[red]✗ Session {full_session_id} not found[/]")
+            console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
+            return
+
+        console.print(Panel(
+            f"[bold blue]Session:[/] {full_session_id[:8]}\n"
+            f"[dim]Task:[/] {session.task[:60]}...\n"
+            f"[dim]Model:[/] {session.model}\n"
+            f"[dim]Iterations:[/] {session.iterations}",
+            title="🔨 Resuming Sindri Session"
+        ))
+
+        # Create orchestrator
+        config = LoopConfig(max_iterations=max_iter)
+        orchestrator = Orchestrator(
+            config=config,
+            total_vram_gb=vram_gb,
+            enable_memory=True
+        )
+
+        # Create a task with the existing session_id to resume
+        resume_task = Task(
+            description=session.task,
+            assigned_agent="brokkr",
+            session_id=full_session_id,
+            priority=0
+        )
+
+        # Add to scheduler and execute
+        orchestrator.scheduler.add_task(resume_task)
+
+        with console.status("[bold green]Resuming..."):
+            # Execute task queue (same as orchestrate)
+            while orchestrator.scheduler.has_work():
+                next_task = orchestrator.scheduler.get_next_task()
+
+                if next_task is None:
+                    await asyncio.sleep(0.5)
+                    continue
+
+                result = await orchestrator.loop.run_task(next_task)
+
+                if result.success:
+                    console.print(f"[green]✓ Task completed[/]")
+                else:
+                    console.print(f"[red]✗ Task failed: {result.reason}[/]")
+                    break
+
+        # Show final status
+        if resume_task.status.value == "complete":
+            console.print(f"\n[green]✓ Session {full_session_id[:8]} completed successfully[/]")
+            if resume_task.result:
+                console.print(f"\n[dim]{resume_task.result}[/]")
+        else:
+            console.print(f"\n[yellow]Session {full_session_id[:8]} status: {resume_task.status.value}[/]")
+
+    asyncio.run(execute_resume())
 
 
 @cli.command()
@@ -251,123 +354,104 @@ def recover(session_id: str = None):
 
 @cli.command()
 @click.option("--config-path", help="Path to config file to validate")
-def doctor(config_path: str = None):
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def doctor(config_path: str = None, verbose: bool = False):
     """Check Sindri installation and configuration."""
 
-    from sindri.config import SindriConfig, validate_config
+    from sindri.core.doctor import get_all_checks
     from rich.table import Table
-    import ollama
+    from pathlib import Path
 
     console.print("[bold cyan]🔨 Sindri Doctor[/bold cyan]\n")
+    console.print("[dim]Checking system health...[/dim]\n")
 
-    # Check Ollama
-    console.print("[bold]1. Checking Ollama...[/]", end=" ")
-    try:
-        client = ollama.Client()
-        models = client.list()
-        model_count = len(models.get("models", []))
-        console.print(f"[green]✓ OK[/green] ({model_count} models available)")
+    # Run all health checks
+    results = get_all_checks(config_path)
+    checks = results["checks"]
 
-        # Show available models
-        if model_count > 0:
-            table = Table(show_header=True, box=None, padding=(0, 2))
-            table.add_column("Model", style="cyan")
-            table.add_column("Size", style="yellow", justify="right")
+    # Display results
+    check_num = 1
 
-            for model in models["models"][:10]:  # Show first 10
-                size_gb = model.get("size", 0) / 1e9
-                table.add_row(model["name"], f"{size_gb:.1f} GB")
+    # 1. Python Version
+    check = checks["python"]
+    _print_check(check_num, check)
+    check_num += 1
 
-            console.print(table)
-            if model_count > 10:
-                console.print(f"[dim]... and {model_count - 10} more[/dim]\n")
-    except Exception as e:
-        console.print(f"[red]✗ FAIL[/red] ({e})")
+    # 2. Ollama
+    check = checks["ollama"]
+    _print_check(check_num, check)
+    check_num += 1
 
-    # Check config
-    console.print("[bold]2. Loading configuration...[/]", end=" ")
-    try:
-        config = SindriConfig.load(config_path)
-        console.print("[green]✓ OK[/green]")
+    # 3. Required Models
+    check = checks["models"]
+    _print_check(check_num, check)
 
-        # Show config summary
-        console.print(f"   Data dir: {config.data_dir}")
-        console.print(f"   Ollama host: {config.ollama_host}")
-        console.print(f"   VRAM: {config.total_vram_gb}GB total, {config.reserve_vram_gb}GB reserved")
+    if results["models"]["missing"]:
+        console.print("\n   [yellow]Missing models:[/yellow]")
+        for model in sorted(results["models"]["missing"]):
+            console.print(f"     • {model}")
 
-        # Validate config
-        warnings = validate_config(config)
-        if warnings:
-            console.print("\n[yellow]⚠ Configuration Warnings:[/yellow]")
-            for w in warnings:
-                console.print(f"  • {w}")
-        else:
-            console.print("   [green]No configuration warnings[/green]")
+        console.print("\n   [bold]Pull missing models:[/bold]")
+        for model in sorted(results["models"]["missing"]):
+            console.print(f"     ollama pull {model}")
+    elif verbose and results["models"]["available"]:
+        console.print("\n   [dim]Available models:[/dim]")
+        for model in sorted(results["models"]["available"])[:5]:
+            console.print(f"     • {model}")
+        if len(results["models"]["available"]) > 5:
+            console.print(f"     [dim]... and {len(results['models']['available']) - 5} more[/dim]")
 
-    except Exception as e:
-        console.print(f"[red]✗ FAIL[/red] ({e})")
+    console.print()
+    check_num += 1
 
-    # Check data directory
-    console.print("\n[bold]3. Checking data directory...[/]", end=" ")
-    try:
-        data_dir = Path.home() / ".sindri"
-        if data_dir.exists():
-            db_path = data_dir / "sindri.db"
-            db_exists = db_path.exists()
-            db_size = db_path.stat().st_size / 1024 if db_exists else 0
+    # 4. GPU/VRAM
+    check = checks["gpu"]
+    _print_check(check_num, check)
+    check_num += 1
 
-            console.print(f"[green]✓ OK[/green]")
-            console.print(f"   Path: {data_dir}")
-            console.print(f"   Database: {'exists' if db_exists else 'not created'}")
-            if db_exists:
-                console.print(f"   DB size: {db_size:.1f} KB")
+    # 5. Configuration
+    check = checks["config"]
+    _print_check(check_num, check)
+    check_num += 1
 
-            # Check state directory
-            state_dir = data_dir / "state"
-            if state_dir.exists():
-                checkpoints = len(list(state_dir.glob("*.checkpoint.json")))
-                console.print(f"   Checkpoints: {checkpoints}")
-        else:
-            console.print(f"[yellow]⚠ Not created[/yellow]")
-            console.print(f"   Will be created on first run: {data_dir}")
-    except Exception as e:
-        console.print(f"[red]✗ FAIL[/red] ({e})")
+    # 6. Database
+    check = checks["database"]
+    _print_check(check_num, check)
+    check_num += 1
 
-    # Check Python environment
-    console.print("\n[bold]4. Checking Python environment...[/]", end=" ")
-    try:
-        import sys
-        python_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    # 7. Dependencies
+    check = checks["dependencies"]
+    _print_check(check_num, check)
 
-        if sys.version_info >= (3, 11):
-            console.print(f"[green]✓ OK[/green] (Python {python_version})")
-        else:
-            console.print(f"[yellow]⚠ WARNING[/yellow] (Python {python_version}, requires >=3.11)")
-    except Exception as e:
-        console.print(f"[red]✗ FAIL[/red] ({e})")
+    if verbose:
+        console.print()
+        for module, description, is_optional, installed in results["dependencies"]:
+            status = "[green]✓[/green]" if installed else ("[yellow]⚠[/yellow]" if is_optional else "[red]✗[/red]")
+            optional_tag = " [dim](optional)[/dim]" if is_optional else ""
+            console.print(f"     {status} {description} ({module}){optional_tag}")
 
-    # Check dependencies
-    console.print("\n[bold]5. Checking dependencies...[/]")
-    deps = [
-        ("ollama", "Ollama client"),
-        ("click", "CLI framework"),
-        ("rich", "Terminal formatting"),
-        ("pydantic", "Data validation"),
-        ("structlog", "Logging"),
-        ("textual", "TUI framework (optional)"),
-    ]
+    # Overall status
+    console.print()
+    if results["overall"]["all_passed"]:
+        console.print("[bold green]✓ All checks passed - Sindri is ready![/bold green]")
+    elif results["overall"]["critical_passed"]:
+        console.print("[bold yellow]⚠ Some optional checks failed - Sindri should work[/bold yellow]")
+    else:
+        console.print("[bold red]✗ Critical checks failed - Sindri may not work correctly[/bold red]")
+        console.print("[dim]Fix the issues above and run 'sindri doctor' again[/dim]")
 
-    for module, description in deps:
-        try:
-            __import__(module)
-            console.print(f"   [green]✓[/green] {description} ({module})")
-        except ImportError:
-            optional = "(optional)" in description
-            color = "yellow" if optional else "red"
-            status = "⚠" if optional else "✗"
-            console.print(f"   [{color}]{status}[/{color}] {description} ({module}) - Not installed")
 
-    console.print("\n[bold green]✓ Doctor check complete[/bold green]")
+def _print_check(num: int, check):
+    """Helper to print a health check result."""
+    from sindri.core.doctor import HealthCheck
+
+    status = "[green]✓[/green]" if check.passed else "[red]✗[/red]"
+    console.print(f"[bold]{num}. {check.name}:[/] {status} {check.message}")
+
+    if check.details:
+        # Indent details
+        for line in check.details.split('\n'):
+            console.print(f"   [dim]{line}[/dim]")
 
 
 if __name__ == "__main__":

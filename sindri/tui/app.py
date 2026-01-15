@@ -2,11 +2,12 @@
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.widgets import Header, Footer, Input, Tree, RichLog
+from textual.widgets import Footer, Input, Tree, RichLog
 from textual.containers import Horizontal
 from typing import Optional
 import asyncio
 
+from sindri.tui.widgets.header import SindriHeader
 from sindri.tui.screens.help import HelpScreen
 from sindri.core.events import EventBus, EventType, Event
 from sindri.core.tasks import Task, TaskStatus
@@ -93,7 +94,7 @@ class SindriApp(App):
 
     def compose(self) -> ComposeResult:
         """Create child widgets."""
-        yield Header()
+        yield SindriHeader()
         with Horizontal():
             yield Tree("📋 Tasks", id="tasks")
             yield RichLog(highlight=True, markup=True, id="output")
@@ -108,6 +109,28 @@ class SindriApp(App):
         output.write("")
         output.write("[green]✓[/green] Ready to forge code with local LLMs")
         output.write("")
+
+        # Show memory status if enabled
+        if self.orchestrator and self.orchestrator.memory:
+            try:
+                # Get memory stats
+                memory = self.orchestrator.memory
+                indexed_files = memory.semantic.get_indexed_file_count()
+                episodes_count = memory.episodic.get_episode_count()
+
+                output.write(f"[dim]📚 Memory: {indexed_files} files indexed, {episodes_count} episodes[/dim]")
+                output.write("")
+
+                # Update subtitle in header
+                header = self.query_one(SindriHeader)
+                self.sub_title = f"Memory: {indexed_files} files, {episodes_count} episodes"
+            except Exception as e:
+                output.write(f"[dim yellow]⚠ Memory system available (stats unavailable: {e})[/dim yellow]")
+                output.write("")
+        else:
+            output.write("[dim]📚 Memory system disabled[/dim]")
+            output.write("")
+
         output.write("[dim]• Type a task in the input field below[/dim]")
         output.write("[dim]• Press Enter to submit[/dim]")
         output.write("[dim]• Press Ctrl+C to cancel running task[/dim]")
@@ -124,9 +147,28 @@ class SindriApp(App):
         # Set up event handlers
         self._setup_event_handlers()
 
+        # Start VRAM monitor
+        if self.orchestrator and hasattr(self.orchestrator, 'model_manager'):
+            self.set_interval(2.0, self._update_vram_stats)
+            self._update_vram_stats()  # Initial update
+
         # Run initial task if provided
         if self.initial_task and self.orchestrator:
             self.run_worker(self._run_task(self.initial_task))
+
+    def _update_vram_stats(self):
+        """Update VRAM stats in header."""
+        try:
+            if self.orchestrator and hasattr(self.orchestrator, 'model_manager'):
+                stats = self.orchestrator.model_manager.get_vram_stats()
+                header = self.query_one(SindriHeader)
+                header.update_vram(
+                    used=stats['used'],
+                    total=stats['total'],
+                    loaded_models=stats['loaded_models']
+                )
+        except Exception as e:
+            self.log(f"Error updating VRAM stats: {e}")
 
     def _setup_event_handlers(self):
         """Set up event handlers for orchestrator events."""

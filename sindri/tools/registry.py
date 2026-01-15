@@ -6,7 +6,13 @@ from typing import Optional
 import structlog
 
 from sindri.tools.base import Tool, ToolResult
-from sindri.tools.filesystem import ReadFileTool, WriteFileTool, EditFileTool
+from sindri.tools.filesystem import (
+    ReadFileTool,
+    WriteFileTool,
+    EditFileTool,
+    ListDirectoryTool,
+    ReadTreeTool,
+)
 from sindri.tools.shell import ShellTool
 
 log = structlog.get_logger()
@@ -88,5 +94,7 @@ class ToolRegistry:
         registry.register(ReadFileTool(work_dir=work_dir))
         registry.register(WriteFileTool(work_dir=work_dir))
         registry.register(EditFileTool(work_dir=work_dir))
+        registry.register(ListDirectoryTool(work_dir=work_dir))
+        registry.register(ReadTreeTool(work_dir=work_dir))
         registry.register(ShellTool(work_dir=work_dir))
         return registry

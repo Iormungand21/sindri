@@ -137,3 +137,11 @@ class SemanticMemory:
         self.vectors.delete_namespace(namespace)
         self._file_hashes.clear()
         log.info("semantic_index_cleared", namespace=namespace)
+
+    def get_indexed_file_count(self) -> int:
+        """Get the number of unique files indexed.
+
+        Returns:
+            Number of indexed files tracked in file_hashes
+        """
+        return len(self._file_hashes)

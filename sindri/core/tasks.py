@@ -54,6 +54,10 @@ class Task:
     # Cancellation
     cancel_requested: bool = False
 
+    # Phase 6.1: Parallel execution support
+    vram_required: float = 0.0  # VRAM needed for this task's model (GB)
+    model_name: Optional[str] = None  # Model used by assigned agent
+
     def add_subtask(self, subtask_id: str):
         """Add a subtask to this task."""
         if subtask_id not in self.subtask_ids:
@@ -84,3 +88,31 @@ class Task:
             if subtask and subtask.status not in (TaskStatus.COMPLETE, TaskStatus.FAILED):
                 return True
         return False
+
+    def can_run_parallel_with(self, other: "Task") -> bool:
+        """Check if this task can run in parallel with another task.
+
+        Tasks can run in parallel if:
+        1. Neither depends on the other
+        2. They don't share parent-child relationships
+        """
+        # Can't run with self
+        if self.id == other.id:
+            return False
+
+        # Check dependencies
+        if other.id in self.depends_on or self.id in other.depends_on:
+            return False
+
+        # Check parent-child relationships
+        if self.parent_id == other.id or other.parent_id == self.id:
+            return False
+
+        return True
+
+    def shares_model_with(self, other: "Task") -> bool:
+        """Check if this task uses the same model as another task."""
+        return (
+            self.model_name is not None
+            and self.model_name == other.model_name
+        )

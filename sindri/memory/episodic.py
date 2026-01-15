@@ -157,6 +157,17 @@ class EpisodicMemory:
             timestamp=datetime.fromisoformat(row[5])
         )
 
+    def get_episode_count(self) -> int:
+        """Get the total number of episodes stored.
+
+        Returns:
+            Number of episodes in the database
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM episodes")
+        count = cursor.fetchone()[0]
+        return count
+
     def close(self):
         """Close the database connection."""
         if self.conn:

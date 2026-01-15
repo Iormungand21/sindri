@@ -11,7 +11,7 @@ log = structlog.get_logger()
 
 
 class TaskScheduler:
-    """Priority queue with dependency resolution."""
+    """Priority queue with dependency resolution and parallel execution support."""
 
     def __init__(self, model_manager: ModelManager):
         self.tasks: dict[str, Task] = {}
@@ -22,6 +22,14 @@ class TaskScheduler:
 
     def add_task(self, task: Task) -> str:
         """Add task to scheduler."""
+        from sindri.agents.registry import AGENTS
+
+        # Populate VRAM requirements from agent registry
+        agent = AGENTS.get(task.assigned_agent)
+        if agent:
+            task.vram_required = agent.estimated_vram_gb
+            task.model_name = agent.model
+
         self.tasks[task.id] = task
         heapq.heappush(self.pending, (task.priority, task.id))
 
@@ -29,6 +37,7 @@ class TaskScheduler:
                  task_id=task.id,
                  priority=task.priority,
                  agent=task.assigned_agent,
+                 vram_required=task.vram_required,
                  description=task.description[:50])
 
         return task.id
@@ -63,6 +72,92 @@ class TaskScheduler:
             heapq.heappush(self.pending, item)
 
         return None
+
+    def get_ready_batch(self, max_vram: Optional[float] = None) -> list[Task]:
+        """Get all tasks that can run in parallel within VRAM budget.
+
+        This method implements the core parallel execution logic:
+        1. Finds all tasks whose dependencies are satisfied
+        2. Groups tasks that can fit within VRAM constraints
+        3. Tasks sharing the same model only count VRAM once
+
+        Args:
+            max_vram: Maximum VRAM budget. If None, uses model_manager.available.
+
+        Returns:
+            List of tasks that can run concurrently.
+        """
+        if max_vram is None:
+            max_vram = self.model_manager.available
+
+        ready_tasks: list[Task] = []
+        vram_allocated: float = 0.0
+        models_used: set[str] = set()
+        not_ready: list[tuple[int, str]] = []
+
+        # Get currently loaded models - they don't need additional VRAM
+        loaded_models = set(self.model_manager.loaded.keys())
+
+        while self.pending:
+            priority, task_id = heapq.heappop(self.pending)
+            task = self.tasks.get(task_id)
+
+            if not task or task.status != TaskStatus.PENDING:
+                continue
+
+            # Check dependencies
+            if not self._dependencies_satisfied(task):
+                not_ready.append((priority, task_id))
+                continue
+
+            # Check if task can run in parallel with already selected tasks
+            can_add = True
+            for selected in ready_tasks:
+                if not task.can_run_parallel_with(selected):
+                    can_add = False
+                    break
+
+            if not can_add:
+                not_ready.append((priority, task_id))
+                continue
+
+            # Calculate VRAM needed for this task
+            model = task.model_name
+            vram_needed = task.vram_required
+
+            if model in models_used or model in loaded_models:
+                # Model already allocated or loaded - no additional VRAM needed
+                vram_needed = 0.0
+
+            # Check if we have VRAM budget
+            if vram_allocated + vram_needed > max_vram:
+                not_ready.append((priority, task_id))
+                continue
+
+            # Add task to batch
+            ready_tasks.append(task)
+            vram_allocated += vram_needed
+            if model:
+                models_used.add(model)
+
+            log.debug("task_added_to_batch",
+                      task_id=task.id,
+                      agent=task.assigned_agent,
+                      model=model,
+                      vram_needed=vram_needed,
+                      total_vram=vram_allocated)
+
+        # Put back non-ready tasks
+        for item in not_ready:
+            heapq.heappush(self.pending, item)
+
+        if ready_tasks:
+            log.info("batch_ready",
+                     task_count=len(ready_tasks),
+                     vram_allocated=vram_allocated,
+                     models=list(models_used))
+
+        return ready_tasks
 
     def _dependencies_satisfied(self, task: Task) -> bool:
         """Check if all task dependencies are complete."""
