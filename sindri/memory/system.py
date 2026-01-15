@@ -10,6 +10,7 @@ from sindri.memory.semantic import SemanticMemory
 from sindri.memory.embedder import LocalEmbedder
 from sindri.memory.patterns import PatternStore, Pattern
 from sindri.memory.learner import PatternLearner, LearningConfig
+from sindri.memory.codebase import CodebaseAnalyzer, CodebaseAnalysisStore
 from sindri.persistence.vectors import VectorStore
 
 if TYPE_CHECKING:
@@ -27,16 +28,18 @@ class MemoryConfig:
     max_context_tokens: int = 16384
     working_memory_ratio: float = 0.6  # 60% for conversation
     enable_learning: bool = True  # Whether to learn from completions
+    enable_codebase_analysis: bool = True  # Phase 7.4: Codebase understanding
 
 
 class MuninnMemory:
     """The complete memory system - Odin's raven of memory.
 
-    Four-tier architecture:
+    Five-tier architecture:
     - Working: Immediate context (recent conversation)
     - Episodic: Project history (past tasks/decisions)
     - Semantic: Codebase index (code embeddings)
     - Patterns: Learned successful approaches (Phase 7.2)
+    - Analysis: Codebase structure understanding (Phase 7.4)
     """
 
     def __init__(
@@ -58,9 +61,13 @@ class MuninnMemory:
             LearningConfig()
         ) if self.config.enable_learning else None
 
+        # Phase 7.4: Codebase analysis system
+        self.codebase_analyzer = CodebaseAnalyzer(db_path) if self.config.enable_codebase_analysis else None
+
         log.info("muninn_memory_initialized",
                 db_path=db_path,
-                learning_enabled=self.config.enable_learning)
+                learning_enabled=self.config.enable_learning,
+                analysis_enabled=self.config.enable_codebase_analysis)
 
     def build_context(
         self,
@@ -71,24 +78,40 @@ class MuninnMemory:
     ) -> list[dict]:
         """Build complete context for an agent invocation.
 
-        Allocates token budget across four memory tiers:
-        - 55% working memory (recent conversation)
-        - 20% episodic memory (past tasks)
-        - 20% semantic memory (codebase)
+        Allocates token budget across five memory tiers:
+        - 50% working memory (recent conversation)
+        - 18% episodic memory (past tasks)
+        - 18% semantic memory (codebase)
         - 5% patterns (learned approaches)
+        - 9% codebase analysis (Phase 7.4)
         """
 
         max_tokens = max_tokens or self.config.max_context_tokens
 
-        # Budget allocation (adjusted for patterns)
-        working_budget = int(max_tokens * 0.55)
-        episodic_budget = int(max_tokens * 0.2)
-        semantic_budget = int(max_tokens * 0.2)
+        # Budget allocation (adjusted for codebase analysis)
+        working_budget = int(max_tokens * 0.50)
+        episodic_budget = int(max_tokens * 0.18)
+        semantic_budget = int(max_tokens * 0.18)
         pattern_budget = int(max_tokens * 0.05)
+        analysis_budget = int(max_tokens * 0.09)
 
         context_parts = []
 
-        # 1. Pattern suggestions (learned approaches) - Phase 7.2
+        # 1. Codebase analysis context (Phase 7.4) - project structure understanding
+        try:
+            if self.codebase_analyzer:
+                analysis_context = self.codebase_analyzer.get_context_for_agent(project_id)
+                if analysis_context:
+                    analysis_context = self._truncate_to_tokens(analysis_context, analysis_budget)
+                    context_parts.append({
+                        "role": "user",
+                        "content": f"[Project structure]\n{analysis_context}"
+                    })
+                    log.debug("analysis_context_added", project_id=project_id)
+        except Exception as e:
+            log.warning("analysis_context_failed", error=str(e))
+
+        # 2. Pattern suggestions (learned approaches) - Phase 7.2
         try:
             if self.learner:
                 suggestions = self.learner.suggest_patterns(
@@ -107,7 +130,7 @@ class MuninnMemory:
         except Exception as e:
             log.warning("pattern_context_failed", error=str(e))
 
-        # 2. Semantic memory (codebase context)
+        # 3. Semantic memory (codebase context)
         try:
             semantic_results = self.semantic.search(
                 namespace=project_id,
@@ -125,7 +148,7 @@ class MuninnMemory:
         except Exception as e:
             log.warning("semantic_context_failed", error=str(e))
 
-        # 3. Episodic memory (past decisions)
+        # 4. Episodic memory (past decisions)
         try:
             episodes = self.episodic.retrieve_relevant(
                 project_id=project_id,
@@ -143,7 +166,7 @@ class MuninnMemory:
         except Exception as e:
             log.warning("episodic_context_failed", error=str(e))
 
-        # 4. Working memory (recent conversation)
+        # 5. Working memory (recent conversation)
         working_conv = self._fit_conversation(conversation, working_budget)
         log.debug(
             "context_built",
@@ -283,3 +306,51 @@ class MuninnMemory:
         stats = self.learner.get_stats()
         stats["learning_enabled"] = True
         return stats
+
+    # Phase 7.4: Codebase analysis methods
+
+    def analyze_codebase(
+        self,
+        project_path: str,
+        project_id: Optional[str] = None,
+        force: bool = False
+    ) -> Optional["CodebaseAnalysis"]:
+        """Analyze a codebase structure and store results.
+
+        Args:
+            project_path: Path to the project directory
+            project_id: Optional project identifier
+            force: Force re-analysis even if cached
+
+        Returns:
+            CodebaseAnalysis results or None if analysis disabled
+        """
+        if not self.codebase_analyzer:
+            log.warning("codebase_analysis_disabled")
+            return None
+
+        from sindri.analysis.results import CodebaseAnalysis
+        return self.codebase_analyzer.analyze_project(project_path, project_id, force)
+
+    def get_codebase_analysis(self, project_id: str) -> Optional["CodebaseAnalysis"]:
+        """Get stored codebase analysis.
+
+        Args:
+            project_id: The project identifier
+
+        Returns:
+            CodebaseAnalysis if found, None otherwise
+        """
+        if not self.codebase_analyzer:
+            return None
+        return self.codebase_analyzer.store.get(project_id)
+
+    def get_analysis_count(self) -> int:
+        """Get the number of analyzed codebases.
+
+        Returns:
+            Number of stored codebase analyses
+        """
+        if not self.codebase_analyzer:
+            return 0
+        return self.codebase_analyzer.store.get_analysis_count()

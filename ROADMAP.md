@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Phase 7.2 COMPLETE!** (v0.1.0) - Learning from success pattern system. **100% production ready.** 407/407 tests passing (100%). Ready for Phase 8.1 (Plugin System) or Phase 7.4 (Codebase Understanding).
+**Current Status:** ✅ **Phase 7.4 COMPLETE!** (v0.1.0) - Codebase understanding system. **100% production ready.** 448/448 tests passing (100%). Ready for Phase 8.1 (Plugin System) or Phase 8.2 (Agent Marketplace).
 
 ---
 
@@ -11,15 +11,15 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ Phase 7.2 COMPLETE - Learning from success pattern system
-- ✅ 407/407 tests passing (100%)
+- ✅ Phase 7.4 COMPLETE - Codebase understanding (dependency, architecture, style analysis)
+- ✅ 448/448 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 407 passed
+.venv/bin/pytest tests/ -v           # Should see 448 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -32,13 +32,12 @@
 ### Essential Reading
 1. **STATUS.md** - Detailed current state, what works, what doesn't
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
-3. **This file** - See "Phase 8.1 Plugin System" or "Phase 7.4 Codebase Understanding" for next priority
+3. **This file** - See "Phase 8.1 Plugin System" for next priority
 
-### Recommended Next: Phase 8.1 - Plugin System OR Phase 7.4 - Codebase Understanding
+### Recommended Next: Phase 8.1 - Plugin System
 - **Phase 8.1 Goal:** User-defined tools and agents via plugin system
-- **Phase 7.4 Goal:** Deep project structure analysis (dependencies, architecture detection)
-- **Effort:** 1-2 days each
-- **Impact:** HIGH - Extensibility or better project understanding
+- **Effort:** 1-2 days
+- **Impact:** HIGH - Extensibility for custom workflows
 
 ### Need Help?
 - Check tests for examples: `tests/test_*.py`
@@ -762,43 +761,47 @@ After: Parallel = 20s (2x faster, shared model = 5GB total)
 
 ---
 
-### 7.4 Codebase Understanding (High Priority)
+### ✅ 7.4 Codebase Understanding (COMPLETED 2026-01-15)
 
-**Goal:** Help agents deeply understand project structure
+**Status:** ✅ Implemented and tested with 41 new tests
 
-#### Features:
+#### Implementation Summary:
 
-**Dependency Graph**
-- Parse imports/requires
-- Build module dependency graph
-- Identify circular dependencies
-- Suggest refactoring opportunities
+**Analysis Module** (`sindri/analysis/` - NEW):
+- ✅ `results.py` - Data models: `CodebaseAnalysis`, `DependencyInfo`, `ArchitectureInfo`, `StyleInfo`
+- ✅ `dependencies.py` - `DependencyAnalyzer` for import parsing, circular dep detection, entry points
+- ✅ `architecture.py` - `ArchitectureDetector` for pattern detection (layered, modular, MVC, flat)
+- ✅ `style.py` - `StyleAnalyzer` for conventions (indentation, docstrings, type hints, formatters)
 
-**Architecture Detection**
-- Detect patterns (MVC, layered, microservices)
-- Identify entry points (main.py, index.js)
-- Map data flow
+**Codebase Storage** (`sindri/memory/codebase.py` - NEW):
+- ✅ `CodebaseAnalysisStore` - SQLite-backed storage for analysis results
+- ✅ `CodebaseAnalyzer` - High-level coordinator with 24-hour caching
+- ✅ `get_context_for_agent()` - Format analysis for context injection
 
-**Style Analysis**
-- Extract coding conventions from existing files
-- Detect formatter config (.prettierrc, .editorconfig)
-- Apply project style to new code
+**Memory Integration** (`sindri/memory/system.py`):
+- ✅ Five-tier memory: working (50%), episodic (18%), semantic (18%), patterns (5%), analysis (9%)
+- ✅ `analyze_codebase()`, `get_codebase_analysis()`, `get_analysis_count()` methods
+- ✅ Codebase context automatically injected into agent prompts
 
-**Documentation Parsing**
-- Read README, CONTRIBUTING.md
-- Extract project-specific conventions
-- Understand custom tools/scripts
+**Key Features:**
+- ✅ **Dependency Analysis**: Internal/external imports, circular deps, entry points, orphan modules
+- ✅ **Architecture Detection**: Pattern detection, framework detection, project type inference
+- ✅ **Style Analysis**: Indentation, naming conventions, docstring style, formatter/linter detection
+- ✅ **Agent Context**: Project structure/style hints for better code generation
+- ✅ **Caching**: 24-hour TTL with force re-analysis option
 
-**Implementation:**
-- Run on first `sindri orchestrate` in new project
-- Store in semantic memory
-- Update incrementally as files change
+**Files Created:**
+- `sindri/analysis/__init__.py` (20 lines) - Module exports
+- `sindri/analysis/results.py` (380 lines) - Data models with serialization
+- `sindri/analysis/dependencies.py` (280 lines) - Dependency analyzer
+- `sindri/analysis/architecture.py` (300 lines) - Architecture detector
+- `sindri/analysis/style.py` (320 lines) - Style analyzer
+- `sindri/memory/codebase.py` (350 lines) - Storage and coordinator
+- `tests/test_codebase_understanding.py` (700 lines) - 41 comprehensive tests
 
-**Files:**
-- `sindri/analysis/dependencies.py` - Import graph
-- `sindri/analysis/architecture.py` - Pattern detection
-- `sindri/analysis/style.py` - Convention extraction
-- `sindri/memory/codebase.py` - Store analysis results
+**Test Results:**
+- 41 new tests added (all passing)
+- Total: 448/448 tests passing (100%)
 
 ---
 
@@ -1027,9 +1030,9 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Streaming~~ | Medium | Medium | ✅ Complete | 6.3 | Done 2026-01-14 |
 | ~~Interactive planning~~ | Medium | Medium | ✅ Complete | 7.3 | Done 2026-01-14 |
 | ~~Learning system~~ | Medium | High | ✅ Complete | 7.2 | Done 2026-01-15 |
+| ~~Codebase understanding~~ | High | Medium | ✅ Complete | 7.4 | Done 2026-01-15 |
 | TUI enhancements | Medium | Medium | 🟡 Later | 5.5 | History/export |
 | Plugin system | Medium | High | 🟢 Next | 8.1 | Future |
-| Codebase understanding | High | Medium | 🟢 Next | 7.4 | Future |
 | Web UI | High | Very High | 🟢 Later | 8.3 | Future |
 
 ---
@@ -1168,6 +1171,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 7.4 | ✅ **Phase 7.4 COMPLETE!** Codebase understanding system (41 tests) |
 | 2026-01-15 | 7.2 | ✅ **Phase 7.2 COMPLETE!** Learning from success pattern system (35 tests) |
 | 2026-01-14 | 7.3 | ✅ **Phase 7.3 COMPLETE!** Interactive planning with execution plans (28 tests) |
 | 2026-01-14 | 6.3 | ✅ **Phase 6.3 COMPLETE!** Streaming output with real-time tokens (35 tests) |
@@ -1185,13 +1189,32 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-15 (Phase 7.2 Complete!)
-**Next Review:** When starting Phase 8.1 (Plugin System) or Phase 7.4 (Codebase Understanding)
+**Last Updated:** 2026-01-15 (Phase 7.4 Complete!)
+**Next Review:** When starting Phase 8.1 (Plugin System)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 PHASE 7.4: COMPLETE!** (2026-01-15)
+
+Codebase understanding system:
+1. ✅ **DependencyAnalyzer** - Parse imports, build dependency graphs, detect circular deps
+2. ✅ **ArchitectureDetector** - Detect patterns (layered, modular, MVC), frameworks, project types
+3. ✅ **StyleAnalyzer** - Extract conventions (indentation, docstrings, type hints, formatters)
+4. ✅ **CodebaseAnalysisStore** - SQLite-backed storage for analysis results
+5. ✅ **CodebaseAnalyzer** - High-level coordinator with 24-hour caching
+6. ✅ **MuninnMemory integration** - Five-tier memory with project context
+7. ✅ **41 new tests** - Comprehensive codebase understanding coverage
+
+**Impact:**
+- Test coverage: 407 → 448 tests (+41 tests, 100% passing)
+- Agents now understand project structure and conventions
+- Code generation follows detected coding style
+- Memory system is now five-tier (working, episodic, semantic, patterns, analysis)
+
+---
 
 **🎉 PHASE 7.2: COMPLETE!** (2026-01-15)
 
@@ -1208,7 +1231,6 @@ Learning from success pattern system:
 - Test coverage: 372 → 407 tests (+35 tests, 100% passing)
 - Agents now learn from successful completions
 - Pattern suggestions improve future task performance
-- Memory system is now four-tier (working, episodic, semantic, patterns)
 
 ---
 

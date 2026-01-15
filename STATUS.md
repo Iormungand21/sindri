@@ -1,19 +1,29 @@
 # Sindri Project Status Report
-**Date:** 2026-01-15 (Phase 7.2 Complete!)
-**Session:** Phase 7.2 Learning from Success - Full Implementation
+**Date:** 2026-01-15 (Phase 7.4 Complete!)
+**Session:** Phase 7.4 Codebase Understanding - Full Implementation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 7.2 Complete! 🎉
-**Just Completed:** Learning from Success pattern system ✓ (2026-01-15)
-**Test Status:** 407/407 tests, **407 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 7.4 Complete! 🎉
+**Just Completed:** Codebase Understanding system ✓ (2026-01-15)
+**Test Status:** 448/448 tests, **448 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 8.1 (Plugin System) or Phase 7.4 (Codebase Understanding)
+**Next Priority:** Phase 8.1 (Plugin System) or Phase 8.2 (Agent Marketplace)
 
-**Key New Features (Phase 7.2 - Learning from Success):**
+**Key New Features (Phase 7.4 - Codebase Understanding):**
+- **DependencyAnalyzer** - Parse imports, build dependency graphs, detect circular deps
+- **ArchitectureDetector** - Detect patterns (layered, modular, MVC), frameworks, project types
+- **StyleAnalyzer** - Extract coding conventions, docstring style, type hints, formatters
+- **CodebaseAnalysisStore** - SQLite-backed storage for analysis results
+- **CodebaseAnalyzer** - High-level coordinator with caching (24-hour TTL)
+- **MuninnMemory integration** - 5-tier memory with project structure context
+- **Context injection** - Agents receive architecture/style hints for code generation
+- **41 new tests** - Comprehensive codebase understanding coverage
+
+**Previous Features (Phase 7.2 - Learning from Success):**
 - **PatternStore** - SQLite-backed storage for learned patterns
 - **PatternLearner** - Extracts patterns from successful task completions
 - **Pattern class** - Data model with context, keywords, tool sequences, metrics
@@ -81,29 +91,30 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (407/407 passing!)
+# Run all tests (448/448 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_learning.py -v              # Phase 7.2 learning tests (NEW!)
-.venv/bin/pytest tests/test_streaming.py -v             # Phase 6.3 streaming tests
-.venv/bin/pytest tests/test_planning.py -v              # Phase 7.3 planning tests
-.venv/bin/pytest tests/test_agent_specialization.py -v  # Phase 7.1 agent tests
-.venv/bin/pytest tests/test_error_classification.py -v  # Phase 5.6 error tests
-.venv/bin/pytest tests/test_tool_retry.py -v            # Phase 5.6 retry tests
-.venv/bin/pytest tests/test_stuck_detection.py -v       # Phase 5.6 stuck tests
-.venv/bin/pytest tests/test_database_backup.py -v       # Phase 5.6 backup tests
-.venv/bin/pytest tests/test_model_degradation.py -v     # Phase 5.6 degradation tests
-.venv/bin/pytest tests/test_recovery_integration.py -v  # Phase 5.6 recovery tests
-.venv/bin/pytest tests/test_parallel_execution.py -v    # Phase 6.1 tests
-.venv/bin/pytest tests/test_model_caching.py -v         # Phase 6.2 tests
+.venv/bin/pytest tests/test_codebase_understanding.py -v  # Phase 7.4 codebase tests (NEW!)
+.venv/bin/pytest tests/test_learning.py -v                # Phase 7.2 learning tests
+.venv/bin/pytest tests/test_streaming.py -v               # Phase 6.3 streaming tests
+.venv/bin/pytest tests/test_planning.py -v                # Phase 7.3 planning tests
+.venv/bin/pytest tests/test_agent_specialization.py -v    # Phase 7.1 agent tests
+.venv/bin/pytest tests/test_error_classification.py -v    # Phase 5.6 error tests
+.venv/bin/pytest tests/test_tool_retry.py -v              # Phase 5.6 retry tests
+.venv/bin/pytest tests/test_stuck_detection.py -v         # Phase 5.6 stuck tests
+.venv/bin/pytest tests/test_database_backup.py -v         # Phase 5.6 backup tests
+.venv/bin/pytest tests/test_model_degradation.py -v       # Phase 5.6 degradation tests
+.venv/bin/pytest tests/test_recovery_integration.py -v    # Phase 5.6 recovery tests
+.venv/bin/pytest tests/test_parallel_execution.py -v      # Phase 6.1 tests
+.venv/bin/pytest tests/test_model_caching.py -v           # Phase 6.2 tests
 
 # CLI Commands
 .venv/bin/sindri agents              # List all agents
 .venv/bin/sindri sessions            # List recent sessions
 .venv/bin/sindri doctor --verbose    # Check system health
 
-# Test orchestration (with parallel execution + model caching + learning)
+# Test orchestration (with parallel execution + model caching + learning + codebase understanding)
 .venv/bin/sindri orchestrate "Create a Python function and write tests for it"
 
 # Test TUI with VRAM gauge + pattern count
@@ -113,13 +124,64 @@
 **For New Developer/Agent:**
 1. **Start here:** Read this STATUS.md - current state, what works, what's next
 2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
-3. **Roadmap:** See ROADMAP.md for Phase 7.2 (Learning) or Phase 8.1 (Plugin System)
-4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 372 tests should pass
+3. **Roadmap:** See ROADMAP.md for Phase 8.1 (Plugin System) or Phase 8.2 (Agent Marketplace)
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 448 tests should pass
 5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
 
 ---
 
-## 📊 Session Summary (2026-01-14 - Phase 7.3 Interactive Planning)
+## 📊 Session Summary (2026-01-15 - Phase 7.4 Codebase Understanding)
+
+### ✅ Phase 7.4 Complete - Codebase Understanding Implemented! 🎉
+
+**Implementation Time:** ~1.5 hours
+
+**Core Changes:**
+
+1. **Analysis Module** (`sindri/analysis/` - NEW)
+   - `results.py` - Data models: `CodebaseAnalysis`, `DependencyInfo`, `ArchitectureInfo`, `StyleInfo`
+   - `dependencies.py` - `DependencyAnalyzer` for import parsing and circular dependency detection
+   - `architecture.py` - `ArchitectureDetector` for pattern detection (layered, modular, MVC, etc.)
+   - `style.py` - `StyleAnalyzer` for convention detection (indentation, docstrings, type hints, formatters)
+
+2. **Codebase Storage** (`sindri/memory/codebase.py` - NEW)
+   - `CodebaseAnalysisStore` - SQLite-backed storage for analysis results
+   - `CodebaseAnalyzer` - High-level coordinator with 24-hour caching
+   - `get_context_for_agent()` - Format analysis for agent context injection
+
+3. **Memory System Integration** (`sindri/memory/system.py`)
+   - Five-tier memory architecture: working, episodic, semantic, patterns, analysis
+   - Token budget allocation: 50% working, 18% episodic, 18% semantic, 5% patterns, 9% analysis
+   - `analyze_codebase()`, `get_codebase_analysis()`, `get_analysis_count()` methods
+   - Codebase context injected into agent prompts
+
+4. **Key Features**
+   - **Dependency Analysis**: Internal/external imports, circular dependencies, entry points
+   - **Architecture Detection**: Pattern detection (layered, modular, MVC), framework detection
+   - **Style Analysis**: Indentation, naming conventions, docstring style, formatters/linters
+   - **Project Context**: Agents receive architecture/style hints for code generation
+   - **Caching**: 24-hour TTL for analysis results, force re-analysis option
+
+**Files Created:**
+- `sindri/analysis/__init__.py` (20 lines) - Module exports
+- `sindri/analysis/results.py` (380 lines) - Data models
+- `sindri/analysis/dependencies.py` (280 lines) - Dependency analyzer
+- `sindri/analysis/architecture.py` (300 lines) - Architecture detector
+- `sindri/analysis/style.py` (320 lines) - Style analyzer
+- `sindri/memory/codebase.py` (350 lines) - Storage and coordinator
+- `tests/test_codebase_understanding.py` (700 lines) - 41 comprehensive tests
+
+**Files Modified:**
+- `sindri/memory/system.py` (+60 lines) - Five-tier memory integration
+
+**Test Results:**
+- **Before:** 407/407 tests passing (100%)
+- **After:** 448/448 tests passing (100%) 🎉
+- **New Tests:** 41 tests (all passing)
+
+---
+
+## 📊 Previous Session Summary (2026-01-14 - Phase 7.3 Interactive Planning)
 
 ### ✅ Phase 7.3 Complete - Interactive Planning Implemented! 🎉
 
@@ -1227,29 +1289,30 @@ export SINDRI_LOG_LEVEL=DEBUG
 **Virtual Environment:** `.venv/`
 **Data Directory:** `~/.sindri/`
 
-**This Session By:** Claude Opus 4.5 (2026-01-14 - Phase 7.3 Complete!)
-**Session Focus:** Phase 7.3 Interactive Planning - Full implementation
-**Session Duration:** ~1 hour
-**Lines Added:** ~700 lines
+**This Session By:** Claude Opus 4.5 (2026-01-15 - Phase 7.4 Complete!)
+**Session Focus:** Phase 7.4 Codebase Understanding - Full implementation
+**Session Duration:** ~1.5 hours
+**Lines Added:** ~2100 lines
 **Files Created:**
-- `sindri/tools/planning.py` (230 lines) - ProposePlanTool and data models
-- `tests/test_planning.py` (400 lines, 28 tests)
+- `sindri/analysis/__init__.py` (20 lines) - Module exports
+- `sindri/analysis/results.py` (380 lines) - Data models
+- `sindri/analysis/dependencies.py` (280 lines) - Dependency analyzer
+- `sindri/analysis/architecture.py` (300 lines) - Architecture detector
+- `sindri/analysis/style.py` (320 lines) - Style analyzer
+- `sindri/memory/codebase.py` (350 lines) - Storage and coordinator
+- `tests/test_codebase_understanding.py` (700 lines, 41 tests)
 **Files Modified:**
-- `sindri/core/events.py` - New planning event types
-- `sindri/tools/registry.py` - Registered ProposePlanTool
-- `sindri/agents/registry.py` - Added propose_plan to Brokkr
-- `sindri/agents/prompts.py` - Planning instructions for Brokkr
-- `sindri/core/hierarchical.py` - PLAN_PROPOSED event emission
-- `sindri/tui/app.py` - Plan display handler
-**Tests Added:** 28 tests (all passing)
-**Impact:** Phase 7.3 COMPLETE! 372/372 tests passing (100%) 🎉
+- `sindri/memory/system.py` - Five-tier memory integration
+**Tests Added:** 41 tests (all passing)
+**Impact:** Phase 7.4 COMPLETE! 448/448 tests passing (100%) 🎉
 
-**Previous Session By:** Claude Opus 4.5 (2026-01-14 - Phase 6.3 Complete!)
-**Session Focus:** Phase 6.3 Streaming Output - Full implementation
-**Session Duration:** ~1 hour
-**Impact:** 344/344 tests passing (100%)
+**Previous Session By:** Claude Opus 4.5 (2026-01-15 - Phase 7.2 Complete!)
+**Session Focus:** Phase 7.2 Learning from Success - Full implementation
+**Impact:** 407/407 tests passing (100%)
 
 **Earlier Sessions (2026-01-14):**
+- Phase 7.3 Interactive Planning (~1 hour, 28 tests)
+- Phase 6.3 Streaming Output (~1 hour, 35 tests)
 - Phase 7.1 Agent Specialization (~45 min, 43 tests)
 - Phase 5.6 Error Handling (~2 hours, 116 tests)
 - Phase 6.2 Model Caching (~30 min, 25 tests)
@@ -1257,24 +1320,24 @@ export SINDRI_LOG_LEVEL=DEBUG
 
 **For Next Developer/Agent:**
 1. Run `sindri doctor --verbose` to check system health
-2. Run `pytest tests/ -v` to verify 372/372 pass rate 🎉
+2. Run `pytest tests/ -v` to verify 448/448 pass rate 🎉
 3. Try all CLI commands:
    - `sindri agents`
    - `sindri sessions`
    - `sindri recover`
    - `sindri resume <id>` (use short ID from sessions!)
-4. Review ROADMAP.md for Phase 7.2 or Phase 8.1 priorities
+4. Review ROADMAP.md for Phase 8.1 priorities
 5. Check PROJECT_HANDOFF.md for detailed context
-6. **Recommended Next:** Phase 7.2 (Learning from Success) or Phase 8.1 (Plugin System)
+6. **Recommended Next:** Phase 8.1 (Plugin System) or Phase 8.2 (Agent Marketplace)
 
 **Questions?** Check documentation:
-- ROADMAP.md - Feature roadmap (updated with Phase 7.3 complete)
+- ROADMAP.md - Feature roadmap (updated with Phase 7.4 complete)
 - CLAUDE.md - Project context
 - TOOLS_AND_MODELS_ANALYSIS.md - Tools/models guide
 - PROJECT_HANDOFF.md - Comprehensive handoff doc
 
 ---
 
-**Status:** ✅ PRODUCTION READY (100%) - Phase 7.3 COMPLETE! 🎉
-**Last Updated:** 2026-01-14 - Phase 7.3 Interactive Planning Session
-**Next Session Goal:** Phase 7.2 - Learning from Success or Phase 8.1 - Plugin System
+**Status:** ✅ PRODUCTION READY (100%) - Phase 7.4 COMPLETE! 🎉
+**Last Updated:** 2026-01-15 - Phase 7.4 Codebase Understanding Session
+**Next Session Goal:** Phase 8.1 - Plugin System or Phase 8.2 - Agent Marketplace
