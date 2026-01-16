@@ -46,6 +46,7 @@ export function SessionList() {
     { value: 'completed', label: 'Completed' },
     { value: 'failed', label: 'Failed' },
     { value: 'active', label: 'Active' },
+    { value: 'stale', label: 'Stale' },
     { value: 'cancelled', label: 'Cancelled' },
   ]
 

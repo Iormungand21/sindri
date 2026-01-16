@@ -221,9 +221,8 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
 
     # ===== Health & Info Endpoints =====
 
-    @app.get("/health", response_model=HealthResponse, tags=["System"])
-    async def health_check():
-        """Check API health status."""
+    async def _health_check_impl():
+        """Health check implementation."""
         from ollama import Client
 
         # Check Ollama
@@ -251,6 +250,16 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             database_ok=db_ok,
             timestamp=datetime.now().isoformat()
         )
+
+    @app.get("/health", response_model=HealthResponse, tags=["System"])
+    async def health_check():
+        """Check API health status."""
+        return await _health_check_impl()
+
+    @app.get("/api/health", response_model=HealthResponse, tags=["System"])
+    async def health_check_api():
+        """Check API health status (alias for /health)."""
+        return await _health_check_impl()
 
     # ===== Agent Endpoints =====
 
@@ -294,16 +303,48 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
 
     # ===== Session Endpoints =====
 
+    def _is_session_stale(session: dict) -> bool:
+        """Check if a session is stale (active but >1hr old)."""
+        if session.get("status") != "active":
+            return False
+        try:
+            created_at = session.get("created_at", "")
+            if isinstance(created_at, str):
+                session_time = datetime.fromisoformat(created_at.replace("Z", "+00:00")).timestamp()
+            else:
+                session_time = created_at.timestamp() if hasattr(created_at, 'timestamp') else 0
+            stale_threshold = datetime.now().timestamp() - 3600  # 1 hour ago
+            return session_time < stale_threshold
+        except (ValueError, TypeError):
+            return True  # If we can't parse the time, assume it's stale
+
     @app.get("/api/sessions", response_model=list[SessionResponse], tags=["Sessions"])
     async def list_sessions(
         limit: int = Query(default=20, ge=1, le=100, description="Maximum sessions to return"),
-        status: Optional[str] = Query(default=None, description="Filter by status")
+        status: Optional[str] = Query(default=None, description="Filter by status (active, completed, failed, cancelled, stale)")
     ):
-        """List recent sessions."""
-        sessions = await api.state.list_sessions(limit=limit)
+        """List recent sessions.
+
+        Status filter options:
+        - active: Only truly active sessions (started within last hour)
+        - stale: Sessions marked active but older than 1 hour (likely abandoned)
+        - completed, failed, cancelled: Filter by that status
+        """
+        sessions = await api.state.list_sessions(limit=limit * 2 if status else limit)  # Fetch more to account for filtering
 
         if status:
-            sessions = [s for s in sessions if s["status"] == status]
+            if status == "stale":
+                # Return only stale sessions (active but >1hr old)
+                sessions = [s for s in sessions if _is_session_stale(s)]
+            elif status == "active":
+                # Return only truly active sessions (not stale)
+                sessions = [s for s in sessions if s["status"] == "active" and not _is_session_stale(s)]
+            else:
+                # Standard status filter
+                sessions = [s for s in sessions if s["status"] == status]
+
+        # Apply limit after filtering
+        sessions = sessions[:limit]
 
         return [
             SessionResponse(
