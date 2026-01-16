@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Git Tools COMPLETE!** (v0.1.0) - git_status, git_diff, git_log, git_branch tools implemented. **100% production ready.** 678/678 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
+**Current Status:** ✅ **HTTP Tools COMPLETE!** (v0.1.0) - http_request, http_get, http_post tools implemented. **100% production ready.** 711/711 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
 
 ---
 
@@ -11,15 +11,15 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ Git Tools COMPLETE - git_status, git_diff, git_log, git_branch
-- ✅ 678/678 tests passing (100%)
+- ✅ HTTP Tools COMPLETE - http_request, http_get, http_post
+- ✅ 711/711 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search, git tools
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search, git tools, HTTP client
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 678 passed
+.venv/bin/pytest tests/ -v           # Should see 711 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -83,14 +83,14 @@
 ## Tools & Models Reference
 
 **See [TOOLS_AND_MODELS_ANALYSIS.md](TOOLS_AND_MODELS_ANALYSIS.md) for comprehensive analysis:**
-- Current tools: 13 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, shell, delegate) ✅
-- Recommended additions: 12 tools remaining across 5 categories
+- Current tools: 16 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, shell, delegate) ✅
+- Recommended additions: 9 tools remaining across 5 categories
 - Current models: 7 active (qwen, llama, deepseek, sqlcoder)
 - Recommended models: 9 additions (codellama, mistral, starcoder2, phi3, etc.)
 - New agent proposals: 4 (Thor, Heimdall, Idunn, Loki)
 
 **Next priorities:**
-- Tools: http_request, check_syntax, run_tests
+- Tools: check_syntax, run_tests, format_code
 - Models: codellama:13b, mistral:7b, starcoder2:15b
 
 ---
@@ -1119,6 +1119,7 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Web API Backend~~ | High | Medium | ✅ Complete | 8.3 | Done 2026-01-15 |
 | ~~Search code tools~~ | Very High | Medium | ✅ Complete | 5.2 | Done 2026-01-15 |
 | ~~Git operations~~ | Medium | Low | ✅ Complete | 6 | Done 2026-01-15 |
+| ~~HTTP tools~~ | High | Medium | ✅ Complete | 8.3 | Done 2026-01-15 |
 | Web UI Frontend | High | High | 🟢 Next | 8.3 | Future |
 
 ---
@@ -1257,6 +1258,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 8.3 | ✅ **HTTP Tools COMPLETE!** http_request, http_get, http_post for API interaction (33 tests) |
 | 2026-01-15 | 6 | ✅ **Git Tools COMPLETE!** git_status, git_diff, git_log, git_branch for version control awareness (40 tests) |
 | 2026-01-15 | 5.2 | ✅ **Code Search Tools COMPLETE!** search_code & find_symbol for fast codebase exploration (39 tests) |
 | 2026-01-15 | 8.3 | ✅ **Phase 8.3 (Foundation) COMPLETE!** Web API server with FastAPI, REST, WebSocket (34 tests) |
@@ -1280,13 +1282,31 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-15 (Git Tools Complete!)
+**Last Updated:** 2026-01-15 (HTTP Tools Complete!)
 **Next Review:** When starting Phase 8.3 Web UI Frontend (React)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 HTTP TOOLS COMPLETE!** (2026-01-15)
+
+HTTP client tools for API interaction:
+1. ✅ **HttpRequestTool** - Full HTTP client (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
+2. ✅ **HttpGetTool** - Simplified GET requests
+3. ✅ **HttpPostTool** - Simplified POST with JSON body
+4. ✅ **Security Features** - Blocks localhost, metadata endpoints, private IPs
+5. ✅ **Agent Integration** - Added to Brokkr, Huginn, Skald, Fenrir
+6. ✅ **33 new tests** - Comprehensive HTTP tools coverage
+
+**Impact:**
+- Test coverage: 678 → 711 tests (+33 tests, 100% passing)
+- Agents can now interact with external APIs
+- Fetch documentation, call webhooks, integrate with services
+- Essential for API-based workflows and integrations
+
+---
 
 **🎉 GIT TOOLS COMPLETE!** (2026-01-15)
 
