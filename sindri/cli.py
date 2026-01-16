@@ -251,12 +251,27 @@ def agents():
 
 
 @cli.command()
-def sessions():
-    """List recent sessions."""
+@click.option("--cleanup", is_flag=True, help="Mark stale active sessions as failed")
+@click.option("--max-age", default=1.0, help="Max age in hours before session is stale (default: 1.0)")
+def sessions(cleanup: bool = False, max_age: float = 1.0):
+    """List recent sessions.
+
+    Use --cleanup to mark stale sessions (active but old) as failed.
+    """
 
     async def show_sessions():
         state = SessionState()
-        sessions = await state.list_sessions()
+
+        if cleanup:
+            # Cleanup stale sessions
+            cleaned = await state.cleanup_stale_sessions(max_age_hours=max_age)
+            if cleaned > 0:
+                console.print(f"[green]✓ Marked {cleaned} stale session(s) as failed[/]")
+            else:
+                console.print("[dim]No stale sessions to clean up[/dim]")
+            console.print()
+
+        sessions = await state.list_sessions(limit=20)
 
         if not sessions:
             console.print("[yellow]No sessions found[/]")
@@ -264,10 +279,28 @@ def sessions():
 
         console.print("[bold]Recent sessions:[/]\n")
         for session in sessions:
-            status_color = "green" if session["status"] == "completed" else "yellow"
-            console.print(f"[{status_color}]●[/] {session['id'][:8]} - {session['task'][:50]}")
+            status = session["status"]
+            if status == "completed":
+                status_color = "green"
+                status_icon = "✓"
+            elif status == "failed":
+                status_color = "red"
+                status_icon = "✗"
+            elif status == "active":
+                status_color = "blue"
+                status_icon = "●"
+            else:
+                status_color = "yellow"
+                status_icon = "○"
+
+            console.print(f"[{status_color}]{status_icon}[/] {session['id'][:8]} - {session['task'][:50]}")
             console.print(f"   Model: {session['model']} | Iterations: {session['iterations']} | {session['created_at']}")
             console.print()
+
+        # Show cleanup hint if there are active sessions
+        active_count = sum(1 for s in sessions if s["status"] == "active")
+        if active_count > 0 and not cleanup:
+            console.print(f"[dim]Found {active_count} active session(s). Use --cleanup to mark stale ones as failed.[/dim]")
 
     asyncio.run(show_sessions())
 

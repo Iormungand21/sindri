@@ -56,7 +56,7 @@ export function Dashboard() {
       </div>
 
       {/* Metrics cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <MetricCard
           label="Total Sessions"
           value={metrics?.total_sessions ?? 0}
@@ -79,14 +79,6 @@ export function Dashboard() {
           value={metrics?.active_sessions ?? 0}
           loading={metricsLoading}
           variant="info"
-          subtitle="Running now"
-        />
-        <MetricCard
-          label="Stale"
-          value={metrics?.stale_sessions ?? 0}
-          loading={metricsLoading}
-          variant="muted"
-          subtitle="Abandoned (>1hr)"
         />
       </div>
 

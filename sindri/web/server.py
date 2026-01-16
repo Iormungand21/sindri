@@ -93,7 +93,6 @@ class MetricsResponse(BaseModel):
     completed_sessions: int
     failed_sessions: int
     active_sessions: int
-    stale_sessions: int  # Sessions marked active but likely abandoned (>1hr old)
     total_iterations: int
     vram_used_gb: float
     vram_total_gb: float
@@ -132,6 +131,12 @@ class SindriAPI:
         """Initialize API components."""
         await self.state.db.initialize()
         self.model_manager = ModelManager(total_vram_gb=self.vram_gb)
+
+        # Clean up stale sessions on startup
+        # Any "active" sessions from before server start are clearly not running
+        cleaned = await self.state.cleanup_stale_sessions(max_age_hours=0.0)
+        if cleaned > 0:
+            log.info("startup_cleanup", stale_sessions_marked_failed=cleaned)
 
         # Subscribe to events for WebSocket broadcast
         for event_type in EventType:
@@ -303,48 +308,16 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
 
     # ===== Session Endpoints =====
 
-    def _is_session_stale(session: dict) -> bool:
-        """Check if a session is stale (active but >1hr old)."""
-        if session.get("status") != "active":
-            return False
-        try:
-            created_at = session.get("created_at", "")
-            if isinstance(created_at, str):
-                session_time = datetime.fromisoformat(created_at.replace("Z", "+00:00")).timestamp()
-            else:
-                session_time = created_at.timestamp() if hasattr(created_at, 'timestamp') else 0
-            stale_threshold = datetime.now().timestamp() - 3600  # 1 hour ago
-            return session_time < stale_threshold
-        except (ValueError, TypeError):
-            return True  # If we can't parse the time, assume it's stale
-
     @app.get("/api/sessions", response_model=list[SessionResponse], tags=["Sessions"])
     async def list_sessions(
         limit: int = Query(default=20, ge=1, le=100, description="Maximum sessions to return"),
-        status: Optional[str] = Query(default=None, description="Filter by status (active, completed, failed, cancelled, stale)")
+        status: Optional[str] = Query(default=None, description="Filter by status (active, completed, failed, cancelled)")
     ):
-        """List recent sessions.
-
-        Status filter options:
-        - active: Only truly active sessions (started within last hour)
-        - stale: Sessions marked active but older than 1 hour (likely abandoned)
-        - completed, failed, cancelled: Filter by that status
-        """
-        sessions = await api.state.list_sessions(limit=limit * 2 if status else limit)  # Fetch more to account for filtering
+        """List recent sessions."""
+        sessions = await api.state.list_sessions(limit=limit)
 
         if status:
-            if status == "stale":
-                # Return only stale sessions (active but >1hr old)
-                sessions = [s for s in sessions if _is_session_stale(s)]
-            elif status == "active":
-                # Return only truly active sessions (not stale)
-                sessions = [s for s in sessions if s["status"] == "active" and not _is_session_stale(s)]
-            else:
-                # Standard status filter
-                sessions = [s for s in sessions if s["status"] == status]
-
-        # Apply limit after filtering
-        sessions = sessions[:limit]
+            sessions = [s for s in sessions if s["status"] == status]
 
         return [
             SessionResponse(
@@ -501,31 +474,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         sessions = await api.state.list_sessions(limit=1000)
         completed = sum(1 for s in sessions if s["status"] == "completed")
         failed = sum(1 for s in sessions if s["status"] == "failed")
-
-        # Detect stale sessions: "active" status but older than 1 hour
-        # These are likely from crashed processes
-        stale_threshold = datetime.now().timestamp() - 3600  # 1 hour ago
-        active_sessions = [s for s in sessions if s["status"] == "active"]
-
-        stale_count = 0
-        truly_active_count = 0
-        for s in active_sessions:
-            try:
-                # Parse created_at timestamp
-                created_at = s.get("created_at", "")
-                if isinstance(created_at, str):
-                    session_time = datetime.fromisoformat(created_at.replace("Z", "+00:00")).timestamp()
-                else:
-                    session_time = created_at.timestamp() if hasattr(created_at, 'timestamp') else 0
-
-                if session_time < stale_threshold:
-                    stale_count += 1
-                else:
-                    truly_active_count += 1
-            except (ValueError, TypeError):
-                # If we can't parse the time, assume it's stale
-                stale_count += 1
-
+        active = sum(1 for s in sessions if s["status"] == "active")
         total_iterations = sum(s["iterations"] for s in sessions)
 
         # Get VRAM stats
@@ -540,8 +489,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             total_sessions=len(sessions),
             completed_sessions=completed,
             failed_sessions=failed,
-            active_sessions=truly_active_count,  # Only truly active (< 1hr old)
-            stale_sessions=stale_count,  # Old "active" sessions (likely abandoned)
+            active_sessions=active,
             total_iterations=total_iterations,
             vram_used_gb=vram_used,
             vram_total_gb=api.vram_gb,

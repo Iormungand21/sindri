@@ -209,3 +209,62 @@ class SessionState:
                         "iterations": row[5]
                     })
                 return sessions
+
+    async def cleanup_stale_sessions(self, max_age_hours: float = 1.0) -> int:
+        """Mark stale 'active' sessions as 'failed'.
+
+        Sessions that are marked as 'active' but older than max_age_hours
+        are considered stale (likely from crashed/interrupted processes)
+        and are marked as 'failed'.
+
+        Args:
+            max_age_hours: Maximum age in hours for an active session before
+                          it's considered stale. Default is 1 hour.
+
+        Returns:
+            Number of sessions marked as failed.
+        """
+        from datetime import timedelta
+
+        await self.db.initialize()
+
+        cutoff_time = datetime.now() - timedelta(hours=max_age_hours)
+
+        async with self.db.get_connection() as conn:
+            # First, count how many we'll update
+            async with conn.execute(
+                """
+                SELECT COUNT(*) FROM sessions
+                WHERE status = 'active' AND created_at < ?
+                """,
+                (cutoff_time.isoformat(),)
+            ) as cursor:
+                row = await cursor.fetchone()
+                count = row[0] if row else 0
+
+            if count > 0:
+                # Mark stale active sessions as failed
+                await conn.execute(
+                    """
+                    UPDATE sessions
+                    SET status = 'failed', completed_at = ?
+                    WHERE status = 'active' AND created_at < ?
+                    """,
+                    (datetime.now(), cutoff_time.isoformat())
+                )
+                await conn.commit()
+
+                log.info("stale_sessions_cleaned", count=count, max_age_hours=max_age_hours)
+
+        return count
+
+    async def get_active_session_count(self) -> int:
+        """Get count of active sessions."""
+        await self.db.initialize()
+
+        async with self.db.get_connection() as conn:
+            async with conn.execute(
+                "SELECT COUNT(*) FROM sessions WHERE status = 'active'"
+            ) as cursor:
+                row = await cursor.fetchone()
+                return row[0] if row else 0

@@ -46,7 +46,6 @@ export function SessionList() {
     { value: 'completed', label: 'Completed' },
     { value: 'failed', label: 'Failed' },
     { value: 'active', label: 'Active' },
-    { value: 'stale', label: 'Stale' },
     { value: 'cancelled', label: 'Cancelled' },
   ]
 
@@ -69,11 +68,6 @@ export function SessionList() {
             <span className="text-green-400">{metrics?.completed_sessions ?? 0} completed</span>
             <span className="text-red-400">{metrics?.failed_sessions ?? 0} failed</span>
             <span className="text-blue-400">{metrics?.active_sessions ?? 0} active</span>
-            {(metrics?.stale_sessions ?? 0) > 0 && (
-              <span className="text-sindri-500" title="Sessions marked active but older than 1 hour (likely abandoned)">
-                {metrics?.stale_sessions ?? 0} stale
-              </span>
-            )}
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -126,11 +120,6 @@ function SessionCard({ session }: SessionCardProps) {
     ? new Date(session.completed_at)
     : null
 
-  // Detect stale sessions: active but older than 1 hour
-  const isStale =
-    session.status === 'active' &&
-    Date.now() - createdAt.getTime() > 3600000 // 1 hour in ms
-
   const statusStyles = {
     completed: {
       bg: 'bg-green-900/30 border-green-800',
@@ -147,11 +136,6 @@ function SessionCard({ session }: SessionCardProps) {
       badge: 'bg-blue-900/50 text-blue-400 border-blue-700',
       icon: '●',
     },
-    stale: {
-      bg: 'bg-sindri-800/50 border-sindri-700',
-      badge: 'bg-sindri-700/50 text-sindri-400 border-sindri-600',
-      icon: '○',
-    },
     cancelled: {
       bg: 'bg-gray-900/30 border-gray-700',
       badge: 'bg-gray-900/50 text-gray-400 border-gray-600',
@@ -159,13 +143,10 @@ function SessionCard({ session }: SessionCardProps) {
     },
   }
 
-  const styleKey = isStale ? 'stale' : session.status
-  const style = statusStyles[styleKey] || statusStyles.cancelled
+  const style = statusStyles[session.status] || statusStyles.cancelled
 
   const duration = completedAt
     ? formatDuration(completedAt.getTime() - createdAt.getTime())
-    : isStale
-    ? formatDuration(Date.now() - createdAt.getTime()) + ' (stale)'
     : 'In progress'
 
   return (
@@ -191,10 +172,9 @@ function SessionCard({ session }: SessionCardProps) {
         </div>
         <span
           className={`flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-sm border ${style.badge}`}
-          title={isStale ? 'Session appears abandoned (>1hr with no completion)' : ''}
         >
           <span>{style.icon}</span>
-          {isStale ? 'stale' : session.status}
+          {session.status}
         </span>
       </div>
       <div className="mt-3 pt-3 border-t border-sindri-700/50">
