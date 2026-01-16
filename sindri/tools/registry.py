@@ -20,6 +20,7 @@ from sindri.tools.planning import ProposePlanTool
 from sindri.tools.search import SearchCodeTool, FindSymbolTool
 from sindri.tools.git import GitStatusTool, GitDiffTool, GitLogTool, GitBranchTool
 from sindri.tools.http import HttpRequestTool, HttpGetTool, HttpPostTool
+from sindri.tools.testing import RunTestsTool, CheckSyntaxTool
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -241,4 +242,6 @@ class ToolRegistry:
         registry.register(HttpRequestTool(work_dir=work_dir))
         registry.register(HttpGetTool(work_dir=work_dir))
         registry.register(HttpPostTool(work_dir=work_dir))
+        registry.register(RunTestsTool(work_dir=work_dir))
+        registry.register(CheckSyntaxTool(work_dir=work_dir))
         return registry

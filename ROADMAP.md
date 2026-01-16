@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **HTTP Tools COMPLETE!** (v0.1.0) - http_request, http_get, http_post tools implemented. **100% production ready.** 711/711 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
+**Current Status:** ✅ **Testing Tools COMPLETE!** (v0.1.0) - run_tests, check_syntax tools implemented. **100% production ready.** 763/763 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
 
 ---
 
@@ -11,15 +11,15 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ HTTP Tools COMPLETE - http_request, http_get, http_post
-- ✅ 711/711 tests passing (100%)
+- ✅ Testing Tools COMPLETE - run_tests, check_syntax
+- ✅ 763/763 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search, git tools, HTTP client
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search, git tools, HTTP client, testing tools
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 711 passed
+.venv/bin/pytest tests/ -v           # Should see 763 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -83,14 +83,14 @@
 ## Tools & Models Reference
 
 **See [TOOLS_AND_MODELS_ANALYSIS.md](TOOLS_AND_MODELS_ANALYSIS.md) for comprehensive analysis:**
-- Current tools: 16 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, shell, delegate) ✅
-- Recommended additions: 9 tools remaining across 5 categories
+- Current tools: 18 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, shell, delegate) ✅
+- Recommended additions: 7 tools remaining across 5 categories
 - Current models: 7 active (qwen, llama, deepseek, sqlcoder)
 - Recommended models: 9 additions (codellama, mistral, starcoder2, phi3, etc.)
 - New agent proposals: 4 (Thor, Heimdall, Idunn, Loki)
 
 **Next priorities:**
-- Tools: check_syntax, run_tests, format_code
+- Tools: format_code, lint_code, refactor
 - Models: codellama:13b, mistral:7b, starcoder2:15b
 
 ---
@@ -1120,6 +1120,7 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Search code tools~~ | Very High | Medium | ✅ Complete | 5.2 | Done 2026-01-15 |
 | ~~Git operations~~ | Medium | Low | ✅ Complete | 6 | Done 2026-01-15 |
 | ~~HTTP tools~~ | High | Medium | ✅ Complete | 8.3 | Done 2026-01-15 |
+| ~~Testing tools~~ | Very High | Medium | ✅ Complete | 8.3 | Done 2026-01-15 |
 | Web UI Frontend | High | High | 🟢 Next | 8.3 | Future |
 
 ---
@@ -1258,6 +1259,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 8.3 | ✅ **Testing Tools COMPLETE!** run_tests, check_syntax for test execution and syntax validation (52 tests) |
 | 2026-01-15 | 8.3 | ✅ **HTTP Tools COMPLETE!** http_request, http_get, http_post for API interaction (33 tests) |
 | 2026-01-15 | 6 | ✅ **Git Tools COMPLETE!** git_status, git_diff, git_log, git_branch for version control awareness (40 tests) |
 | 2026-01-15 | 5.2 | ✅ **Code Search Tools COMPLETE!** search_code & find_symbol for fast codebase exploration (39 tests) |
@@ -1282,13 +1284,35 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-15 (HTTP Tools Complete!)
+**Last Updated:** 2026-01-15 (Testing Tools Complete!)
 **Next Review:** When starting Phase 8.3 Web UI Frontend (React)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 TESTING TOOLS COMPLETE!** (2026-01-15)
+
+Testing tools for code quality assurance:
+1. ✅ **RunTestsTool** - Execute tests with auto-detected framework
+   - Supports: pytest, unittest, npm, jest, cargo, go
+   - Pattern filtering, verbose output, fail-fast, coverage
+   - Result parsing with pass/fail/skipped counts
+2. ✅ **CheckSyntaxTool** - Validate code syntax without execution
+   - Supports: Python (ast), JavaScript (node --check), TypeScript (tsc)
+   - Also: Rust (cargo check), Go (go build)
+   - Auto-detects language from file extension
+3. ✅ **Agent Integration** - Added to Brokkr, Huginn, Mimir, Skald
+4. ✅ **52 new tests** - Comprehensive testing tools coverage
+
+**Impact:**
+- Test coverage: 711 → 763 tests (+52 tests, 100% passing)
+- Agents can now verify code changes by running tests
+- Syntax checking catches errors before execution
+- Essential for CI/CD integration and code review
+
+---
 
 **🎉 HTTP TOOLS COMPLETE!** (2026-01-15)
 

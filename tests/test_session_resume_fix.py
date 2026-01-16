@@ -11,8 +11,36 @@ from sindri.persistence.state import Session, Turn
 from sindri.agents.definitions import AgentDefinition
 
 
+@pytest.fixture
+def mock_brokkr_agent():
+    """Fixture that provides a mock brokkr agent and restores original after test."""
+    from sindri.agents.registry import AGENTS
+
+    # Save original
+    original_brokkr = AGENTS.get("brokkr")
+
+    # Create mock agent
+    agent = AgentDefinition(
+        name="brokkr",
+        role="orchestrator",
+        model="test-model",
+        system_prompt="Test prompt",
+        tools=[],
+        max_iterations=10,
+        can_delegate=True,
+        delegate_to=[]
+    )
+    AGENTS["brokkr"] = agent
+
+    yield agent
+
+    # Restore original
+    if original_brokkr is not None:
+        AGENTS["brokkr"] = original_brokkr
+
+
 @pytest.mark.asyncio
-async def test_new_task_creates_new_session():
+async def test_new_task_creates_new_session(mock_brokkr_agent):
     """Test that a new task without session_id creates a new session."""
 
     # Setup mocks
@@ -57,23 +85,7 @@ async def test_new_task_creates_new_session():
         assigned_agent="brokkr"
     )
 
-    # Mock agent
-    agent = AgentDefinition(
-        name="brokkr",
-        role="orchestrator",
-        model="test-model",
-        system_prompt="Test prompt",
-        tools=[],
-        max_iterations=10,
-        can_delegate=True,
-        delegate_to=[]
-    )
-
-    # Manually add agent to registry for test
-    from sindri.agents.registry import AGENTS
-    AGENTS["brokkr"] = agent
-
-    # Run the loop
+    # Run the loop (mock_brokkr_agent fixture already set up the agent)
     await loop.run_task(task)
 
     # Verify new session was created (not loaded)
@@ -85,7 +97,7 @@ async def test_new_task_creates_new_session():
 
 
 @pytest.mark.asyncio
-async def test_task_with_session_id_resumes_session():
+async def test_task_with_session_id_resumes_session(mock_brokkr_agent):
     """Test that a task with existing session_id loads that session."""
 
     # Setup mocks
@@ -136,22 +148,7 @@ async def test_task_with_session_id_resumes_session():
         session_id="existing-session-id"  # Key: task already has session_id
     )
 
-    # Mock agent
-    agent = AgentDefinition(
-        name="brokkr",
-        role="orchestrator",
-        model="test-model",
-        system_prompt="Test prompt",
-        tools=[],
-        max_iterations=10,
-        can_delegate=True,
-        delegate_to=[]
-    )
-
-    from sindri.agents.registry import AGENTS
-    AGENTS["brokkr"] = agent
-
-    # Run the loop
+    # Run the loop (mock_brokkr_agent fixture already set up the agent)
     await loop.run_task(task)
 
     # Verify session was LOADED (not created)
@@ -173,7 +170,7 @@ async def test_task_with_session_id_resumes_session():
 
 
 @pytest.mark.asyncio
-async def test_session_load_failure_falls_back_to_create():
+async def test_session_load_failure_falls_back_to_create(mock_brokkr_agent):
     """Test that if session load fails, we create a new session."""
 
     # Setup mocks
@@ -219,22 +216,7 @@ async def test_session_load_failure_falls_back_to_create():
         session_id="nonexistent-session-id"
     )
 
-    # Mock agent
-    agent = AgentDefinition(
-        name="brokkr",
-        role="orchestrator",
-        model="test-model",
-        system_prompt="Test prompt",
-        tools=[],
-        max_iterations=10,
-        can_delegate=True,
-        delegate_to=[]
-    )
-
-    from sindri.agents.registry import AGENTS
-    AGENTS["brokkr"] = agent
-
-    # Run the loop
+    # Run the loop (mock_brokkr_agent fixture already set up the agent)
     await loop.run_task(task)
 
     # Verify load was attempted but create was used as fallback
