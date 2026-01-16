@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Code Search Tools COMPLETE!** (v0.1.0) - search_code & find_symbol tools implemented. **100% production ready.** 638/638 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend) or Git Tools.
+**Current Status:** ✅ **Git Tools COMPLETE!** (v0.1.0) - git_status, git_diff, git_log, git_branch tools implemented. **100% production ready.** 678/678 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
 
 ---
 
@@ -11,15 +11,15 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ Code Search Tools COMPLETE - search_code & find_symbol tools
-- ✅ 638/638 tests passing (100%)
+- ✅ Git Tools COMPLETE - git_status, git_diff, git_log, git_branch
+- ✅ 678/678 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search, git tools
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 638 passed
+.venv/bin/pytest tests/ -v           # Should see 678 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -83,14 +83,14 @@
 ## Tools & Models Reference
 
 **See [TOOLS_AND_MODELS_ANALYSIS.md](TOOLS_AND_MODELS_ANALYSIS.md) for comprehensive analysis:**
-- Current tools: 9 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, shell, delegate) ✅
-- Recommended additions: 16 tools remaining across 6 categories
+- Current tools: 13 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, shell, delegate) ✅
+- Recommended additions: 12 tools remaining across 5 categories
 - Current models: 7 active (qwen, llama, deepseek, sqlcoder)
 - Recommended models: 9 additions (codellama, mistral, starcoder2, phi3, etc.)
 - New agent proposals: 4 (Thor, Heimdall, Idunn, Loki)
 
 **Next priorities:**
-- Tools: git operations (git_status, git_diff, git_log)
+- Tools: http_request, check_syntax, run_tests
 - Models: codellama:13b, mistral:7b, starcoder2:15b
 
 ---
@@ -1118,8 +1118,8 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~TUI enhancements~~ | Medium | Medium | ✅ Complete | 5.5 | Done 2026-01-15 |
 | ~~Web API Backend~~ | High | Medium | ✅ Complete | 8.3 | Done 2026-01-15 |
 | ~~Search code tools~~ | Very High | Medium | ✅ Complete | 5.2 | Done 2026-01-15 |
+| ~~Git operations~~ | Medium | Low | ✅ Complete | 6 | Done 2026-01-15 |
 | Web UI Frontend | High | High | 🟢 Next | 8.3 | Future |
-| Git operations | Medium | Low | 🟡 Soon | 6 | Planned |
 
 ---
 
@@ -1257,6 +1257,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 6 | ✅ **Git Tools COMPLETE!** git_status, git_diff, git_log, git_branch for version control awareness (40 tests) |
 | 2026-01-15 | 5.2 | ✅ **Code Search Tools COMPLETE!** search_code & find_symbol for fast codebase exploration (39 tests) |
 | 2026-01-15 | 8.3 | ✅ **Phase 8.3 (Foundation) COMPLETE!** Web API server with FastAPI, REST, WebSocket (34 tests) |
 | 2026-01-15 | 5.5 | ✅ **Phase 5.5 (Partial) COMPLETE!** Conversation export to Markdown (28 tests) |
@@ -1279,13 +1280,31 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-15 (Code Search Tools Complete!)
-**Next Review:** When starting Phase 8.3 Web UI Frontend (React) or Git Tools
+**Last Updated:** 2026-01-15 (Git Tools Complete!)
+**Next Review:** When starting Phase 8.3 Web UI Frontend (React)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 GIT TOOLS COMPLETE!** (2026-01-15)
+
+Git integration for version control awareness:
+1. ✅ **GitStatusTool** - Repository status (modified, staged, untracked files)
+2. ✅ **GitDiffTool** - Show changes (full diff, stat, name-only)
+3. ✅ **GitLogTool** - Commit history with filtering
+4. ✅ **GitBranchTool** - List branches, get current branch
+5. ✅ **Agent Integration** - Added to Brokkr, Huginn, Mimir, Odin
+6. ✅ **40 new tests** - Comprehensive git tools coverage
+
+**Impact:**
+- Test coverage: 638 → 678 tests (+40 tests, 100% passing)
+- Agents now understand project version control state
+- Can review changes, check history, understand branches
+- Essential for code review and change tracking tasks
+
+---
 
 **🎉 CODE SEARCH TOOLS COMPLETE!** (2026-01-15)
 

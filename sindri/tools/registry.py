@@ -18,6 +18,7 @@ from sindri.tools.filesystem import (
 from sindri.tools.shell import ShellTool
 from sindri.tools.planning import ProposePlanTool
 from sindri.tools.search import SearchCodeTool, FindSymbolTool
+from sindri.tools.git import GitStatusTool, GitDiffTool, GitLogTool, GitBranchTool
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -232,4 +233,8 @@ class ToolRegistry:
         registry.register(ProposePlanTool(work_dir=work_dir))
         registry.register(SearchCodeTool(work_dir=work_dir))
         registry.register(FindSymbolTool(work_dir=work_dir))
+        registry.register(GitStatusTool(work_dir=work_dir))
+        registry.register(GitDiffTool(work_dir=work_dir))
+        registry.register(GitLogTool(work_dir=work_dir))
+        registry.register(GitBranchTool(work_dir=work_dir))
         return registry

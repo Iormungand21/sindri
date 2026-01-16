@@ -1,25 +1,32 @@
 # Sindri Project Status Report
-**Date:** 2026-01-15 (Search Code Tools Complete!)
-**Session:** Code Search Tools - SearchCodeTool & FindSymbolTool
+**Date:** 2026-01-15 (Git Tools Complete!)
+**Session:** Git Integration Tools - git_status, git_diff, git_log, git_branch
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Code Search Tools Complete! 🎉
-**Just Completed:** search_code & find_symbol Tools ✓ (2026-01-15)
-**Test Status:** 638/638 tests, **638 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Git Tools Complete! 🎉
+**Just Completed:** git_status, git_diff, git_log, git_branch Tools ✓ (2026-01-15)
+**Test Status:** 678/678 tests, **678 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 8.3 (Web UI Frontend - React) or Git Integration Tools
+**Next Priority:** Phase 8.3 (Web UI Frontend - React)
 
-**Key New Features (Code Search Tools):**
+**Key New Features (Git Tools):**
+- **GitStatusTool** - Get repository status (modified, staged, untracked files)
+- **GitDiffTool** - Show changes with stat, name-only, or full diff output
+- **GitLogTool** - View commit history with filtering by author, date, file
+- **GitBranchTool** - List branches, get current branch
+- **Agent Integration** - Added to Brokkr, Huginn, Mimir, Odin agents
+- **40 new tests** - Comprehensive git tools coverage
+
+**Previous Features (Code Search Tools):**
 - **SearchCodeTool** - Fast text search using ripgrep with regex support
 - **FindSymbolTool** - Find function/class/variable definitions across codebase
 - **Semantic Search** - Embedding-based conceptual code search (when memory enabled)
 - **File Type Filtering** - Search only in specific file types (py, ts, js, etc.)
 - **Directory Exclusion** - Automatically skips node_modules, __pycache__, .git, etc.
-- **Agent Integration** - Added to Brokkr, Huginn, Mimir, Odin agents
 - **39 new tests** - Comprehensive search tools coverage
 
 **Previous Features (Phase 8.3 - Web API Foundation):**
@@ -152,11 +159,12 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (638/638 passing!)
+# Run all tests (678/678 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_search_tools.py -v             # Search tools tests (NEW!)
+.venv/bin/pytest tests/test_git_tools.py -v               # Git tools tests (NEW!)
+.venv/bin/pytest tests/test_search_tools.py -v             # Search tools tests
 .venv/bin/pytest tests/test_web.py -v                      # Phase 8.3 web API tests
 .venv/bin/pytest tests/test_history_panel.py -v           # Phase 5.5 history panel tests
 .venv/bin/pytest tests/test_metrics.py -v                 # Phase 5.5 metrics tests
@@ -204,15 +212,90 @@
 **For New Developer/Agent:**
 1. **Start here:** Read this STATUS.md - current state, what works, what's next
 2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
-3. **Roadmap:** See ROADMAP.md for Phase 8.3 (Web UI) or Git Tools
-4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 638 tests should pass
+3. **Roadmap:** See ROADMAP.md for Phase 8.3 (Web UI Frontend)
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 678 tests should pass
 5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
 6. **View metrics:** Try `sindri metrics` then `sindri metrics <session_id> -t`
 7. **View history:** Launch `sindri tui` and press 'h' to toggle history panel
 
 ---
 
-## 📊 Session Summary (2026-01-15 - Code Search Tools)
+## 📊 Session Summary (2026-01-15 - Git Tools)
+
+### ✅ Git Integration Tools Implemented! 🎉
+
+**Implementation Time:** ~30 minutes
+
+**Core Changes:**
+
+1. **GitStatusTool** (`sindri/tools/git.py` - NEW)
+   - Show repository status (modified, staged, untracked files)
+   - Short format with branch info (-s -b)
+   - Metadata parsing for file counts
+   - Clean repository detection
+
+2. **GitDiffTool** (`sindri/tools/git.py` - NEW)
+   - Show unstaged or staged (--cached) changes
+   - Full diff, stat, or name-only output
+   - Commit comparison (HEAD~1, branches)
+   - File-specific diffs
+   - Custom context lines
+
+3. **GitLogTool** (`sindri/tools/git.py` - NEW)
+   - View commit history with limit control
+   - Filter by author, date, file path
+   - Search commit messages with grep
+   - Oneline and stat formats
+
+4. **GitBranchTool** (`sindri/tools/git.py` - NEW)
+   - List local and remote branches
+   - Get current branch name
+   - Verbose output with commit info
+
+**Files Created:**
+- `sindri/tools/git.py` (600 lines) - All git tools
+- `tests/test_git_tools.py` (580 lines) - 40 comprehensive tests
+
+**Files Modified:**
+- `sindri/tools/registry.py` (+5 lines) - Import and register git tools
+- `sindri/agents/registry.py` (+4 lines) - Add tools to agent tool lists
+
+**Agent Integration:**
+- **Brokkr**: git_status, git_diff, git_log, git_branch (all tools)
+- **Huginn**: git_status, git_diff, git_log (coder needs git awareness)
+- **Mimir**: git_diff, git_log (reviewer needs change context)
+- **Odin**: git_status, git_log (planner needs project state)
+
+**Test Results:**
+- **Before:** 638/638 tests passing (100%)
+- **After:** 678/678 tests passing (100%) 🎉
+- **New Tests:** 40 tests (all passing)
+
+**Example Usage:**
+```python
+# Check repository status
+git_status()
+git_status(short=True)
+
+# View changes
+git_diff()                          # Unstaged changes
+git_diff(staged=True)               # Staged changes
+git_diff(commit="HEAD~1")           # Since previous commit
+git_diff(stat=True)                 # Summary only
+
+# View history
+git_log(limit=5)
+git_log(author="John", since="1 week ago")
+git_log(file_path="src/main.py")
+
+# Branch info
+git_branch()
+git_branch(current=True)
+```
+
+---
+
+## 📊 Previous Session Summary (2026-01-15 - Code Search Tools)
 
 ### ✅ Code Search Tools Implemented! 🎉
 
