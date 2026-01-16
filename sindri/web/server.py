@@ -18,6 +18,8 @@ from pathlib import Path
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 import structlog
 
@@ -559,6 +561,39 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             if websocket in api.websocket_connections:
                 api.websocket_connections.remove(websocket)
             log.info("websocket_cleanup", remaining_connections=len(api.websocket_connections))
+
+    # ===== Static Files & SPA Support =====
+
+    # Path to static files (React build output)
+    static_dir = Path(__file__).parent / "static" / "dist"
+
+    if static_dir.exists():
+        # Mount static assets (JS, CSS, images)
+        app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+
+        # Serve index.html for SPA routing (catch-all for non-API routes)
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_spa(full_path: str):
+            """Serve the SPA for all non-API routes."""
+            # Don't catch API or WebSocket routes
+            if full_path.startswith("api/") or full_path == "ws" or full_path == "health":
+                raise HTTPException(status_code=404, detail="Not found")
+
+            # Try to serve static file first
+            file_path = static_dir / full_path
+            if file_path.is_file():
+                return FileResponse(file_path)
+
+            # Fall back to index.html for SPA client-side routing
+            index_path = static_dir / "index.html"
+            if index_path.exists():
+                return FileResponse(index_path)
+
+            raise HTTPException(status_code=404, detail="Not found")
+
+        log.info("static_files_mounted", path=str(static_dir))
+    else:
+        log.warning("static_files_not_found", expected_path=str(static_dir))
 
     return app
 

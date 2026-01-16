@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-primary: theme('colors.forge.500');
+    --color-primary-hover: theme('colors.forge.600');
+  }
+
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply min-h-screen;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors;
+  }
+
+  .btn-primary {
+    @apply bg-forge-500 text-white hover:bg-forge-600 active:bg-forge-700;
+  }
+
+  .btn-secondary {
+    @apply bg-sindri-700 text-sindri-100 hover:bg-sindri-600 active:bg-sindri-500;
+  }
+
+  .btn-ghost {
+    @apply text-sindri-300 hover:text-sindri-100 hover:bg-sindri-800;
+  }
+
+  .card {
+    @apply bg-sindri-900 border border-sindri-700 rounded-xl;
+  }
+
+  .input {
+    @apply bg-sindri-800 border border-sindri-600 rounded-lg px-3 py-2;
+    @apply text-sindri-100 placeholder:text-sindri-500;
+    @apply focus:outline-none focus:ring-2 focus:ring-forge-500 focus:border-transparent;
+  }
+
+  .label {
+    @apply block text-sm font-medium text-sindri-300 mb-1;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.sindri.600') transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: theme('colors.sindri.600');
+    border-radius: 3px;
+  }
+}
