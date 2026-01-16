@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Web UI Frontend COMPLETE!** (v0.1.0) - Full React + TypeScript frontend with Dashboard, Agent List, Sessions. **100% production ready.** 895/895 backend tests + 22 frontend tests passing (100%). Ready for Phase 8.4 or enhancements.
+**Current Status:** ✅ **Multi-Project Memory COMPLETE!** (v0.1.0) - Cross-project search with project registry, tagging, and privacy controls. **100% production ready.** 942/942 backend tests + 22 frontend tests passing (100%). Ready for Web UI Enhancements.
 
 ---
 
@@ -10,11 +10,11 @@
 
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
-### Current State (2026-01-15)
-- ✅ Web UI Frontend COMPLETE - React + TypeScript + TailwindCSS
-- ✅ 895/895 backend tests + 22 frontend tests passing (100%)
+### Current State (2026-01-16)
+- ✅ Multi-Project Memory COMPLETE - Cross-project search, tagging, privacy
+- ✅ 942/942 backend tests + 22 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory
 
 ### Try It Out
 ```bash
@@ -50,11 +50,12 @@ cd sindri/web/static && npm run build  # Build frontend
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
 3. **This file** - See roadmap sections below
 
-### 🎯 Recommended Next: Phase 8.4 - Multi-Project Memory OR Enhancements
-- **Phase 8.4 Goal:** Learn patterns across all projects, cross-project search
-- **OR:** Enhance Web UI with D3.js agent graph, code diff viewer
+### 🎯 Recommended Next: Web UI Enhancements
+- **D3.js Agent Graph:** Animated delegation flow visualization, click nodes to see conversations
+- **Code Diff Viewer:** Before/after for file edits with syntax highlighting
+- **Timeline View:** Horizontal timeline showing parallel execution, filter by agent/status
 - **Effort:** 1-2 days per enhancement
-- **Impact:** MEDIUM - Better cross-project learning
+- **Impact:** MEDIUM - Better visualization and UX
 
 **Web UI Development:**
 ```bash
@@ -1062,37 +1063,65 @@ Ratatoskr
 
 ---
 
-### 8.4 Multi-Project Memory (Low Priority)
+### ✅ 8.4 Multi-Project Memory (COMPLETED 2026-01-16)
 
-**Concept:** Learn patterns across all projects, not just one
+**Status:** ✅ Implemented and tested with 47 new tests
 
-#### Global Semantic Memory:
+#### Implementation Summary:
 
-**Shared Embeddings** (`~/.sindri/global_memory.db`):
-- Index all projects you've worked on
-- Cross-project pattern search
-- "I used FastAPI auth in project X, similar to this"
+**ProjectRegistry** (`sindri/memory/projects.py`):
+- ✅ `ProjectConfig` dataclass with path, name, tags, enabled, indexed, file_count
+- ✅ JSON-backed storage in `~/.sindri/projects.json`
+- ✅ CRUD operations: add_project, remove_project, list_projects
+- ✅ Tagging: tag_project, add_tags, matches_tag, matches_any_tag
+- ✅ Enable/disable for privacy control
 
-**Project Tagging**:
+**GlobalMemoryStore** (`sindri/memory/global_memory.py`):
+- ✅ SQLite-backed storage in `~/.sindri/global_memory.db`
+- ✅ sqlite-vec for embedding search across projects
+- ✅ `index_project()` - Index files with chunking (50 lines/chunk)
+- ✅ `search()` - Cross-project semantic search
+- ✅ `search_by_tags()` - Filter by project tags
+- ✅ `exclude_current` - Exclude current project from results
+- ✅ `CrossProjectResult` dataclass with project info and similarity scores
+
+**CLI Commands** (`sindri/cli.py`):
+- ✅ `sindri projects list` - List registered projects with status/tags
+- ✅ `sindri projects add <path>` - Add project with optional tags
+- ✅ `sindri projects remove <path>` - Remove project from registry
+- ✅ `sindri projects tag <path> <tags>` - Set/add tags
+- ✅ `sindri projects search <query>` - Cross-project semantic search
+- ✅ `sindri projects index [path]` - Index project(s)
+- ✅ `sindri projects enable/disable <path>` - Privacy controls
+- ✅ `sindri projects stats` - Global memory statistics
+
+**Files Created:**
+- `sindri/memory/projects.py` (320 lines) - Project registry
+- `sindri/memory/global_memory.py` (400 lines) - Global memory store
+- `tests/test_multi_project.py` (600 lines) - 47 comprehensive tests
+
+**Files Modified:**
+- `sindri/cli.py` (+330 lines) - Project management CLI commands
+
+**Test Results:**
+- 47 new tests added (all passing)
+- Total: 942/942 tests passing (100%)
+
+**Example Usage:**
 ```bash
-sindri projects tag current "fastapi,postgresql,auth"
-sindri projects tag ~/other-project "django,mysql"
+# Register projects
+sindri projects add ~/project1 --tags "python,fastapi"
+sindri projects add ~/project2 --tags "python,django"
+
+# Search across all projects
+sindri projects search "authentication handler"
+
+# Search by tags
+sindri projects search "API endpoint" --tags "fastapi"
+
+# View statistics
+sindri projects stats
 ```
-
-**Cross-Project Search**:
-- "Find all authentication implementations"
-- Returns snippets from all projects
-- Agents can reference other projects
-
-**Privacy Controls**:
-- Opt-in per project
-- Exclude sensitive projects
-- Local-only (never uploaded)
-
-**Files:**
-- `sindri/memory/global_memory.py`
-- `sindri/cli.py` - Project management commands
-- `~/.sindri/projects.json` - Project registry
 
 ---
 
@@ -1151,7 +1180,7 @@ sindri projects tag ~/other-project "django,mysql"
 | ~~Testing tools~~ | Very High | Medium | ✅ Complete | 8.3 | Done 2026-01-15 |
 | ~~Formatting tools~~ | High | Medium | ✅ Complete | 8.3 | Done 2026-01-15 |
 | ~~Web UI Frontend~~ | High | High | ✅ Complete | 8.3 | Done 2026-01-15 |
-| Multi-Project Memory | Medium | Medium | 🟢 Next | 8.4 | Future |
+| ~~Multi-Project Memory~~ | Medium | Medium | ✅ Complete | 8.4 | Done 2026-01-16 |
 
 ---
 
@@ -1289,6 +1318,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-16 | 8.4 | ✅ **Multi-Project Memory COMPLETE!** Cross-project search, project registry, tagging, privacy controls (47 tests) |
 | 2026-01-15 | 8.3 | ✅ **Web UI Frontend COMPLETE!** React + TypeScript + TailwindCSS frontend with Dashboard, Agents, Sessions (22 tests) |
 | 2026-01-15 | 7.1 | ✅ **SQL Tools COMPLETE!** execute_query, describe_schema, explain_query for Fenrir agent (42 tests) |
 | 2026-01-15 | 8.3 | ✅ **Refactoring Tools COMPLETE!** rename_symbol, extract_function, inline_variable for code refactoring (39 tests) |
@@ -1318,13 +1348,46 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-15 (Web UI Frontend Complete!)
-**Next Review:** When starting Phase 8.4 Multi-Project Memory or enhancements
+**Last Updated:** 2026-01-16 (Multi-Project Memory Complete!)
+**Next Review:** When starting Web UI Enhancements (D3.js Agent Graph, Code Diff Viewer)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 MULTI-PROJECT MEMORY COMPLETE!** (2026-01-16)
+
+Cross-project semantic search and project management:
+1. ✅ **ProjectRegistry** - JSON-backed project registry
+   - ProjectConfig dataclass with path, name, tags, enabled, indexed
+   - CRUD operations for project management
+   - Tagging system for categorization
+   - Enable/disable for privacy control
+2. ✅ **GlobalMemoryStore** - Cross-project embeddings
+   - SQLite-backed with sqlite-vec for vector search
+   - Index projects with automatic file chunking
+   - Search across all projects or filter by tags
+   - Exclude current project option
+   - CrossProjectResult with similarity scores
+3. ✅ **CLI Commands** - Complete project management
+   - `projects list` - View all registered projects
+   - `projects add <path>` - Register a project
+   - `projects remove <path>` - Unregister a project
+   - `projects tag <path> <tags>` - Tag projects
+   - `projects search <query>` - Cross-project search
+   - `projects index [path]` - Index for search
+   - `projects enable/disable <path>` - Privacy control
+   - `projects stats` - View global memory statistics
+4. ✅ **47 new tests** - Comprehensive coverage
+
+**Impact:**
+- Test coverage: 895 → 942 tests (+47 tests, 100% passing)
+- Cross-project pattern discovery
+- Reuse code and patterns from past projects
+- Privacy controls for sensitive projects
+
+---
 
 **🎉 WEB UI FRONTEND COMPLETE!** (2026-01-15)
 

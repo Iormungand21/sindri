@@ -1058,6 +1058,333 @@ def plugins_dirs():
         console.print(f"  [yellow]⚠[/yellow] Agent directory doesn't exist (run 'sindri plugins init' to create)")
 
 
+# ============================================
+# Phase 8.4: Multi-Project Memory Commands
+# ============================================
+
+
+@cli.group()
+def projects():
+    """Manage multi-project memory (Phase 8.4)."""
+    pass
+
+
+@projects.command("list")
+@click.option("--tags", "-t", help="Filter by tags (comma-separated)")
+@click.option("--enabled-only", "-e", is_flag=True, help="Show only enabled projects")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def projects_list(tags: str = None, enabled_only: bool = False, verbose: bool = False):
+    """List all registered projects."""
+    from rich.table import Table
+    from sindri.memory.projects import ProjectRegistry
+
+    registry = ProjectRegistry()
+    tag_list = [t.strip() for t in tags.split(",")] if tags else None
+    projects = registry.list_projects(enabled_only=enabled_only, tags=tag_list)
+
+    if not projects:
+        console.print("[yellow]No projects registered.[/yellow]")
+        console.print("\n[dim]Register projects with: sindri projects add <path>[/dim]")
+        return
+
+    table = Table(
+        title=f"📁 Registered Projects ({len(projects)})",
+        show_header=True,
+        header_style="bold cyan"
+    )
+    table.add_column("Name", style="cyan", width=20)
+    table.add_column("Status", width=10)
+    table.add_column("Indexed", width=10)
+    table.add_column("Tags", width=25)
+    if verbose:
+        table.add_column("Path", style="dim", width=40)
+
+    for p in projects:
+        status = "[green]enabled[/green]" if p.enabled else "[yellow]disabled[/yellow]"
+        indexed = f"[green]{p.file_count} files[/green]" if p.indexed else "[dim]not indexed[/dim]"
+        tags_str = ", ".join(p.tags[:3]) if p.tags else "[dim]none[/dim]"
+        if len(p.tags) > 3:
+            tags_str += f" (+{len(p.tags)-3})"
+
+        row = [p.name, status, indexed, tags_str]
+        if verbose:
+            row.append(p.path)
+
+        table.add_row(*row)
+
+    console.print(table)
+
+    # Summary
+    stats = {
+        "total": len(projects),
+        "enabled": sum(1 for p in projects if p.enabled),
+        "indexed": sum(1 for p in projects if p.indexed),
+    }
+    console.print(f"\n[dim]Total: {stats['total']} | Enabled: {stats['enabled']} | Indexed: {stats['indexed']}[/dim]")
+
+
+@projects.command("add")
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--name", "-n", help="Project name (default: directory name)")
+@click.option("--tags", "-t", help="Tags (comma-separated)")
+@click.option("--no-index", is_flag=True, help="Don't index immediately")
+def projects_add(path: str, name: str = None, tags: str = None, no_index: bool = False):
+    """Add a project to the registry."""
+    from pathlib import Path
+    from sindri.memory.projects import ProjectRegistry
+    from sindri.memory.global_memory import GlobalMemoryStore
+
+    registry = ProjectRegistry()
+    tag_list = [t.strip() for t in tags.split(",")] if tags else None
+
+    try:
+        project = registry.add_project(path, name=name, tags=tag_list)
+        console.print(f"[green]✓[/green] Added project: [cyan]{project.name}[/cyan]")
+        console.print(f"  Path: {project.path}")
+        if project.tags:
+            console.print(f"  Tags: {', '.join(project.tags)}")
+
+        # Index unless --no-index
+        if not no_index:
+            console.print("\n[dim]Indexing project...[/dim]")
+            try:
+                global_memory = GlobalMemoryStore(registry=registry)
+                chunks = global_memory.index_project(project.path)
+                console.print(f"[green]✓[/green] Indexed {chunks} chunks")
+            except Exception as e:
+                console.print(f"[yellow]⚠[/yellow] Indexing failed: {e}")
+                console.print("[dim]You can index later with: sindri projects index <path>[/dim]")
+        else:
+            console.print("\n[dim]Index with: sindri projects index <path>[/dim]")
+
+    except ValueError as e:
+        console.print(f"[red]✗[/red] {e}")
+
+
+@projects.command("remove")
+@click.argument("path", type=click.Path())
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
+def projects_remove(path: str, yes: bool = False):
+    """Remove a project from the registry."""
+    from sindri.memory.projects import ProjectRegistry
+    from sindri.memory.global_memory import GlobalMemoryStore
+
+    registry = ProjectRegistry()
+    project = registry.get_project(path)
+
+    if not project:
+        console.print(f"[red]✗[/red] Project not found: {path}")
+        return
+
+    if not yes:
+        console.print(f"Remove project [cyan]{project.name}[/cyan]?")
+        console.print(f"  Path: {project.path}")
+        if not click.confirm("Proceed?"):
+            console.print("[dim]Cancelled[/dim]")
+            return
+
+    # Remove from global memory
+    try:
+        global_memory = GlobalMemoryStore(registry=registry)
+        global_memory.remove_project(project.path)
+    except Exception as e:
+        console.print(f"[yellow]⚠[/yellow] Failed to remove from global memory: {e}")
+
+    # Remove from registry
+    if registry.remove_project(path):
+        console.print(f"[green]✓[/green] Removed project: {project.name}")
+    else:
+        console.print(f"[red]✗[/red] Failed to remove project")
+
+
+@projects.command("tag")
+@click.argument("path", type=click.Path())
+@click.argument("tags")
+@click.option("--add", "-a", is_flag=True, help="Add tags instead of replacing")
+def projects_tag(path: str, tags: str, add: bool = False):
+    """Set or add tags to a project.
+
+    TAGS is a comma-separated list of tags.
+
+    Examples:
+        sindri projects tag . "python,fastapi,web"
+        sindri projects tag ~/myproject "ml,pytorch" --add
+    """
+    from sindri.memory.projects import ProjectRegistry
+
+    registry = ProjectRegistry()
+    tag_list = [t.strip() for t in tags.split(",")]
+
+    if add:
+        project = registry.add_tags(path, tag_list)
+    else:
+        project = registry.tag_project(path, tag_list)
+
+    if not project:
+        console.print(f"[red]✗[/red] Project not found: {path}")
+        return
+
+    console.print(f"[green]✓[/green] Updated tags for [cyan]{project.name}[/cyan]")
+    console.print(f"  Tags: {', '.join(project.tags)}")
+
+
+@projects.command("search")
+@click.argument("query")
+@click.option("--limit", "-n", default=10, help="Maximum results")
+@click.option("--tags", "-t", help="Filter by tags (comma-separated)")
+@click.option("--exclude", "-e", help="Exclude project path")
+def projects_search(query: str, limit: int, tags: str = None, exclude: str = None):
+    """Search across all indexed projects.
+
+    Examples:
+        sindri projects search "authentication handler"
+        sindri projects search "API endpoint" --tags "python,fastapi"
+    """
+    from rich.table import Table
+    from rich.syntax import Syntax
+    from sindri.memory.global_memory import GlobalMemoryStore
+
+    console.print(f"[dim]Searching for: {query}[/dim]\n")
+
+    try:
+        global_memory = GlobalMemoryStore()
+        tag_list = [t.strip() for t in tags.split(",")] if tags else None
+        results = global_memory.search(
+            query,
+            limit=limit,
+            tags=tag_list,
+            exclude_current=exclude
+        )
+
+        if not results:
+            console.print("[yellow]No results found.[/yellow]")
+            stats = global_memory.get_stats()
+            console.print(f"\n[dim]Indexed: {stats['indexed_projects']} projects, {stats['total_chunks']} chunks[/dim]")
+            return
+
+        console.print(f"[green]Found {len(results)} results:[/green]\n")
+
+        for i, result in enumerate(results, 1):
+            console.print(f"[bold cyan]{i}. [{result.project_name}][/bold cyan] {result.file_path}")
+            console.print(f"   Lines {result.start_line}-{result.end_line} | Similarity: {result.similarity:.2%}")
+            if result.tags:
+                console.print(f"   Tags: {', '.join(result.tags)}")
+
+            # Show code preview (truncated)
+            preview = result.content[:200] + "..." if len(result.content) > 200 else result.content
+            console.print(f"   [dim]─────[/dim]")
+            for line in preview.split('\n')[:5]:
+                console.print(f"   [dim]{line}[/dim]")
+            console.print()
+
+    except Exception as e:
+        console.print(f"[red]✗[/red] Search failed: {e}")
+        console.print("[dim]Make sure projects are indexed: sindri projects index --all[/dim]")
+
+
+@projects.command("index")
+@click.argument("path", type=click.Path(), required=False)
+@click.option("--all", "-a", "index_all", is_flag=True, help="Index all registered projects")
+@click.option("--force", "-f", is_flag=True, help="Force re-index")
+def projects_index(path: str = None, index_all: bool = False, force: bool = False):
+    """Index project(s) for cross-project search.
+
+    Examples:
+        sindri projects index .              # Index current directory
+        sindri projects index ~/myproject    # Index specific project
+        sindri projects index --all          # Index all registered projects
+    """
+    from sindri.memory.global_memory import GlobalMemoryStore
+
+    if not path and not index_all:
+        console.print("[red]✗[/red] Specify a path or use --all")
+        return
+
+    global_memory = GlobalMemoryStore()
+
+    if index_all:
+        console.print("[dim]Indexing all registered projects...[/dim]\n")
+        results = global_memory.index_all_projects(force=force)
+
+        if not results:
+            console.print("[yellow]No projects to index.[/yellow]")
+            console.print("[dim]Add projects with: sindri projects add <path>[/dim]")
+            return
+
+        total_chunks = sum(results.values())
+        console.print(f"\n[green]✓[/green] Indexed {len(results)} projects, {total_chunks} total chunks")
+
+        for proj_path, chunks in results.items():
+            proj_name = global_memory.registry.get_project(proj_path)
+            name = proj_name.name if proj_name else proj_path.split("/")[-1]
+            console.print(f"  • {name}: {chunks} chunks")
+    else:
+        console.print(f"[dim]Indexing {path}...[/dim]")
+        try:
+            chunks = global_memory.index_project(path, force=force)
+            console.print(f"[green]✓[/green] Indexed {chunks} chunks")
+        except Exception as e:
+            console.print(f"[red]✗[/red] Failed: {e}")
+
+
+@projects.command("enable")
+@click.argument("path", type=click.Path())
+def projects_enable(path: str):
+    """Enable a project for cross-project search."""
+    from sindri.memory.projects import ProjectRegistry
+
+    registry = ProjectRegistry()
+    project = registry.enable_project(path, enabled=True)
+
+    if not project:
+        console.print(f"[red]✗[/red] Project not found: {path}")
+        return
+
+    console.print(f"[green]✓[/green] Enabled project: [cyan]{project.name}[/cyan]")
+
+
+@projects.command("disable")
+@click.argument("path", type=click.Path())
+def projects_disable(path: str):
+    """Disable a project from cross-project search."""
+    from sindri.memory.projects import ProjectRegistry
+
+    registry = ProjectRegistry()
+    project = registry.enable_project(path, enabled=False)
+
+    if not project:
+        console.print(f"[red]✗[/red] Project not found: {path}")
+        return
+
+    console.print(f"[yellow]⚠[/yellow] Disabled project: [cyan]{project.name}[/cyan]")
+
+
+@projects.command("stats")
+def projects_stats():
+    """Show global memory statistics."""
+    from sindri.memory.global_memory import GlobalMemoryStore
+    from sindri.memory.projects import ProjectRegistry
+
+    registry = ProjectRegistry()
+    global_memory = GlobalMemoryStore(registry=registry)
+
+    stats = global_memory.get_stats()
+    all_tags = registry.get_all_tags()
+
+    console.print("[bold]📊 Global Memory Statistics[/bold]\n")
+
+    console.print(f"  Registered projects: {stats['registered_projects']}")
+    console.print(f"  Enabled projects:    {stats['enabled_projects']}")
+    console.print(f"  Indexed projects:    {stats['indexed_projects']}")
+    console.print(f"  Total files:         {stats['total_files']}")
+    console.print(f"  Total chunks:        {stats['total_chunks']}")
+
+    if all_tags:
+        console.print(f"\n  [dim]Tags in use: {', '.join(all_tags[:10])}")
+        if len(all_tags) > 10:
+            console.print(f"               (+{len(all_tags)-10} more)[/dim]")
+
+
 @cli.command()
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", "-p", default=8000, help="Port to listen on")
