@@ -17,6 +17,7 @@ from sindri.tools.filesystem import (
 )
 from sindri.tools.shell import ShellTool
 from sindri.tools.planning import ProposePlanTool
+from sindri.tools.search import SearchCodeTool, FindSymbolTool
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -229,4 +230,6 @@ class ToolRegistry:
         registry.register(ReadTreeTool(work_dir=work_dir))
         registry.register(ShellTool(work_dir=work_dir))
         registry.register(ProposePlanTool(work_dir=work_dir))
+        registry.register(SearchCodeTool(work_dir=work_dir))
+        registry.register(FindSymbolTool(work_dir=work_dir))
         return registry

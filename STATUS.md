@@ -1,19 +1,28 @@
 # Sindri Project Status Report
-**Date:** 2026-01-15 (Phase 8.3 Web API Foundation Complete!)
-**Session:** Phase 8.3 Web API - FastAPI Server Foundation
+**Date:** 2026-01-15 (Search Code Tools Complete!)
+**Session:** Code Search Tools - SearchCodeTool & FindSymbolTool
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Phase 8.3 Web API Foundation Complete! 🎉
-**Just Completed:** Web API Server Foundation ✓ (2026-01-15)
-**Test Status:** 599/599 tests, **599 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Code Search Tools Complete! 🎉
+**Just Completed:** search_code & find_symbol Tools ✓ (2026-01-15)
+**Test Status:** 638/638 tests, **638 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 8.3 (Web UI Frontend - React)
+**Next Priority:** Phase 8.3 (Web UI Frontend - React) or Git Integration Tools
 
-**Key New Features (Phase 8.3 - Web API Foundation):**
+**Key New Features (Code Search Tools):**
+- **SearchCodeTool** - Fast text search using ripgrep with regex support
+- **FindSymbolTool** - Find function/class/variable definitions across codebase
+- **Semantic Search** - Embedding-based conceptual code search (when memory enabled)
+- **File Type Filtering** - Search only in specific file types (py, ts, js, etc.)
+- **Directory Exclusion** - Automatically skips node_modules, __pycache__, .git, etc.
+- **Agent Integration** - Added to Brokkr, Huginn, Mimir, Odin agents
+- **39 new tests** - Comprehensive search tools coverage
+
+**Previous Features (Phase 8.3 - Web API Foundation):**
 - **FastAPI Server** - Full REST API for Sindri orchestration
 - **Agent Endpoints** - `/api/agents`, `/api/agents/{name}` with full agent info
 - **Session Endpoints** - `/api/sessions`, `/api/sessions/{id}` with turn details
@@ -143,11 +152,12 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (599/599 passing!)
+# Run all tests (638/638 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_web.py -v                      # Phase 8.3 web API tests (NEW!)
+.venv/bin/pytest tests/test_search_tools.py -v             # Search tools tests (NEW!)
+.venv/bin/pytest tests/test_web.py -v                      # Phase 8.3 web API tests
 .venv/bin/pytest tests/test_history_panel.py -v           # Phase 5.5 history panel tests
 .venv/bin/pytest tests/test_metrics.py -v                 # Phase 5.5 metrics tests
 .venv/bin/pytest tests/test_export.py -v                  # Phase 5.5 export tests
@@ -194,15 +204,79 @@
 **For New Developer/Agent:**
 1. **Start here:** Read this STATUS.md - current state, what works, what's next
 2. **Architecture:** Check PROJECT_HANDOFF.md for comprehensive overview
-3. **Roadmap:** See ROADMAP.md for Phase 8.3 (Web UI)
-4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 565 tests should pass
+3. **Roadmap:** See ROADMAP.md for Phase 8.3 (Web UI) or Git Tools
+4. **Verify:** Run `.venv/bin/pytest tests/ -v` - all 638 tests should pass
 5. **Health check:** Run `.venv/bin/sindri doctor --verbose`
 6. **View metrics:** Try `sindri metrics` then `sindri metrics <session_id> -t`
 7. **View history:** Launch `sindri tui` and press 'h' to toggle history panel
 
 ---
 
-## 📊 Session Summary (2026-01-15 - Phase 8.3 Web API Foundation)
+## 📊 Session Summary (2026-01-15 - Code Search Tools)
+
+### ✅ Code Search Tools Implemented! 🎉
+
+**Implementation Time:** ~45 minutes
+
+**Core Changes:**
+
+1. **SearchCodeTool** (`sindri/tools/search.py` - NEW)
+   - Fast text search using ripgrep (with grep fallback)
+   - Literal and regex pattern support
+   - Case-sensitive/insensitive search
+   - File type filtering (py, ts, js, etc.)
+   - Context lines around matches
+   - Automatic directory exclusion (node_modules, __pycache__, .git, etc.)
+   - Semantic search mode using embeddings (when memory enabled)
+   - Max results limiting
+
+2. **FindSymbolTool** (`sindri/tools/search.py` - NEW)
+   - Find function/class/variable definitions
+   - Language-aware patterns (Python, TypeScript, JavaScript)
+   - Symbol type filtering (function, class, variable, any)
+   - File type filtering
+
+3. **Tool Registry** (`sindri/tools/registry.py`)
+   - Registered SearchCodeTool and FindSymbolTool in default registry
+
+4. **Agent Integration** (`sindri/agents/registry.py`)
+   - Added `search_code` and `find_symbol` to Brokkr (orchestrator)
+   - Added `search_code` and `find_symbol` to Huginn (coder)
+   - Added `search_code` to Mimir (reviewer)
+   - Added `search_code` to Odin (planner)
+
+**Files Created:**
+- `sindri/tools/search.py` (450 lines) - SearchCodeTool and FindSymbolTool
+- `tests/test_search_tools.py` (400 lines) - 39 comprehensive tests
+
+**Files Modified:**
+- `sindri/tools/registry.py` (+3 lines) - Import and register new tools
+- `sindri/agents/registry.py` (+4 lines) - Add tools to agent tool lists
+
+**Test Results:**
+- **Before:** 599/599 tests passing (100%)
+- **After:** 638/638 tests passing (100%) 🎉
+- **New Tests:** 39 tests (all passing)
+
+**Example Usage:**
+```python
+# Text search (using ripgrep)
+search_code(query="authenticate")
+search_code(query="def.*validate", regex=True)
+search_code(query="TODO", file_types=["py", "ts"])
+
+# Semantic search (needs memory enabled)
+search_code(query="user authentication logic", semantic=True)
+
+# Find symbol definitions
+find_symbol(name="UserModel", symbol_type="class")
+find_symbol(name="validate_email", symbol_type="function")
+find_symbol(name="config", file_types=["py"])
+```
+
+---
+
+## 📊 Previous Session Summary (2026-01-15 - Phase 8.3 Web API Foundation)
 
 ### ✅ Phase 8.3 (Foundation) - Web API Server Implemented! 🎉
 
