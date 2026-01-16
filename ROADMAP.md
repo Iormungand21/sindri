@@ -1323,7 +1323,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
-| 2026-01-16 | 8.3 | ✅ **Web UI Cleanup & Stale Session Detection!** Fixed session count discrepancy, added stale session detection (>1hr), improved Dashboard metrics (5 cards), SessionList now fetches 100 sessions with global stats |
+| 2026-01-16 | 8.3 | ✅ **Stale Session Cleanup!** Proper cleanup via `cleanup_stale_sessions()`, auto-cleanup on server startup, CLI `--cleanup` flag, fixed `/api/health` 404, removed stale workarounds |
 | 2026-01-16 | 8.3 | ✅ **D3.js Agent Graph COMPLETE!** Interactive visualization with delegation flow animation, click-to-view details, view mode toggle (15 frontend tests) |
 | 2026-01-16 | 8.4 | ✅ **Multi-Project Memory COMPLETE!** Cross-project search, project registry, tagging, privacy controls (47 tests) |
 | 2026-01-15 | 8.3 | ✅ **Web UI Frontend COMPLETE!** React + TypeScript + TailwindCSS frontend with Dashboard, Agents, Sessions (22 tests) |
@@ -1355,7 +1355,7 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-16 (Web UI Cleanup & Stale Session Detection)
+**Last Updated:** 2026-01-16 (Stale Session Cleanup Complete)
 **Next Review:** When starting Web UI Enhancements (Code Diff Viewer, Timeline View)
 **Maintained By:** Project maintainers and contributors
 

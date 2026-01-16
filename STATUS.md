@@ -1,16 +1,16 @@
 # Sindri Project Status Report
-**Date:** 2026-01-16 (Web UI Cleanup & Stale Session Detection)
-**Session:** Web UI Cleanup - Fix Session Count Data Representation
+**Date:** 2026-01-16 (Stale Session Cleanup & Web UI Fixes)
+**Session:** Web UI Cleanup - Proper Stale Session Handling
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Web UI Data Accuracy Improved! 🎉
-**Just Completed:** Stale session detection + UI cleanup + metrics accuracy ✓ (2026-01-16)
+**Current State:** ✅ **PRODUCTION READY (100%)** - Stale Session Cleanup Complete! 🎉
+**Just Completed:** Proper stale session cleanup + /api/health fix ✓ (2026-01-16)
 **Test Status:** 942/942 backend tests + 37 frontend tests, **all passing (100%)** 🎉
-**Production Readiness:** 100% - Full-stack system with accurate session metrics!
+**Production Readiness:** 100% - Full-stack system with clean session management!
 **Next Priority:** 🎯 **Web UI Enhancements** (Code Diff Viewer, Timeline View)
 
 ---
@@ -21,16 +21,20 @@
 
 ### What Was Just Completed ✅
 
-**Web UI Data Accuracy & Cleanup (2026-01-16):**
-- Fixed session count discrepancy between dashboard and session list
-- Added stale session detection: sessions "active" for >1hr are marked as stale
-- Updated Dashboard with 5 metric cards (Total, Completed, Failed, Active, Stale)
-- Added subtitles to metric cards ("Running now", "Abandoned (>1hr)")
-- SessionList now fetches 100 sessions (up from 20) for better visibility
-- SessionList shows global metrics for accurate counts ("Showing X of Y total")
-- Session cards now show "stale" status with distinct styling
-- RecentTasks component updated with stale session detection
-- All components consistently detect stale sessions (>1hr threshold)
+**Stale Session Cleanup (2026-01-16):**
+- Added `SessionState.cleanup_stale_sessions()` to mark abandoned sessions as "failed"
+- Auto-cleanup on web server startup (all "active" sessions marked failed on restart)
+- CLI command: `sindri sessions --cleanup` for manual cleanup
+- Custom threshold support: `sindri sessions --cleanup --max-age 0.5` (hours)
+- Fixed `/api/health` 404 error (added alias endpoint)
+- Removed stale filtering workarounds - clean, simple session statuses
+- Dashboard back to 4 metric cards (Total, Completed, Failed, Active)
+- Sessions now show actual status without stale detection complexity
+
+**Why This Approach:**
+- Stale sessions are failed sessions (crashed/interrupted processes)
+- Server restart = all prior "active" sessions are definitely not running
+- Proper database cleanup instead of UI-level filtering hacks
 
 **Previous: D3.js Agent Graph (Web UI Enhancement):**
 - Interactive force-directed graph visualization of agent hierarchy
