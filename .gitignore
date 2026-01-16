@@ -82,3 +82,7 @@ dmypy.json
 
 # Distribution / packaging
 *.whl
+
+# Node.js
+node_modules/
+package-lock.json
