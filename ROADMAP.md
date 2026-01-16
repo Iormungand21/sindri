@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Refactoring Tools COMPLETE!** (v0.1.0) - rename_symbol, extract_function, inline_variable tools implemented. **100% production ready.** 853/853 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
+**Current Status:** ✅ **SQL Tools COMPLETE!** (v0.1.0) - execute_query, describe_schema, explain_query tools implemented for Fenrir. **100% production ready.** 895/895 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
 
 ---
 
@@ -11,15 +11,15 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ Refactoring Tools COMPLETE - rename_symbol, extract_function, inline_variable
-- ✅ 853/853 tests passing (100%)
+- ✅ SQL Tools COMPLETE - execute_query, describe_schema, explain_query for Fenrir
+- ✅ 895/895 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 853 passed
+.venv/bin/pytest tests/ -v           # Should see 895 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -100,8 +100,8 @@ cd sindri/web && npm create vite@latest static -- --template react-ts
 ## Tools & Models Reference
 
 **See [TOOLS_AND_MODELS_ANALYSIS.md](TOOLS_AND_MODELS_ANALYSIS.md) for comprehensive analysis:**
-- Current tools: 23 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, format_code, lint_code, rename_symbol, extract_function, inline_variable, shell, delegate) ✅
-- Recommended additions: 2 tools remaining (refactor patterns, multi-file refactor)
+- Current tools: 26 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, format_code, lint_code, rename_symbol, extract_function, inline_variable, execute_query, describe_schema, explain_query, shell, delegate) ✅
+- Recommended additions: Multi-file refactoring patterns (advanced)
 - Current models: 7 active (qwen, llama, deepseek, sqlcoder)
 - Recommended models: 9 additions (codellama, mistral, starcoder2, phi3, etc.)
 - New agent proposals: 4 (Thor, Heimdall, Idunn, Loki)
@@ -1277,6 +1277,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 7.1 | ✅ **SQL Tools COMPLETE!** execute_query, describe_schema, explain_query for Fenrir agent (42 tests) |
 | 2026-01-15 | 8.3 | ✅ **Refactoring Tools COMPLETE!** rename_symbol, extract_function, inline_variable for code refactoring (39 tests) |
 | 2026-01-15 | 8.3 | ✅ **Formatting Tools COMPLETE!** format_code, lint_code for code formatting and linting (51 tests) |
 | 2026-01-15 | 8.3 | ✅ **Testing Tools COMPLETE!** run_tests, check_syntax for test execution and syntax validation (52 tests) |
@@ -1304,13 +1305,43 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-15 (Refactoring Tools Complete!)
+**Last Updated:** 2026-01-15 (SQL Tools Complete!)
 **Next Review:** When starting Phase 8.3 Web UI Frontend (React)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 SQL TOOLS COMPLETE!** (2026-01-15)
+
+SQL tools for the Fenrir agent to interact with SQLite databases:
+1. ✅ **ExecuteQueryTool** - Execute SQL queries
+   - SELECT queries with parameterized values
+   - Write operations (INSERT, UPDATE, DELETE) with explicit permission
+   - Result formatting as readable tables
+   - Row limits (default 100, max 1000) and timeout configuration
+   - Safety: Write operations blocked by default
+2. ✅ **DescribeSchemaTool** - Get database schema information
+   - List all tables with column definitions
+   - Show column types, nullability, defaults, primary keys
+   - Display indexes and foreign key relationships
+   - Include CREATE statements optionally
+3. ✅ **ExplainQueryTool** - Analyze query execution plans
+   - Show how SQLite will execute a query
+   - Identify index usage vs table scans
+   - Provide optimization hints and suggestions
+   - Optional detailed bytecode output
+4. ✅ **Agent Integration** - Added to Fenrir agent
+5. ✅ **42 new tests** - Comprehensive SQL tools coverage
+
+**Impact:**
+- Test coverage: 853 → 895 tests (+42 tests, 100% passing)
+- Fenrir can now actually work with databases
+- Essential for data analysis and database management tasks
+- Safe by default (read-only unless explicitly allowed)
+
+---
 
 **🎉 REFACTORING TOOLS COMPLETE!** (2026-01-15)
 
