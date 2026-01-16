@@ -32,10 +32,19 @@ interface SessionRowProps {
 }
 
 function SessionRow({ session }: SessionRowProps) {
+  const createdAt = new Date(session.created_at)
+  const timeAgo = formatTimeAgo(createdAt)
+
+  // Detect stale sessions: active but older than 1 hour
+  const isStale =
+    session.status === 'active' &&
+    Date.now() - createdAt.getTime() > 3600000 // 1 hour in ms
+
   const statusColors = {
     completed: 'bg-green-900/50 text-green-400 border-green-700',
     failed: 'bg-red-900/50 text-red-400 border-red-700',
     active: 'bg-blue-900/50 text-blue-400 border-blue-700',
+    stale: 'bg-sindri-700/50 text-sindri-400 border-sindri-600',
     cancelled: 'bg-gray-900/50 text-gray-400 border-gray-700',
   }
 
@@ -43,14 +52,13 @@ function SessionRow({ session }: SessionRowProps) {
     completed: '✓',
     failed: '✗',
     active: '●',
+    stale: '○',
     cancelled: '○',
   }
 
-  const statusColor = statusColors[session.status] || statusColors.cancelled
-  const statusIcon = statusIcons[session.status] || '?'
-
-  const createdAt = new Date(session.created_at)
-  const timeAgo = formatTimeAgo(createdAt)
+  const effectiveStatus = isStale ? 'stale' : session.status
+  const statusColor = statusColors[effectiveStatus] || statusColors.cancelled
+  const statusIcon = statusIcons[effectiveStatus] || '?'
 
   return (
     <a
@@ -70,9 +78,10 @@ function SessionRow({ session }: SessionRowProps) {
         </div>
         <span
           className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ${statusColor}`}
+          title={isStale ? 'Session appears abandoned (>1hr with no completion)' : ''}
         >
           <span>{statusIcon}</span>
-          {session.status}
+          {effectiveStatus}
         </span>
       </div>
     </a>

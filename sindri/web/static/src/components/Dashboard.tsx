@@ -56,7 +56,7 @@ export function Dashboard() {
       </div>
 
       {/* Metrics cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard
           label="Total Sessions"
           value={metrics?.total_sessions ?? 0}
@@ -78,7 +78,15 @@ export function Dashboard() {
           label="Active"
           value={metrics?.active_sessions ?? 0}
           loading={metricsLoading}
-          variant="warning"
+          variant="info"
+          subtitle="Running now"
+        />
+        <MetricCard
+          label="Stale"
+          value={metrics?.stale_sessions ?? 0}
+          loading={metricsLoading}
+          variant="muted"
+          subtitle="Abandoned (>1hr)"
         />
       </div>
 
@@ -168,7 +176,8 @@ interface MetricCardProps {
   label: string
   value: number
   loading?: boolean
-  variant?: 'default' | 'success' | 'error' | 'warning'
+  variant?: 'default' | 'success' | 'error' | 'warning' | 'info' | 'muted'
+  subtitle?: string
 }
 
 function MetricCard({
@@ -176,12 +185,15 @@ function MetricCard({
   value,
   loading,
   variant = 'default',
+  subtitle,
 }: MetricCardProps) {
   const colors = {
     default: 'text-sindri-100',
     success: 'text-green-400',
     error: 'text-red-400',
     warning: 'text-yellow-400',
+    info: 'text-blue-400',
+    muted: 'text-sindri-500',
   }
 
   return (
@@ -190,7 +202,12 @@ function MetricCard({
       {loading ? (
         <div className="h-8 w-16 bg-sindri-700 animate-pulse rounded mt-1" />
       ) : (
-        <p className={`text-3xl font-bold ${colors[variant]}`}>{value}</p>
+        <>
+          <p className={`text-3xl font-bold ${colors[variant]}`}>{value}</p>
+          {subtitle && (
+            <p className="text-xs text-sindri-500 mt-0.5">{subtitle}</p>
+          )}
+        </>
       )}
     </div>
   )

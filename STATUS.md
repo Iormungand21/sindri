@@ -1,16 +1,16 @@
 # Sindri Project Status Report
-**Date:** 2026-01-16 (D3.js Agent Graph Complete!)
-**Session:** Web UI Enhancement - Agent Graph Visualization
+**Date:** 2026-01-16 (Web UI Cleanup & Stale Session Detection)
+**Session:** Web UI Cleanup - Fix Session Count Data Representation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - D3.js Agent Graph Complete! 🎉
-**Just Completed:** D3.js Agent Graph with delegation flow visualization ✓ (2026-01-16)
+**Current State:** ✅ **PRODUCTION READY (100%)** - Web UI Data Accuracy Improved! 🎉
+**Just Completed:** Stale session detection + UI cleanup + metrics accuracy ✓ (2026-01-16)
 **Test Status:** 942/942 backend tests + 37 frontend tests, **all passing (100%)** 🎉
-**Production Readiness:** 100% - Full-stack system with interactive agent visualization!
+**Production Readiness:** 100% - Full-stack system with accurate session metrics!
 **Next Priority:** 🎯 **Web UI Enhancements** (Code Diff Viewer, Timeline View)
 
 ---
@@ -21,7 +21,18 @@
 
 ### What Was Just Completed ✅
 
-**D3.js Agent Graph (Web UI Enhancement):**
+**Web UI Data Accuracy & Cleanup (2026-01-16):**
+- Fixed session count discrepancy between dashboard and session list
+- Added stale session detection: sessions "active" for >1hr are marked as stale
+- Updated Dashboard with 5 metric cards (Total, Completed, Failed, Active, Stale)
+- Added subtitles to metric cards ("Running now", "Abandoned (>1hr)")
+- SessionList now fetches 100 sessions (up from 20) for better visibility
+- SessionList shows global metrics for accurate counts ("Showing X of Y total")
+- Session cards now show "stale" status with distinct styling
+- RecentTasks component updated with stale session detection
+- All components consistently detect stale sessions (>1hr threshold)
+
+**Previous: D3.js Agent Graph (Web UI Enhancement):**
 - Interactive force-directed graph visualization of agent hierarchy
 - Real-time delegation flow animation via WebSocket events
 - Click-to-view agent details modal

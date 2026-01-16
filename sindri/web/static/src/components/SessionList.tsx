@@ -3,13 +3,15 @@
  */
 
 import { useState } from 'react'
-import { useSessions } from '../hooks/useApi'
+import { useSessions, useMetrics } from '../hooks/useApi'
 import type { Session } from '../types/api'
 
 export function SessionList() {
   const [statusFilter, setStatusFilter] = useState<string>('')
+  const { data: metrics } = useMetrics()
   const { data: sessions, isLoading, error } = useSessions({
     status: statusFilter || undefined,
+    limit: 100,  // Fetch more sessions for better visibility
   })
 
   if (isLoading) {
@@ -47,23 +49,31 @@ export function SessionList() {
     { value: 'cancelled', label: 'Cancelled' },
   ]
 
-  // Stats
-  const stats = {
-    total: sessions?.length ?? 0,
-    completed: sessions?.filter((s) => s.status === 'completed').length ?? 0,
-    failed: sessions?.filter((s) => s.status === 'failed').length ?? 0,
-    active: sessions?.filter((s) => s.status === 'active').length ?? 0,
-  }
+  // Use global metrics for accurate stats (sessions list may be limited)
+  const displayedCount = sessions?.length ?? 0
+  const totalCount = metrics?.total_sessions ?? displayedCount
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-sindri-100">Sessions</h1>
-          <p className="text-sindri-400 text-sm mt-1">
-            {stats.total} total • {stats.completed} completed • {stats.failed}{' '}
-            failed • {stats.active} active
-          </p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm mt-1">
+            <span className="text-sindri-400">
+              {displayedCount < totalCount
+                ? `Showing ${displayedCount} of ${totalCount} total`
+                : `${totalCount} total`
+              }
+            </span>
+            <span className="text-green-400">{metrics?.completed_sessions ?? 0} completed</span>
+            <span className="text-red-400">{metrics?.failed_sessions ?? 0} failed</span>
+            <span className="text-blue-400">{metrics?.active_sessions ?? 0} active</span>
+            {(metrics?.stale_sessions ?? 0) > 0 && (
+              <span className="text-sindri-500" title="Sessions marked active but older than 1 hour (likely abandoned)">
+                {metrics?.stale_sessions ?? 0} stale
+              </span>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-2">
           {statusOptions.map((option) => (
@@ -110,6 +120,16 @@ interface SessionCardProps {
 }
 
 function SessionCard({ session }: SessionCardProps) {
+  const createdAt = new Date(session.created_at)
+  const completedAt = session.completed_at
+    ? new Date(session.completed_at)
+    : null
+
+  // Detect stale sessions: active but older than 1 hour
+  const isStale =
+    session.status === 'active' &&
+    Date.now() - createdAt.getTime() > 3600000 // 1 hour in ms
+
   const statusStyles = {
     completed: {
       bg: 'bg-green-900/30 border-green-800',
@@ -126,6 +146,11 @@ function SessionCard({ session }: SessionCardProps) {
       badge: 'bg-blue-900/50 text-blue-400 border-blue-700',
       icon: '●',
     },
+    stale: {
+      bg: 'bg-sindri-800/50 border-sindri-700',
+      badge: 'bg-sindri-700/50 text-sindri-400 border-sindri-600',
+      icon: '○',
+    },
     cancelled: {
       bg: 'bg-gray-900/30 border-gray-700',
       badge: 'bg-gray-900/50 text-gray-400 border-gray-600',
@@ -133,14 +158,13 @@ function SessionCard({ session }: SessionCardProps) {
     },
   }
 
-  const style = statusStyles[session.status] || statusStyles.cancelled
+  const styleKey = isStale ? 'stale' : session.status
+  const style = statusStyles[styleKey] || statusStyles.cancelled
 
-  const createdAt = new Date(session.created_at)
-  const completedAt = session.completed_at
-    ? new Date(session.completed_at)
-    : null
   const duration = completedAt
     ? formatDuration(completedAt.getTime() - createdAt.getTime())
+    : isStale
+    ? formatDuration(Date.now() - createdAt.getTime()) + ' (stale)'
     : 'In progress'
 
   return (
@@ -166,9 +190,10 @@ function SessionCard({ session }: SessionCardProps) {
         </div>
         <span
           className={`flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-sm border ${style.badge}`}
+          title={isStale ? 'Session appears abandoned (>1hr with no completion)' : ''}
         >
           <span>{style.icon}</span>
-          {session.status}
+          {isStale ? 'stale' : session.status}
         </span>
       </div>
       <div className="mt-3 pt-3 border-t border-sindri-700/50">

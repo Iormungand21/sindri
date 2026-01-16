@@ -68,6 +68,7 @@ export interface Metrics {
   completed_sessions: number
   failed_sessions: number
   active_sessions: number
+  stale_sessions: number  // Sessions marked active but likely abandoned (>1hr old)
   total_iterations: number
   vram_used_gb: number
   vram_total_gb: number
