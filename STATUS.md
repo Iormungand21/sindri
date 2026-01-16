@@ -1,19 +1,37 @@
 # Sindri Project Status Report
-**Date:** 2026-01-15 (Formatting Tools Complete!)
-**Session:** Formatting Tools - format_code, lint_code
+**Date:** 2026-01-15 (Refactoring Tools Complete!)
+**Session:** Refactoring Tools - rename_symbol, extract_function, inline_variable
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Formatting Tools Complete! 🎉
-**Just Completed:** format_code, lint_code Tools ✓ (2026-01-15)
-**Test Status:** 814/814 tests, **814 passing (100%)** - All tests passing! 🎉
+**Current State:** ✅ **PRODUCTION READY (100%)** - Refactoring Tools Complete! 🎉
+**Just Completed:** rename_symbol, extract_function, inline_variable Tools ✓ (2026-01-15)
+**Test Status:** 853/853 tests, **853 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
 **Next Priority:** Phase 8.3 (Web UI Frontend - React)
 
-**Key New Features (Formatting Tools):**
+**Key New Features (Refactoring Tools):**
+- **RenameSymbolTool** - Rename symbols across codebase
+  - Rename functions, classes, variables, methods across files
+  - Respects word boundaries (avoids partial matches)
+  - Dry run mode for previewing changes
+  - File type filtering support
+- **ExtractFunctionTool** - Extract code into a new function
+  - Extract code blocks by line numbers
+  - Auto-generates function with proper indentation
+  - Supports Python and JavaScript/TypeScript
+  - Configurable parameters, return values, docstrings
+- **InlineVariableTool** - Inline variable values
+  - Replace variable usages with assigned values
+  - Automatic parentheses wrapping for complex expressions
+  - Option to keep or remove original assignment
+- **Agent Integration** - Added to Brokkr, Huginn agents
+- **39 new tests** - Comprehensive refactoring tools coverage
+
+**Previous Features (Formatting Tools):**
 - **FormatCodeTool** - Format code using language-appropriate formatters
   - Python: black, autopep8, ruff
   - JavaScript/TypeScript: prettier
@@ -193,11 +211,12 @@
 
 **Quick Test Commands:**
 ```bash
-# Run all tests (711/711 passing!)
+# Run all tests (853/853 passing!)
 .venv/bin/pytest tests/ -v
 
 # Run specific test suites
-.venv/bin/pytest tests/test_http_tools.py -v              # HTTP tools tests (NEW!)
+.venv/bin/pytest tests/test_refactoring_tools.py -v       # Refactoring tools tests (NEW!)
+.venv/bin/pytest tests/test_http_tools.py -v              # HTTP tools tests
 .venv/bin/pytest tests/test_git_tools.py -v               # Git tools tests
 .venv/bin/pytest tests/test_search_tools.py -v             # Search tools tests
 .venv/bin/pytest tests/test_web.py -v                      # Phase 8.3 web API tests

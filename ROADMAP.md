@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Formatting Tools COMPLETE!** (v0.1.0) - format_code, lint_code tools implemented. **100% production ready.** 814/814 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
+**Current Status:** ✅ **Refactoring Tools COMPLETE!** (v0.1.0) - rename_symbol, extract_function, inline_variable tools implemented. **100% production ready.** 853/853 tests passing (100%). Ready for Phase 8.3 (Web UI Frontend).
 
 ---
 
@@ -11,15 +11,15 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-15)
-- ✅ Formatting Tools COMPLETE - format_code, lint_code
-- ✅ 814/814 tests passing (100%)
+- ✅ Refactoring Tools COMPLETE - rename_symbol, extract_function, inline_variable
+- ✅ 853/853 tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search, git tools, HTTP client, testing tools, formatting tools
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 814 passed
+.venv/bin/pytest tests/ -v           # Should see 853 passed
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -83,14 +83,14 @@
 ## Tools & Models Reference
 
 **See [TOOLS_AND_MODELS_ANALYSIS.md](TOOLS_AND_MODELS_ANALYSIS.md) for comprehensive analysis:**
-- Current tools: 20 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, format_code, lint_code, shell, delegate) ✅
-- Recommended additions: 5 tools remaining across 4 categories
+- Current tools: 23 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, format_code, lint_code, rename_symbol, extract_function, inline_variable, shell, delegate) ✅
+- Recommended additions: 2 tools remaining (refactor patterns, multi-file refactor)
 - Current models: 7 active (qwen, llama, deepseek, sqlcoder)
 - Recommended models: 9 additions (codellama, mistral, starcoder2, phi3, etc.)
 - New agent proposals: 4 (Thor, Heimdall, Idunn, Loki)
 
 **Next priorities:**
-- Tools: refactor, rename_symbol, extract_function
+- Tools: Multi-file refactoring patterns
 - Models: codellama:13b, mistral:7b, starcoder2:15b
 
 ---
@@ -1260,6 +1260,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-15 | 8.3 | ✅ **Refactoring Tools COMPLETE!** rename_symbol, extract_function, inline_variable for code refactoring (39 tests) |
 | 2026-01-15 | 8.3 | ✅ **Formatting Tools COMPLETE!** format_code, lint_code for code formatting and linting (51 tests) |
 | 2026-01-15 | 8.3 | ✅ **Testing Tools COMPLETE!** run_tests, check_syntax for test execution and syntax validation (52 tests) |
 | 2026-01-15 | 8.3 | ✅ **HTTP Tools COMPLETE!** http_request, http_get, http_post for API interaction (33 tests) |
@@ -1286,13 +1287,42 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-15 (Formatting Tools Complete!)
+**Last Updated:** 2026-01-15 (Refactoring Tools Complete!)
 **Next Review:** When starting Phase 8.3 Web UI Frontend (React)
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 REFACTORING TOOLS COMPLETE!** (2026-01-15)
+
+Code refactoring tools for automated code transformations:
+1. ✅ **RenameSymbolTool** - Rename symbols across codebase
+   - Rename functions, classes, variables, methods
+   - Works across multiple files
+   - Respects word boundaries (no partial matches)
+   - Dry run mode for previewing changes
+   - File type filtering support
+2. ✅ **ExtractFunctionTool** - Extract code into a new function
+   - Extract code blocks by line numbers
+   - Auto-generates function with proper indentation
+   - Supports Python and JavaScript/TypeScript
+   - Configurable parameters, return values, docstrings
+3. ✅ **InlineVariableTool** - Inline variable values
+   - Replace variable usages with assigned values
+   - Automatic parentheses wrapping for complex expressions
+   - Option to keep or remove original assignment
+4. ✅ **Agent Integration** - Added to Brokkr, Huginn
+5. ✅ **39 new tests** - Comprehensive refactoring tools coverage
+
+**Impact:**
+- Test coverage: 814 → 853 tests (+39 tests, 100% passing)
+- Agents can now rename, extract, and inline code automatically
+- Essential for automated refactoring workflows
+- Supports multi-language development
+
+---
 
 **🎉 FORMATTING TOOLS COMPLETE!** (2026-01-15)
 
