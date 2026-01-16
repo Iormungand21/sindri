@@ -1,27 +1,67 @@
 # Sindri Project Status Report
-**Date:** 2026-01-16 (Stale Session Cleanup & Web UI Fixes)
-**Session:** Web UI Cleanup - Proper Stale Session Handling
+**Date:** 2026-01-16 (Phase 9: Agent Expansion)
+**Session:** Agent Expansion - 4 New Specialized Agents + Model Upgrades
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Stale Session Cleanup Complete! 🎉
-**Just Completed:** Proper stale session cleanup + /api/health fix ✓ (2026-01-16)
-**Test Status:** 942/942 backend tests + 37 frontend tests, **all passing (100%)** 🎉
-**Production Readiness:** 100% - Full-stack system with clean session management!
-**Next Priority:** 🎯 **Web UI Enhancements** (Code Diff Viewer, Timeline View)
+**Current State:** ✅ **PRODUCTION READY (100%)** - Agent Expansion Complete! 🎉
+**Just Completed:** Phase 9 Agent Expansion - 4 new agents + Odin upgrade ✓ (2026-01-16)
+**Test Status:** 995/995 backend tests + 37 frontend tests, **all passing (100%)** 🎉
+**Production Readiness:** 100% - 11 specialized agents with larger model support!
+**Next Priority:** 🎯 **Pull new models** (qwen3:14b, codestral:22b) then **Web UI Enhancements**
 
 ---
 
-## 🎯 NEXT SESSION: Web UI Enhancements
+## 🎯 NEXT SESSION: Pull Models & Web UI Enhancements
 
-**Goal:** Continue improving Sindri with advanced visualizations.
+**Goal:** Pull required models for new agents, then continue UI improvements.
 
 ### What Was Just Completed ✅
 
-**Stale Session Cleanup (2026-01-16):**
+**Phase 9: Agent Expansion (2026-01-16):**
+
+Added 4 new specialized agents with larger model support (up to 14GB VRAM):
+
+| Agent | Role | Model | VRAM |
+|-------|------|-------|------|
+| **Heimdall** | Security Guardian - OWASP vulnerability detection | qwen3:14b | ~10GB |
+| **Baldr** | Debugger - Root cause analysis, bug hunting | deepseek-r1:14b | ~9GB |
+| **Idunn** | Documentation - Docstrings, READMEs, API docs | llama3.1:8b | ~5GB |
+| **Vidar** | Multi-language Coder - 80+ programming languages | codestral:22b | ~14GB |
+
+**Odin Upgrade:**
+- Upgraded from deepseek-r1:8b → deepseek-r1:14b (already pulled!)
+- Better reasoning capabilities for planning tasks
+
+**Brokkr Delegation:**
+- Now can delegate to 9 agents (was 5)
+- Added heimdall, baldr, idunn, vidar to delegation targets
+
+**Models to Pull:**
+```bash
+# Required for new agents (run these to activate Heimdall and Vidar):
+ollama pull qwen3:14b              # ~9GB download - For Heimdall (security)
+ollama pull codestral:22b-v0.1-q4_K_M  # ~13GB download - For Vidar (multi-lang)
+
+# Already pulled (reused):
+# deepseek-r1:14b - Already pulled! Used by Baldr + upgraded Odin
+# llama3.1:8b - Already pulled! Shared by Idunn + Mimir
+```
+
+**New Tests:** 53 tests for new agents in `tests/test_new_agents.py`
+
+**Files Modified:**
+- `sindri/agents/prompts.py` - Added 4 comprehensive prompts (~1100 lines)
+- `sindri/agents/registry.py` - Added 4 agent definitions + Odin upgrade
+- `tests/test_new_agents.py` - New test file (53 tests)
+- `AGENT_EXPANSION_PLAN.md` - Implementation plan document
+
+---
+
+**Previous: Stale Session Cleanup (2026-01-16):**
 - Added `SessionState.cleanup_stale_sessions()` to mark abandoned sessions as "failed"
 - Auto-cleanup on web server startup (all "active" sessions marked failed on restart)
 - CLI command: `sindri sessions --cleanup` for manual cleanup

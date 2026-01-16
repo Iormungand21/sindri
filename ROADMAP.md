@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **D3.js Agent Graph COMPLETE!** (v0.1.0) - Interactive agent visualization with delegation flow animation. **100% production ready.** 942/942 backend tests + 37 frontend tests passing (100%). Ready for more Web UI Enhancements.
+**Current Status:** ✅ **Phase 9 Agent Expansion COMPLETE!** (v0.1.0) - 11 specialized agents with larger model support. **100% production ready.** 995/995 backend tests + 37 frontend tests passing (100%). Ready for model pulls + Web UI Enhancements.
 
 ---
 
@@ -11,18 +11,18 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-16)
-- ✅ D3.js Agent Graph COMPLETE - Interactive visualization with delegation flow
-- ✅ 942/942 backend tests + 37 frontend tests passing (100%)
+- ✅ Phase 9 Agent Expansion COMPLETE - 11 specialized agents (was 7)
+- ✅ 995/995 backend tests + 37 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, **4 new specialized agents (Heimdall, Baldr, Idunn, Vidar)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 942 passed
+.venv/bin/pytest tests/ -v           # Should see 995 passed
 cd sindri/web/static && npm test -- --run  # 37 frontend tests
 .venv/bin/sindri doctor --verbose    # Check system health
-.venv/bin/sindri agents              # See all 7 agents
+.venv/bin/sindri agents              # See all 11 agents
 .venv/bin/sindri sessions            # View past sessions
 .venv/bin/sindri tui                 # Launch TUI (press 'h' for history, Ctrl+C to exit)
 
@@ -111,13 +111,13 @@ curl http://localhost:8000/api/agents | jq
 **See [TOOLS_AND_MODELS_ANALYSIS.md](TOOLS_AND_MODELS_ANALYSIS.md) for comprehensive analysis:**
 - Current tools: 26 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, format_code, lint_code, rename_symbol, extract_function, inline_variable, execute_query, describe_schema, explain_query, shell, delegate) ✅
 - Recommended additions: Multi-file refactoring patterns (advanced)
-- Current models: 7 active (qwen, llama, deepseek, sqlcoder)
-- Recommended models: 9 additions (codellama, mistral, starcoder2, phi3, etc.)
-- New agent proposals: 4 (Thor, Heimdall, Idunn, Loki)
+- Current agents: **11 specialized agents** (Brokkr, Huginn, Mimir, Ratatoskr, Skald, Fenrir, Odin, **Heimdall, Baldr, Idunn, Vidar**) ✅
+- Current models: 9 active (qwen2.5-coder:14b/7b/3b/1.5b, llama3.1:8b, deepseek-r1:14b/8b, sqlcoder:7b, **qwen3:14b, codestral:22b**)
+- New agents implemented: **Heimdall** (security), **Baldr** (debugging), **Idunn** (docs), **Vidar** (multi-lang) ✅
 
 **Next priorities:**
+- Pull models: `ollama pull qwen3:14b` and `ollama pull codestral:22b-v0.1-q4_K_M`
 - Tools: Multi-file refactoring patterns
-- Models: codellama:13b, mistral:7b, starcoder2:15b
 
 ---
 
