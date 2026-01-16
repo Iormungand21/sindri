@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Multi-Project Memory COMPLETE!** (v0.1.0) - Cross-project search with project registry, tagging, and privacy controls. **100% production ready.** 942/942 backend tests + 22 frontend tests passing (100%). Ready for Web UI Enhancements.
+**Current Status:** ✅ **D3.js Agent Graph COMPLETE!** (v0.1.0) - Interactive agent visualization with delegation flow animation. **100% production ready.** 942/942 backend tests + 37 frontend tests passing (100%). Ready for more Web UI Enhancements.
 
 ---
 
@@ -11,16 +11,16 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-16)
-- ✅ Multi-Project Memory COMPLETE - Cross-project search, tagging, privacy
-- ✅ 942/942 backend tests + 22 frontend tests passing (100%)
+- ✅ D3.js Agent Graph COMPLETE - Interactive visualization with delegation flow
+- ✅ 942/942 backend tests + 37 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 895 passed
-cd sindri/web/static && npm test -- --run  # 22 frontend tests
+.venv/bin/pytest tests/ -v           # Should see 942 passed
+cd sindri/web/static && npm test -- --run  # 37 frontend tests
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 7 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -51,9 +51,9 @@ cd sindri/web/static && npm run build  # Build frontend
 3. **This file** - See roadmap sections below
 
 ### 🎯 Recommended Next: Web UI Enhancements
-- **D3.js Agent Graph:** Animated delegation flow visualization, click nodes to see conversations
 - **Code Diff Viewer:** Before/after for file edits with syntax highlighting
 - **Timeline View:** Horizontal timeline showing parallel execution, filter by agent/status
+- **Session Replay:** Step-by-step replay of past sessions with tool call visualization
 - **Effort:** 1-2 days per enhancement
 - **Impact:** MEDIUM - Better visualization and UX
 
@@ -64,15 +64,20 @@ cd sindri/web/static && npm run dev  # Port 3000 with proxy
 .venv/bin/sindri web --port 8000     # Backend in another terminal
 curl http://localhost:8000/api/agents | jq
 
-# Create React frontend:
-cd sindri/web && npm create vite@latest static -- --template react-ts
+# View the Agent Graph
+# Visit http://localhost:8000/agents and toggle to "Graph" view
 ```
 
-**Key Features to Build:**
-1. Dashboard with metrics and task input
-2. Agent collaboration graph (D3.js)
-3. Session viewer with conversation display
-4. Real-time updates via WebSocket
+**Key Features Already Built:**
+1. ✅ Dashboard with metrics and task input
+2. ✅ Agent collaboration graph (D3.js) - with delegation animation!
+3. ✅ Session viewer with conversation display
+4. ✅ Real-time updates via WebSocket
+
+**Features to Build:**
+1. Code diff viewer for file changes
+2. Timeline view for task execution
+3. Session replay functionality
 
 ### Need Help?
 - Check tests for examples: `tests/test_*.py`
@@ -1318,6 +1323,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-16 | 8.3 | ✅ **D3.js Agent Graph COMPLETE!** Interactive visualization with delegation flow animation, click-to-view details, view mode toggle (15 frontend tests) |
 | 2026-01-16 | 8.4 | ✅ **Multi-Project Memory COMPLETE!** Cross-project search, project registry, tagging, privacy controls (47 tests) |
 | 2026-01-15 | 8.3 | ✅ **Web UI Frontend COMPLETE!** React + TypeScript + TailwindCSS frontend with Dashboard, Agents, Sessions (22 tests) |
 | 2026-01-15 | 7.1 | ✅ **SQL Tools COMPLETE!** execute_query, describe_schema, explain_query for Fenrir agent (42 tests) |
@@ -1348,8 +1354,8 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-16 (Multi-Project Memory Complete!)
-**Next Review:** When starting Web UI Enhancements (D3.js Agent Graph, Code Diff Viewer)
+**Last Updated:** 2026-01-16 (D3.js Agent Graph Complete!)
+**Next Review:** When starting Web UI Enhancements (Code Diff Viewer, Timeline View)
 **Maintained By:** Project maintainers and contributors
 
 ---

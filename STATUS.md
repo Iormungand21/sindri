@@ -1,17 +1,17 @@
 # Sindri Project Status Report
-**Date:** 2026-01-16 (Multi-Project Memory Complete!)
-**Session:** Phase 8.4 - Multi-Project Memory
+**Date:** 2026-01-16 (D3.js Agent Graph Complete!)
+**Session:** Web UI Enhancement - Agent Graph Visualization
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Multi-Project Memory Complete! 🎉
-**Just Completed:** Multi-Project Memory with cross-project search ✓ (2026-01-16)
-**Test Status:** 942/942 backend tests + 22 frontend tests, **all passing (100%)** 🎉
-**Production Readiness:** 100% - Full-stack system with cross-project memory!
-**Next Priority:** 🎯 **Web UI Enhancements** (D3.js Agent Graph, Code Diff Viewer)
+**Current State:** ✅ **PRODUCTION READY (100%)** - D3.js Agent Graph Complete! 🎉
+**Just Completed:** D3.js Agent Graph with delegation flow visualization ✓ (2026-01-16)
+**Test Status:** 942/942 backend tests + 37 frontend tests, **all passing (100%)** 🎉
+**Production Readiness:** 100% - Full-stack system with interactive agent visualization!
+**Next Priority:** 🎯 **Web UI Enhancements** (Code Diff Viewer, Timeline View)
 
 ---
 
@@ -21,52 +21,48 @@
 
 ### What Was Just Completed ✅
 
-**Multi-Project Memory (Phase 8.4):**
-- Project Registry for managing multiple projects
-- Global Memory Store for cross-project embeddings
-- Cross-project semantic search
-- Project tagging and filtering
-- Privacy controls (enable/disable per project)
-- Full CLI suite for project management
-- 47 comprehensive tests
+**D3.js Agent Graph (Web UI Enhancement):**
+- Interactive force-directed graph visualization of agent hierarchy
+- Real-time delegation flow animation via WebSocket events
+- Click-to-view agent details modal
+- Color-coded nodes by role (Orchestrator, Coder, Reviewer, etc.)
+- VRAM indicator rings around nodes
+- Drag nodes to rearrange, scroll to zoom
+- View mode toggle: Graph / Tree / Cards
+- Legend and controls hint
+- Active delegation counter with live updates
+- 15 new component tests
 
 ### Try It Out
 ```bash
-# Add a project to the registry
-.venv/bin/sindri projects add . --name "MySindri" --tags "python,llm"
+# Build and start the web UI
+cd sindri/web/static && npm run build
+.venv/bin/sindri web --port 8000
 
-# List registered projects
-.venv/bin/sindri projects list
-
-# Index all projects for cross-project search
-.venv/bin/sindri projects index --all
-
-# Search across all projects
-.venv/bin/sindri projects search "authentication handler"
-
-# Search only in projects with specific tags
-.venv/bin/sindri projects search "API endpoint" --tags "python,fastapi"
-
-# View global memory statistics
-.venv/bin/sindri projects stats
+# Visit http://localhost:8000/agents to see the Agent Graph
+# - Click on nodes to view agent details
+# - Drag nodes to rearrange
+# - Scroll to zoom in/out
+# - Toggle between Graph, Tree, and Cards views
+# - Watch delegation flow animate in real-time during task execution
 ```
 
 ### Potential Next Features
 
-1. **D3.js Agent Graph** (Priority: Medium)
-   - Animated delegation flow visualization
-   - Click nodes to see agent conversations
-   - Real-time VRAM usage display
-
-2. **Code Diff Viewer** (Priority: Medium)
+1. **Code Diff Viewer** (Priority: Medium)
    - Before/after for file edits
    - Syntax highlighting
    - Accept/reject changes
 
-3. **Timeline View** (Priority: Low)
+2. **Timeline View** (Priority: Medium)
    - Horizontal timeline of tasks
    - Show parallel execution
    - Filter by agent, status, date
+
+3. **Session Replay** (Priority: Low)
+   - Replay past sessions step-by-step
+   - Visualize tool calls and responses
+   - Educational/debugging tool
 
 4. **Multi-Project Memory** (Phase 8.4)
    - Learn patterns across all projects
