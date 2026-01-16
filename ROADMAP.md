@@ -43,15 +43,32 @@
 ```
 
 ### Essential Reading
-1. **STATUS.md** - Detailed current state, what works, what doesn't
+1. **STATUS.md** - Detailed current state + **Web UI Getting Started Guide**
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
-3. **This file** - See "Phase 8.2 Agent Marketplace" for next priority
+3. **This file** - See "Phase 8.3 Web UI Frontend" section below
 
-### Recommended Next: Phase 8.3 - Web UI Frontend
+### 🎯 Recommended Next: Phase 8.3 - Web UI Frontend
 - **Phase 8.3 Goal:** React frontend with rich visualization
 - **Backend:** ✅ Complete (FastAPI server with REST API and WebSocket)
+- **Start Here:** Run `sindri web --port 8000` then visit http://localhost:8000/docs
 - **Effort:** 2-3 days
 - **Impact:** HIGH - Better UX for complex workflows
+
+**Quick Start for Web UI:**
+```bash
+# Backend already works - test it:
+.venv/bin/sindri web --port 8000 &
+curl http://localhost:8000/api/agents | jq
+
+# Create React frontend:
+cd sindri/web && npm create vite@latest static -- --template react-ts
+```
+
+**Key Features to Build:**
+1. Dashboard with metrics and task input
+2. Agent collaboration graph (D3.js)
+3. Session viewer with conversation display
+4. Real-time updates via WebSocket
 
 ### Need Help?
 - Check tests for examples: `tests/test_*.py`

@@ -11,7 +11,102 @@
 **Just Completed:** rename_symbol, extract_function, inline_variable Tools ✓ (2026-01-15)
 **Test Status:** 853/853 tests, **853 passing (100%)** - All tests passing! 🎉
 **Production Readiness:** 100% - All core systems complete!
-**Next Priority:** Phase 8.3 (Web UI Frontend - React)
+**Next Priority:** 🎯 **Phase 8.3 - Web UI Frontend (React)**
+
+---
+
+## 🎯 NEXT SESSION: Web UI Frontend
+
+**Goal:** Build a React frontend for the already-complete FastAPI backend.
+
+### Backend Already Complete ✅
+The REST API and WebSocket server are fully implemented in `sindri/web/server.py`:
+```bash
+# Start the backend (already works!)
+.venv/bin/sindri web --port 8000
+
+# API docs at http://localhost:8000/docs
+# WebSocket at ws://localhost:8000/ws
+```
+
+**Available API Endpoints:**
+- `GET /api/agents` - List all agents
+- `GET /api/agents/{name}` - Get agent details
+- `GET /api/sessions` - List sessions (with ?status, ?limit filters)
+- `GET /api/sessions/{id}` - Get session with turns
+- `POST /api/tasks` - Create new task
+- `GET /api/tasks/{id}` - Get task status
+- `GET /api/metrics` - System-wide metrics
+- `WS /ws` - Real-time event streaming
+
+### Frontend Features to Implement
+
+1. **Dashboard** (Priority: High)
+   - Recent tasks with success/failure status
+   - System metrics (total tasks, agents used, avg duration)
+   - VRAM usage gauge
+   - Quick task input form
+
+2. **Agent Collaboration Graph** (Priority: High)
+   - Visual graph of agent hierarchy
+   - Animated delegation flow during execution
+   - Click node to see conversation
+   - Real-time VRAM usage per agent
+
+3. **Session Viewer** (Priority: Medium)
+   - List of past sessions with filtering
+   - Conversation view with tool calls
+   - Code diff viewer for file edits
+   - Export to Markdown
+
+4. **Timeline View** (Priority: Medium)
+   - Horizontal timeline of tasks
+   - Show parallel execution
+   - Filter by agent, status, date
+
+### Recommended Tech Stack
+- **React 18+** with TypeScript
+- **D3.js** for agent graph visualization
+- **TailwindCSS** for styling
+- **React Query** for API data fetching
+- **WebSocket hooks** for real-time updates
+
+### File Structure
+```
+sindri/web/
+├── server.py          # ✅ Already complete (FastAPI backend)
+└── static/            # 📁 Create this for React frontend
+    ├── index.html
+    ├── src/
+    │   ├── App.tsx
+    │   ├── components/
+    │   │   ├── Dashboard.tsx
+    │   │   ├── AgentGraph.tsx
+    │   │   ├── SessionList.tsx
+    │   │   └── TaskInput.tsx
+    │   ├── hooks/
+    │   │   └── useWebSocket.ts
+    │   └── api/
+    │       └── client.ts
+    └── package.json
+```
+
+### Getting Started
+```bash
+# Verify backend works
+.venv/bin/sindri web --port 8000 &
+curl http://localhost:8000/api/agents | jq
+
+# Create React app in sindri/web/static/
+cd sindri/web
+npm create vite@latest static -- --template react-ts
+cd static && npm install
+
+# Key dependencies
+npm install d3 @types/d3 tailwindcss axios react-query
+```
+
+---
 
 **Key New Features (Refactoring Tools):**
 - **RenameSymbolTool** - Rename symbols across codebase
