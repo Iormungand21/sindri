@@ -83,7 +83,6 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 |---------|-------------|--------|
 | Voice Interface | Speech-to-text commands, TTS responses | Planned |
 | Plugin Marketplace | Share and discover community plugins | **Complete** |
-| VS Code Extension | IDE integration with inline commands | Planned |
 
 ### Medium Priority
 
