@@ -1,27 +1,66 @@
 # Sindri Project Status Report
-**Date:** 2026-01-16 (Session Replay Feature)
-**Session:** Web UI Enhancement - Session Replay Implementation
+**Date:** 2026-01-16 (MoveFileTool Feature)
+**Session:** Multi-file Refactoring - MoveFileTool Implementation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - Session Replay Complete! 🎉
-**Just Completed:** Session Replay for Web UI ✓ (2026-01-16)
-**Test Status:** 1004/1004 backend tests + 104 frontend tests, **all passing (100%)** 🎉
-**Production Readiness:** 100% - Full-featured Session Replay with playback controls!
-**Next Priority:** 🎯 **Web UI Enhancements** (Additional features TBD)
+**Current State:** ✅ **PRODUCTION READY (100%)** - MoveFileTool Complete! 🎉
+**Just Completed:** MoveFileTool with import updates ✓ (2026-01-16)
+**Test Status:** 1032/1032 backend tests + 104 frontend tests, **all passing (100%)** 🎉
+**Production Readiness:** 100% - Full multi-file refactoring capability with automatic import updates!
+**Next Priority:** 🎯 **Phase 9 Features** (CI/CD Integration, Remote Collaboration, etc.)
 
 ---
 
-## 🎯 NEXT SESSION: Web UI Enhancements
+## 🎯 NEXT SESSION: Advanced Features
 
-**Goal:** Continue improving Sindri with advanced visualizations and UX improvements.
+**Goal:** Continue improving Sindri with Phase 9 features or additional refactoring patterns.
 
 ### What Was Just Completed ✅
 
-**Session Replay (2026-01-16):**
+**MoveFileTool (2026-01-16):**
+
+Added comprehensive MoveFileTool for moving/renaming files with automatic import updates:
+
+**Backend:**
+- New `MoveFileTool` class in `sindri/tools/refactoring.py`
+- Move/rename files from source to destination paths
+- Automatic Python import updates (`import x`, `from x import y`)
+- Automatic JavaScript/TypeScript import updates (ES modules, CommonJS require)
+- Dry run mode for previewing changes before applying
+- Create destination directories automatically
+- Skip standard ignore directories (node_modules, __pycache__, .git, etc.)
+
+**Features:**
+- `move_file(source, destination)` - Basic file move
+- `move_file(source, dest, update_imports=true)` - Move with import updates
+- `move_file(source, dest, dry_run=true)` - Preview changes
+- `move_file(source, dest, search_path=dir)` - Custom search scope
+- Metadata includes: files updated, imports updated count
+
+**Agent Integration:**
+- Added to **Brokkr** (orchestrator) tool list
+- Added to **Huginn** (coder) tool list
+- Total tools: 27 implemented
+
+**New Tests:**
+- 28 tests in `tests/test_move_file.py`
+- Test categories: Basic moves, Dry run, Python imports, JS/TS imports, Error handling, Edge cases, Integration
+
+**Files Created:**
+- `tests/test_move_file.py` (~400 lines) - Comprehensive test coverage
+
+**Files Modified:**
+- `sindri/tools/refactoring.py` (+400 lines) - MoveFileTool implementation
+- `sindri/tools/registry.py` (+2 lines) - Tool registration
+- `sindri/agents/registry.py` (+2 lines) - Agent tool lists
+
+---
+
+**Previous: Session Replay (2026-01-16):**
 
 Added comprehensive Session Replay to the Web UI for step-by-step playback of past sessions:
 

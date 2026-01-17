@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Session Replay COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay. **100% production ready.** 1004/1004 backend tests + 104 frontend tests passing (100%).
+**Current Status:** ✅ **MoveFileTool COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay + MoveFileTool. **100% production ready.** 1032/1032 backend tests + 104 frontend tests passing (100%).
 
 ---
 
@@ -11,15 +11,15 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-16)
-- ✅ Timeline View COMPLETE - Web UI execution timeline visualization
-- ✅ 1004/1004 backend tests + 71 frontend tests passing (100%)
+- ✅ MoveFileTool COMPLETE - Multi-file refactoring with import updates
+- ✅ 1032/1032 backend tests + 104 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, **Timeline View**
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, Timeline View, Session Replay, **MoveFileTool**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 1004 passed
+.venv/bin/pytest tests/ -v           # Should see 1032 passed
 cd sindri/web/static && npm test -- --run  # 71 frontend tests
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 11 agents
@@ -50,14 +50,14 @@ cd sindri/web/static && npm run build  # Build frontend
 2. **PROJECT_HANDOFF.md** - Comprehensive project context and architecture
 3. **This file** - See roadmap sections below
 
-### 🎯 Recommended Next: Web UI Enhancements
+### 🎯 Recommended Next: Phase 9 Features
 - ~~**Code Diff Viewer:** Before/after for file edits with syntax highlighting~~ ✅ **COMPLETED!**
 - ~~**Timeline View:** Horizontal timeline showing parallel execution, filter by agent/status~~ ✅ **COMPLETED!**
 - ~~**Session Replay:** Step-by-step replay of past sessions with tool call visualization~~ ✅ **COMPLETED!**
-- **Effort:** 1-2 days per enhancement
-- **Impact:** MEDIUM - Better visualization and UX
+- ~~**MoveFileTool:** Move/rename files with automatic import updates~~ ✅ **COMPLETED!**
+- **Next:** CI/CD Integration, Remote Collaboration, or additional refactoring tools
 
-**All core Web UI enhancements complete! 🎉**
+**All core Web UI enhancements + MoveFileTool complete! 🎉**
 
 **Web UI Development:**
 ```bash
@@ -111,8 +111,8 @@ curl http://localhost:8000/api/agents | jq
 ## Tools & Models Reference
 
 **See [TOOLS_AND_MODELS_ANALYSIS.md](TOOLS_AND_MODELS_ANALYSIS.md) for comprehensive analysis:**
-- Current tools: 26 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, format_code, lint_code, rename_symbol, extract_function, inline_variable, execute_query, describe_schema, explain_query, shell, delegate) ✅
-- Recommended additions: Multi-file refactoring patterns (advanced)
+- Current tools: 27 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, format_code, lint_code, rename_symbol, extract_function, inline_variable, move_file, execute_query, describe_schema, explain_query, shell, delegate) ✅
+- Recommended additions: Additional multi-file patterns (batch rename, split/merge files)
 - Current agents: **11 specialized agents** (Brokkr, Huginn, Mimir, Ratatoskr, Skald, Fenrir, Odin, **Heimdall, Baldr, Idunn, Vidar**) ✅
 - Current models: **All 15 models installed** ✅
   - qwen2.5-coder:14b/7b/3b/1.5b, qwen2.5:3b-instruct, qwen3:14b
@@ -1332,6 +1332,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-16 | 9 | ✅ **MoveFileTool COMPLETE!** Move/rename files with automatic Python and JS/TS import updates, dry run mode, 28 tests |
 | 2026-01-16 | 8.3 | ✅ **Session Replay COMPLETE!** Step-by-step playback, speed controls (0.5x-4x), keyboard shortcuts, tool call visualization, 33 frontend tests |
 | 2026-01-16 | 8.3 | ✅ **Timeline View COMPLETE!** Horizontal timeline visualization, two view modes, event filtering, category colors, expand/collapse, 18 frontend tests |
 | 2026-01-16 | 8.3 | ✅ **Stale Session Cleanup!** Proper cleanup via `cleanup_stale_sessions()`, auto-cleanup on server startup, CLI `--cleanup` flag, fixed `/api/health` 404, removed stale workarounds |
@@ -1373,6 +1374,26 @@ All high-impact, low-effort improvements completed!
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 MOVE FILE TOOL COMPLETE!** (2026-01-16)
+
+Multi-file refactoring capability with automatic import updates:
+1. ✅ **MoveFileTool** - Move/rename files with intelligent import updates
+   - Move files from source to destination paths
+   - Automatic Python import updates (import, from...import)
+   - Automatic JavaScript/TypeScript import updates (ES modules, require)
+   - Dry run mode for previewing changes
+   - Creates destination directories automatically
+   - Skips standard ignore dirs (node_modules, __pycache__, .git)
+2. ✅ **Agent Integration** - Added to Brokkr and Huginn agents
+3. ✅ **28 new tests** - Comprehensive coverage for all scenarios
+
+**Impact:**
+- Backend tests: 1004 → 1032 tests (+28 tests, 100% passing)
+- Total tools: 26 → 27 tools
+- Enables safe file reorganization with automatic codebase updates
+
+---
 
 **🎉 TIMELINE VIEW COMPLETE!** (2026-01-16)
 

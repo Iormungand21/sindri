@@ -4,6 +4,7 @@ Provides tools for common code refactoring operations:
 - RenameSymbolTool: Rename symbols across codebase
 - ExtractFunctionTool: Extract code into a new function
 - InlineVariableTool: Inline variable values into usages
+- MoveFileTool: Move/rename files and update imports across codebase
 """
 
 import ast
@@ -807,3 +808,544 @@ Examples:
             return False
 
         return any(op in value_stripped for op in operators)
+
+
+class MoveFileTool(Tool):
+    """Move or rename a file and update imports across the codebase.
+
+    Moves a file from one location to another and automatically updates
+    all import statements that reference the old path. Supports Python
+    and JavaScript/TypeScript import syntaxes.
+    """
+
+    name = "move_file"
+    description = """Move or rename a file and automatically update all imports that reference it.
+
+This tool moves a file from source to destination and updates import statements across
+the codebase to reflect the new location. Supports Python and JavaScript/TypeScript.
+
+Examples:
+- move_file(source="src/utils.py", destination="src/helpers/utils.py") - Move and update imports
+- move_file(source="src/old_name.py", destination="src/new_name.py") - Rename file
+- move_file(source="lib/api.ts", destination="services/api.ts", update_imports=true) - Move TypeScript file
+- move_file(source="src/model.py", destination="src/models/user.py", dry_run=true) - Preview changes"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "source": {
+                "type": "string",
+                "description": "Path to the file to move (relative or absolute)"
+            },
+            "destination": {
+                "type": "string",
+                "description": "Destination path for the file"
+            },
+            "update_imports": {
+                "type": "boolean",
+                "description": "Update imports in other files (default: true)"
+            },
+            "search_path": {
+                "type": "string",
+                "description": "Directory to search for files to update (default: current directory)"
+            },
+            "dry_run": {
+                "type": "boolean",
+                "description": "Preview changes without applying them (default: false)"
+            },
+            "create_dirs": {
+                "type": "boolean",
+                "description": "Create destination directories if they don't exist (default: true)"
+            }
+        },
+        "required": ["source", "destination"]
+    }
+
+    # Directories to skip during import search
+    SKIP_DIRS = {
+        'node_modules', '__pycache__', '.git', '.svn', '.hg',
+        'dist', 'build', 'target', 'venv', '.venv', 'env',
+        '.tox', '.nox', '.pytest_cache', '.mypy_cache',
+        'coverage', '.coverage', 'htmlcov', '.eggs'
+    }
+
+    # File extensions that can contain imports
+    IMPORT_FILE_TYPES = {
+        '.py': 'python',
+        '.ts': 'typescript',
+        '.tsx': 'typescript',
+        '.js': 'javascript',
+        '.jsx': 'javascript',
+        '.mjs': 'javascript',
+        '.cjs': 'javascript',
+    }
+
+    async def execute(
+        self,
+        source: str,
+        destination: str,
+        update_imports: bool = True,
+        search_path: Optional[str] = None,
+        dry_run: bool = False,
+        create_dirs: bool = True,
+        **kwargs
+    ) -> ToolResult:
+        """Execute file move with import updates."""
+        # Resolve paths
+        source_path = self._resolve_path(source)
+        dest_path = self._resolve_path(destination)
+        search_root = self._resolve_path(search_path or ".")
+
+        # Validate source
+        if not source_path.exists():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Source file not found: {source}"
+            )
+
+        if not source_path.is_file():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Source is not a file: {source}. Use shell commands to move directories."
+            )
+
+        # Check if destination already exists
+        if dest_path.exists() and not dry_run:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Destination already exists: {destination}"
+            )
+
+        # Validate search path
+        if not search_root.exists():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Search path does not exist: {search_path}"
+            )
+
+        try:
+            results = {
+                "source": str(source_path),
+                "destination": str(dest_path),
+                "files_updated": [],
+                "imports_updated": 0,
+                "dry_run": dry_run
+            }
+            output_lines = []
+
+            # Calculate module paths for import updates
+            source_module = self._path_to_module(source_path, search_root)
+            dest_module = self._path_to_module(dest_path, search_root)
+
+            # Update imports in other files
+            if update_imports and source_module != dest_module:
+                import_updates = await self._update_imports(
+                    search_root, source_path, dest_path,
+                    source_module, dest_module, dry_run
+                )
+                results["files_updated"] = import_updates["files"]
+                results["imports_updated"] = import_updates["count"]
+
+                if import_updates["count"] > 0:
+                    action = "Would update" if dry_run else "Updated"
+                    output_lines.append(f"{action} {import_updates['count']} import(s) in {len(import_updates['files'])} file(s)")
+                    for file_info in import_updates["files"][:10]:  # Show first 10
+                        output_lines.append(f"  - {file_info['file']}: {file_info['count']} import(s)")
+                    if len(import_updates["files"]) > 10:
+                        output_lines.append(f"  ... and {len(import_updates['files']) - 10} more files")
+
+            # Perform the actual move
+            if not dry_run:
+                # Create destination directory if needed
+                if create_dirs:
+                    dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+                # Move the file
+                shutil.move(str(source_path), str(dest_path))
+
+                # Update relative imports within the moved file
+                await self._update_internal_imports(dest_path, source_path.parent, dest_path.parent)
+
+            # Build output
+            action = "Would move" if dry_run else "Moved"
+            output_lines.insert(0, f"{action}: {source} → {destination}")
+
+            if source_module != dest_module:
+                output_lines.append(f"Module path: {source_module} → {dest_module}")
+
+            log.info(
+                "file_moved",
+                source=str(source_path),
+                destination=str(dest_path),
+                imports_updated=results["imports_updated"],
+                files_updated=len(results["files_updated"]),
+                dry_run=dry_run,
+                work_dir=str(self.work_dir) if self.work_dir else None
+            )
+
+            return ToolResult(
+                success=True,
+                output="\n".join(output_lines),
+                metadata=results
+            )
+
+        except Exception as e:
+            log.error("move_file_error", error=str(e))
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Failed to move file: {str(e)}"
+            )
+
+    def _path_to_module(self, file_path: Path, root: Path) -> str:
+        """Convert a file path to a Python-style module path."""
+        try:
+            # Make path relative to root
+            rel_path = file_path.relative_to(root)
+        except ValueError:
+            # File is outside root, use absolute path parts
+            rel_path = file_path
+
+        # Remove extension and convert to dot notation
+        parts = list(rel_path.parts)
+        if parts:
+            # Remove file extension from last part
+            parts[-1] = Path(parts[-1]).stem
+
+        return ".".join(parts)
+
+    async def _update_imports(
+        self,
+        search_root: Path,
+        source_path: Path,
+        dest_path: Path,
+        old_module: str,
+        new_module: str,
+        dry_run: bool
+    ) -> dict:
+        """Update imports across the codebase."""
+        results = {"files": [], "count": 0}
+
+        # Determine the source file type
+        source_ext = source_path.suffix.lower()
+        source_lang = self.IMPORT_FILE_TYPES.get(source_ext)
+
+        if not source_lang:
+            return results  # Can't update imports for unknown file types
+
+        # Find all files that might contain imports
+        for ext, lang in self.IMPORT_FILE_TYPES.items():
+            for file_path in search_root.rglob(f"*{ext}"):
+                # Skip directories we should ignore
+                if any(part in self.SKIP_DIRS for part in file_path.parts):
+                    continue
+
+                # Skip the source file itself
+                if file_path.resolve() == source_path.resolve():
+                    continue
+
+                # Update imports in this file
+                count = await self._update_imports_in_file(
+                    file_path, source_path, dest_path,
+                    old_module, new_module, source_lang, dry_run
+                )
+
+                if count > 0:
+                    results["files"].append({
+                        "file": str(file_path),
+                        "count": count
+                    })
+                    results["count"] += count
+
+        return results
+
+    async def _update_imports_in_file(
+        self,
+        file_path: Path,
+        source_path: Path,
+        dest_path: Path,
+        old_module: str,
+        new_module: str,
+        source_lang: str,
+        dry_run: bool
+    ) -> int:
+        """Update imports in a single file. Returns count of updates."""
+        try:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = await f.read()
+        except Exception:
+            return 0
+
+        file_ext = file_path.suffix.lower()
+        file_lang = self.IMPORT_FILE_TYPES.get(file_ext)
+
+        if not file_lang:
+            return 0
+
+        original_content = content
+        update_count = 0
+
+        # Python imports
+        if file_lang == 'python' and source_lang == 'python':
+            content, count = self._update_python_imports(
+                content, old_module, new_module, source_path, dest_path, file_path
+            )
+            update_count += count
+
+        # JavaScript/TypeScript imports
+        elif file_lang in ['javascript', 'typescript'] and source_lang in ['javascript', 'typescript']:
+            content, count = self._update_js_imports(
+                content, source_path, dest_path, file_path
+            )
+            update_count += count
+
+        # Write changes if any
+        if update_count > 0 and not dry_run and content != original_content:
+            async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+                await f.write(content)
+
+        return update_count
+
+    def _update_python_imports(
+        self,
+        content: str,
+        old_module: str,
+        new_module: str,
+        source_path: Path,
+        dest_path: Path,
+        importing_file: Path
+    ) -> Tuple[str, int]:
+        """Update Python import statements."""
+        update_count = 0
+
+        # Handle: import old_module
+        pattern = re.compile(r'^(\s*import\s+)' + re.escape(old_module) + r'(\s*(?:#.*)?)$', re.MULTILINE)
+        content, n = pattern.subn(rf'\g<1>{new_module}\g<2>', content)
+        update_count += n
+
+        # Handle: import old_module as alias
+        pattern = re.compile(r'^(\s*import\s+)' + re.escape(old_module) + r'(\s+as\s+\w+\s*(?:#.*)?)$', re.MULTILINE)
+        content, n = pattern.subn(rf'\g<1>{new_module}\g<2>', content)
+        update_count += n
+
+        # Handle: from old_module import ...
+        pattern = re.compile(r'^(\s*from\s+)' + re.escape(old_module) + r'(\s+import\s+)', re.MULTILINE)
+        content, n = pattern.subn(rf'\g<1>{new_module}\g<2>', content)
+        update_count += n
+
+        # Handle: from old_module.submodule import ... (partial module path match)
+        pattern = re.compile(r'^(\s*from\s+)' + re.escape(old_module) + r'\.(\S+\s+import\s+)', re.MULTILINE)
+        content, n = pattern.subn(rf'\g<1>{new_module}.\g<2>', content)
+        update_count += n
+
+        # Handle: import old_module.submodule
+        pattern = re.compile(r'^(\s*import\s+)' + re.escape(old_module) + r'\.(\S+)', re.MULTILINE)
+        content, n = pattern.subn(rf'\g<1>{new_module}.\g<2>', content)
+        update_count += n
+
+        return content, update_count
+
+    def _update_js_imports(
+        self,
+        content: str,
+        source_path: Path,
+        dest_path: Path,
+        importing_file: Path
+    ) -> Tuple[str, int]:
+        """Update JavaScript/TypeScript import statements."""
+        update_count = 0
+
+        # Calculate relative paths from importing file to both source and dest
+        try:
+            importing_dir = importing_file.parent
+            old_rel = self._compute_js_import_path(source_path, importing_dir)
+            new_rel = self._compute_js_import_path(dest_path, importing_dir)
+        except Exception:
+            return content, 0
+
+        if old_rel == new_rel:
+            return content, 0
+
+        # Handle: import ... from 'old_path'
+        # Match various import styles: import x from, import { x } from, import * as x from
+        patterns = [
+            # import default from '...'
+            r'(import\s+\w+\s+from\s+[\'"])' + re.escape(old_rel) + r'([\'"])',
+            # import { ... } from '...'
+            r'(import\s+\{[^}]+\}\s+from\s+[\'"])' + re.escape(old_rel) + r'([\'"])',
+            # import * as x from '...'
+            r'(import\s+\*\s+as\s+\w+\s+from\s+[\'"])' + re.escape(old_rel) + r'([\'"])',
+            # import '...' (side effect import)
+            r'(import\s+[\'"])' + re.escape(old_rel) + r'([\'"])',
+            # export ... from '...'
+            r'(export\s+\{[^}]+\}\s+from\s+[\'"])' + re.escape(old_rel) + r'([\'"])',
+            r'(export\s+\*\s+from\s+[\'"])' + re.escape(old_rel) + r'([\'"])',
+            # require('...')
+            r'(require\s*\(\s*[\'"])' + re.escape(old_rel) + r'([\'"])',
+        ]
+
+        for pattern in patterns:
+            regex = re.compile(pattern)
+            content, n = regex.subn(rf'\g<1>{new_rel}\g<2>', content)
+            update_count += n
+
+        # Also check for import paths without leading ./
+        if not old_rel.startswith('./') and not old_rel.startswith('../'):
+            old_rel_with_dot = './' + old_rel
+            new_rel_with_dot = './' + new_rel if not new_rel.startswith('./') and not new_rel.startswith('../') else new_rel
+
+            for pattern in patterns:
+                # Replace old_rel with old_rel_with_dot in pattern
+                pattern_with_dot = pattern.replace(re.escape(old_rel), re.escape(old_rel_with_dot))
+                regex = re.compile(pattern_with_dot)
+                content, n = regex.subn(rf'\g<1>{new_rel_with_dot}\g<2>', content)
+                update_count += n
+
+        return content, update_count
+
+    def _compute_js_import_path(self, target_path: Path, from_dir: Path) -> str:
+        """Compute the JS import path from a directory to a target file."""
+        try:
+            # Get relative path from importing file's directory to target
+            rel_path = target_path.relative_to(from_dir.resolve())
+            rel_str = str(rel_path).replace('\\', '/')
+
+            # Remove extension for JS/TS imports (common practice)
+            if rel_str.endswith(('.ts', '.tsx', '.js', '.jsx', '.mjs')):
+                rel_str = str(Path(rel_str).with_suffix(''))
+
+            # Add ./ prefix for relative imports if not going up directories
+            if not rel_str.startswith('.'):
+                rel_str = './' + rel_str
+
+            return rel_str
+
+        except ValueError:
+            # Need to go up directories
+            try:
+                common = Path(from_dir.resolve()).relative_to(target_path.parent.resolve())
+                up_count = len(common.parts)
+                rel_from_common = target_path.relative_to(target_path.parent)
+                up_path = '../' * up_count
+                result = up_path + str(rel_from_common).replace('\\', '/')
+
+                # Remove extension
+                if result.endswith(('.ts', '.tsx', '.js', '.jsx', '.mjs')):
+                    result = str(Path(result).with_suffix(''))
+
+                return result
+            except Exception:
+                # Fallback: compute using os.path.relpath logic
+                from_resolved = from_dir.resolve()
+                target_resolved = target_path.resolve()
+
+                # Find common prefix
+                from_parts = from_resolved.parts
+                target_parts = target_resolved.parts
+
+                common_length = 0
+                for i, (f, t) in enumerate(zip(from_parts, target_parts)):
+                    if f == t:
+                        common_length = i + 1
+                    else:
+                        break
+
+                up_count = len(from_parts) - common_length
+                down_parts = target_parts[common_length:]
+
+                result = '../' * up_count + '/'.join(down_parts)
+
+                # Remove extension
+                if result.endswith(('.ts', '.tsx', '.js', '.jsx', '.mjs')):
+                    result = str(Path(result).with_suffix(''))
+
+                if not result.startswith('.'):
+                    result = './' + result
+
+                return result
+
+    async def _update_internal_imports(
+        self,
+        file_path: Path,
+        old_dir: Path,
+        new_dir: Path
+    ) -> None:
+        """Update relative imports within the moved file itself."""
+        if old_dir == new_dir:
+            return
+
+        file_ext = file_path.suffix.lower()
+        file_lang = self.IMPORT_FILE_TYPES.get(file_ext)
+
+        if not file_lang:
+            return
+
+        try:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = await f.read()
+        except Exception:
+            return
+
+        original_content = content
+
+        if file_lang == 'python':
+            # For Python, relative imports use dots (.module, ..module)
+            # These would need adjustment based on new package structure
+            # This is complex and often requires manual review
+            pass  # Python relative imports need package context
+
+        elif file_lang in ['javascript', 'typescript']:
+            # For JS/TS, update relative import paths
+            # This adjusts ../ and ./ paths based on directory change
+
+            # Pattern to find relative imports
+            import_pattern = re.compile(
+                r'((?:import|export)\s+(?:[\w{},*\s]+\s+from\s+)?[\'"])(\.[^\'"\s]+)([\'"])'
+            )
+            require_pattern = re.compile(
+                r'(require\s*\(\s*[\'"])(\.[^\'"\s]+)([\'"])'
+            )
+
+            def adjust_path(match):
+                prefix = match.group(1)
+                rel_path = match.group(2)
+                suffix = match.group(3)
+
+                # Parse the relative path
+                if rel_path.startswith('./'):
+                    target = old_dir / rel_path[2:]
+                elif rel_path.startswith('../'):
+                    # Count how many levels up
+                    path_parts = rel_path.split('/')
+                    ups = 0
+                    remaining = []
+                    for part in path_parts:
+                        if part == '..':
+                            ups += 1
+                        elif part != '.':
+                            remaining.append(part)
+                    current = old_dir
+                    for _ in range(ups):
+                        current = current.parent
+                    target = current / '/'.join(remaining)
+                else:
+                    return match.group(0)
+
+                # Compute new relative path from new_dir
+                try:
+                    new_rel = self._compute_js_import_path(target, new_dir)
+                    return prefix + new_rel + suffix
+                except Exception:
+                    return match.group(0)
+
+            content = import_pattern.sub(adjust_path, content)
+            content = require_pattern.sub(adjust_path, content)
+
+        # Write if changed
+        if content != original_content:
+            async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+                await f.write(content)
