@@ -32,32 +32,41 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 
 ## Recent Changes
 
-### CI/CD Fix - Linting and Formatting (2026-01-17)
+### CI/CD Fix - Linting, Formatting, and Dependencies (2026-01-17)
 
-Fixed GitHub Actions CI/CD pipeline failures caused by linting and formatting issues:
+Fixed GitHub Actions CI/CD pipeline issues (lint step now passes):
 
-**Issues Resolved:**
+**Linting & Formatting:**
 - Fixed ~2800 ruff linting errors across the codebase
-- Applied black formatting to 133 files
+- Applied black formatting to 133+ files
 - Added TYPE_CHECKING imports for forward references in type hints
 - Replaced try/import patterns with `importlib.util.find_spec` for availability checks
 - Renamed ambiguous variable names (`l` → `line`, `ln`)
 - Fixed import shadowing issues
 
-**Files Modified:**
-- `sindri/cli.py` - Fixed unused imports in dependency checks
-- `sindri/core/retry.py` - Added TYPE_CHECKING import for OllamaClient
-- `sindri/memory/episodic.py` - Added TYPE_CHECKING import for LocalEmbedder
-- `sindri/memory/semantic.py` - Added TYPE_CHECKING imports for VectorStore, LocalEmbedder
-- `sindri/memory/system.py` - Added TYPE_CHECKING import for CodebaseAnalysis
-- `sindri/plugins/loader.py` - Renamed shadowed variable
-- `sindri/tools/git.py` - Renamed ambiguous variable names
-- `sindri/tools/search.py` - Added TYPE_CHECKING import for SemanticMemory
-- `sindri/voice/tts.py` - Replaced try/import with importlib.util.find_spec
-- `sindri/web/server.py` - Added TYPE_CHECKING imports for collaboration types
-- Plus formatting changes across 133 files
+**CI Dependencies Added:**
+- `pytest-cov` to dev dependencies (required for `--cov` flag)
+- `pytest-mock` to dev dependencies (for mocker fixture)
+- Pytest configuration in pyproject.toml
 
-**Tests:** All 1575 tests pass (100%)
+**CI Configuration Changes:**
+- Removed Python 3.13 from test matrix (faster-whisper/ctranslate2 lacks wheels)
+- Removed voice extras from CI (tests mock voice dependencies)
+
+**Files Modified:**
+- `pyproject.toml` - Added pytest-cov, pytest-mock, pytest config
+- `.github/workflows/ci.yml` - Simplified dependencies, removed Python 3.13
+- 133+ source files for formatting/linting fixes
+
+**Local Tests:** All 1575 tests pass (100%)
+**CI Status:** Lint step passes; test step still failing - requires viewing CI logs
+
+**For Next Agent:**
+If CI tests still fail, check the GitHub Actions logs for the actual error message.
+The tests pass locally on Python 3.13; issue is specific to CI environment (Python 3.11/3.12).
+
+Sources:
+- [faster-whisper Python 3.13 incompatibility](https://github.com/SYSTRAN/faster-whisper/issues/1231)
 
 ### API Spec Generator (2026-01-17)
 
