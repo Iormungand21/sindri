@@ -41,7 +41,9 @@ class ModelStatus(Static):
 
         # VRAM bar
         used = sum(self.models.values())
-        used_pct = min((used / self.total_vram) * 100, 100) if self.total_vram > 0 else 0
+        used_pct = (
+            min((used / self.total_vram) * 100, 100) if self.total_vram > 0 else 0
+        )
         bar_length = 20
         bar_filled = int((used_pct / 100) * bar_length)
 

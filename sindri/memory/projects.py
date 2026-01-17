@@ -38,7 +38,9 @@ class ProjectConfig:
             "tags": self.tags,
             "enabled": self.enabled,
             "indexed": self.indexed,
-            "last_indexed": self.last_indexed.isoformat() if self.last_indexed else None,
+            "last_indexed": (
+                self.last_indexed.isoformat() if self.last_indexed else None
+            ),
             "file_count": self.file_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
@@ -52,9 +54,17 @@ class ProjectConfig:
             tags=data.get("tags", []),
             enabled=data.get("enabled", True),
             indexed=data.get("indexed", False),
-            last_indexed=datetime.fromisoformat(data["last_indexed"]) if data.get("last_indexed") else None,
+            last_indexed=(
+                datetime.fromisoformat(data["last_indexed"])
+                if data.get("last_indexed")
+                else None
+            ),
             file_count=data.get("file_count", 0),
-            created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
+            created_at=(
+                datetime.fromisoformat(data["created_at"])
+                if data.get("created_at")
+                else None
+            ),
         )
 
     def matches_tag(self, tag: str) -> bool:
@@ -115,7 +125,7 @@ class ProjectRegistry:
                 "version": 1,
                 "projects": {
                     path: proj.to_dict() for path, proj in self._projects.items()
-                }
+                },
             }
 
             with open(self.config_path, "w") as f:
@@ -131,7 +141,7 @@ class ProjectRegistry:
         path: str,
         name: Optional[str] = None,
         tags: Optional[List[str]] = None,
-        enabled: bool = True
+        enabled: bool = True,
     ) -> ProjectConfig:
         """Add a project to the registry.
 
@@ -222,9 +232,7 @@ class ProjectRegistry:
         return self._projects.get(normalized_path) or self._projects.get(path)
 
     def list_projects(
-        self,
-        enabled_only: bool = False,
-        tags: Optional[List[str]] = None
+        self, enabled_only: bool = False, tags: Optional[List[str]] = None
     ) -> List[ProjectConfig]:
         """List all registered projects.
 
@@ -296,10 +304,7 @@ class ProjectRegistry:
         return project
 
     def set_indexed(
-        self,
-        path: str,
-        indexed: bool,
-        file_count: int = 0
+        self, path: str, indexed: bool, file_count: int = 0
     ) -> Optional[ProjectConfig]:
         """Mark a project as indexed/unindexed.
 
@@ -323,7 +328,9 @@ class ProjectRegistry:
         self._save()
         return project
 
-    def enable_project(self, path: str, enabled: bool = True) -> Optional[ProjectConfig]:
+    def enable_project(
+        self, path: str, enabled: bool = True
+    ) -> Optional[ProjectConfig]:
         """Enable or disable a project for cross-project search.
 
         Args:

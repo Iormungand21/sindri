@@ -1,8 +1,6 @@
 """Tests for formatting tools (format_code and lint_code)."""
 
 import json
-import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -155,7 +153,7 @@ class TestFormatCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("x=1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -172,7 +170,7 @@ class TestFormatCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("x=1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -189,7 +187,7 @@ class TestFormatCodeTool:
         js_file = tmp_path / "code.js"
         js_file.write_text("const x=1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -206,7 +204,7 @@ class TestFormatCodeTool:
         ts_file = tmp_path / "code.ts"
         ts_file.write_text("const x: number=1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -223,7 +221,7 @@ class TestFormatCodeTool:
         rs_file = tmp_path / "code.rs"
         rs_file.write_text("fn main(){}")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -240,7 +238,7 @@ class TestFormatCodeTool:
         go_file = tmp_path / "code.go"
         go_file.write_text("package main\nfunc main(){}")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -257,13 +255,13 @@ class TestFormatCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("x = 1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
             mock_proc.return_value = mock_process
 
-            result = await tool.execute(path="code.py", line_length=120)
+            await tool.execute(path="code.py", line_length=120)
 
             # Check that line-length was passed
             call_args = mock_proc.call_args[0][0]
@@ -275,7 +273,7 @@ class TestFormatCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("x = 1\n")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0  # 0 = properly formatted
@@ -292,7 +290,7 @@ class TestFormatCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("x=1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"would reformat code.py", b"")
             mock_process.returncode = 1  # 1 = needs formatting
@@ -384,7 +382,7 @@ class TestLintCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("import os\nx = 1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -401,7 +399,7 @@ class TestLintCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("import os\nx = 1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -418,11 +416,11 @@ class TestLintCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("x = 1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (
                 b"Your code has been rated at 10.00/10",
-                b""
+                b"",
             )
             mock_process.returncode = 0
             mock_proc.return_value = mock_process
@@ -438,7 +436,7 @@ class TestLintCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("x: int = 1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"Success: no issues found", b"")
             mock_process.returncode = 0
@@ -455,7 +453,7 @@ class TestLintCodeTool:
         js_file = tmp_path / "code.js"
         js_file.write_text("const x = 1;")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -472,13 +470,13 @@ class TestLintCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("import os\nx = 1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
             mock_proc.return_value = mock_process
 
-            result = await tool.execute(path="code.py", fix=True)
+            await tool.execute(path="code.py", fix=True)
 
             # Check that --fix was passed
             call_args = mock_proc.call_args[0][0]
@@ -490,11 +488,11 @@ class TestLintCodeTool:
         py_file = tmp_path / "code.py"
         py_file.write_text("import os\nx = 1")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (
                 b"code.py:1:1: F401 `os` imported but unused",
-                b""
+                b"",
             )
             mock_process.returncode = 1
             mock_proc.return_value = mock_process
@@ -510,7 +508,7 @@ class TestLintCodeTool:
         rs_file = tmp_path / "code.rs"
         rs_file.write_text("fn main() {}")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -527,7 +525,7 @@ class TestLintCodeTool:
         go_file = tmp_path / "code.go"
         go_file.write_text("package main")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0

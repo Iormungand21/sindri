@@ -4,7 +4,7 @@ Maintains a registry of installed plugins, their sources, and metadata
 to enable updates and management.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -32,6 +32,7 @@ class InstalledPlugin:
         enabled: Whether the plugin is enabled
         pinned: If True, don't auto-update this plugin
     """
+
     metadata: PluginMetadata
     source: PluginSource
     installed_path: Path
@@ -112,11 +113,7 @@ class MarketplaceIndex:
                 try:
                     self._plugins[name] = InstalledPlugin.from_dict(plugin_data)
                 except (KeyError, ValueError) as e:
-                    log.warning(
-                        "plugin_index_entry_invalid",
-                        name=name,
-                        error=str(e)
-                    )
+                    log.warning("plugin_index_entry_invalid", name=name, error=str(e))
 
             self._loaded = True
             log.debug("marketplace_index_loaded", count=len(self._plugins))
@@ -134,8 +131,7 @@ class MarketplaceIndex:
             "version": 1,
             "updated_at": datetime.now().isoformat(),
             "plugins": {
-                name: plugin.to_dict()
-                for name, plugin in self._plugins.items()
+                name: plugin.to_dict() for name, plugin in self._plugins.items()
             },
         }
 
@@ -163,7 +159,7 @@ class MarketplaceIndex:
         log.info(
             "marketplace_plugin_added",
             name=plugin.metadata.name,
-            version=plugin.metadata.version
+            version=plugin.metadata.version,
         )
 
     def remove(self, name: str) -> Optional[InstalledPlugin]:
@@ -212,10 +208,7 @@ class MarketplaceIndex:
             List of plugins in that category
         """
         self._ensure_loaded()
-        return [
-            p for p in self._plugins.values()
-            if p.metadata.category == category
-        ]
+        return [p for p in self._plugins.values() if p.metadata.category == category]
 
     def get_by_type(self, plugin_type: str) -> list[InstalledPlugin]:
         """Get plugins by type (tool or agent).
@@ -228,8 +221,7 @@ class MarketplaceIndex:
         """
         self._ensure_loaded()
         return [
-            p for p in self._plugins.values()
-            if p.metadata.plugin_type == plugin_type
+            p for p in self._plugins.values() if p.metadata.plugin_type == plugin_type
         ]
 
     def exists(self, name: str) -> bool:
@@ -277,11 +269,7 @@ class MarketplaceIndex:
         plugin = self._plugins.get(name)
         if plugin:
             plugin.enabled = enabled
-            log.info(
-                "marketplace_plugin_enabled_changed",
-                name=name,
-                enabled=enabled
-            )
+            log.info("marketplace_plugin_enabled_changed", name=name, enabled=enabled)
             return True
         return False
 
@@ -299,11 +287,7 @@ class MarketplaceIndex:
         plugin = self._plugins.get(name)
         if plugin:
             plugin.pinned = pinned
-            log.info(
-                "marketplace_plugin_pinned_changed",
-                name=name,
-                pinned=pinned
-            )
+            log.info("marketplace_plugin_pinned_changed", name=name, pinned=pinned)
             return True
         return False
 

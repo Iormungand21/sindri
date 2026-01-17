@@ -49,7 +49,7 @@ class PatternLearner:
         iterations: int,
         tool_calls: List[str],
         final_output: str,
-        session_turns: Optional[List[dict]] = None
+        session_turns: Optional[List[dict]] = None,
     ) -> Optional[int]:
         """Learn a pattern from a successful task completion.
 
@@ -70,16 +70,14 @@ class PatternLearner:
 
         # Skip if too many iterations (inefficient pattern)
         if iterations > self.config.efficiency_threshold:
-            log.debug("skip_learning_inefficient",
-                     task_id=task.id,
-                     iterations=iterations)
+            log.debug(
+                "skip_learning_inefficient", task_id=task.id, iterations=iterations
+            )
             return None
 
         # Skip trivial completions (too few iterations)
         if iterations < self.config.min_iterations:
-            log.debug("skip_learning_trivial",
-                     task_id=task.id,
-                     iterations=iterations)
+            log.debug("skip_learning_trivial", task_id=task.id, iterations=iterations)
             return None
 
         # Extract pattern components
@@ -111,12 +109,14 @@ class PatternLearner:
         # Store pattern
         pattern_id = self.store.store(pattern)
 
-        log.info("pattern_learned",
-                pattern_id=pattern_id,
-                name=name,
-                context=context,
-                iterations=iterations,
-                tools=len(tool_sequence))
+        log.info(
+            "pattern_learned",
+            pattern_id=pattern_id,
+            name=name,
+            context=context,
+            iterations=iterations,
+            tools=len(tool_sequence),
+        )
 
         return pattern_id
 
@@ -137,7 +137,9 @@ class PatternLearner:
         # Check for specific patterns in description
         if any(w in desc_lower for w in ["test", "pytest", "unittest", "spec"]):
             return "testing"
-        if any(w in desc_lower for w in ["refactor", "rename", "extract", "restructure"]):
+        if any(
+            w in desc_lower for w in ["refactor", "rename", "extract", "restructure"]
+        ):
             return "refactoring"
         if any(w in desc_lower for w in ["review", "check", "analyze", "audit"]):
             return "review"
@@ -149,7 +151,9 @@ class PatternLearner:
             return "file_editing"
         if any(w in desc_lower for w in ["run", "execute", "shell", "command"]):
             return "shell_execution"
-        if any(w in desc_lower for w in ["plan", "delegate", "orchestrate", "coordinate"]):
+        if any(
+            w in desc_lower for w in ["plan", "delegate", "orchestrate", "coordinate"]
+        ):
             return "orchestration"
         if any(w in desc_lower for w in ["sql", "query", "database", "schema"]):
             return "database"
@@ -164,21 +168,109 @@ class PatternLearner:
 
         # Remove common stop words
         stop_words = {
-            "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for",
-            "of", "with", "by", "from", "is", "are", "was", "were", "be", "been",
-            "being", "have", "has", "had", "do", "does", "did", "will", "would",
-            "could", "should", "may", "might", "must", "shall", "can", "need",
-            "that", "this", "these", "those", "it", "its", "i", "me", "my", "we",
-            "our", "you", "your", "they", "them", "their", "he", "she", "him",
-            "her", "what", "which", "who", "whom", "where", "when", "why", "how",
-            "all", "each", "every", "both", "few", "more", "most", "other",
-            "some", "such", "no", "not", "only", "same", "so", "than", "too",
-            "very", "just", "also", "now", "here", "there", "if", "then", "else",
-            "as", "because", "while", "although", "though", "even", "about"
+            "a",
+            "an",
+            "the",
+            "and",
+            "or",
+            "but",
+            "in",
+            "on",
+            "at",
+            "to",
+            "for",
+            "of",
+            "with",
+            "by",
+            "from",
+            "is",
+            "are",
+            "was",
+            "were",
+            "be",
+            "been",
+            "being",
+            "have",
+            "has",
+            "had",
+            "do",
+            "does",
+            "did",
+            "will",
+            "would",
+            "could",
+            "should",
+            "may",
+            "might",
+            "must",
+            "shall",
+            "can",
+            "need",
+            "that",
+            "this",
+            "these",
+            "those",
+            "it",
+            "its",
+            "i",
+            "me",
+            "my",
+            "we",
+            "our",
+            "you",
+            "your",
+            "they",
+            "them",
+            "their",
+            "he",
+            "she",
+            "him",
+            "her",
+            "what",
+            "which",
+            "who",
+            "whom",
+            "where",
+            "when",
+            "why",
+            "how",
+            "all",
+            "each",
+            "every",
+            "both",
+            "few",
+            "more",
+            "most",
+            "other",
+            "some",
+            "such",
+            "no",
+            "not",
+            "only",
+            "same",
+            "so",
+            "than",
+            "too",
+            "very",
+            "just",
+            "also",
+            "now",
+            "here",
+            "there",
+            "if",
+            "then",
+            "else",
+            "as",
+            "because",
+            "while",
+            "although",
+            "though",
+            "even",
+            "about",
         }
 
         # Extract words
-        words = re.findall(r'[a-z_][a-z0-9_]*', text)
+        words = re.findall(r"[a-z_][a-z0-9_]*", text)
 
         # Filter and deduplicate
         keywords = []
@@ -193,9 +285,7 @@ class PatternLearner:
         return keywords
 
     def _extract_approach(
-        self,
-        session_turns: Optional[List[dict]],
-        final_output: str
+        self, session_turns: Optional[List[dict]], final_output: str
     ) -> str:
         """Extract the approach/strategy from session history.
 
@@ -206,7 +296,8 @@ class PatternLearner:
 
         # Get assistant turns (agent's reasoning)
         assistant_turns = [
-            t["content"] for t in session_turns
+            t["content"]
+            for t in session_turns
             if t.get("role") == "assistant" and t.get("content")
         ]
 
@@ -217,8 +308,8 @@ class PatternLearner:
         first_response = assistant_turns[0][:500]
 
         # Clean up any tool call markers
-        approach = re.sub(r'```[^`]*```', '[code]', first_response)
-        approach = re.sub(r'\{[^}]*\}', '[json]', approach)
+        approach = re.sub(r"```[^`]*```", "[code]", first_response)
+        approach = re.sub(r"\{[^}]*\}", "[json]", approach)
 
         return approach[:300]
 
@@ -248,10 +339,7 @@ class PatternLearner:
         return "_".join(name_parts)
 
     def suggest_patterns(
-        self,
-        task_description: str,
-        project_id: Optional[str] = None,
-        limit: int = 3
+        self, task_description: str, project_id: Optional[str] = None, limit: int = 3
     ) -> List[Tuple[Pattern, str]]:
         """Suggest relevant patterns for a new task.
 
@@ -263,7 +351,7 @@ class PatternLearner:
             task_description=task_description,
             context=context,
             project_id=project_id,
-            limit=limit
+            limit=limit,
         )
 
         suggestions = []
@@ -285,8 +373,10 @@ class PatternLearner:
             parts.append(f"Tools used: {tools}")
 
         if pattern.success_count > 1:
-            parts.append(f"(Used successfully {pattern.success_count} times, "
-                        f"avg {pattern.avg_iterations:.1f} iterations)")
+            parts.append(
+                f"(Used successfully {pattern.success_count} times, "
+                f"avg {pattern.avg_iterations:.1f} iterations)"
+            )
 
         return "\n".join(parts)
 
@@ -320,5 +410,7 @@ class PatternLearner:
             "total_successes": total_successes,
             "contexts": contexts,
             "agents": agents,
-            "avg_success_per_pattern": total_successes / len(all_patterns) if all_patterns else 0,
+            "avg_success_per_pattern": (
+                total_successes / len(all_patterns) if all_patterns else 0
+            ),
         }

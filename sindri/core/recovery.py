@@ -1,6 +1,5 @@
 """Session recovery after crashes."""
 
-import os
 import json
 from pathlib import Path
 from datetime import datetime
@@ -34,7 +33,7 @@ class RecoveryManager:
         checkpoint = {
             "session_id": session_id,
             "timestamp": datetime.now().isoformat(),
-            "state": state
+            "state": state,
         }
 
         # Atomic write (write to temp, then rename)
@@ -75,7 +74,7 @@ class RecoveryManager:
             log.info(
                 "checkpoint_loaded",
                 session_id=session_id,
-                saved_at=data.get("timestamp")
+                saved_at=data.get("timestamp"),
             )
             return data.get("state")
         except Exception as e:
@@ -104,14 +103,18 @@ class RecoveryManager:
         for checkpoint_path in self.state_dir.glob("*.checkpoint.json"):
             try:
                 data = json.loads(checkpoint_path.read_text())
-                sessions.append({
-                    "session_id": data.get("session_id"),
-                    "timestamp": data.get("timestamp"),
-                    "task": data.get("state", {}).get("task", "Unknown"),
-                    "iterations": data.get("state", {}).get("iterations", 0)
-                })
+                sessions.append(
+                    {
+                        "session_id": data.get("session_id"),
+                        "timestamp": data.get("timestamp"),
+                        "task": data.get("state", {}).get("task", "Unknown"),
+                        "iterations": data.get("state", {}).get("iterations", 0),
+                    }
+                )
             except Exception as e:
-                log.warning("checkpoint_parse_failed", path=str(checkpoint_path), error=str(e))
+                log.warning(
+                    "checkpoint_parse_failed", path=str(checkpoint_path), error=str(e)
+                )
                 continue
 
         # Sort by timestamp, most recent first
@@ -126,7 +129,9 @@ class RecoveryManager:
         """
         if keep is not None:
             # Keep N most recent, delete the rest
-            sessions = self.list_recoverable_sessions()  # Already sorted by timestamp desc
+            sessions = (
+                self.list_recoverable_sessions()
+            )  # Already sorted by timestamp desc
 
             if len(sessions) <= keep:
                 return  # Nothing to clean up
@@ -134,7 +139,9 @@ class RecoveryManager:
             # Delete older ones
             to_delete = sessions[keep:]
             for session in to_delete:
-                checkpoint_path = self.state_dir / f"{session['session_id']}.checkpoint.json"
+                checkpoint_path = (
+                    self.state_dir / f"{session['session_id']}.checkpoint.json"
+                )
                 if checkpoint_path.exists():
                     checkpoint_path.unlink()
 
@@ -160,4 +167,6 @@ class RecoveryManager:
                     continue
 
             if removed > 0:
-                log.info("old_checkpoints_removed", count=removed, max_age_days=max_age_days)
+                log.info(
+                    "old_checkpoints_removed", count=removed, max_age_days=max_age_days
+                )

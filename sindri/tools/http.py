@@ -1,6 +1,5 @@
 """HTTP request tools for Sindri."""
 
-import asyncio
 import json
 from pathlib import Path
 from typing import Optional, Any
@@ -14,6 +13,7 @@ log = structlog.get_logger()
 # Try to import httpx, fall back gracefully if not available
 try:
     import httpx
+
     HTTPX_AVAILABLE = True
 except ImportError:
     HTTPX_AVAILABLE = False
@@ -38,41 +38,38 @@ Examples:
     parameters = {
         "type": "object",
         "properties": {
-            "url": {
-                "type": "string",
-                "description": "The URL to request"
-            },
+            "url": {"type": "string", "description": "The URL to request"},
             "method": {
                 "type": "string",
                 "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
-                "description": "HTTP method (default: GET)"
+                "description": "HTTP method (default: GET)",
             },
             "headers": {
                 "type": "object",
-                "description": "Request headers as key-value pairs"
+                "description": "Request headers as key-value pairs",
             },
             "params": {
                 "type": "object",
-                "description": "Query parameters as key-value pairs"
+                "description": "Query parameters as key-value pairs",
             },
             "json": {
                 "type": "object",
-                "description": "JSON body for POST/PUT/PATCH requests"
+                "description": "JSON body for POST/PUT/PATCH requests",
             },
             "data": {
                 "type": "string",
-                "description": "Raw body data for POST/PUT/PATCH requests"
+                "description": "Raw body data for POST/PUT/PATCH requests",
             },
             "timeout": {
                 "type": "number",
-                "description": "Request timeout in seconds (default: 30)"
+                "description": "Request timeout in seconds (default: 30)",
             },
             "follow_redirects": {
                 "type": "boolean",
-                "description": "Follow HTTP redirects (default: true)"
-            }
+                "description": "Follow HTTP redirects (default: true)",
+            },
         },
-        "required": ["url"]
+        "required": ["url"],
     }
 
     # Default timeout in seconds
@@ -141,7 +138,7 @@ Examples:
         data: Optional[str] = None,
         timeout: float = DEFAULT_TIMEOUT,
         follow_redirects: bool = True,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute HTTP request.
 
@@ -159,16 +156,12 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error="httpx library not installed. Install with: pip install httpx"
+                error="httpx library not installed. Install with: pip install httpx",
             )
 
         # Validate URL
         if not url or not url.strip():
-            return ToolResult(
-                success=False,
-                output="",
-                error="URL cannot be empty"
-            )
+            return ToolResult(success=False, output="", error="URL cannot be empty")
 
         # Ensure URL has scheme
         if not url.startswith(("http://", "https://")):
@@ -179,16 +172,14 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Requests to this host are blocked for security reasons"
+                error="Requests to this host are blocked for security reasons",
             )
 
         # Validate method
         method = method.upper()
         if method not in ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"]:
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Invalid HTTP method: {method}"
+                success=False, output="", error=f"Invalid HTTP method: {method}"
             )
 
         # Validate timeout
@@ -204,13 +195,12 @@ Examples:
             has_headers=bool(headers),
             has_params=bool(params),
             has_json=bool(json),
-            has_data=bool(data)
+            has_data=bool(data),
         )
 
         try:
             async with httpx.AsyncClient(
-                timeout=timeout,
-                follow_redirects=follow_redirects
+                timeout=timeout, follow_redirects=follow_redirects
             ) as client:
                 # Build request kwargs
                 request_kwargs: dict[str, Any] = {}
@@ -236,7 +226,11 @@ Examples:
                     "headers": dict(response.headers),
                     "url": str(response.url),
                     "method": method,
-                    "elapsed_ms": response.elapsed.total_seconds() * 1000 if response.elapsed else None,
+                    "elapsed_ms": (
+                        response.elapsed.total_seconds() * 1000
+                        if response.elapsed
+                        else None
+                    ),
                     "is_redirect": response.is_redirect,
                     "is_success": response.is_success,
                     "is_error": response.is_error,
@@ -251,14 +245,14 @@ Examples:
                     return ToolResult(
                         success=True,
                         output=f"Response too large ({content_length} bytes). Headers and status returned in metadata.",
-                        metadata=metadata
+                        metadata=metadata,
                     )
 
                 # Try to get response body
                 try:
                     body = response.text
                     if len(body) > self.MAX_RESPONSE_SIZE:
-                        body = body[:self.MAX_RESPONSE_SIZE] + "\n... (truncated)"
+                        body = body[: self.MAX_RESPONSE_SIZE] + "\n... (truncated)"
                         metadata["truncated"] = True
                 except Exception:
                     body = f"[Binary content, {len(response.content)} bytes]"
@@ -277,7 +271,7 @@ Examples:
                 output_parts = [
                     f"HTTP {response.status_code} {response.reason_phrase}",
                     f"URL: {response.url}",
-                    ""
+                    "",
                 ]
 
                 # Add selected headers to output
@@ -289,9 +283,7 @@ Examples:
                 output_parts.extend(["", "--- Response Body ---", body])
 
                 return ToolResult(
-                    success=True,
-                    output="\n".join(output_parts),
-                    metadata=metadata
+                    success=True, output="\n".join(output_parts), metadata=metadata
                 )
 
         except httpx.TimeoutException:
@@ -299,31 +291,26 @@ Examples:
                 success=False,
                 output="",
                 error=f"Request timed out after {timeout} seconds",
-                metadata={"timeout": timeout, "url": url}
+                metadata={"timeout": timeout, "url": url},
             )
         except httpx.ConnectError as e:
             return ToolResult(
                 success=False,
                 output="",
                 error=f"Connection failed: {str(e)}",
-                metadata={"url": url}
+                metadata={"url": url},
             )
         except httpx.HTTPStatusError as e:
             return ToolResult(
                 success=False,
                 output="",
                 error=f"HTTP error: {e.response.status_code} {e.response.reason_phrase}",
-                metadata={
-                    "status_code": e.response.status_code,
-                    "url": url
-                }
+                metadata={"status_code": e.response.status_code, "url": url},
             )
         except Exception as e:
             log.error("http_request_failed", url=url, error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Request failed: {str(e)}"
+                success=False, output="", error=f"Request failed: {str(e)}"
             )
 
     def _format_json(self, data: Any, indent: int = 2) -> str:
@@ -347,16 +334,10 @@ Examples:
     parameters = {
         "type": "object",
         "properties": {
-            "url": {
-                "type": "string",
-                "description": "The URL to request"
-            },
-            "headers": {
-                "type": "object",
-                "description": "Optional request headers"
-            }
+            "url": {"type": "string", "description": "The URL to request"},
+            "headers": {"type": "object", "description": "Optional request headers"},
         },
-        "required": ["url"]
+        "required": ["url"],
     }
 
     def __init__(self, work_dir: Optional[Path] = None):
@@ -365,17 +346,10 @@ Examples:
         self._http_tool = HttpRequestTool(work_dir)
 
     async def execute(
-        self,
-        url: str,
-        headers: Optional[dict[str, str]] = None,
-        **kwargs
+        self, url: str, headers: Optional[dict[str, str]] = None, **kwargs
     ) -> ToolResult:
         """Execute HTTP GET request."""
-        return await self._http_tool.execute(
-            url=url,
-            method="GET",
-            headers=headers
-        )
+        return await self._http_tool.execute(url=url, method="GET", headers=headers)
 
 
 class HttpPostTool(Tool):
@@ -391,20 +365,11 @@ Examples:
     parameters = {
         "type": "object",
         "properties": {
-            "url": {
-                "type": "string",
-                "description": "The URL to request"
-            },
-            "json": {
-                "type": "object",
-                "description": "JSON body to send"
-            },
-            "headers": {
-                "type": "object",
-                "description": "Optional request headers"
-            }
+            "url": {"type": "string", "description": "The URL to request"},
+            "json": {"type": "object", "description": "JSON body to send"},
+            "headers": {"type": "object", "description": "Optional request headers"},
         },
-        "required": ["url"]
+        "required": ["url"],
     }
 
     def __init__(self, work_dir: Optional[Path] = None):
@@ -417,12 +382,9 @@ Examples:
         url: str,
         json: Optional[dict[str, Any]] = None,
         headers: Optional[dict[str, str]] = None,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute HTTP POST request."""
         return await self._http_tool.execute(
-            url=url,
-            method="POST",
-            json=json,
-            headers=headers
+            url=url, method="POST", json=json, headers=headers
         )

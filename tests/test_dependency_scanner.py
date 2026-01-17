@@ -1,13 +1,9 @@
 """Tests for dependency scanner tools (Phase 9.4)."""
 
 import pytest
-import pytest_asyncio
-import asyncio
 import json
 import tempfile
-import os
-from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from pathlib import Path
 
 from sindri.tools.dependency_scanner import (
@@ -19,7 +15,6 @@ from sindri.tools.dependency_scanner import (
     GenerateSBOMTool,
     CheckOutdatedTool,
 )
-from sindri.tools.base import ToolResult
 
 
 # ============================================
@@ -79,7 +74,12 @@ class TestSeverity:
         """Test sorting by severity."""
         severities = [Severity.LOW, Severity.CRITICAL, Severity.MEDIUM, Severity.HIGH]
         sorted_sevs = sorted(severities, key=lambda s: s.score, reverse=True)
-        assert sorted_sevs == [Severity.CRITICAL, Severity.HIGH, Severity.MEDIUM, Severity.LOW]
+        assert sorted_sevs == [
+            Severity.CRITICAL,
+            Severity.HIGH,
+            Severity.MEDIUM,
+            Severity.LOW,
+        ]
 
 
 # ============================================
@@ -219,12 +219,14 @@ class TestScanResult:
             ecosystem="node",
             total_dependencies=50,
             vulnerabilities=[
-                Vulnerability("CVE-1", "pkg1", "1.0", "1.1", Severity.CRITICAL, "Critical"),
+                Vulnerability(
+                    "CVE-1", "pkg1", "1.0", "1.1", Severity.CRITICAL, "Critical"
+                ),
                 Vulnerability("CVE-2", "pkg2", "2.0", "2.1", Severity.HIGH, "High"),
                 Vulnerability("CVE-3", "pkg3", "3.0", "3.1", Severity.MEDIUM, "Medium"),
                 Vulnerability("CVE-4", "pkg4", "4.0", "4.1", Severity.LOW, "Low"),
                 Vulnerability("CVE-5", "pkg5", "5.0", "5.1", Severity.LOW, "Low2"),
-            ]
+            ],
         )
         assert result.vulnerability_count == 5
         assert result.critical_count == 1
@@ -241,7 +243,7 @@ class TestScanResult:
                 DependencyInfo("pkg1", "1.0", "2.0", is_outdated=True),
                 DependencyInfo("pkg2", "2.0", "2.0", is_outdated=False),
                 DependencyInfo("pkg3", "1.0", "3.0", is_outdated=True),
-            ]
+            ],
         )
         assert result.outdated_count == 2
 
@@ -388,7 +390,14 @@ class TestScanDependenciesTool:
             ecosystem="python",
             total_dependencies=10,
             vulnerabilities=[
-                Vulnerability("CVE-2023-1234", "requests", "2.25.0", "2.31.0", Severity.HIGH, "Test vulnerability"),
+                Vulnerability(
+                    "CVE-2023-1234",
+                    "requests",
+                    "2.25.0",
+                    "2.31.0",
+                    Severity.HIGH,
+                    "Test vulnerability",
+                ),
             ],
             scanner_tool="pip-audit",
         )
@@ -406,7 +415,14 @@ class TestScanDependenciesTool:
             ecosystem="python",
             total_dependencies=10,
             vulnerabilities=[
-                Vulnerability("CVE-2023-1234", "requests", "2.25.0", "2.31.0", Severity.HIGH, "Test"),
+                Vulnerability(
+                    "CVE-2023-1234",
+                    "requests",
+                    "2.25.0",
+                    "2.31.0",
+                    Severity.HIGH,
+                    "Test",
+                ),
             ],
         )
         sarif = tool._to_sarif(result)
@@ -426,50 +442,68 @@ class TestScanDependenciesTool:
             (Path(tmpdir) / "requirements.txt").write_text("requests==2.31.0\n")
 
             # Mock the scan to return vulnerabilities
-            with patch.object(tool, '_scan_python', new_callable=AsyncMock) as mock_scan:
+            with patch.object(
+                tool, "_scan_python", new_callable=AsyncMock
+            ) as mock_scan:
                 mock_scan.return_value = ScanResult(
                     ecosystem="python",
                     total_dependencies=1,
                     vulnerabilities=[
-                        Vulnerability("CVE-1", "pkg1", "1.0", "1.1", Severity.CRITICAL, "Critical"),
-                        Vulnerability("CVE-2", "pkg2", "1.0", "1.1", Severity.HIGH, "High"),
-                        Vulnerability("CVE-3", "pkg3", "1.0", "1.1", Severity.MEDIUM, "Medium"),
-                        Vulnerability("CVE-4", "pkg4", "1.0", "1.1", Severity.LOW, "Low"),
-                    ]
+                        Vulnerability(
+                            "CVE-1", "pkg1", "1.0", "1.1", Severity.CRITICAL, "Critical"
+                        ),
+                        Vulnerability(
+                            "CVE-2", "pkg2", "1.0", "1.1", Severity.HIGH, "High"
+                        ),
+                        Vulnerability(
+                            "CVE-3", "pkg3", "1.0", "1.1", Severity.MEDIUM, "Medium"
+                        ),
+                        Vulnerability(
+                            "CVE-4", "pkg4", "1.0", "1.1", Severity.LOW, "Low"
+                        ),
+                    ],
                 )
 
                 # Filter to high and above
                 result = await tool.execute(path=tmpdir, min_severity="high")
                 assert result.success
-                assert result.metadata["vulnerability_count"] == 2  # Only critical and high
+                assert (
+                    result.metadata["vulnerability_count"] == 2
+                )  # Only critical and high
 
     @pytest.mark.asyncio
     async def test_pip_audit_mock(self):
         """Test pip-audit execution with mock."""
         tool = ScanDependenciesTool()
 
-        pip_audit_output = json.dumps({
-            "dependencies": [
-                {
-                    "name": "requests",
-                    "version": "2.25.0",
-                    "vulns": [
-                        {
-                            "id": "PYSEC-2023-001",
-                            "severity": "high",
-                            "description": "Test vulnerability",
-                            "fix_versions": ["2.31.0"],
-                        }
-                    ]
-                }
-            ]
-        })
+        pip_audit_output = json.dumps(
+            {
+                "dependencies": [
+                    {
+                        "name": "requests",
+                        "version": "2.25.0",
+                        "vulns": [
+                            {
+                                "id": "PYSEC-2023-001",
+                                "severity": "high",
+                                "description": "Test vulnerability",
+                                "fix_versions": ["2.31.0"],
+                            }
+                        ],
+                    }
+                ]
+            }
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch('shutil.which', return_value="/usr/bin/pip-audit"):
-                with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_exec:
+            with patch("shutil.which", return_value="/usr/bin/pip-audit"):
+                with patch(
+                    "asyncio.create_subprocess_exec", new_callable=AsyncMock
+                ) as mock_exec:
                     mock_process = AsyncMock()
-                    mock_process.communicate = AsyncMock(return_value=(pip_audit_output.encode(), b""))
+                    mock_process.communicate = AsyncMock(
+                        return_value=(pip_audit_output.encode(), b"")
+                    )
                     mock_process.returncode = 0
                     mock_exec.return_value = mock_process
 
@@ -556,14 +590,20 @@ class TestGenerateSBOMTool:
         """Test gathering Python dependencies."""
         tool = GenerateSBOMTool()
 
-        pip_list_output = json.dumps([
-            {"name": "requests", "version": "2.31.0"},
-            {"name": "click", "version": "8.0.0"},
-        ])
+        pip_list_output = json.dumps(
+            [
+                {"name": "requests", "version": "2.31.0"},
+                {"name": "click", "version": "8.0.0"},
+            ]
+        )
 
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_exec:
+        with patch(
+            "asyncio.create_subprocess_exec", new_callable=AsyncMock
+        ) as mock_exec:
             mock_process = AsyncMock()
-            mock_process.communicate = AsyncMock(return_value=(pip_list_output.encode(), b""))
+            mock_process.communicate = AsyncMock(
+                return_value=(pip_list_output.encode(), b"")
+            )
             mock_exec.return_value = mock_process
 
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -585,7 +625,7 @@ class TestGenerateSBOMTool:
                 },
                 "devDependencies": {
                     "jest": "^29.0.0",
-                }
+                },
             }
             (Path(tmpdir) / "package.json").write_text(json.dumps(package_json))
 
@@ -607,7 +647,9 @@ class TestGenerateSBOMTool:
             output_file = Path(tmpdir) / "sbom.json"
 
             # Mock pip list
-            with patch.object(tool, '_gather_dependencies', new_callable=AsyncMock) as mock_gather:
+            with patch.object(
+                tool, "_gather_dependencies", new_callable=AsyncMock
+            ) as mock_gather:
                 mock_gather.return_value = [DependencyInfo("requests", "2.31.0")]
 
                 result = await tool.execute(
@@ -653,7 +695,9 @@ class TestCheckOutdatedTool:
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "requirements.txt").write_text("requests==2.31.0\n")
 
-            with patch.object(tool, '_check_outdated', new_callable=AsyncMock) as mock_check:
+            with patch.object(
+                tool, "_check_outdated", new_callable=AsyncMock
+            ) as mock_check:
                 mock_check.return_value = []
 
                 result = await tool.execute(path=tmpdir)
@@ -669,7 +713,9 @@ class TestCheckOutdatedTool:
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "requirements.txt").write_text("requests==2.25.0\n")
 
-            with patch.object(tool, '_check_outdated', new_callable=AsyncMock) as mock_check:
+            with patch.object(
+                tool, "_check_outdated", new_callable=AsyncMock
+            ) as mock_check:
                 mock_check.return_value = [
                     DependencyInfo("requests", "2.25.0", "2.31.0", is_outdated=True),
                 ]
@@ -684,16 +730,22 @@ class TestCheckOutdatedTool:
         """Test Python outdated check with mock."""
         tool = CheckOutdatedTool()
 
-        pip_outdated_output = json.dumps([
-            {"name": "requests", "version": "2.25.0", "latest_version": "2.31.0"},
-        ])
+        pip_outdated_output = json.dumps(
+            [
+                {"name": "requests", "version": "2.25.0", "latest_version": "2.31.0"},
+            ]
+        )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "requirements.txt").write_text("requests==2.25.0\n")
 
-            with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_exec:
+            with patch(
+                "asyncio.create_subprocess_exec", new_callable=AsyncMock
+            ) as mock_exec:
                 mock_process = AsyncMock()
-                mock_process.communicate = AsyncMock(return_value=(pip_outdated_output.encode(), b""))
+                mock_process.communicate = AsyncMock(
+                    return_value=(pip_outdated_output.encode(), b"")
+                )
                 mock_exec.return_value = mock_process
 
                 outdated = await tool._check_outdated(Path(tmpdir), "python", True)
@@ -718,10 +770,14 @@ class TestDependencyScannerIntegration:
 
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create Python project
-            (Path(tmpdir) / "requirements.txt").write_text("requests==2.31.0\nclick==8.0.0\n")
+            (Path(tmpdir) / "requirements.txt").write_text(
+                "requests==2.31.0\nclick==8.0.0\n"
+            )
 
             # Mock the scan
-            with patch.object(scan_tool, '_scan_python', new_callable=AsyncMock) as mock_scan:
+            with patch.object(
+                scan_tool, "_scan_python", new_callable=AsyncMock
+            ) as mock_scan:
                 mock_scan.return_value = ScanResult(
                     ecosystem="python",
                     total_dependencies=2,
@@ -735,7 +791,9 @@ class TestDependencyScannerIntegration:
                 assert scan_result.metadata["ecosystem"] == "python"
 
             # Mock SBOM generation
-            with patch.object(sbom_tool, '_gather_dependencies', new_callable=AsyncMock) as mock_gather:
+            with patch.object(
+                sbom_tool, "_gather_dependencies", new_callable=AsyncMock
+            ) as mock_gather:
                 mock_gather.return_value = [
                     DependencyInfo("requests", "2.31.0"),
                     DependencyInfo("click", "8.0.0"),
@@ -754,12 +812,21 @@ class TestDependencyScannerIntegration:
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "requirements.txt").write_text("requests==2.31.0\n")
 
-            with patch.object(tool, '_scan_python', new_callable=AsyncMock) as mock_scan:
+            with patch.object(
+                tool, "_scan_python", new_callable=AsyncMock
+            ) as mock_scan:
                 mock_scan.return_value = ScanResult(
                     ecosystem="python",
                     total_dependencies=1,
                     vulnerabilities=[
-                        Vulnerability("CVE-1", "requests", "2.25.0", "2.31.0", Severity.HIGH, "Test"),
+                        Vulnerability(
+                            "CVE-1",
+                            "requests",
+                            "2.25.0",
+                            "2.31.0",
+                            Severity.HIGH,
+                            "Test",
+                        ),
                     ],
                     scanner_tool="pip-audit",
                 )
@@ -789,7 +856,7 @@ class TestDependencyScannerErrors:
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "requirements.txt").write_text("requests==2.31.0\n")
 
-            with patch('shutil.which', return_value=None):
+            with patch("shutil.which", return_value=None):
                 result = await tool._scan_python(Path(tmpdir), True, False, False)
                 assert result.error is not None
                 assert "pip-audit" in result.error
@@ -802,7 +869,7 @@ class TestDependencyScannerErrors:
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "package.json").write_text('{"name": "test"}')
 
-            with patch('shutil.which', return_value=None):
+            with patch("shutil.which", return_value=None):
                 result = await tool._scan_node(Path(tmpdir), True, False, False)
                 assert result.error is not None
                 assert "npm" in result.error
@@ -815,7 +882,7 @@ class TestDependencyScannerErrors:
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "Cargo.toml").write_text('[package]\nname = "test"')
 
-            with patch('shutil.which', return_value=None):
+            with patch("shutil.which", return_value=None):
                 result = await tool._scan_rust(Path(tmpdir), False, False)
                 assert result.error is not None
                 assert "cargo" in result.error.lower()
@@ -828,7 +895,7 @@ class TestDependencyScannerErrors:
         with tempfile.TemporaryDirectory() as tmpdir:
             (Path(tmpdir) / "go.mod").write_text("module example.com/test")
 
-            with patch('shutil.which', return_value=None):
+            with patch("shutil.which", return_value=None):
                 result = await tool._scan_go(Path(tmpdir), False)
                 assert result.error is not None
                 assert "go" in result.error.lower()

@@ -240,7 +240,9 @@ class ShareStore:
                     max_uses=row[6],
                     use_count=row[7],
                     is_active=bool(row[8]),
-                    created_at=datetime.fromisoformat(row[9]) if row[9] else datetime.now(),
+                    created_at=(
+                        datetime.fromisoformat(row[9]) if row[9] else datetime.now()
+                    ),
                 )
 
     async def validate_and_use_share(self, share_token: str) -> Optional[SessionShare]:
@@ -259,8 +261,10 @@ class ShareStore:
             return None
 
         if not share.is_valid:
-            reason = "inactive" if not share.is_active else (
-                "expired" if share.is_expired else "exhausted"
+            reason = (
+                "inactive"
+                if not share.is_active
+                else ("expired" if share.is_expired else "exhausted")
             )
             log.warning("share_invalid", token=share_token[:8] + "...", reason=reason)
             return None
@@ -309,11 +313,17 @@ class ShareStore:
                             share_token=row[2],
                             created_by=row[3],
                             permission=SharePermission(row[4]),
-                            expires_at=datetime.fromisoformat(row[5]) if row[5] else None,
+                            expires_at=(
+                                datetime.fromisoformat(row[5]) if row[5] else None
+                            ),
                             max_uses=row[6],
                             use_count=row[7],
                             is_active=bool(row[8]),
-                            created_at=datetime.fromisoformat(row[9]) if row[9] else datetime.now(),
+                            created_at=(
+                                datetime.fromisoformat(row[9])
+                                if row[9]
+                                else datetime.now()
+                            ),
                         )
                     )
 

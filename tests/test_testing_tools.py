@@ -2,8 +2,6 @@
 
 import asyncio
 import json
-import tempfile
-from pathlib import Path
 from unittest.mock import AsyncMock, patch, MagicMock
 
 import pytest
@@ -48,10 +46,10 @@ class TestRunTestsTool:
         """Test pytest detection from conftest.py."""
         (tmp_path / "conftest.py").write_text("# pytest config")
 
-        with patch.object(tool, '_detect_framework') as mock_detect:
+        with patch.object(tool, "_detect_framework") as mock_detect:
             mock_detect.return_value = "pytest"
 
-            with patch('asyncio.create_subprocess_shell') as mock_proc:
+            with patch("asyncio.create_subprocess_shell") as mock_proc:
                 mock_process = AsyncMock()
                 mock_process.communicate.return_value = (b"1 passed in 0.1s", b"")
                 mock_process.returncode = 0
@@ -66,23 +64,20 @@ class TestRunTestsTool:
         """Test pytest detection from pyproject.toml."""
         (tmp_path / "pyproject.toml").write_text("[tool.pytest]")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             # First call for pytest check, second for running tests
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"1 passed", b"")
             mock_process.returncode = 0
             mock_proc.return_value = mock_process
 
-            result = await tool.execute()
+            await tool.execute()
             # Framework should be detected
 
     @pytest.mark.asyncio
     async def test_detect_jest_from_package_json(self, tool, tmp_path):
         """Test jest detection from package.json."""
-        package_json = {
-            "name": "test-project",
-            "devDependencies": {"jest": "^29.0.0"}
-        }
+        package_json = {"name": "test-project", "devDependencies": {"jest": "^29.0.0"}}
         (tmp_path / "package.json").write_text(json.dumps(package_json))
 
         framework = await tool._detect_framework(tmp_path)
@@ -91,10 +86,7 @@ class TestRunTestsTool:
     @pytest.mark.asyncio
     async def test_detect_npm_from_package_json_test_script(self, tool, tmp_path):
         """Test npm detection from package.json test script."""
-        package_json = {
-            "name": "test-project",
-            "scripts": {"test": "mocha tests/"}
-        }
+        package_json = {"name": "test-project", "scripts": {"test": "mocha tests/"}}
         (tmp_path / "package.json").write_text(json.dumps(package_json))
 
         framework = await tool._detect_framework(tmp_path)
@@ -103,7 +95,7 @@ class TestRunTestsTool:
     @pytest.mark.asyncio
     async def test_detect_cargo_from_cargo_toml(self, tool, tmp_path):
         """Test cargo detection from Cargo.toml."""
-        (tmp_path / "Cargo.toml").write_text("[package]\nname = \"test\"")
+        (tmp_path / "Cargo.toml").write_text('[package]\nname = "test"')
 
         framework = await tool._detect_framework(tmp_path)
         assert framework == "cargo"
@@ -141,7 +133,7 @@ class TestRunTestsTool:
             pattern=None,
             verbose=True,
             fail_fast=False,
-            coverage=False
+            coverage=False,
         )
         assert "python -m pytest" in cmd
         assert "-v" in cmd
@@ -157,7 +149,7 @@ class TestRunTestsTool:
             pattern="test_auth",
             verbose=True,
             fail_fast=False,
-            coverage=False
+            coverage=False,
         )
         assert "-k" in cmd
         assert "test_auth" in cmd
@@ -172,7 +164,7 @@ class TestRunTestsTool:
             pattern=None,
             verbose=True,
             fail_fast=True,
-            coverage=False
+            coverage=False,
         )
         assert "-x" in cmd
 
@@ -186,7 +178,7 @@ class TestRunTestsTool:
             pattern=None,
             verbose=True,
             fail_fast=False,
-            coverage=True
+            coverage=True,
         )
         assert "--cov" in cmd
 
@@ -200,7 +192,7 @@ class TestRunTestsTool:
             pattern=None,
             verbose=True,
             fail_fast=False,
-            coverage=False
+            coverage=False,
         )
         assert "npx jest" in cmd
         assert "--verbose" in cmd
@@ -216,7 +208,7 @@ class TestRunTestsTool:
             pattern=None,
             verbose=True,
             fail_fast=False,
-            coverage=False
+            coverage=False,
         )
         assert "cargo test" in cmd
         assert "--verbose" in cmd
@@ -231,7 +223,7 @@ class TestRunTestsTool:
             pattern=None,
             verbose=True,
             fail_fast=False,
-            coverage=False
+            coverage=False,
         )
         assert "go test" in cmd
         assert "-v" in cmd
@@ -247,7 +239,7 @@ class TestRunTestsTool:
             pattern=None,
             verbose=True,
             fail_fast=False,
-            coverage=False
+            coverage=False,
         )
         assert cmd is None
 
@@ -261,7 +253,9 @@ class TestRunTestsTool:
 
     def test_parse_pytest_results_mixed(self, tool):
         """Test parsing pytest output with mixed results."""
-        output = "=============== 3 passed, 2 failed, 1 skipped in 0.52s ==============="
+        output = (
+            "=============== 3 passed, 2 failed, 1 skipped in 0.52s ==============="
+        )
         results = tool._parse_results("pytest", output, 1)
         assert results["passed"] == 3
         assert results["failed"] == 2
@@ -317,11 +311,11 @@ ok      example.com/pkg 0.001s"""
     @pytest.mark.asyncio
     async def test_run_tests_success(self, tool, tmp_path):
         """Test successful test execution."""
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (
                 b"======================== 5 passed in 0.52s ========================",
-                b""
+                b"",
             )
             mock_process.returncode = 0
             mock_proc.return_value = mock_process
@@ -335,11 +329,11 @@ ok      example.com/pkg 0.001s"""
     @pytest.mark.asyncio
     async def test_run_tests_failure(self, tool, tmp_path):
         """Test failed test execution."""
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (
                 b"=============== 3 passed, 2 failed in 0.52s ===============",
-                b""
+                b"",
             )
             mock_process.returncode = 1
             mock_proc.return_value = mock_process
@@ -354,7 +348,7 @@ ok      example.com/pkg 0.001s"""
     @pytest.mark.asyncio
     async def test_run_tests_timeout(self, tool, tmp_path):
         """Test test execution timeout."""
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.side_effect = asyncio.TimeoutError()
             mock_process.kill = MagicMock()
@@ -372,13 +366,15 @@ ok      example.com/pkg 0.001s"""
         test_file.parent.mkdir(parents=True, exist_ok=True)
         test_file.write_text("def test_pass(): pass")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"1 passed", b"")
             mock_process.returncode = 0
             mock_proc.return_value = mock_process
 
-            result = await tool.execute(path="tests/test_example.py", framework="pytest")
+            result = await tool.execute(
+                path="tests/test_example.py", framework="pytest"
+            )
 
             # Check that path is included in metadata
             assert "test_example.py" in result.metadata["path"]
@@ -464,7 +460,7 @@ class TestCheckSyntaxTool:
         js_file = tmp_path / "valid.js"
         js_file.write_text("function hello() { return 'world'; }")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -481,9 +477,12 @@ class TestCheckSyntaxTool:
         js_file = tmp_path / "invalid.js"
         js_file.write_text("function hello( { return 'world'; }")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
-            mock_process.communicate.return_value = (b"", b"SyntaxError: Unexpected token")
+            mock_process.communicate.return_value = (
+                b"",
+                b"SyntaxError: Unexpected token",
+            )
             mock_process.returncode = 1
             mock_proc.return_value = mock_process
 
@@ -498,7 +497,7 @@ class TestCheckSyntaxTool:
         ts_file = tmp_path / "app.ts"
         ts_file.write_text("const x: string = 'hello';")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -514,11 +513,11 @@ class TestCheckSyntaxTool:
         ts_file = tmp_path / "app.ts"
         ts_file.write_text("const x: string = 123;")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (
                 b"app.ts(1,7): error TS2322: Type 'number' is not assignable to type 'string'.",
-                b""
+                b"",
             )
             mock_process.returncode = 1
             mock_proc.return_value = mock_process
@@ -531,11 +530,11 @@ class TestCheckSyntaxTool:
     @pytest.mark.asyncio
     async def test_rust_syntax_check(self, tool, tmp_path):
         """Test Rust syntax check."""
-        (tmp_path / "Cargo.toml").write_text("[package]\nname = \"test\"")
+        (tmp_path / "Cargo.toml").write_text('[package]\nname = "test"')
         (tmp_path / "src").mkdir()
         (tmp_path / "src" / "main.rs").write_text("fn main() {}")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0
@@ -551,7 +550,7 @@ class TestCheckSyntaxTool:
         go_file = tmp_path / "main.go"
         go_file.write_text("package main\n\nfunc main() {}")
 
-        with patch('asyncio.create_subprocess_shell') as mock_proc:
+        with patch("asyncio.create_subprocess_shell") as mock_proc:
             mock_process = AsyncMock()
             mock_process.communicate.return_value = (b"", b"")
             mock_process.returncode = 0

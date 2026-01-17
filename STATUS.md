@@ -13,7 +13,7 @@
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 1513 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1575 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -31,6 +31,33 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### CI/CD Fix - Linting and Formatting (2026-01-17)
+
+Fixed GitHub Actions CI/CD pipeline failures caused by linting and formatting issues:
+
+**Issues Resolved:**
+- Fixed ~2800 ruff linting errors across the codebase
+- Applied black formatting to 133 files
+- Added TYPE_CHECKING imports for forward references in type hints
+- Replaced try/import patterns with `importlib.util.find_spec` for availability checks
+- Renamed ambiguous variable names (`l` → `line`, `ln`)
+- Fixed import shadowing issues
+
+**Files Modified:**
+- `sindri/cli.py` - Fixed unused imports in dependency checks
+- `sindri/core/retry.py` - Added TYPE_CHECKING import for OllamaClient
+- `sindri/memory/episodic.py` - Added TYPE_CHECKING import for LocalEmbedder
+- `sindri/memory/semantic.py` - Added TYPE_CHECKING imports for VectorStore, LocalEmbedder
+- `sindri/memory/system.py` - Added TYPE_CHECKING import for CodebaseAnalysis
+- `sindri/plugins/loader.py` - Renamed shadowed variable
+- `sindri/tools/git.py` - Renamed ambiguous variable names
+- `sindri/tools/search.py` - Added TYPE_CHECKING import for SemanticMemory
+- `sindri/voice/tts.py` - Replaced try/import with importlib.util.find_spec
+- `sindri/web/server.py` - Added TYPE_CHECKING imports for collaboration types
+- Plus formatting changes across 133 files
+
+**Tests:** All 1575 tests pass (100%)
 
 ### API Spec Generator (2026-01-17)
 

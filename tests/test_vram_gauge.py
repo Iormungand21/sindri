@@ -1,7 +1,5 @@
 """Tests for VRAM gauge in TUI header."""
 
-import pytest
-from unittest.mock import Mock
 from sindri.tui.widgets.header import SindriHeader
 
 
@@ -30,7 +28,9 @@ def test_header_render_contains_vram(monkeypatch):
     header = SindriHeader()
 
     # Mock the title/subtitle getter
-    monkeypatch.setattr(header, '_get_title_subtitle', lambda: ("Test Title", "Test Subtitle"))
+    monkeypatch.setattr(
+        header, "_get_title_subtitle", lambda: ("Test Title", "Test Subtitle")
+    )
 
     # Update with some usage
     header.update_vram(used=8.0, total=16.0, loaded_models=["model1", "model2"])
@@ -51,7 +51,7 @@ def test_header_render_empty_vram(monkeypatch):
     header = SindriHeader()
 
     # Mock the title/subtitle getter
-    monkeypatch.setattr(header, '_get_title_subtitle', lambda: ("Sindri", None))
+    monkeypatch.setattr(header, "_get_title_subtitle", lambda: ("Sindri", None))
 
     # No models loaded
     header.update_vram(used=0.0, total=16.0, loaded_models=[])
@@ -70,7 +70,7 @@ def test_header_vram_bar_calculation(monkeypatch):
     header = SindriHeader()
 
     # Mock the title/subtitle getter
-    monkeypatch.setattr(header, '_get_title_subtitle', lambda: ("Sindri", None))
+    monkeypatch.setattr(header, "_get_title_subtitle", lambda: ("Sindri", None))
 
     # 50% usage (8GB of 16GB)
     header.update_vram(used=8.0, total=16.0, loaded_models=["model1"])
@@ -87,7 +87,7 @@ def test_header_multiple_models(monkeypatch):
     header = SindriHeader()
 
     # Mock the title/subtitle getter
-    monkeypatch.setattr(header, '_get_title_subtitle', lambda: ("Sindri", None))
+    monkeypatch.setattr(header, "_get_title_subtitle", lambda: ("Sindri", None))
 
     # Multiple models
     models = ["qwen2.5-coder:14b", "llama3.1:8b", "qwen2.5:3b"]

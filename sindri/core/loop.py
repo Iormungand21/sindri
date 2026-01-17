@@ -48,7 +48,7 @@ class AgentLoop:
         client: OllamaClient,
         tools: ToolRegistry,
         state: SessionState,
-        config: LoopConfig = None
+        config: LoopConfig = None,
     ):
         self.client = client
         self.tools = tools
@@ -68,20 +68,20 @@ class AgentLoop:
 
             # 1. Build messages
             messages = self.context.build(
-                task=task,
-                history=session.turns,
-                tools=self.tools.get_schemas()
+                task=task, history=session.turns, tools=self.tools.get_schemas()
             )
 
             # 2. Call LLM
             response = await self.client.chat(
-                model=model,
-                messages=messages,
-                tools=self.tools.get_schemas()
+                model=model, messages=messages, tools=self.tools.get_schemas()
             )
 
             assistant_content = response.message.content
-            log.info("llm_response", content=assistant_content[:200], has_tool_calls=response.message.tool_calls is not None)
+            log.info(
+                "llm_response",
+                content=assistant_content[:200],
+                has_tool_calls=response.message.tool_calls is not None,
+            )
 
             # 3. Execute tool calls FIRST (before checking completion)
             # This ensures tools execute even if agent prematurely marks complete
@@ -95,31 +95,46 @@ class AgentLoop:
             else:
                 # Try parsing tool calls from text
                 from sindri.llm.tool_parser import ToolCallParser
+
                 parser = ToolCallParser()
                 parsed_calls = parser.parse(assistant_content)
                 if parsed_calls:
                     log.info("parsed_tool_calls_from_text", count=len(parsed_calls))
+
                     # Convert to native format
                     class CallWrapper:
                         def __init__(self, name, arguments):
-                            self.function = type('obj', (object,), {
-                                'name': name,
-                                'arguments': arguments
-                            })()
-                    calls_to_execute = [CallWrapper(c.name, c.arguments) for c in parsed_calls]
+                            self.function = type(
+                                "obj", (object,), {"name": name, "arguments": arguments}
+                            )()
+
+                    calls_to_execute = [
+                        CallWrapper(c.name, c.arguments) for c in parsed_calls
+                    ]
 
             # Execute all tool calls
             for call in calls_to_execute:
-                log.info("executing_tool", tool=call.function.name, args=call.function.arguments)
-                result = await self.tools.execute(
-                    call.function.name,
-                    call.function.arguments
+                log.info(
+                    "executing_tool",
+                    tool=call.function.name,
+                    args=call.function.arguments,
                 )
-                tool_results.append({
-                    "tool": call.function.name,
-                    "result": result.output if result.success else f"ERROR: {result.error}"
-                })
-                log.info("tool_executed", tool=call.function.name, success=result.success)
+                result = await self.tools.execute(
+                    call.function.name, call.function.arguments
+                )
+                tool_results.append(
+                    {
+                        "tool": call.function.name,
+                        "result": (
+                            result.output
+                            if result.success
+                            else f"ERROR: {result.error}"
+                        ),
+                    }
+                )
+                log.info(
+                    "tool_executed", tool=call.function.name, success=result.success
+                )
 
             # 4. Check completion (after tool execution)
             if self.completion.is_complete(assistant_content):
@@ -130,11 +145,14 @@ class AgentLoop:
                         success=True,
                         iterations=iteration + 1,
                         reason="completion_marker",
-                        final_output=assistant_content
+                        final_output=assistant_content,
                     )
                 else:
                     # Tools executed - continue to show agent the results
-                    log.warning("completion_marker_with_tools", message="Agent marked complete but tools executed - continuing")
+                    log.warning(
+                        "completion_marker_with_tools",
+                        message="Agent marked complete but tools executed - continuing",
+                    )
 
             # 5. Check stuck
             recent_responses.append(assistant_content)
@@ -144,12 +162,17 @@ class AgentLoop:
             if self._is_stuck(recent_responses):
                 log.warning("stuck_detected")
                 # Add nudge
-                session.add_turn("user", "You seem stuck. Try a different approach or ask for clarification.")
+                session.add_turn(
+                    "user",
+                    "You seem stuck. Try a different approach or ask for clarification.",
+                )
                 recent_responses.clear()
                 continue
 
             # 6. Update session
-            session.add_turn("assistant", assistant_content, tool_calls=response.message.tool_calls)
+            session.add_turn(
+                "assistant", assistant_content, tool_calls=response.message.tool_calls
+            )
             if tool_results:
                 session.add_turn("tool", str(tool_results))
 
@@ -161,7 +184,7 @@ class AgentLoop:
         return LoopResult(
             success=False,
             iterations=self.config.max_iterations,
-            reason="max_iterations_reached"
+            reason="max_iterations_reached",
         )
 
     def _is_stuck(self, responses: list[str]) -> bool:

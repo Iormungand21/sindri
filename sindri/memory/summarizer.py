@@ -27,35 +27,27 @@ class ConversationSummarizer:
     def __init__(
         self,
         client: OllamaClient,
-        model: str = "qwen2.5:3b-instruct-q8_0"  # Small, fast model for summarization
+        model: str = "qwen2.5:3b-instruct-q8_0",  # Small, fast model for summarization
     ):
         self.client = client
         self.model = model
         log.info("summarizer_initialized", model=model)
 
-    async def summarize(
-        self,
-        task: str,
-        conversation: list[dict]
-    ) -> str:
+    async def summarize(self, task: str, conversation: list[dict]) -> str:
         """Summarize a completed task conversation."""
 
         # Format conversation (truncate long messages)
         conv_text = "\n".join(
             f"{msg['role']}: {msg.get('content', '')[:500]}"
             for msg in conversation
-            if msg.get('content')
+            if msg.get("content")
         )
 
-        prompt = SUMMARIZE_PROMPT.format(
-            task=task,
-            conversation=conv_text
-        )
+        prompt = SUMMARIZE_PROMPT.format(task=task, conversation=conv_text)
 
         try:
             response = await self.client.chat(
-                model=self.model,
-                messages=[{"role": "user", "content": prompt}]
+                model=self.model, messages=[{"role": "user", "content": prompt}]
             )
             summary = response.message.content.strip()
             log.info("conversation_summarized", length=len(summary))

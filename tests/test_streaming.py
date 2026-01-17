@@ -9,10 +9,9 @@ Tests cover:
 """
 
 import pytest
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import patch
 
-from sindri.llm.client import OllamaClient, StreamingResponse, Response, Message
+from sindri.llm.client import OllamaClient, StreamingResponse, Response
 from sindri.llm.streaming import StreamingBuffer, DetectedToolCall
 from sindri.core.events import EventBus, EventType, Event
 from sindri.core.loop import LoopConfig
@@ -21,6 +20,7 @@ from sindri.core.loop import LoopConfig
 # =============================================================================
 # StreamingResponse Tests
 # =============================================================================
+
 
 class TestStreamingResponse:
     """Tests for StreamingResponse dataclass."""
@@ -39,7 +39,7 @@ class TestStreamingResponse:
             content="Hello world",
             tool_calls=[{"name": "test"}],
             model="qwen2.5:7b",
-            done=True
+            done=True,
         )
         response = streaming.to_response()
 
@@ -52,10 +52,7 @@ class TestStreamingResponse:
 
     def test_to_response_without_tool_calls(self):
         """Test conversion without tool calls."""
-        streaming = StreamingResponse(
-            content="Just text",
-            model="llama3.1:8b"
-        )
+        streaming = StreamingResponse(content="Just text", model="llama3.1:8b")
         response = streaming.to_response()
 
         assert response.message.tool_calls is None
@@ -65,6 +62,7 @@ class TestStreamingResponse:
 # =============================================================================
 # StreamingBuffer Tests
 # =============================================================================
+
 
 class TestStreamingBuffer:
     """Tests for StreamingBuffer tool call detection."""
@@ -236,14 +234,15 @@ class TestStreamingBuffer:
 # Event System Tests
 # =============================================================================
 
+
 class TestStreamingEvents:
     """Tests for streaming-related events."""
 
     def test_streaming_token_event_type_exists(self):
         """Test that STREAMING_TOKEN event type is defined."""
-        assert hasattr(EventType, 'STREAMING_TOKEN')
-        assert hasattr(EventType, 'STREAMING_START')
-        assert hasattr(EventType, 'STREAMING_END')
+        assert hasattr(EventType, "STREAMING_TOKEN")
+        assert hasattr(EventType, "STREAMING_START")
+        assert hasattr(EventType, "STREAMING_END")
 
     def test_streaming_event_subscription(self):
         """Test subscribing to streaming events."""
@@ -255,10 +254,7 @@ class TestStreamingEvents:
 
         bus.subscribe(EventType.STREAMING_TOKEN, handler)
 
-        bus.emit(Event(
-            type=EventType.STREAMING_TOKEN,
-            data={"token": "Hello"}
-        ))
+        bus.emit(Event(type=EventType.STREAMING_TOKEN, data={"token": "Hello"}))
 
         assert len(received) == 1
         assert received[0]["token"] == "Hello"
@@ -270,14 +266,12 @@ class TestStreamingEvents:
 
         bus.subscribe(EventType.STREAMING_START, lambda d: received.append(d))
 
-        bus.emit(Event(
-            type=EventType.STREAMING_START,
-            data={
-                "task_id": "task-123",
-                "agent": "huginn",
-                "model": "qwen2.5:7b"
-            }
-        ))
+        bus.emit(
+            Event(
+                type=EventType.STREAMING_START,
+                data={"task_id": "task-123", "agent": "huginn", "model": "qwen2.5:7b"},
+            )
+        )
 
         assert len(received) == 1
         assert received[0]["agent"] == "huginn"
@@ -289,14 +283,12 @@ class TestStreamingEvents:
 
         bus.subscribe(EventType.STREAMING_END, lambda d: received.append(d))
 
-        bus.emit(Event(
-            type=EventType.STREAMING_END,
-            data={
-                "task_id": "task-123",
-                "agent": "huginn",
-                "content_length": 150
-            }
-        ))
+        bus.emit(
+            Event(
+                type=EventType.STREAMING_END,
+                data={"task_id": "task-123", "agent": "huginn", "content_length": 150},
+            )
+        )
 
         assert len(received) == 1
         assert received[0]["content_length"] == 150
@@ -304,9 +296,7 @@ class TestStreamingEvents:
     def test_streaming_events_have_task_id(self):
         """Test that streaming events include task_id for filtering."""
         event = Event(
-            type=EventType.STREAMING_TOKEN,
-            data={"token": "x"},
-            task_id="task-456"
+            type=EventType.STREAMING_TOKEN, data={"token": "x"}, task_id="task-456"
         )
 
         assert event.task_id == "task-456"
@@ -315,6 +305,7 @@ class TestStreamingEvents:
 # =============================================================================
 # OllamaClient Streaming Tests
 # =============================================================================
+
 
 class TestOllamaClientStreaming:
     """Tests for OllamaClient.chat_stream() method."""
@@ -330,15 +321,14 @@ class TestOllamaClientStreaming:
                 {"message": {"content": "Hello"}, "done": False},
                 {"message": {"content": " "}, "done": False},
                 {"message": {"content": "world"}, "done": False},
-                {"message": {"content": "!"}, "done": True, "model": "test:7b"}
+                {"message": {"content": "!"}, "done": True, "model": "test:7b"},
             ]
             for chunk in chunks:
                 yield chunk
 
-        with patch.object(client._async_client, 'chat', return_value=mock_stream()):
+        with patch.object(client._async_client, "chat", return_value=mock_stream()):
             result = await client.chat_stream(
-                model="test:7b",
-                messages=[{"role": "user", "content": "Hi"}]
+                model="test:7b", messages=[{"role": "user", "content": "Hi"}]
             )
 
             assert result.content == "Hello world!"
@@ -355,11 +345,9 @@ class TestOllamaClientStreaming:
                 yield {"message": {"content": text}, "done": False}
             yield {"message": {"content": ""}, "done": True, "model": "test:7b"}
 
-        with patch.object(client._async_client, 'chat', return_value=mock_stream()):
-            result = await client.chat_stream(
-                model="test:7b",
-                messages=[],
-                on_token=lambda t: tokens.append(t)
+        with patch.object(client._async_client, "chat", return_value=mock_stream()):
+            await client.chat_stream(
+                model="test:7b", messages=[], on_token=lambda t: tokens.append(t)
             )
 
             assert tokens == ["A", "B", "C"]
@@ -374,17 +362,17 @@ class TestOllamaClientStreaming:
             yield {
                 "message": {
                     "content": "",
-                    "tool_calls": [{"function": {"name": "test", "arguments": {}}}]
+                    "tool_calls": [{"function": {"name": "test", "arguments": {}}}],
                 },
                 "done": True,
-                "model": "test:7b"
+                "model": "test:7b",
             }
 
-        with patch.object(client._async_client, 'chat', return_value=mock_stream()):
+        with patch.object(client._async_client, "chat", return_value=mock_stream()):
             result = await client.chat_stream(
                 model="test:7b",
                 messages=[],
-                tools=[{"function": {"name": "test", "description": "Test"}}]
+                tools=[{"function": {"name": "test", "description": "Test"}}],
             )
 
             assert result.tool_calls is not None
@@ -398,11 +386,8 @@ class TestOllamaClientStreaming:
         async def mock_stream(*args, **kwargs):
             yield {"message": {"content": "Test"}, "done": True, "model": "test:7b"}
 
-        with patch.object(client._async_client, 'chat', return_value=mock_stream()):
-            streaming_result = await client.chat_stream(
-                model="test:7b",
-                messages=[]
-            )
+        with patch.object(client._async_client, "chat", return_value=mock_stream()):
+            streaming_result = await client.chat_stream(model="test:7b", messages=[])
 
             response = streaming_result.to_response()
             assert isinstance(response, Response)
@@ -412,6 +397,7 @@ class TestOllamaClientStreaming:
 # =============================================================================
 # LoopConfig Streaming Tests
 # =============================================================================
+
 
 class TestLoopConfigStreaming:
     """Tests for streaming configuration."""
@@ -431,15 +417,13 @@ class TestLoopConfigStreaming:
 # Integration Tests
 # =============================================================================
 
+
 class TestStreamingIntegration:
     """Integration tests for streaming through the system."""
 
     def test_detected_tool_call_dataclass(self):
         """Test DetectedToolCall dataclass."""
-        call = DetectedToolCall(
-            name="read_file",
-            arguments={"path": "test.py"}
-        )
+        call = DetectedToolCall(name="read_file", arguments={"path": "test.py"})
 
         assert call.name == "read_file"
         assert call.arguments["path"] == "test.py"
@@ -480,6 +464,7 @@ class TestStreamingIntegration:
 # =============================================================================
 # Edge Case Tests
 # =============================================================================
+
 
 class TestStreamingEdgeCases:
     """Edge case tests for streaming."""

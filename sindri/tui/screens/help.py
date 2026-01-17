@@ -1,7 +1,7 @@
 """Help screen."""
 
 from textual.screen import Screen
-from textual.widgets import Static, MarkdownViewer
+from textual.widgets import MarkdownViewer
 from textual.binding import Binding
 
 

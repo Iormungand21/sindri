@@ -18,6 +18,7 @@ log = structlog.get_logger()
 @dataclass
 class DockerProjectInfo:
     """Detected project information for Docker generation."""
+
     project_type: str  # python, node, rust, go, generic
     python_version: str = "3.11"
     node_version: str = "20"
@@ -62,47 +63,47 @@ Examples:
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to project directory (default: current directory)"
+                "description": "Path to project directory (default: current directory)",
             },
             "output_file": {
                 "type": "string",
-                "description": "Output file path (default: Dockerfile)"
+                "description": "Output file path (default: Dockerfile)",
             },
             "project_type": {
                 "type": "string",
                 "description": "Override project type detection: 'python', 'node', 'rust', 'go', 'generic'",
-                "enum": ["python", "node", "rust", "go", "generic"]
+                "enum": ["python", "node", "rust", "go", "generic"],
             },
             "python_version": {
                 "type": "string",
-                "description": "Python version (default: 3.11)"
+                "description": "Python version (default: 3.11)",
             },
             "node_version": {
                 "type": "string",
-                "description": "Node.js version (default: 20)"
+                "description": "Node.js version (default: 20)",
             },
             "port": {
                 "type": "integer",
-                "description": "Port to expose (default: 8000 for Python, 3000 for Node)"
+                "description": "Port to expose (default: 8000 for Python, 3000 for Node)",
             },
             "entry_point": {
                 "type": "string",
-                "description": "Application entry point (e.g., 'main.py', 'src/index.js')"
+                "description": "Application entry point (e.g., 'main.py', 'src/index.js')",
             },
             "multi_stage": {
                 "type": "boolean",
-                "description": "Use multi-stage build for smaller images (default: true for compiled languages)"
+                "description": "Use multi-stage build for smaller images (default: true for compiled languages)",
             },
             "alpine": {
                 "type": "boolean",
-                "description": "Use Alpine-based images for smaller size (default: false)"
+                "description": "Use Alpine-based images for smaller size (default: false)",
             },
             "dry_run": {
                 "type": "boolean",
-                "description": "Preview Dockerfile without creating file"
-            }
+                "description": "Preview Dockerfile without creating file",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
@@ -117,7 +118,7 @@ Examples:
         multi_stage: Optional[bool] = None,
         alpine: bool = False,
         dry_run: bool = False,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Generate a Dockerfile.
 
@@ -139,7 +140,7 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Project path does not exist: {project_path}"
+                error=f"Project path does not exist: {project_path}",
             )
 
         # Detect project information
@@ -174,8 +175,8 @@ Examples:
                 metadata={
                     "dry_run": True,
                     "project_type": info.project_type,
-                    "output_file": str(output_path)
-                }
+                    "output_file": str(output_path),
+                },
             )
 
         # Write Dockerfile
@@ -184,7 +185,7 @@ Examples:
             log.info(
                 "dockerfile_generated",
                 project_type=info.project_type,
-                output_file=str(output_path)
+                output_file=str(output_path),
             )
             return ToolResult(
                 success=True,
@@ -193,15 +194,13 @@ Examples:
                     "project_type": info.project_type,
                     "output_file": str(output_path),
                     "multi_stage": multi_stage,
-                    "alpine": alpine
-                }
+                    "alpine": alpine,
+                },
             )
         except Exception as e:
             log.error("dockerfile_write_failed", error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to write Dockerfile: {str(e)}"
+                success=False, output="", error=f"Failed to write Dockerfile: {str(e)}"
             )
 
     def _detect_project(self, path: Path) -> DockerProjectInfo:
@@ -292,7 +291,10 @@ Examples:
                 info.start_command = f"node {info.entry_point}"
 
             # Check for static files (Next.js, etc.)
-            deps = {**pkg_json.get("dependencies", {}), **pkg_json.get("devDependencies", {})}
+            deps = {
+                **pkg_json.get("dependencies", {}),
+                **pkg_json.get("devDependencies", {}),
+            }
             if "next" in deps:
                 info.uses_static_files = True
                 info.port = 3000
@@ -309,6 +311,7 @@ Examples:
             # Try to extract binary name
             if "[package]" in cargo_toml and "name" in cargo_toml:
                 import re
+
                 match = re.search(r'name\s*=\s*"([^"]+)"', cargo_toml)
                 if match:
                     info.entry_point = match.group(1)
@@ -325,10 +328,7 @@ Examples:
         return info
 
     def _generate_dockerfile(
-        self,
-        info: DockerProjectInfo,
-        multi_stage: bool,
-        alpine: bool
+        self, info: DockerProjectInfo, multi_stage: bool, alpine: bool
     ) -> str:
         """Generate Dockerfile content."""
         if info.project_type == "python":
@@ -343,13 +343,14 @@ Examples:
             return self._generic_dockerfile(info)
 
     def _python_dockerfile(
-        self,
-        info: DockerProjectInfo,
-        multi_stage: bool,
-        alpine: bool
+        self, info: DockerProjectInfo, multi_stage: bool, alpine: bool
     ) -> str:
         """Generate Python Dockerfile."""
-        base_image = f"python:{info.python_version}-alpine" if alpine else f"python:{info.python_version}-slim"
+        base_image = (
+            f"python:{info.python_version}-alpine"
+            if alpine
+            else f"python:{info.python_version}-slim"
+        )
 
         entry_point = info.entry_point or "main.py"
         # If entry_point was explicitly set, use it for the command
@@ -360,7 +361,7 @@ Examples:
             start_cmd = info.start_command or f"python {entry_point}"
 
         if info.package_manager == "poetry":
-            return f'''# Python Poetry Dockerfile
+            return f"""# Python Poetry Dockerfile
 FROM {base_image} AS base
 
 # Set environment variables
@@ -392,12 +393,16 @@ EXPOSE {info.port}
 
 # Run the application
 CMD ["poetry", "run", "python", "{entry_point}"]
-'''
+"""
         else:
             # pip-based
-            install_cmd = "pip install --no-cache-dir -r requirements.txt" if info.has_requirements else "pip install --no-cache-dir -e ."
+            install_cmd = (
+                "pip install --no-cache-dir -r requirements.txt"
+                if info.has_requirements
+                else "pip install --no-cache-dir -e ."
+            )
 
-            return f'''# Python Dockerfile
+            return f"""# Python Dockerfile
 FROM {base_image}
 
 # Set environment variables
@@ -418,16 +423,17 @@ EXPOSE {info.port}
 
 # Run the application
 CMD [{", ".join(f'"{part}"' for part in start_cmd.split())}]
-'''
+"""
 
     def _node_dockerfile(
-        self,
-        info: DockerProjectInfo,
-        multi_stage: bool,
-        alpine: bool
+        self, info: DockerProjectInfo, multi_stage: bool, alpine: bool
     ) -> str:
         """Generate Node.js Dockerfile."""
-        base_image = f"node:{info.node_version}-alpine" if alpine else f"node:{info.node_version}-slim"
+        base_image = (
+            f"node:{info.node_version}-alpine"
+            if alpine
+            else f"node:{info.node_version}-slim"
+        )
 
         if info.package_manager == "yarn":
             install_cmd = "yarn install --frozen-lockfile"
@@ -442,7 +448,7 @@ CMD [{", ".join(f'"{part}"' for part in start_cmd.split())}]
         start_cmd = info.start_command or f"node {info.entry_point or 'index.js'}"
 
         if multi_stage and info.build_command:
-            return f'''# Node.js Multi-Stage Dockerfile
+            return f"""# Node.js Multi-Stage Dockerfile
 FROM {base_image} AS builder
 
 WORKDIR /app
@@ -482,9 +488,9 @@ EXPOSE {info.port}
 
 # Run the application
 CMD [{", ".join(f'"{part}"' for part in start_cmd.split())}]
-'''
+"""
         else:
-            return f'''# Node.js Dockerfile
+            return f"""# Node.js Dockerfile
 FROM {base_image}
 
 WORKDIR /app
@@ -500,26 +506,23 @@ RUN {install_cmd}
 # Copy application code
 COPY . .
 
-{f"# Build the application" + chr(10) + f"RUN {info.build_command}" + chr(10) if info.build_command else ""}
+{"# Build the application" + chr(10) + f"RUN {info.build_command}" + chr(10) if info.build_command else ""}
 # Expose port
 EXPOSE {info.port}
 
 # Run the application
 CMD [{", ".join(f'"{part}"' for part in start_cmd.split())}]
-'''
+"""
 
     def _rust_dockerfile(
-        self,
-        info: DockerProjectInfo,
-        multi_stage: bool,
-        alpine: bool
+        self, info: DockerProjectInfo, multi_stage: bool, alpine: bool
     ) -> str:
         """Generate Rust Dockerfile."""
         binary_name = info.entry_point or "app"
 
         if multi_stage:
             runtime_image = "alpine:latest" if alpine else "debian:bookworm-slim"
-            return f'''# Rust Multi-Stage Dockerfile
+            return f"""# Rust Multi-Stage Dockerfile
 FROM rust:{info.rust_version} AS builder
 
 WORKDIR /app
@@ -554,9 +557,9 @@ EXPOSE {info.port}
 
 # Run the application
 CMD ["./{binary_name}"]
-'''
+"""
         else:
-            return f'''# Rust Dockerfile
+            return f"""# Rust Dockerfile
 FROM rust:{info.rust_version}
 
 WORKDIR /app
@@ -575,19 +578,18 @@ EXPOSE {info.port}
 
 # Run the application
 CMD ["./target/release/{binary_name}"]
-'''
+"""
 
     def _go_dockerfile(
-        self,
-        info: DockerProjectInfo,
-        multi_stage: bool,
-        alpine: bool
+        self, info: DockerProjectInfo, multi_stage: bool, alpine: bool
     ) -> str:
         """Generate Go Dockerfile."""
         if multi_stage:
-            runtime_image = "alpine:latest" if alpine else "gcr.io/distroless/base-debian12"
+            runtime_image = (
+                "alpine:latest" if alpine else "gcr.io/distroless/base-debian12"
+            )
 
-            return f'''# Go Multi-Stage Dockerfile
+            return f"""# Go Multi-Stage Dockerfile
 FROM golang:{info.go_version} AS builder
 
 WORKDIR /app
@@ -617,9 +619,9 @@ EXPOSE {info.port}
 
 # Run the application
 CMD ["./main"]
-'''
+"""
         else:
-            return f'''# Go Dockerfile
+            return f"""# Go Dockerfile
 FROM golang:{info.go_version}
 
 WORKDIR /app
@@ -641,11 +643,11 @@ EXPOSE {info.port}
 
 # Run the application
 CMD ["./main"]
-'''
+"""
 
     def _generic_dockerfile(self, info: DockerProjectInfo) -> str:
         """Generate generic Dockerfile."""
-        return f'''# Generic Dockerfile
+        return f"""# Generic Dockerfile
 FROM alpine:latest
 
 WORKDIR /app
@@ -661,7 +663,7 @@ EXPOSE {info.port}
 
 # Run the application
 # CMD ["./your-app"]
-'''
+"""
 
 
 class GenerateDockerComposeTool(Tool):
@@ -689,39 +691,36 @@ Examples:
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to project directory (default: current directory)"
+                "description": "Path to project directory (default: current directory)",
             },
             "output_file": {
                 "type": "string",
-                "description": "Output file path (default: docker-compose.yml)"
+                "description": "Output file path (default: docker-compose.yml)",
             },
             "services": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Additional services: 'postgres', 'mysql', 'redis', 'mongodb', 'rabbitmq', 'kafka', 'elasticsearch', 'nginx'"
+                "description": "Additional services: 'postgres', 'mysql', 'redis', 'mongodb', 'rabbitmq', 'kafka', 'elasticsearch', 'nginx'",
             },
             "app_name": {
                 "type": "string",
-                "description": "Application service name (default: 'app')"
+                "description": "Application service name (default: 'app')",
             },
-            "port": {
-                "type": "integer",
-                "description": "Application port to expose"
-            },
+            "port": {"type": "integer", "description": "Application port to expose"},
             "include_volumes": {
                 "type": "boolean",
-                "description": "Include persistent volumes for services (default: true)"
+                "description": "Include persistent volumes for services (default: true)",
             },
             "production": {
                 "type": "boolean",
-                "description": "Generate production-ready configuration"
+                "description": "Generate production-ready configuration",
             },
             "dry_run": {
                 "type": "boolean",
-                "description": "Preview without creating file"
-            }
+                "description": "Preview without creating file",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
@@ -734,7 +733,7 @@ Examples:
         include_volumes: bool = True,
         production: bool = False,
         dry_run: bool = False,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Generate docker-compose.yml.
 
@@ -754,7 +753,7 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Project path does not exist: {project_path}"
+                error=f"Project path does not exist: {project_path}",
             )
 
         # Detect project information
@@ -779,8 +778,8 @@ Examples:
                     "dry_run": True,
                     "project_type": info.project_type,
                     "services": info.services,
-                    "output_file": str(output_path)
-                }
+                    "output_file": str(output_path),
+                },
             )
 
         # Write docker-compose file
@@ -790,7 +789,7 @@ Examples:
                 "docker_compose_generated",
                 project_type=info.project_type,
                 services=info.services,
-                output_file=str(output_path)
+                output_file=str(output_path),
             )
             return ToolResult(
                 success=True,
@@ -798,15 +797,15 @@ Examples:
                 metadata={
                     "project_type": info.project_type,
                     "services": info.services,
-                    "output_file": str(output_path)
-                }
+                    "output_file": str(output_path),
+                },
             )
         except Exception as e:
             log.error("docker_compose_write_failed", error=str(e))
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Failed to write docker-compose.yml: {str(e)}"
+                error=f"Failed to write docker-compose.yml: {str(e)}",
             )
 
     def _detect_project(self, path: Path) -> DockerProjectInfo:
@@ -834,7 +833,7 @@ Examples:
         info: DockerProjectInfo,
         app_name: str,
         include_volumes: bool,
-        production: bool
+        production: bool,
     ) -> str:
         """Generate docker-compose.yml content."""
         services = [self._app_service(info, app_name, production)]
@@ -860,33 +859,43 @@ Examples:
 
         return "\n".join(compose_lines)
 
-    def _app_service(self, info: DockerProjectInfo, app_name: str, production: bool) -> str:
+    def _app_service(
+        self, info: DockerProjectInfo, app_name: str, production: bool
+    ) -> str:
         """Generate the main application service."""
         restart_policy = "always" if production else "unless-stopped"
 
         depends_on = ""
         if info.services:
-            deps = [s for s in info.services if s in ("postgres", "mysql", "mongodb", "redis")]
+            deps = [
+                s
+                for s in info.services
+                if s in ("postgres", "mysql", "mongodb", "redis")
+            ]
             if deps:
-                depends_on = "\n    depends_on:\n" + "\n".join(f"      - {d}" for d in deps)
+                depends_on = "\n    depends_on:\n" + "\n".join(
+                    f"      - {d}" for d in deps
+                )
 
         env_vars = self._get_env_vars(info.services)
 
-        return f'''  {app_name}:
+        return f"""  {app_name}:
     build: .
     ports:
       - "{info.port}:{info.port}"
     environment:
       - PORT={info.port}{env_vars}
     restart: {restart_policy}{depends_on}
-'''
+"""
 
     def _get_env_vars(self, services: list[str]) -> str:
         """Get environment variables for services."""
         env_vars = []
 
         if "postgres" in services:
-            env_vars.append("      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/app")
+            env_vars.append(
+                "      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/app"
+            )
         if "mysql" in services:
             env_vars.append("      - DATABASE_URL=mysql://root:root@mysql:3306/app")
         if "mongodb" in services:
@@ -905,7 +914,8 @@ Examples:
     def _get_service(self, service: str, include_volumes: bool) -> tuple[str, str]:
         """Get service definition and volume definition."""
         services = {
-            "postgres": ('''  postgres:
+            "postgres": (
+                """  postgres:
     image: postgres:15-alpine
     environment:
       - POSTGRES_USER=postgres
@@ -915,8 +925,11 @@ Examples:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-''', "  postgres_data:"),
-            "mysql": ('''  mysql:
+""",
+                "  postgres_data:",
+            ),
+            "mysql": (
+                """  mysql:
     image: mysql:8
     environment:
       - MYSQL_ROOT_PASSWORD=root
@@ -925,30 +938,42 @@ Examples:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-''', "  mysql_data:"),
-            "mongodb": ('''  mongodb:
+""",
+                "  mysql_data:",
+            ),
+            "mongodb": (
+                """  mongodb:
     image: mongo:7
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-''', "  mongodb_data:"),
-            "redis": ('''  redis:
+""",
+                "  mongodb_data:",
+            ),
+            "redis": (
+                """  redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
-''', "  redis_data:"),
-            "rabbitmq": ('''  rabbitmq:
+""",
+                "  redis_data:",
+            ),
+            "rabbitmq": (
+                """  rabbitmq:
     image: rabbitmq:3-management-alpine
     ports:
       - "5672:5672"
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
-''', "  rabbitmq_data:"),
-            "kafka": ('''  zookeeper:
+""",
+                "  rabbitmq_data:",
+            ),
+            "kafka": (
+                """  zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     environment:
       - ZOOKEEPER_CLIENT_PORT=2181
@@ -966,8 +991,11 @@ Examples:
       - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
     ports:
       - "9092:9092"
-''', ""),
-            "elasticsearch": ('''  elasticsearch:
+""",
+                "",
+            ),
+            "elasticsearch": (
+                """  elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
     environment:
       - discovery.type=single-node
@@ -977,15 +1005,20 @@ Examples:
       - "9200:9200"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
-''', "  elasticsearch_data:"),
-            "nginx": ('''  nginx:
+""",
+                "  elasticsearch_data:",
+            ),
+            "nginx": (
+                """  nginx:
     image: nginx:alpine
     ports:
       - "80:80"
       - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
-''', ""),
+""",
+                "",
+            ),
         }
 
         return services.get(service, ("", ""))
@@ -1010,21 +1043,18 @@ Examples:
         "properties": {
             "file_path": {
                 "type": "string",
-                "description": "Path to Dockerfile to validate (default: Dockerfile)"
+                "description": "Path to Dockerfile to validate (default: Dockerfile)",
             },
             "content": {
                 "type": "string",
-                "description": "Dockerfile content to validate directly"
-            }
+                "description": "Dockerfile content to validate directly",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
-        self,
-        file_path: Optional[str] = None,
-        content: Optional[str] = None,
-        **kwargs
+        self, file_path: Optional[str] = None, content: Optional[str] = None, **kwargs
     ) -> ToolResult:
         """Validate Dockerfile.
 
@@ -1041,7 +1071,7 @@ Examples:
                 return ToolResult(
                     success=False,
                     output="",
-                    error=f"Dockerfile not found: {dockerfile_path}"
+                    error=f"Dockerfile not found: {dockerfile_path}",
                 )
             dockerfile_content = dockerfile_path.read_text()
             source = str(dockerfile_path)
@@ -1076,17 +1106,13 @@ Examples:
                 "errors": result["errors"],
                 "warnings": result["warnings"],
                 "suggestions": result["suggestions"],
-                "valid": len(result["errors"]) == 0
-            }
+                "valid": len(result["errors"]) == 0,
+            },
         )
 
     def _validate(self, content: str, source: str) -> dict:
         """Validate Dockerfile content."""
-        result = {
-            "errors": [],
-            "warnings": [],
-            "suggestions": []
-        }
+        result = {"errors": [], "warnings": [], "suggestions": []}
 
         stripped_content = content.strip()
         if not stripped_content:
@@ -1111,16 +1137,29 @@ Examples:
         content_lower = content.lower()
 
         # Check for latest tag
-        if ":latest" in content_lower or "from python " in content_lower or "from node " in content_lower:
-            result["warnings"].append("Using ':latest' tag or untagged base image. Consider using specific versions.")
+        if (
+            ":latest" in content_lower
+            or "from python " in content_lower
+            or "from node " in content_lower
+        ):
+            result["warnings"].append(
+                "Using ':latest' tag or untagged base image. Consider using specific versions."
+            )
 
         # Check for apt-get without cleanup
-        if "apt-get install" in content_lower and "rm -rf /var/lib/apt/lists" not in content_lower:
-            result["suggestions"].append("Consider cleaning apt cache: rm -rf /var/lib/apt/lists/*")
+        if (
+            "apt-get install" in content_lower
+            and "rm -rf /var/lib/apt/lists" not in content_lower
+        ):
+            result["suggestions"].append(
+                "Consider cleaning apt cache: rm -rf /var/lib/apt/lists/*"
+            )
 
         # Check for pip install without --no-cache-dir
         if "pip install" in content_lower and "--no-cache-dir" not in content_lower:
-            result["suggestions"].append("Consider using pip install --no-cache-dir to reduce image size")
+            result["suggestions"].append(
+                "Consider using pip install --no-cache-dir to reduce image size"
+            )
 
         # Check for missing WORKDIR
         if "workdir " not in content_lower:
@@ -1128,33 +1167,49 @@ Examples:
 
         # Check for running as root
         if "user " not in content_lower:
-            result["suggestions"].append("Consider adding USER instruction to run as non-root user")
+            result["suggestions"].append(
+                "Consider adding USER instruction to run as non-root user"
+            )
 
         # Check for COPY vs ADD
         if "add " in content_lower and "add --from" not in content_lower:
-            result["suggestions"].append("Prefer COPY over ADD unless you need ADD's special features (URL download, tar extraction)")
+            result["suggestions"].append(
+                "Prefer COPY over ADD unless you need ADD's special features (URL download, tar extraction)"
+            )
 
         # Check for .dockerignore reference
         # Note: we can't check if .dockerignore exists, just suggest it
-        result["suggestions"].append("Ensure you have a .dockerignore file to exclude unnecessary files")
+        result["suggestions"].append(
+            "Ensure you have a .dockerignore file to exclude unnecessary files"
+        )
 
         # Check instruction order (COPY before RUN for better caching)
-        copy_indices = [i for i, line in enumerate(lines) if line.strip().upper().startswith("COPY")]
-        run_indices = [i for i, line in enumerate(lines) if line.strip().upper().startswith("RUN")]
+        copy_indices = [
+            i for i, line in enumerate(lines) if line.strip().upper().startswith("COPY")
+        ]
+        run_indices = [
+            i for i, line in enumerate(lines) if line.strip().upper().startswith("RUN")
+        ]
 
         if copy_indices and run_indices:
             # Check if dependencies are copied before other files
             first_copy = copy_indices[0]
             last_run = run_indices[-1] if run_indices else 0
             if first_copy > last_run and from_count == 1:
-                result["suggestions"].append("Consider copying dependency files and running install before copying source code for better caching")
+                result["suggestions"].append(
+                    "Consider copying dependency files and running install before copying source code for better caching"
+                )
 
         # Check for HEALTHCHECK
         if "healthcheck " not in content_lower:
-            result["suggestions"].append("Consider adding HEALTHCHECK instruction for container health monitoring")
+            result["suggestions"].append(
+                "Consider adding HEALTHCHECK instruction for container health monitoring"
+            )
 
         # Check for exposed ports
         if "expose " not in content_lower:
-            result["suggestions"].append("Consider adding EXPOSE instruction to document the ports the container listens on")
+            result["suggestions"].append(
+                "Consider adding EXPOSE instruction to document the ports the container listens on"
+            )
 
         return result

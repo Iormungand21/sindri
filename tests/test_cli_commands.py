@@ -1,10 +1,9 @@
 """Tests for CLI commands."""
 
-import pytest
 from click.testing import CliRunner
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
-from sindri.cli import cli, agents, sessions, recover, resume
+from sindri.cli import agents, sessions, recover, resume
 
 
 def test_agents_command():
@@ -24,7 +23,9 @@ def test_sessions_command_no_sessions():
     """Test sessions command with no sessions."""
     from sindri.persistence.state import SessionState
 
-    with patch.object(SessionState, 'list_sessions', new_callable=AsyncMock) as mock_list:
+    with patch.object(
+        SessionState, "list_sessions", new_callable=AsyncMock
+    ) as mock_list:
         mock_list.return_value = []
 
         runner = CliRunner()
@@ -45,7 +46,7 @@ def test_sessions_command_with_sessions():
             "model": "test-model",
             "iterations": 5,
             "status": "completed",
-            "created_at": "2026-01-15 12:00:00"
+            "created_at": "2026-01-15 12:00:00",
         },
         {
             "id": "test-session-2",
@@ -53,11 +54,13 @@ def test_sessions_command_with_sessions():
             "model": "test-model-2",
             "iterations": 3,
             "status": "active",
-            "created_at": "2026-01-15 13:00:00"
-        }
+            "created_at": "2026-01-15 13:00:00",
+        },
     ]
 
-    with patch.object(SessionState, 'list_sessions', new_callable=AsyncMock) as mock_list:
+    with patch.object(
+        SessionState, "list_sessions", new_callable=AsyncMock
+    ) as mock_list:
         mock_list.return_value = mock_sessions
 
         runner = CliRunner()
@@ -74,7 +77,7 @@ def test_recover_command_no_sessions():
     """Test recover command with no recoverable sessions."""
     from sindri.core.recovery import RecoveryManager
 
-    with patch.object(RecoveryManager, 'list_recoverable_sessions') as mock_list:
+    with patch.object(RecoveryManager, "list_recoverable_sessions") as mock_list:
         mock_list.return_value = []
 
         runner = CliRunner()
@@ -92,11 +95,11 @@ def test_recover_command_with_sessions():
         {
             "session_id": "test-session-1",
             "task": "Test interrupted task",
-            "timestamp": "2026-01-15 12:00:00"
+            "timestamp": "2026-01-15 12:00:00",
         }
     ]
 
-    with patch.object(RecoveryManager, 'list_recoverable_sessions') as mock_list:
+    with patch.object(RecoveryManager, "list_recoverable_sessions") as mock_list:
         mock_list.return_value = mock_sessions
 
         runner = CliRunner()
@@ -110,7 +113,7 @@ def test_recover_command_with_sessions():
 def test_resume_command_not_found():
     """Test resume command with non-existent full-length session ID."""
     runner = CliRunner()
-    result = runner.invoke(resume, ['aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'])
+    result = runner.invoke(resume, ["aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"])
 
     # Should complete without error but report not found
     assert result.exit_code == 0
@@ -120,7 +123,7 @@ def test_resume_command_not_found():
 def test_resume_command_short_id_not_found():
     """Test resume command with short session ID that doesn't exist."""
     runner = CliRunner()
-    result = runner.invoke(resume, ['xxxxxxxx'])
+    result = runner.invoke(resume, ["xxxxxxxx"])
 
     # Should complete without error but report not found
     assert result.exit_code == 0

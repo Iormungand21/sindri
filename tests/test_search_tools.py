@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 import tempfile
 import shutil
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock
 
 from sindri.tools.search import SearchCodeTool, FindSymbolTool
 
@@ -15,7 +15,8 @@ def temp_dir():
     temp = Path(tempfile.mkdtemp())
 
     # Create Python files
-    (temp / "main.py").write_text("""#!/usr/bin/env python
+    (temp / "main.py").write_text(
+        """#!/usr/bin/env python
 \"\"\"Main application module.\"\"\"
 
 def authenticate(username: str, password: str) -> bool:
@@ -39,9 +40,11 @@ config = {
 async def fetch_data(url: str):
     \"\"\"Fetch data from API.\"\"\"
     pass
-""")
+"""
+    )
 
-    (temp / "utils.py").write_text("""\"\"\"Utility functions.\"\"\"
+    (temp / "utils.py").write_text(
+        """\"\"\"Utility functions.\"\"\"
 
 def validate_email(email: str) -> bool:
     \"\"\"Validate email address.\"\"\"
@@ -55,10 +58,12 @@ def format_name(first: str, last: str) -> str:
 
 # TODO: Add more utilities
 DEBUG = True
-""")
+"""
+    )
 
     # Create TypeScript file
-    (temp / "app.ts").write_text("""// Application entry point
+    (temp / "app.ts").write_text(
+        """// Application entry point
 
 export interface User {
     id: number;
@@ -81,10 +86,12 @@ export const config = {
 export function handleError(err: Error): void {
     console.error(err);
 }
-""")
+"""
+    )
 
     # Create JavaScript file
-    (temp / "helpers.js").write_text("""// Helper functions
+    (temp / "helpers.js").write_text(
+        """// Helper functions
 
 const API_URL = "http://api.example.com";
 
@@ -104,11 +111,13 @@ class DataManager {
 }
 
 export { fetchUser, DataManager, API_URL };
-""")
+"""
+    )
 
     # Create a subdirectory
     (temp / "subdir").mkdir()
-    (temp / "subdir" / "module.py").write_text("""\"\"\"Submodule.\"\"\"
+    (temp / "subdir" / "module.py").write_text(
+        """\"\"\"Submodule.\"\"\"
 
 class Handler:
     pass
@@ -116,7 +125,8 @@ class Handler:
 
 def process_data(data):
     return data
-""")
+"""
+    )
 
     # Create node_modules directory (should be skipped)
     (temp / "node_modules").mkdir()
@@ -134,6 +144,7 @@ def process_data(data):
 # =============================================================================
 # SearchCodeTool Tests - Text Search
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_search_code_basic_literal(temp_dir):
@@ -282,6 +293,7 @@ async def test_search_code_relative_path(temp_dir):
 # SearchCodeTool Tests - Semantic Search
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_search_code_semantic_no_memory():
     """Test semantic search without memory system returns error."""
@@ -297,8 +309,16 @@ async def test_search_code_semantic_with_mock_memory():
     """Test semantic search with mocked memory system."""
     mock_memory = Mock()
     mock_memory.search.return_value = [
-        ("def authenticate():\n    pass", {"path": "auth.py", "start_line": 1, "end_line": 2}, 0.95),
-        ("# Login logic here", {"path": "login.py", "start_line": 10, "end_line": 11}, 0.85),
+        (
+            "def authenticate():\n    pass",
+            {"path": "auth.py", "start_line": 1, "end_line": 2},
+            0.95,
+        ),
+        (
+            "# Login logic here",
+            {"path": "login.py", "start_line": 10, "end_line": 11},
+            0.85,
+        ),
     ]
 
     tool = SearchCodeTool(semantic_memory=mock_memory, namespace="test")
@@ -346,6 +366,7 @@ async def test_search_code_semantic_with_file_type_filter():
 # =============================================================================
 # FindSymbolTool Tests
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_find_symbol_function(temp_dir):
@@ -428,7 +449,9 @@ async def test_find_symbol_file_type_filter(temp_dir):
 async def test_find_symbol_typescript_class(temp_dir):
     """Test finding TypeScript class."""
     tool = FindSymbolTool(work_dir=temp_dir)
-    result = await tool.execute(name="UserHandler", symbol_type="class", file_types=["ts"])
+    result = await tool.execute(
+        name="UserHandler", symbol_type="class", file_types=["ts"]
+    )
 
     assert result.success is True
     assert "UserHandler" in result.output
@@ -491,6 +514,7 @@ async def test_find_symbol_nonexistent_path():
 # Tool Registry Integration Tests
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_search_code_in_registry():
     """Test that SearchCodeTool is properly registered."""
@@ -545,6 +569,7 @@ async def test_find_symbol_schema():
 # Agent Integration Tests
 # =============================================================================
 
+
 def test_agents_have_search_tools():
     """Test that appropriate agents have search tools."""
     from sindri.agents.registry import AGENTS
@@ -567,6 +592,7 @@ def test_agents_have_search_tools():
 # =============================================================================
 # Edge Cases and Error Handling
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_search_code_special_characters(temp_dir):

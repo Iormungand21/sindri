@@ -16,10 +16,10 @@ log = structlog.get_logger()
 class ErrorCategory(Enum):
     """Categories of errors for handling decisions."""
 
-    TRANSIENT = "transient"   # Network, timeout, file lock - retry
-    RESOURCE = "resource"     # VRAM, disk space - may recover with eviction
-    FATAL = "fatal"           # Permissions, missing files - no retry
-    AGENT = "agent"           # Stuck, max iterations - agent behavior issue
+    TRANSIENT = "transient"  # Network, timeout, file lock - retry
+    RESOURCE = "resource"  # VRAM, disk space - may recover with eviction
+    FATAL = "fatal"  # Permissions, missing files - no retry
+    AGENT = "agent"  # Stuck, max iterations - agent behavior issue
 
 
 @dataclass
@@ -42,24 +42,30 @@ class ClassifiedError:
 
 # OSError errno values that indicate transient failures
 TRANSIENT_ERRNO = {
-    errno.EAGAIN,      # Resource temporarily unavailable
-    errno.EWOULDBLOCK, # Operation would block
-    errno.EINTR,       # Interrupted system call
-    errno.EBUSY,       # Device or resource busy
-    errno.ENOBUFS,     # No buffer space available
-    errno.ENOMEM,      # Out of memory (sometimes transient)
-    errno.ETIMEDOUT,   # Connection timed out
+    errno.EAGAIN,  # Resource temporarily unavailable
+    errno.EWOULDBLOCK,  # Operation would block
+    errno.EINTR,  # Interrupted system call
+    errno.EBUSY,  # Device or resource busy
+    errno.ENOBUFS,  # No buffer space available
+    errno.ENOMEM,  # Out of memory (sometimes transient)
+    errno.ETIMEDOUT,  # Connection timed out
     errno.ECONNRESET,  # Connection reset by peer
-    errno.ECONNREFUSED,# Connection refused (service may restart)
-    errno.EPIPE,       # Broken pipe
-    errno.ENETUNREACH, # Network unreachable
-    errno.EHOSTUNREACH,# Host unreachable
+    errno.ECONNREFUSED,  # Connection refused (service may restart)
+    errno.EPIPE,  # Broken pipe
+    errno.ENETUNREACH,  # Network unreachable
+    errno.EHOSTUNREACH,  # Host unreachable
 }
 
 # Keywords that indicate VRAM/resource issues in error messages
 VRAM_KEYWORDS = [
-    "vram", "gpu memory", "cuda out of memory", "out of memory",
-    "insufficient memory", "memory allocation", "rocm", "hip error"
+    "vram",
+    "gpu memory",
+    "cuda out of memory",
+    "out of memory",
+    "insufficient memory",
+    "memory allocation",
+    "rocm",
+    "hip error",
 ]
 
 # Suggestions for common error patterns
@@ -82,10 +88,7 @@ ERROR_SUGGESTIONS = {
 }
 
 
-def classify_error(
-    error: Exception,
-    context: str = ""
-) -> ClassifiedError:
+def classify_error(error: Exception, context: str = "") -> ClassifiedError:
     """Classify an exception for appropriate handling.
 
     Args:
@@ -96,16 +99,18 @@ def classify_error(
         ClassifiedError with category, retryability, and suggestions
     """
     error_msg = str(error).lower()
-    error_type = type(error).__name__
+    type(error).__name__
 
     # Check for specific exception types first
-    if isinstance(error, (ConnectionError, ConnectionRefusedError, ConnectionResetError)):
+    if isinstance(
+        error, (ConnectionError, ConnectionRefusedError, ConnectionResetError)
+    ):
         return ClassifiedError(
             category=ErrorCategory.TRANSIENT,
             message=str(error),
             retryable=True,
             suggestion=_get_suggestion(error_msg),
-            original_exception=error
+            original_exception=error,
         )
 
     if isinstance(error, TimeoutError):
@@ -114,7 +119,7 @@ def classify_error(
             message=str(error),
             retryable=True,
             suggestion="Operation timed out - will retry automatically",
-            original_exception=error
+            original_exception=error,
         )
 
     if isinstance(error, PermissionError):
@@ -123,7 +128,7 @@ def classify_error(
             message=str(error),
             retryable=False,
             suggestion="Check file permissions or try a different location",
-            original_exception=error
+            original_exception=error,
         )
 
     if isinstance(error, FileNotFoundError):
@@ -132,7 +137,7 @@ def classify_error(
             message=str(error),
             retryable=False,
             suggestion="Try using list_directory to find the correct path",
-            original_exception=error
+            original_exception=error,
         )
 
     if isinstance(error, IsADirectoryError):
@@ -141,7 +146,7 @@ def classify_error(
             message=str(error),
             retryable=False,
             suggestion="Expected a file path, not a directory",
-            original_exception=error
+            original_exception=error,
         )
 
     if isinstance(error, NotADirectoryError):
@@ -150,18 +155,18 @@ def classify_error(
             message=str(error),
             retryable=False,
             suggestion="Expected a directory path, not a file",
-            original_exception=error
+            original_exception=error,
         )
 
     # Check for OSError with specific errno
-    if isinstance(error, OSError) and hasattr(error, 'errno'):
+    if isinstance(error, OSError) and hasattr(error, "errno"):
         if error.errno in TRANSIENT_ERRNO:
             return ClassifiedError(
                 category=ErrorCategory.TRANSIENT,
                 message=str(error),
                 retryable=True,
                 suggestion=_get_suggestion(error_msg),
-                original_exception=error
+                original_exception=error,
             )
 
     # Check for VRAM/memory issues in message
@@ -171,7 +176,7 @@ def classify_error(
             message=str(error),
             retryable=True,  # May succeed after eviction
             suggestion="Waiting for model eviction or try a smaller model",
-            original_exception=error
+            original_exception=error,
         )
 
     # Check for disk space issues
@@ -181,7 +186,7 @@ def classify_error(
             message=str(error),
             retryable=False,
             suggestion="Free up disk space on the device",
-            original_exception=error
+            original_exception=error,
         )
 
     # Default: treat as fatal (don't retry unknown errors)
@@ -190,14 +195,11 @@ def classify_error(
         message=str(error),
         retryable=False,
         suggestion=_get_suggestion(error_msg),
-        original_exception=error
+        original_exception=error,
     )
 
 
-def classify_error_message(
-    error_msg: str,
-    context: str = ""
-) -> ClassifiedError:
+def classify_error_message(error_msg: str, context: str = "") -> ClassifiedError:
     """Classify an error from its message string.
 
     Use this when you only have an error message, not an exception.
@@ -213,16 +215,21 @@ def classify_error_message(
 
     # Check for transient patterns
     transient_patterns = [
-        "connection refused", "connection reset", "timeout",
-        "temporarily unavailable", "try again", "busy",
-        "rate limit", "too many requests"
+        "connection refused",
+        "connection reset",
+        "timeout",
+        "temporarily unavailable",
+        "try again",
+        "busy",
+        "rate limit",
+        "too many requests",
     ]
     if any(p in msg_lower for p in transient_patterns):
         return ClassifiedError(
             category=ErrorCategory.TRANSIENT,
             message=error_msg,
             retryable=True,
-            suggestion=_get_suggestion(msg_lower)
+            suggestion=_get_suggestion(msg_lower),
         )
 
     # Check for resource patterns
@@ -231,21 +238,26 @@ def classify_error_message(
             category=ErrorCategory.RESOURCE,
             message=error_msg,
             retryable=True,
-            suggestion="Waiting for model eviction or try a smaller model"
+            suggestion="Waiting for model eviction or try a smaller model",
         )
 
     # Check for fatal patterns
     fatal_patterns = [
-        "permission denied", "access denied", "not found",
-        "no such file", "is a directory", "not a directory",
-        "invalid", "malformed"
+        "permission denied",
+        "access denied",
+        "not found",
+        "no such file",
+        "is a directory",
+        "not a directory",
+        "invalid",
+        "malformed",
     ]
     if any(p in msg_lower for p in fatal_patterns):
         return ClassifiedError(
             category=ErrorCategory.FATAL,
             message=error_msg,
             retryable=False,
-            suggestion=_get_suggestion(msg_lower)
+            suggestion=_get_suggestion(msg_lower),
         )
 
     # Default: assume fatal (safer to not retry unknowns)
@@ -253,7 +265,7 @@ def classify_error_message(
         category=ErrorCategory.FATAL,
         message=error_msg,
         retryable=False,
-        suggestion=_get_suggestion(msg_lower)
+        suggestion=_get_suggestion(msg_lower),
     )
 
 

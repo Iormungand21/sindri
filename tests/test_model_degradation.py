@@ -1,8 +1,5 @@
 """Tests for model degradation fallback functionality."""
 
-import pytest
-from unittest.mock import MagicMock, AsyncMock, patch
-
 from sindri.agents.definitions import AgentDefinition
 from sindri.agents.registry import AGENTS
 
@@ -19,7 +16,7 @@ class TestAgentDefinitionFallback:
             system_prompt="test",
             tools=["read_file"],
             fallback_model="test:3b",
-            fallback_vram_gb=3.0
+            fallback_vram_gb=3.0,
         )
         assert agent.fallback_model == "test:3b"
         assert agent.fallback_vram_gb == 3.0
@@ -31,7 +28,7 @@ class TestAgentDefinitionFallback:
             role="test agent",
             model="test:7b",
             system_prompt="test",
-            tools=["read_file"]
+            tools=["read_file"],
         )
         assert agent.fallback_model is None
         assert agent.fallback_vram_gb is None
@@ -86,5 +83,6 @@ class TestAgentRegistryFallbacks:
         """Fallback models should require less VRAM than primary."""
         for name, agent in AGENTS.items():
             if agent.fallback_model:
-                assert agent.fallback_vram_gb < agent.estimated_vram_gb, \
-                    f"{name}: fallback should require less VRAM"
+                assert (
+                    agent.fallback_vram_gb < agent.estimated_vram_gb
+                ), f"{name}: fallback should require less VRAM"

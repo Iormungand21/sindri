@@ -9,14 +9,15 @@ import uuid
 
 class TaskStatus(Enum):
     """Task execution status."""
+
     PENDING = "pending"
     PLANNING = "planning"
-    WAITING = "waiting"       # Waiting on subtask
+    WAITING = "waiting"  # Waiting on subtask
     RUNNING = "running"
     COMPLETE = "complete"
     FAILED = "failed"
     BLOCKED = "blocked"
-    CANCELLED = "cancelled"   # User cancelled task
+    CANCELLED = "cancelled"  # User cancelled task
 
 
 @dataclass
@@ -29,7 +30,7 @@ class Task:
 
     # Description
     description: str = ""
-    task_type: str = "general"        # plan, code, review, execute
+    task_type: str = "general"  # plan, code, review, execute
     assigned_agent: str = "brokkr"
 
     # Status
@@ -85,7 +86,10 @@ class Task:
         """Check if task has incomplete subtasks."""
         for subtask_id in self.subtask_ids:
             subtask = all_tasks.get(subtask_id)
-            if subtask and subtask.status not in (TaskStatus.COMPLETE, TaskStatus.FAILED):
+            if subtask and subtask.status not in (
+                TaskStatus.COMPLETE,
+                TaskStatus.FAILED,
+            ):
                 return True
         return False
 
@@ -112,7 +116,4 @@ class Task:
 
     def shares_model_with(self, other: "Task") -> bool:
         """Check if this task uses the same model as another task."""
-        return (
-            self.model_name is not None
-            and self.model_name == other.model_name
-        )
+        return self.model_name is not None and self.model_name == other.model_name

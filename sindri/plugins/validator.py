@@ -11,21 +11,21 @@ from typing import Optional, Set
 import structlog
 
 from sindri.plugins.loader import PluginInfo, PluginType
-from sindri.tools.base import Tool
 
 log = structlog.get_logger()
 
 
 class ValidationError(Enum):
     """Types of validation errors."""
-    SYNTAX_ERROR = auto()           # Invalid Python syntax
-    IMPORT_ERROR = auto()           # Problematic imports
-    SECURITY_VIOLATION = auto()     # Dangerous code patterns
-    MISSING_REQUIRED = auto()        # Missing required attributes
-    INVALID_SCHEMA = auto()          # Invalid tool schema
-    NAME_CONFLICT = auto()           # Name conflicts with existing tools/agents
-    MODEL_NOT_FOUND = auto()         # Referenced model not available
-    TOOL_NOT_FOUND = auto()          # Referenced tool not available
+
+    SYNTAX_ERROR = auto()  # Invalid Python syntax
+    IMPORT_ERROR = auto()  # Problematic imports
+    SECURITY_VIOLATION = auto()  # Dangerous code patterns
+    MISSING_REQUIRED = auto()  # Missing required attributes
+    INVALID_SCHEMA = auto()  # Invalid tool schema
+    NAME_CONFLICT = auto()  # Name conflicts with existing tools/agents
+    MODEL_NOT_FOUND = auto()  # Referenced model not available
+    TOOL_NOT_FOUND = auto()  # Referenced tool not available
 
 
 @dataclass
@@ -38,6 +38,7 @@ class ValidationResult:
         warnings: List of validation warnings
         info: Additional info messages
     """
+
     valid: bool
     errors: list[tuple[ValidationError, str]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -80,23 +81,23 @@ class PluginValidator:
 
     # Dangerous modules that should not be imported
     DANGEROUS_IMPORTS: Set[str] = {
-        "subprocess",        # Already have shell tool
-        "socket",           # Network access
-        "ctypes",           # Low-level memory access
-        "pickle",           # Arbitrary code execution
-        "marshal",          # Code object manipulation
-        "tempfile",         # Should use provided file tools
+        "subprocess",  # Already have shell tool
+        "socket",  # Network access
+        "ctypes",  # Low-level memory access
+        "pickle",  # Arbitrary code execution
+        "marshal",  # Code object manipulation
+        "tempfile",  # Should use provided file tools
         "multiprocessing",  # Complex process management
-        "threading",        # Should use async
-        "pty",              # Pseudo-terminal (shell escape)
-        "fcntl",            # Low-level file control
-        "mmap",             # Memory mapping
+        "threading",  # Should use async
+        "pty",  # Pseudo-terminal (shell escape)
+        "fcntl",  # Low-level file control
+        "mmap",  # Memory mapping
     }
 
     # Allowed imports that are explicitly safe
     ALLOWED_IMPORTS: Set[str] = {
         "asyncio",
-        "os",               # Limited to path operations
+        "os",  # Limited to path operations
         "pathlib",
         "json",
         "re",
@@ -112,9 +113,9 @@ class PluginValidator:
         "structlog",
         "sindri",
         "pydantic",
-        "aiohttp",          # For web tools
-        "httpx",            # For web tools
-        "aiofiles",         # Async file operations
+        "aiohttp",  # For web tools
+        "httpx",  # For web tools
+        "aiofiles",  # Async file operations
     }
 
     # Dangerous function calls
@@ -123,7 +124,7 @@ class PluginValidator:
         "exec",
         "compile",
         "__import__",
-        "open",             # Should use provided file tools (warning only)
+        "open",  # Should use provided file tools (warning only)
         "exit",
         "quit",
     }
@@ -133,7 +134,7 @@ class PluginValidator:
         existing_tools: Optional[Set[str]] = None,
         existing_agents: Optional[Set[str]] = None,
         available_models: Optional[Set[str]] = None,
-        strict: bool = False
+        strict: bool = False,
     ):
         """Initialize the validator.
 
@@ -187,7 +188,7 @@ class PluginValidator:
         if plugin.name in self.existing_tools:
             result.add_error(
                 ValidationError.NAME_CONFLICT,
-                f"Tool name '{plugin.name}' conflicts with existing tool"
+                f"Tool name '{plugin.name}' conflicts with existing tool",
             )
 
         # Read and parse source
@@ -197,7 +198,7 @@ class PluginValidator:
         except SyntaxError as e:
             result.add_error(
                 ValidationError.SYNTAX_ERROR,
-                f"Syntax error at line {e.lineno}: {e.msg}"
+                f"Syntax error at line {e.lineno}: {e.msg}",
             )
             return
         except Exception as e:
@@ -223,8 +224,7 @@ class PluginValidator:
         """
         if not plugin.agent_config:
             result.add_error(
-                ValidationError.MISSING_REQUIRED,
-                "Agent configuration not loaded"
+                ValidationError.MISSING_REQUIRED, "Agent configuration not loaded"
             )
             return
 
@@ -234,7 +234,7 @@ class PluginValidator:
         if config["name"] in self.existing_agents:
             result.add_error(
                 ValidationError.NAME_CONFLICT,
-                f"Agent name '{config['name']}' conflicts with existing agent"
+                f"Agent name '{config['name']}' conflicts with existing agent",
             )
 
         # Check model availability (if we have the list)
@@ -264,8 +264,7 @@ class PluginValidator:
         vram = config.get("estimated_vram_gb", 8.0)
         if vram <= 0:
             result.add_error(
-                ValidationError.INVALID_SCHEMA,
-                "estimated_vram_gb must be positive"
+                ValidationError.INVALID_SCHEMA, "estimated_vram_gb must be positive"
             )
         elif vram > 24:
             result.add_warning(
@@ -277,8 +276,7 @@ class PluginValidator:
         max_iter = config.get("max_iterations", 30)
         if max_iter <= 0:
             result.add_error(
-                ValidationError.INVALID_SCHEMA,
-                "max_iterations must be positive"
+                ValidationError.INVALID_SCHEMA, "max_iterations must be positive"
             )
         elif max_iter > 100:
             result.add_warning(
@@ -312,12 +310,10 @@ class PluginValidator:
                         result.add_error(
                             ValidationError.SECURITY_VIOLATION,
                             f"Dangerous import: '{alias.name}'. "
-                            f"Use Sindri's built-in tools instead."
+                            f"Use Sindri's built-in tools instead.",
                         )
                     elif module_name not in self.ALLOWED_IMPORTS:
-                        result.add_info(
-                            f"Non-standard import: '{alias.name}'"
-                        )
+                        result.add_info(f"Non-standard import: '{alias.name}'")
 
             elif isinstance(node, ast.ImportFrom):
                 if node.module:
@@ -326,7 +322,7 @@ class PluginValidator:
                         result.add_error(
                             ValidationError.SECURITY_VIOLATION,
                             f"Dangerous import from '{node.module}'. "
-                            f"Use Sindri's built-in tools instead."
+                            f"Use Sindri's built-in tools instead.",
                         )
 
     def _check_dangerous_calls(self, tree: ast.AST, result: ValidationResult) -> None:
@@ -354,7 +350,7 @@ class PluginValidator:
                     else:
                         result.add_error(
                             ValidationError.SECURITY_VIOLATION,
-                            f"Dangerous function call: '{func_name}()'"
+                            f"Dangerous function call: '{func_name}()'",
                         )
 
     def _validate_tool_class(self, tool_class: type, result: ValidationResult) -> None:
@@ -367,34 +363,33 @@ class PluginValidator:
         # Check required attributes
         if not hasattr(tool_class, "name"):
             result.add_error(
-                ValidationError.MISSING_REQUIRED,
-                "Tool class missing 'name' attribute"
+                ValidationError.MISSING_REQUIRED, "Tool class missing 'name' attribute"
             )
 
         if not hasattr(tool_class, "description"):
             result.add_error(
                 ValidationError.MISSING_REQUIRED,
-                "Tool class missing 'description' attribute"
+                "Tool class missing 'description' attribute",
             )
 
         if not hasattr(tool_class, "parameters"):
             result.add_error(
                 ValidationError.MISSING_REQUIRED,
-                "Tool class missing 'parameters' attribute"
+                "Tool class missing 'parameters' attribute",
             )
 
         # Check execute method
         if not hasattr(tool_class, "execute"):
             result.add_error(
-                ValidationError.MISSING_REQUIRED,
-                "Tool class missing 'execute' method"
+                ValidationError.MISSING_REQUIRED, "Tool class missing 'execute' method"
             )
         else:
             import inspect
+
             if not inspect.iscoroutinefunction(tool_class.execute):
                 result.add_error(
                     ValidationError.INVALID_SCHEMA,
-                    "Tool 'execute' method must be async"
+                    "Tool 'execute' method must be async",
                 )
 
         # Validate parameters schema
@@ -403,12 +398,10 @@ class PluginValidator:
             if not isinstance(params, dict):
                 result.add_error(
                     ValidationError.INVALID_SCHEMA,
-                    "Tool 'parameters' must be a dict (JSON Schema)"
+                    "Tool 'parameters' must be a dict (JSON Schema)",
                 )
             elif "type" not in params:
-                result.add_warning(
-                    "Tool parameters schema missing 'type' field"
-                )
+                result.add_warning("Tool parameters schema missing 'type' field")
 
         result.add_info(f"Tool class '{tool_class.__name__}' structure validated")
 
@@ -445,8 +438,7 @@ def validate_plugin_file(path: Path, **kwargs) -> ValidationResult:
     if not plugin:
         result = ValidationResult(valid=False)
         result.add_error(
-            ValidationError.SYNTAX_ERROR,
-            f"Could not load plugin from {path}"
+            ValidationError.SYNTAX_ERROR, f"Could not load plugin from {path}"
         )
         return result
 

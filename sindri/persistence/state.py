@@ -20,13 +20,15 @@ def serialize_tool_calls(tool_calls):
     serialized = []
     for call in tool_calls:
         # Handle ollama native ToolCall objects
-        if hasattr(call, 'function'):
-            serialized.append({
-                'function': {
-                    'name': call.function.name,
-                    'arguments': call.function.arguments
+        if hasattr(call, "function"):
+            serialized.append(
+                {
+                    "function": {
+                        "name": call.function.name,
+                        "arguments": call.function.arguments,
+                    }
                 }
-            })
+            )
         # Handle dict format
         elif isinstance(call, dict):
             serialized.append(call)
@@ -72,18 +74,15 @@ class SessionState:
     def __init__(self, database: Optional[Database] = None):
         self.db = database or Database()
 
-    async def create_session(self, task: str, model: str = "qwen2.5-coder:14b") -> Session:
+    async def create_session(
+        self, task: str, model: str = "qwen2.5-coder:14b"
+    ) -> Session:
         """Create a new session."""
 
         await self.db.initialize()
 
         session_id = str(uuid.uuid4())
-        session = Session(
-            id=session_id,
-            task=task,
-            model=model,
-            status="active"
-        )
+        session = Session(id=session_id, task=task, model=model, status="active")
 
         async with self.db.get_connection() as conn:
             await conn.execute(
@@ -91,7 +90,13 @@ class SessionState:
                 INSERT INTO sessions (id, task, model, status, created_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (session.id, session.task, session.model, session.status, session.created_at)
+                (
+                    session.id,
+                    session.task,
+                    session.model,
+                    session.status,
+                    session.created_at,
+                ),
             )
             await conn.commit()
 
@@ -109,7 +114,7 @@ class SessionState:
                 SET status = ?, iterations = ?, completed_at = ?
                 WHERE id = ?
                 """,
-                (session.status, session.iterations, session.completed_at, session.id)
+                (session.status, session.iterations, session.completed_at, session.id),
             )
 
             # Save new turns (simple approach: delete and re-insert all)
@@ -122,7 +127,13 @@ class SessionState:
                     INSERT INTO turns (session_id, role, content, tool_calls, created_at)
                     VALUES (?, ?, ?, ?, ?)
                     """,
-                    (session.id, turn.role, turn.content, tool_calls_json, turn.created_at)
+                    (
+                        session.id,
+                        turn.role,
+                        turn.content,
+                        tool_calls_json,
+                        turn.created_at,
+                    ),
                 )
 
             await conn.commit()
@@ -148,13 +159,13 @@ class SessionState:
                     status=row[3],
                     created_at=datetime.fromisoformat(row[4]),
                     completed_at=datetime.fromisoformat(row[5]) if row[5] else None,
-                    iterations=row[6]
+                    iterations=row[6],
                 )
 
             # Load turns
             async with conn.execute(
                 "SELECT role, content, tool_calls, created_at FROM turns WHERE session_id = ? ORDER BY id",
-                (session_id,)
+                (session_id,),
             ) as cursor:
                 async for row in cursor:
                     tool_calls = json.loads(row[2]) if row[2] else None
@@ -162,7 +173,7 @@ class SessionState:
                         role=row[0],
                         content=row[1],
                         tool_calls=tool_calls,
-                        created_at=datetime.fromisoformat(row[3])
+                        created_at=datetime.fromisoformat(row[3]),
                     )
                     session.turns.append(turn)
 
@@ -179,7 +190,7 @@ class SessionState:
                 SET status = 'completed', completed_at = ?
                 WHERE id = ?
                 """,
-                (datetime.now(), session_id)
+                (datetime.now(), session_id),
             )
             await conn.commit()
 
@@ -196,18 +207,20 @@ class SessionState:
                 ORDER BY created_at DESC
                 LIMIT ?
                 """,
-                (limit,)
+                (limit,),
             ) as cursor:
                 sessions = []
                 async for row in cursor:
-                    sessions.append({
-                        "id": row[0],
-                        "task": row[1],
-                        "model": row[2],
-                        "status": row[3],
-                        "created_at": row[4],
-                        "iterations": row[5]
-                    })
+                    sessions.append(
+                        {
+                            "id": row[0],
+                            "task": row[1],
+                            "model": row[2],
+                            "status": row[3],
+                            "created_at": row[4],
+                            "iterations": row[5],
+                        }
+                    )
                 return sessions
 
     async def cleanup_stale_sessions(self, max_age_hours: float = 1.0) -> int:
@@ -237,7 +250,7 @@ class SessionState:
                 SELECT COUNT(*) FROM sessions
                 WHERE status = 'active' AND created_at < ?
                 """,
-                (cutoff_time.isoformat(),)
+                (cutoff_time.isoformat(),),
             ) as cursor:
                 row = await cursor.fetchone()
                 count = row[0] if row else 0
@@ -250,11 +263,13 @@ class SessionState:
                     SET status = 'failed', completed_at = ?
                     WHERE status = 'active' AND created_at < ?
                     """,
-                    (datetime.now(), cutoff_time.isoformat())
+                    (datetime.now(), cutoff_time.isoformat()),
                 )
                 await conn.commit()
 
-                log.info("stale_sessions_cleaned", count=count, max_age_hours=max_age_hours)
+                log.info(
+                    "stale_sessions_cleaned", count=count, max_age_hours=max_age_hours
+                )
 
         return count
 

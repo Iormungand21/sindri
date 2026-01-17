@@ -16,6 +16,7 @@ log = structlog.get_logger()
 @dataclass
 class ParsedToolCall:
     """A parsed tool call from text."""
+
     name: str
     arguments: dict
 
@@ -25,10 +26,10 @@ class ToolCallParser:
 
     # Improved pattern - matches greedy to get full JSON block
     # Handles multiline and nested structures
-    JSON_BLOCK_PATTERN = re.compile(r'```json\s*(\{.+?\})\s*```', re.DOTALL)
+    JSON_BLOCK_PATTERN = re.compile(r"```json\s*(\{.+?\})\s*```", re.DOTALL)
 
     # Alternative pattern without json marker
-    CODE_BLOCK_PATTERN = re.compile(r'```\s*(\{.+?\})\s*```', re.DOTALL)
+    CODE_BLOCK_PATTERN = re.compile(r"```\s*(\{.+?\})\s*```", re.DOTALL)
 
     def _find_json_objects(self, text: str) -> list[str]:
         """Find JSON objects in text, handling nesting and strings properly."""
@@ -44,7 +45,7 @@ class ToolCallParser:
                 escape_next = False
                 continue
 
-            if char == '\\':
+            if char == "\\":
                 escape_next = True
                 continue
 
@@ -55,30 +56,35 @@ class ToolCallParser:
 
             # Only count braces outside of strings
             if not in_string:
-                if char == '{':
+                if char == "{":
                     if brace_count == 0:
                         start_pos = i
                     brace_count += 1
-                elif char == '}':
+                elif char == "}":
                     brace_count -= 1
                     if brace_count == 0 and start_pos is not None:
-                        json_str = text[start_pos:i+1]
+                        json_str = text[start_pos : i + 1]
                         # Check if it looks like a tool call
-                        if any(key in json_str for key in ['"name"', '"function"', '"tool"']):
+                        if any(
+                            key in json_str
+                            for key in ['"name"', '"function"', '"tool"']
+                        ):
                             results.append(json_str)
                         start_pos = None
 
         # If we have an unclosed JSON object, try to salvage it
         if brace_count > 0 and start_pos is not None:
-            log.warning("unclosed_json_detected",
-                       start_pos=start_pos,
-                       missing_braces=brace_count,
-                       preview=text[start_pos:start_pos+100])
+            log.warning(
+                "unclosed_json_detected",
+                start_pos=start_pos,
+                missing_braces=brace_count,
+                preview=text[start_pos : start_pos + 100],
+            )
             # Try to extract partial JSON for better error reporting
             partial = text[start_pos:]
             if any(key in partial for key in ['"name"', '"function"', '"tool"']):
                 # Attempt to close the JSON
-                closed = partial + ('}' * brace_count)
+                closed = partial + ("}" * brace_count)
                 results.append(closed)
                 log.info("attempting_recovery_with_closed_braces", recovered=True)
 
@@ -98,9 +104,11 @@ class ToolCallParser:
                     tool_calls.append(call)
                     log.info("parsed_tool_call_from_json_block", call=call.name)
             except json.JSONDecodeError as e:
-                log.warning("json_block_decode_failed",
-                           error=str(e),
-                           json_preview=match.group(1)[:100])
+                log.warning(
+                    "json_block_decode_failed",
+                    error=str(e),
+                    json_preview=match.group(1)[:100],
+                )
                 continue
 
         if tool_calls:
@@ -132,10 +140,12 @@ class ToolCallParser:
                     tool_calls.append(call)
                     log.info("parsed_tool_call_from_inline_json", call=call.name)
             except json.JSONDecodeError as e:
-                log.warning("inline_json_decode_failed",
-                           attempt=i+1,
-                           error=str(e),
-                           json_preview=json_str[:150])
+                log.warning(
+                    "inline_json_decode_failed",
+                    attempt=i + 1,
+                    error=str(e),
+                    json_preview=json_str[:150],
+                )
                 # Try to fix common issues
                 fixed_json = self._attempt_json_fix(json_str)
                 if fixed_json:
@@ -149,18 +159,20 @@ class ToolCallParser:
                         continue
 
         if not tool_calls:
-            log.warning("no_tool_calls_extracted",
-                       text_length=len(text),
-                       has_braces='{' in text,
-                       has_json_marker='```json' in text,
-                       text_preview=text[:200])
+            log.warning(
+                "no_tool_calls_extracted",
+                text_length=len(text),
+                has_braces="{" in text,
+                has_json_marker="```json" in text,
+                text_preview=text[:200],
+            )
 
         return tool_calls
 
     def _attempt_json_fix(self, json_str: str) -> Optional[str]:
         """Attempt to fix common JSON issues."""
         # Remove trailing commas before closing braces/brackets
-        fixed = re.sub(r',\s*([\]}])', r'\1', json_str)
+        fixed = re.sub(r",\s*([\]}])", r"\1", json_str)
 
         # Try to handle truncated strings - find last complete field
         if fixed.count('"') % 2 != 0:
@@ -171,11 +183,11 @@ class ToolCallParser:
                 prev_quote = fixed.rfind('"', 0, last_quote - 1)
                 if prev_quote > 0:
                     # Truncate at the last complete field and close JSON
-                    truncated = fixed[:prev_quote + 1]
+                    truncated = fixed[: prev_quote + 1]
                     # Count unclosed braces
-                    open_braces = truncated.count('{') - truncated.count('}')
+                    open_braces = truncated.count("{") - truncated.count("}")
                     if open_braces > 0:
-                        fixed = truncated + ('}' * open_braces)
+                        fixed = truncated + ("}" * open_braces)
                         log.info("attempted_truncation_fix", result_preview=fixed[:100])
                         return fixed
 
@@ -186,37 +198,27 @@ class ToolCallParser:
 
         # Format 1: {"name": "tool_name", "arguments": {...}}
         if "name" in data and "arguments" in data:
-            return ParsedToolCall(
-                name=data["name"],
-                arguments=data["arguments"]
-            )
+            return ParsedToolCall(name=data["name"], arguments=data["arguments"])
 
         # Format 2: {"function": "tool_name", "arguments": {...}}
         if "function" in data and "arguments" in data:
-            return ParsedToolCall(
-                name=data["function"],
-                arguments=data["arguments"]
-            )
+            return ParsedToolCall(name=data["function"], arguments=data["arguments"])
 
         # Format 3: {"tool": "tool_name", "args": {...}}
         if "tool" in data and "args" in data:
-            return ParsedToolCall(
-                name=data["tool"],
-                arguments=data["args"]
-            )
+            return ParsedToolCall(name=data["tool"], arguments=data["args"])
 
         # Format 4: Ollama-style {"function": {"name": "...", "arguments": {...}}}
         if "function" in data and isinstance(data["function"], dict):
             func = data["function"]
             if "name" in func and "arguments" in func:
-                return ParsedToolCall(
-                    name=func["name"],
-                    arguments=func["arguments"]
-                )
+                return ParsedToolCall(name=func["name"], arguments=func["arguments"])
 
         return None
 
-    def has_completion_marker(self, text: str, marker: str = "<sindri:complete/>") -> bool:
+    def has_completion_marker(
+        self, text: str, marker: str = "<sindri:complete/>"
+    ) -> bool:
         """Check if text contains completion marker."""
         return marker in text
 
@@ -226,15 +228,14 @@ class ToolCallParser:
         Returns (thinking, remaining_text)
         """
         # Look for common reasoning patterns
-        reasoning_end = -1
 
         # Check for explicit reasoning blocks
         if "<think>" in text.lower():
             start = text.lower().find("<think>")
             end = text.lower().find("</think>")
             if end > start:
-                reasoning = text[start:end+8]
-                remaining = text[:start] + text[end+8:]
+                reasoning = text[start : end + 8]
+                remaining = text[:start] + text[end + 8 :]
                 return reasoning.strip(), remaining.strip()
 
         # Check for "Let me" or "I will" patterns
@@ -246,7 +247,7 @@ class ToolCallParser:
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if match:
                 reasoning = match.group(0)
-                remaining = text[match.end():]
+                remaining = text[match.end() :]
                 return reasoning.strip(), remaining.strip()
 
         return "", text

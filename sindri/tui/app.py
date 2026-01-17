@@ -5,7 +5,6 @@ from textual.binding import Binding
 from textual.widgets import Footer, Input, Tree, RichLog
 from textual.containers import Horizontal, Vertical
 from typing import Optional
-import asyncio
 
 from sindri.tui.widgets.header import SindriHeader
 from sindri.tui.widgets.history import TaskHistoryPanel, SessionSelected
@@ -102,7 +101,9 @@ class SindriApp(App):
         Binding("h", "toggle_history", "History"),
     ]
 
-    def __init__(self, task: Optional[str] = None, orchestrator=None, event_bus=None, **kwargs):
+    def __init__(
+        self, task: Optional[str] = None, orchestrator=None, event_bus=None, **kwargs
+    ):
         super().__init__(**kwargs)
         self.initial_task = task
         self.orchestrator = orchestrator
@@ -142,14 +143,18 @@ class SindriApp(App):
                 episodes_count = memory.episodic.get_episode_count()
                 pattern_count = memory.get_pattern_count()
 
-                output.write(f"[dim]📚 Memory: {indexed_files} files, {episodes_count} episodes, {pattern_count} patterns[/dim]")
+                output.write(
+                    f"[dim]📚 Memory: {indexed_files} files, {episodes_count} episodes, {pattern_count} patterns[/dim]"
+                )
                 output.write("")
 
                 # Update subtitle in header
-                header = self.query_one(SindriHeader)
+                self.query_one(SindriHeader)
                 self.sub_title = f"Memory: {indexed_files} files, {episodes_count} episodes, {pattern_count} patterns"
             except Exception as e:
-                output.write(f"[dim yellow]⚠ Memory system available (stats unavailable: {e})[/dim yellow]")
+                output.write(
+                    f"[dim yellow]⚠ Memory system available (stats unavailable: {e})[/dim yellow]"
+                )
                 output.write("")
         else:
             output.write("[dim]📚 Memory system disabled[/dim]")
@@ -173,7 +178,7 @@ class SindriApp(App):
         self._setup_event_handlers()
 
         # Start VRAM monitor
-        if self.orchestrator and hasattr(self.orchestrator, 'model_manager'):
+        if self.orchestrator and hasattr(self.orchestrator, "model_manager"):
             self.set_interval(2.0, self._update_vram_stats)
             self._update_vram_stats()  # Initial update
 
@@ -195,13 +200,13 @@ class SindriApp(App):
     def _update_vram_stats(self):
         """Update VRAM stats in header."""
         try:
-            if self.orchestrator and hasattr(self.orchestrator, 'model_manager'):
+            if self.orchestrator and hasattr(self.orchestrator, "model_manager"):
                 stats = self.orchestrator.model_manager.get_vram_stats()
                 header = self.query_one(SindriHeader)
                 header.update_vram(
-                    used=stats['used'],
-                    total=stats['total'],
-                    loaded_models=stats['loaded_models']
+                    used=stats["used"],
+                    total=stats["total"],
+                    loaded_models=stats["loaded_models"],
                 )
         except Exception as e:
             self.log(f"Error updating VRAM stats: {e}")
@@ -246,7 +251,10 @@ class SindriApp(App):
                             base_label = old_label.replace(f"[{old_icon}]", "").strip()
 
                             # Add error message if task failed/cancelled
-                            if status == TaskStatus.FAILED and task_id in self._task_errors:
+                            if (
+                                status == TaskStatus.FAILED
+                                and task_id in self._task_errors
+                            ):
                                 error_msg = self._task_errors[task_id]
                                 new_label = f"[bold red][{new_icon}] {base_label}[/bold red]\n[dim red]    ↳ {error_msg[:60]}[/dim red]"
                             elif status == TaskStatus.CANCELLED:
@@ -285,7 +293,9 @@ class SindriApp(App):
                 result = str(data.get("result", ""))[:200]
 
                 if success:
-                    output.write(f"\n[green]✓ [Tool: {name}][/green] [dim]{result}[/dim]")
+                    output.write(
+                        f"\n[green]✓ [Tool: {name}][/green] [dim]{result}[/dim]"
+                    )
                 else:
                     # Failed tool calls get prominent display
                     output.write("")
@@ -309,7 +319,7 @@ class SindriApp(App):
                 output = self.query_one("#output", RichLog)
                 task_id = data.get("task_id")
                 error_msg = data.get("error", "Unknown error")
-                error_type = data.get("error_type", "error")
+                data.get("error_type", "error")
 
                 # Store error for task tree display
                 if task_id:
@@ -405,7 +415,9 @@ class SindriApp(App):
                         output.write(line)
 
                 output.write("")
-                output.write(f"[dim]Steps: {step_count} | Agents: {', '.join(agents)} | VRAM: ~{vram:.1f}GB[/dim]")
+                output.write(
+                    f"[dim]Steps: {step_count} | Agents: {', '.join(agents)} | VRAM: ~{vram:.1f}GB[/dim]"
+                )
                 output.write("[bold magenta]━━━━━━━━━━━━━━━━━━━━━━[/bold magenta]")
                 output.write("")
 
@@ -429,8 +441,10 @@ class SindriApp(App):
                 if len(tools) > 3:
                     tool_str += f" +{len(tools) - 3}"
 
-                output.write(f"[dim green]📚 Pattern learned (#{pattern_id}) - "
-                           f"{agent} in {iterations} iterations, tools: {tool_str}[/dim green]")
+                output.write(
+                    f"[dim green]📚 Pattern learned (#{pattern_id}) - "
+                    f"{agent} in {iterations} iterations, tools: {tool_str}[/dim green]"
+                )
             except Exception as e:
                 self.log(f"Error in pattern_learned: {e}")
 
@@ -454,44 +468,54 @@ class SindriApp(App):
         output = self.query_one("#output", RichLog)
 
         try:
-            output.write(f"\n[bold yellow]Starting task:[/bold yellow] {task_description}")
+            output.write(
+                f"\n[bold yellow]Starting task:[/bold yellow] {task_description}"
+            )
 
             # Create root task and emit event
             root_task = Task(
                 description=task_description,
                 task_type="orchestration",
                 assigned_agent="brokkr",
-                priority=0
+                priority=0,
             )
 
             # Store root task ID for cancellation
             self._root_task_id = root_task.id
 
-            self.event_bus.emit(Event(
-                type=EventType.TASK_CREATED,
-                data={
-                    "task_id": root_task.id,
-                    "description": task_description,
-                    "status": TaskStatus.PENDING,
-                    "parent_id": None
-                }
-            ))
+            self.event_bus.emit(
+                Event(
+                    type=EventType.TASK_CREATED,
+                    data={
+                        "task_id": root_task.id,
+                        "description": task_description,
+                        "status": TaskStatus.PENDING,
+                        "parent_id": None,
+                    },
+                )
+            )
 
             # Run the orchestrator (event_bus already wired in __init__)
             result = await self.orchestrator.run(task_description)
 
             # Update status
             status = TaskStatus.COMPLETE if result.get("success") else TaskStatus.FAILED
-            self.event_bus.emit(Event(
-                type=EventType.TASK_STATUS_CHANGED,
-                data={"task_id": root_task.id, "status": status}
-            ))
+            self.event_bus.emit(
+                Event(
+                    type=EventType.TASK_STATUS_CHANGED,
+                    data={"task_id": root_task.id, "status": status},
+                )
+            )
 
             if result.get("success"):
                 output.write("")
-                output.write("[bold green]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold green]")
+                output.write(
+                    "[bold green]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold green]"
+                )
                 output.write("[bold green]✓ Task completed successfully![/bold green]")
-                output.write("[bold green]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold green]")
+                output.write(
+                    "[bold green]━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━[/bold green]"
+                )
                 output.write("")
             else:
                 error = result.get("error", "Unknown error")
@@ -611,7 +635,9 @@ class SindriApp(App):
 
             output.write(f"\n[green]✓ Exported session to {output_path}[/green]")
             output.write(f"[dim]Task: {session.task[:60]}...[/dim]")
-            output.write(f"[dim]Turns: {len(session.turns)} | Model: {session.model}[/dim]")
+            output.write(
+                f"[dim]Turns: {len(session.turns)} | Model: {session.model}[/dim]"
+            )
 
             self.notify(f"Exported to {filename}", severity="information")
 
@@ -644,7 +670,7 @@ class SindriApp(App):
         output = self.query_one("#output", RichLog)
 
         output.write("")
-        output.write(f"[bold cyan]━━━ Session Selected ━━━[/bold cyan]")
+        output.write("[bold cyan]━━━ Session Selected ━━━[/bold cyan]")
         output.write(f"[dim]ID:[/dim] {message.session_id[:16]}...")
         output.write(f"[dim]Task:[/dim] {message.task[:60]}...")
         output.write("")

@@ -3,11 +3,10 @@
 import pytest
 import asyncio
 import time
-from unittest.mock import Mock, AsyncMock, patch
 
 from sindri.llm.manager import ModelManager, LoadedModel, CacheMetrics
 from sindri.core.delegation import DelegationManager
-from sindri.core.tasks import Task, TaskStatus
+from sindri.core.tasks import Task
 from sindri.core.scheduler import TaskScheduler
 
 
@@ -57,11 +56,7 @@ class TestLoadedModel:
     def test_loaded_model_with_tracking(self):
         """LoadedModel should accept tracking values."""
         model = LoadedModel(
-            name="test",
-            vram_gb=5.0,
-            last_used=time.time(),
-            use_count=5,
-            load_time=2.5
+            name="test", vram_gb=5.0, last_used=time.time(), use_count=5, load_time=2.5
         )
         assert model.use_count == 5
         assert model.load_time == 2.5
@@ -145,9 +140,7 @@ class TestKeepWarm:
     def manager(self):
         """Create a model manager with keep_warm."""
         return ModelManager(
-            total_vram_gb=16.0,
-            reserve_gb=2.0,
-            keep_warm=["important_model"]
+            total_vram_gb=16.0, reserve_gb=2.0, keep_warm=["important_model"]
         )
 
     def test_keep_warm_initialized(self, manager):
@@ -243,14 +236,12 @@ class TestDelegationPreWarm:
         model_manager = ModelManager(total_vram_gb=16.0, reserve_gb=2.0)
         scheduler = TaskScheduler(model_manager)
         delegation = DelegationManager(
-            scheduler,
-            state=None,
-            model_manager=model_manager
+            scheduler, state=None, model_manager=model_manager
         )
         return {
             "model_manager": model_manager,
             "scheduler": scheduler,
-            "delegation": delegation
+            "delegation": delegation,
         }
 
     @pytest.mark.asyncio
@@ -266,7 +257,7 @@ class TestDelegationPreWarm:
             task_description="Child task",
             context={},
             constraints=[],
-            success_criteria=[]
+            success_criteria=[],
         )
 
         await setup["delegation"].delegate(parent, request)
@@ -294,7 +285,7 @@ class TestDelegationPreWarm:
             task_description="Child task",
             context={},
             constraints=[],
-            success_criteria=[]
+            success_criteria=[],
         )
 
         # Should not raise even without model_manager

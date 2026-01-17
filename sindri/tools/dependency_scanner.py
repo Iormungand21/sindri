@@ -23,6 +23,7 @@ log = structlog.get_logger()
 
 class Severity(Enum):
     """Vulnerability severity levels."""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -59,6 +60,7 @@ class Severity(Enum):
 @dataclass
 class Vulnerability:
     """A detected vulnerability."""
+
     id: str  # CVE-XXXX-XXXX or advisory ID
     package: str
     installed_version: str
@@ -72,6 +74,7 @@ class Vulnerability:
 @dataclass
 class DependencyInfo:
     """Information about a dependency."""
+
     name: str
     version: str
     latest_version: Optional[str] = None
@@ -83,6 +86,7 @@ class DependencyInfo:
 @dataclass
 class ScanResult:
     """Result from dependency scanning."""
+
     ecosystem: str  # python, node, rust, go
     total_dependencies: int
     vulnerabilities: list[Vulnerability] = field(default_factory=list)
@@ -186,37 +190,37 @@ Examples:
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to project directory (default: current directory)"
+                "description": "Path to project directory (default: current directory)",
             },
             "ecosystem": {
                 "type": "string",
                 "description": "Override ecosystem detection: 'python', 'node', 'rust', 'go'",
-                "enum": ["python", "node", "rust", "go"]
+                "enum": ["python", "node", "rust", "go"],
             },
             "min_severity": {
                 "type": "string",
                 "description": "Minimum severity to report: 'low', 'medium', 'high', 'critical'",
-                "enum": ["low", "medium", "high", "critical"]
+                "enum": ["low", "medium", "high", "critical"],
             },
             "include_dev": {
                 "type": "boolean",
-                "description": "Include development dependencies (default: true)"
+                "description": "Include development dependencies (default: true)",
             },
             "check_outdated": {
                 "type": "boolean",
-                "description": "Also check for outdated dependencies (default: false)"
+                "description": "Also check for outdated dependencies (default: false)",
             },
             "format": {
                 "type": "string",
                 "description": "Output format: 'text', 'json', 'sarif'",
-                "enum": ["text", "json", "sarif"]
+                "enum": ["text", "json", "sarif"],
             },
             "fix": {
                 "type": "boolean",
-                "description": "Attempt to automatically fix vulnerabilities (default: false)"
-            }
+                "description": "Attempt to automatically fix vulnerabilities (default: false)",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
@@ -228,7 +232,7 @@ Examples:
         check_outdated: bool = False,
         format: str = "text",
         fix: bool = False,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute dependency scan.
 
@@ -247,7 +251,7 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Project path does not exist: {project_path}"
+                error=f"Project path does not exist: {project_path}",
             )
 
         # Detect ecosystem if not specified
@@ -257,7 +261,7 @@ Examples:
                 return ToolResult(
                     success=False,
                     output="",
-                    error="Could not detect project ecosystem. No package.json, requirements.txt, Cargo.toml, or go.mod found."
+                    error="Could not detect project ecosystem. No package.json, requirements.txt, Cargo.toml, or go.mod found.",
                 )
 
         log.info(
@@ -270,9 +274,13 @@ Examples:
         # Run appropriate scanner
         try:
             if ecosystem == "python":
-                result = await self._scan_python(project_path, include_dev, check_outdated, fix)
+                result = await self._scan_python(
+                    project_path, include_dev, check_outdated, fix
+                )
             elif ecosystem == "node":
-                result = await self._scan_node(project_path, include_dev, check_outdated, fix)
+                result = await self._scan_node(
+                    project_path, include_dev, check_outdated, fix
+                )
             elif ecosystem == "rust":
                 result = await self._scan_rust(project_path, check_outdated, fix)
             elif ecosystem == "go":
@@ -281,21 +289,16 @@ Examples:
                 return ToolResult(
                     success=False,
                     output="",
-                    error=f"Unsupported ecosystem: {ecosystem}"
+                    error=f"Unsupported ecosystem: {ecosystem}",
                 )
 
             if result.error:
-                return ToolResult(
-                    success=False,
-                    output="",
-                    error=result.error
-                )
+                return ToolResult(success=False, output="", error=result.error)
 
             # Filter by severity
             min_sev = Severity.from_string(min_severity)
             result.vulnerabilities = [
-                v for v in result.vulnerabilities
-                if v.severity.score >= min_sev.score
+                v for v in result.vulnerabilities if v.severity.score >= min_sev.score
             ]
 
             # Format output
@@ -317,25 +320,23 @@ Examples:
                     "medium": result.medium_count,
                     "low": result.low_count,
                     "outdated": result.outdated_count,
-                }
+                },
             )
 
         except Exception as e:
             log.error("scan_failed", error=str(e))
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"Scan failed: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Scan failed: {str(e)}")
 
     def _detect_ecosystem(self, path: Path) -> Optional[str]:
         """Detect project ecosystem from files."""
         if (path / "package.json").exists():
             return "node"
-        elif (path / "requirements.txt").exists() or \
-             (path / "pyproject.toml").exists() or \
-             (path / "setup.py").exists() or \
-             (path / "Pipfile").exists():
+        elif (
+            (path / "requirements.txt").exists()
+            or (path / "pyproject.toml").exists()
+            or (path / "setup.py").exists()
+            or (path / "Pipfile").exists()
+        ):
             return "python"
         elif (path / "Cargo.toml").exists():
             return "rust"
@@ -344,11 +345,7 @@ Examples:
         return None
 
     async def _scan_python(
-        self,
-        path: Path,
-        include_dev: bool,
-        check_outdated: bool,
-        fix: bool
+        self, path: Path, include_dev: bool, check_outdated: bool, fix: bool
     ) -> ScanResult:
         """Scan Python project for vulnerabilities."""
         result = ScanResult(ecosystem="python", total_dependencies=0)
@@ -364,24 +361,28 @@ Examples:
             return await self._run_safety(path, check_outdated)
 
         # No scanner available, try using pip to at least list packages
-        result.error = "No Python vulnerability scanner found. Install with: pip install pip-audit"
+        result.error = (
+            "No Python vulnerability scanner found. Install with: pip install pip-audit"
+        )
         return result
 
     async def _run_pip_audit(
-        self,
-        path: Path,
-        include_dev: bool,
-        check_outdated: bool,
-        fix: bool
+        self, path: Path, include_dev: bool, check_outdated: bool, fix: bool
     ) -> ScanResult:
         """Run pip-audit scanner."""
-        result = ScanResult(ecosystem="python", total_dependencies=0, scanner_tool="pip-audit")
+        result = ScanResult(
+            ecosystem="python", total_dependencies=0, scanner_tool="pip-audit"
+        )
 
         cmd = ["pip-audit", "--format", "json"]
 
         # Check for requirements file
         req_file = None
-        for filename in ["requirements.txt", "requirements-dev.txt", "requirements/base.txt"]:
+        for filename in [
+            "requirements.txt",
+            "requirements-dev.txt",
+            "requirements/base.txt",
+        ]:
             if (path / filename).exists():
                 req_file = path / filename
                 break
@@ -417,26 +418,40 @@ Examples:
                         # Each dependency may have vulnerabilities
                         vulns = dep.get("vulns", [])
                         for vuln in vulns:
-                            result.vulnerabilities.append(Vulnerability(
-                                id=vuln.get("id", "UNKNOWN"),
-                                package=dep.get("name", "unknown"),
-                                installed_version=dep.get("version", "unknown"),
-                                fixed_version=vuln.get("fix_versions", [None])[0] if vuln.get("fix_versions") else None,
-                                severity=Severity.from_string(vuln.get("severity", "unknown")),
-                                description=vuln.get("description", "No description available"),
-                                url=vuln.get("url"),
-                                aliases=vuln.get("aliases", []),
-                            ))
+                            result.vulnerabilities.append(
+                                Vulnerability(
+                                    id=vuln.get("id", "UNKNOWN"),
+                                    package=dep.get("name", "unknown"),
+                                    installed_version=dep.get("version", "unknown"),
+                                    fixed_version=(
+                                        vuln.get("fix_versions", [None])[0]
+                                        if vuln.get("fix_versions")
+                                        else None
+                                    ),
+                                    severity=Severity.from_string(
+                                        vuln.get("severity", "unknown")
+                                    ),
+                                    description=vuln.get(
+                                        "description", "No description available"
+                                    ),
+                                    url=vuln.get("url"),
+                                    aliases=vuln.get("aliases", []),
+                                )
+                            )
 
                         # Track dependency info
-                        result.dependencies.append(DependencyInfo(
-                            name=dep.get("name", "unknown"),
-                            version=dep.get("version", "unknown"),
-                        ))
+                        result.dependencies.append(
+                            DependencyInfo(
+                                name=dep.get("name", "unknown"),
+                                version=dep.get("version", "unknown"),
+                            )
+                        )
 
                 except json.JSONDecodeError:
                     # If JSON parsing fails, try to extract info from text
-                    result.error = f"Failed to parse pip-audit output: {stdout.decode()[:200]}"
+                    result.error = (
+                        f"Failed to parse pip-audit output: {stdout.decode()[:200]}"
+                    )
 
         except Exception as e:
             result.error = f"pip-audit failed: {str(e)}"
@@ -449,7 +464,9 @@ Examples:
 
     async def _run_safety(self, path: Path, check_outdated: bool) -> ScanResult:
         """Run safety scanner (fallback)."""
-        result = ScanResult(ecosystem="python", total_dependencies=0, scanner_tool="safety")
+        result = ScanResult(
+            ecosystem="python", total_dependencies=0, scanner_tool="safety"
+        )
 
         cmd = ["safety", "check", "--json"]
 
@@ -473,17 +490,29 @@ Examples:
             if stdout:
                 try:
                     data = json.loads(stdout.decode())
-                    vulns = data if isinstance(data, list) else data.get("vulnerabilities", [])
+                    vulns = (
+                        data
+                        if isinstance(data, list)
+                        else data.get("vulnerabilities", [])
+                    )
 
                     for vuln in vulns:
-                        result.vulnerabilities.append(Vulnerability(
-                            id=vuln.get("vulnerability_id", vuln.get("CVE", "UNKNOWN")),
-                            package=vuln.get("package_name", "unknown"),
-                            installed_version=vuln.get("analyzed_version", "unknown"),
-                            fixed_version=vuln.get("more_info_path"),
-                            severity=Severity.from_string(vuln.get("severity", "unknown")),
-                            description=vuln.get("advisory", "No description"),
-                        ))
+                        result.vulnerabilities.append(
+                            Vulnerability(
+                                id=vuln.get(
+                                    "vulnerability_id", vuln.get("CVE", "UNKNOWN")
+                                ),
+                                package=vuln.get("package_name", "unknown"),
+                                installed_version=vuln.get(
+                                    "analyzed_version", "unknown"
+                                ),
+                                fixed_version=vuln.get("more_info_path"),
+                                severity=Severity.from_string(
+                                    vuln.get("severity", "unknown")
+                                ),
+                                description=vuln.get("advisory", "No description"),
+                            )
+                        )
 
                 except json.JSONDecodeError:
                     pass
@@ -497,7 +526,11 @@ Examples:
         """Check for outdated Python packages."""
         try:
             process = await asyncio.create_subprocess_exec(
-                "pip", "list", "--outdated", "--format", "json",
+                "pip",
+                "list",
+                "--outdated",
+                "--format",
+                "json",
                 cwd=str(path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -515,25 +548,25 @@ Examples:
                             break
                     else:
                         # Add new entry if not found
-                        result.dependencies.append(DependencyInfo(
-                            name=pkg.get("name", "unknown"),
-                            version=pkg.get("version", "unknown"),
-                            latest_version=pkg.get("latest_version"),
-                            is_outdated=True,
-                        ))
+                        result.dependencies.append(
+                            DependencyInfo(
+                                name=pkg.get("name", "unknown"),
+                                version=pkg.get("version", "unknown"),
+                                latest_version=pkg.get("latest_version"),
+                                is_outdated=True,
+                            )
+                        )
 
         except Exception:
             pass  # Outdated check is optional, don't fail on error
 
     async def _scan_node(
-        self,
-        path: Path,
-        include_dev: bool,
-        check_outdated: bool,
-        fix: bool
+        self, path: Path, include_dev: bool, check_outdated: bool, fix: bool
     ) -> ScanResult:
         """Scan Node.js project for vulnerabilities."""
-        result = ScanResult(ecosystem="node", total_dependencies=0, scanner_tool="npm audit")
+        result = ScanResult(
+            ecosystem="node", total_dependencies=0, scanner_tool="npm audit"
+        )
 
         if not shutil.which("npm"):
             result.error = "npm not found. Please install Node.js."
@@ -562,7 +595,9 @@ Examples:
                     vulnerabilities = data.get("vulnerabilities", {})
                     metadata = data.get("metadata", {})
 
-                    result.total_dependencies = metadata.get("dependencies", {}).get("total", 0)
+                    result.total_dependencies = metadata.get("dependencies", {}).get(
+                        "total", 0
+                    )
 
                     for pkg_name, vuln_data in vulnerabilities.items():
                         severity = vuln_data.get("severity", "unknown")
@@ -571,23 +606,41 @@ Examples:
                         # Extract vulnerability details
                         for v in via:
                             if isinstance(v, dict):
-                                result.vulnerabilities.append(Vulnerability(
-                                    id=str(v.get("source", v.get("url", "UNKNOWN"))),
-                                    package=pkg_name,
-                                    installed_version=vuln_data.get("range", "unknown"),
-                                    fixed_version=vuln_data.get("fixAvailable", {}).get("version") if isinstance(vuln_data.get("fixAvailable"), dict) else None,
-                                    severity=Severity.from_string(v.get("severity", severity)),
-                                    description=v.get("title", "No description"),
-                                    url=v.get("url"),
-                                ))
+                                result.vulnerabilities.append(
+                                    Vulnerability(
+                                        id=str(
+                                            v.get("source", v.get("url", "UNKNOWN"))
+                                        ),
+                                        package=pkg_name,
+                                        installed_version=vuln_data.get(
+                                            "range", "unknown"
+                                        ),
+                                        fixed_version=(
+                                            vuln_data.get("fixAvailable", {}).get(
+                                                "version"
+                                            )
+                                            if isinstance(
+                                                vuln_data.get("fixAvailable"), dict
+                                            )
+                                            else None
+                                        ),
+                                        severity=Severity.from_string(
+                                            v.get("severity", severity)
+                                        ),
+                                        description=v.get("title", "No description"),
+                                        url=v.get("url"),
+                                    )
+                                )
 
                 except json.JSONDecodeError:
-                    result.error = f"Failed to parse npm audit output"
+                    result.error = "Failed to parse npm audit output"
 
             # Attempt fix if requested
             if fix and result.vulnerability_count > 0:
                 fix_process = await asyncio.create_subprocess_exec(
-                    "npm", "audit", "fix",
+                    "npm",
+                    "audit",
+                    "fix",
                     cwd=str(path),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -607,7 +660,9 @@ Examples:
         """Check for outdated Node.js packages."""
         try:
             process = await asyncio.create_subprocess_exec(
-                "npm", "outdated", "--json",
+                "npm",
+                "outdated",
+                "--json",
                 cwd=str(path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -618,12 +673,14 @@ Examples:
                 try:
                     outdated = json.loads(stdout.decode())
                     for name, info in outdated.items():
-                        result.dependencies.append(DependencyInfo(
-                            name=name,
-                            version=info.get("current", "unknown"),
-                            latest_version=info.get("latest"),
-                            is_outdated=True,
-                        ))
+                        result.dependencies.append(
+                            DependencyInfo(
+                                name=name,
+                                version=info.get("current", "unknown"),
+                                latest_version=info.get("latest"),
+                                is_outdated=True,
+                            )
+                        )
                 except json.JSONDecodeError:
                     pass
 
@@ -631,13 +688,12 @@ Examples:
             pass
 
     async def _scan_rust(
-        self,
-        path: Path,
-        check_outdated: bool,
-        fix: bool
+        self, path: Path, check_outdated: bool, fix: bool
     ) -> ScanResult:
         """Scan Rust project for vulnerabilities."""
-        result = ScanResult(ecosystem="rust", total_dependencies=0, scanner_tool="cargo audit")
+        result = ScanResult(
+            ecosystem="rust", total_dependencies=0, scanner_tool="cargo audit"
+        )
 
         if not shutil.which("cargo"):
             result.error = "cargo not found. Please install Rust."
@@ -645,14 +701,18 @@ Examples:
 
         # Check if cargo-audit is installed
         audit_check = await asyncio.create_subprocess_exec(
-            "cargo", "audit", "--version",
+            "cargo",
+            "audit",
+            "--version",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
         await audit_check.communicate()
 
         if audit_check.returncode != 0:
-            result.error = "cargo-audit not installed. Install with: cargo install cargo-audit"
+            result.error = (
+                "cargo-audit not installed. Install with: cargo install cargo-audit"
+            )
             return result
 
         cmd = ["cargo", "audit", "--json"]
@@ -680,16 +740,27 @@ Examples:
                         advisory = vuln.get("advisory", {})
                         package = vuln.get("package", {})
 
-                        result.vulnerabilities.append(Vulnerability(
-                            id=advisory.get("id", "UNKNOWN"),
-                            package=package.get("name", "unknown"),
-                            installed_version=package.get("version", "unknown"),
-                            fixed_version=advisory.get("patched_versions", [None])[0] if advisory.get("patched_versions") else None,
-                            severity=Severity.from_string(advisory.get("severity", "unknown")),
-                            description=advisory.get("title", advisory.get("description", "No description")),
-                            url=advisory.get("url"),
-                            aliases=advisory.get("aliases", []),
-                        ))
+                        result.vulnerabilities.append(
+                            Vulnerability(
+                                id=advisory.get("id", "UNKNOWN"),
+                                package=package.get("name", "unknown"),
+                                installed_version=package.get("version", "unknown"),
+                                fixed_version=(
+                                    advisory.get("patched_versions", [None])[0]
+                                    if advisory.get("patched_versions")
+                                    else None
+                                ),
+                                severity=Severity.from_string(
+                                    advisory.get("severity", "unknown")
+                                ),
+                                description=advisory.get(
+                                    "title",
+                                    advisory.get("description", "No description"),
+                                ),
+                                url=advisory.get("url"),
+                                aliases=advisory.get("aliases", []),
+                            )
+                        )
 
                 except json.JSONDecodeError:
                     pass
@@ -701,7 +772,9 @@ Examples:
 
     async def _scan_go(self, path: Path, check_outdated: bool) -> ScanResult:
         """Scan Go project for vulnerabilities."""
-        result = ScanResult(ecosystem="go", total_dependencies=0, scanner_tool="govulncheck")
+        result = ScanResult(
+            ecosystem="go", total_dependencies=0, scanner_tool="govulncheck"
+        )
 
         if not shutil.which("go"):
             result.error = "go not found. Please install Go."
@@ -715,7 +788,9 @@ Examples:
 
         try:
             process = await asyncio.create_subprocess_exec(
-                "govulncheck", "-json", "./...",
+                "govulncheck",
+                "-json",
+                "./...",
                 cwd=str(path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -735,16 +810,29 @@ Examples:
                             vuln = data["vulnerability"]
                             osv = vuln.get("osv", {})
 
-                            result.vulnerabilities.append(Vulnerability(
-                                id=osv.get("id", "UNKNOWN"),
-                                package=vuln.get("module", {}).get("path", "unknown"),
-                                installed_version=vuln.get("module", {}).get("version", "unknown"),
-                                fixed_version=osv.get("affected", [{}])[0].get("ranges", [{}])[0].get("events", [{}])[-1].get("fixed"),
-                                severity=Severity.from_string(osv.get("severity", "unknown")),
-                                description=osv.get("summary", osv.get("details", "No description")),
-                                url=f"https://pkg.go.dev/vuln/{osv.get('id', '')}",
-                                aliases=osv.get("aliases", []),
-                            ))
+                            result.vulnerabilities.append(
+                                Vulnerability(
+                                    id=osv.get("id", "UNKNOWN"),
+                                    package=vuln.get("module", {}).get(
+                                        "path", "unknown"
+                                    ),
+                                    installed_version=vuln.get("module", {}).get(
+                                        "version", "unknown"
+                                    ),
+                                    fixed_version=osv.get("affected", [{}])[0]
+                                    .get("ranges", [{}])[0]
+                                    .get("events", [{}])[-1]
+                                    .get("fixed"),
+                                    severity=Severity.from_string(
+                                        osv.get("severity", "unknown")
+                                    ),
+                                    description=osv.get(
+                                        "summary", osv.get("details", "No description")
+                                    ),
+                                    url=f"https://pkg.go.dev/vuln/{osv.get('id', '')}",
+                                    aliases=osv.get("aliases", []),
+                                )
+                            )
 
                     except json.JSONDecodeError:
                         continue
@@ -778,9 +866,7 @@ Examples:
 
             # Sort by severity
             sorted_vulns = sorted(
-                result.vulnerabilities,
-                key=lambda v: v.severity.score,
-                reverse=True
+                result.vulnerabilities, key=lambda v: v.severity.score, reverse=True
             )
 
             for vuln in sorted_vulns:
@@ -813,16 +899,18 @@ Examples:
         sarif = {
             "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
             "version": "2.1.0",
-            "runs": [{
-                "tool": {
-                    "driver": {
-                        "name": f"sindri-{result.scanner_tool or 'scanner'}",
-                        "version": "1.0.0",
-                        "rules": []
-                    }
-                },
-                "results": []
-            }]
+            "runs": [
+                {
+                    "tool": {
+                        "driver": {
+                            "name": f"sindri-{result.scanner_tool or 'scanner'}",
+                            "version": "1.0.0",
+                            "rules": [],
+                        }
+                    },
+                    "results": [],
+                }
+            ],
         }
 
         rules = sarif["runs"][0]["tool"]["driver"]["rules"]
@@ -830,32 +918,38 @@ Examples:
 
         for vuln in result.vulnerabilities:
             # Add rule
-            rules.append({
-                "id": vuln.id,
-                "name": f"Vulnerable dependency: {vuln.package}",
-                "shortDescription": {"text": vuln.description[:100]},
-                "fullDescription": {"text": vuln.description},
-                "helpUri": vuln.url,
-                "defaultConfiguration": {
-                    "level": "error" if vuln.severity.score >= 3 else "warning"
+            rules.append(
+                {
+                    "id": vuln.id,
+                    "name": f"Vulnerable dependency: {vuln.package}",
+                    "shortDescription": {"text": vuln.description[:100]},
+                    "fullDescription": {"text": vuln.description},
+                    "helpUri": vuln.url,
+                    "defaultConfiguration": {
+                        "level": "error" if vuln.severity.score >= 3 else "warning"
+                    },
                 }
-            })
+            )
 
             # Add result
-            results.append({
-                "ruleId": vuln.id,
-                "level": "error" if vuln.severity.score >= 3 else "warning",
-                "message": {
-                    "text": f"{vuln.package} {vuln.installed_version} has vulnerability {vuln.id}"
-                },
-                "locations": [{
-                    "physicalLocation": {
-                        "artifactLocation": {
-                            "uri": self._get_manifest_file(result.ecosystem)
+            results.append(
+                {
+                    "ruleId": vuln.id,
+                    "level": "error" if vuln.severity.score >= 3 else "warning",
+                    "message": {
+                        "text": f"{vuln.package} {vuln.installed_version} has vulnerability {vuln.id}"
+                    },
+                    "locations": [
+                        {
+                            "physicalLocation": {
+                                "artifactLocation": {
+                                    "uri": self._get_manifest_file(result.ecosystem)
+                                }
+                            }
                         }
-                    }
-                }]
-            })
+                    ],
+                }
+            )
 
         return json.dumps(sarif, indent=2)
 
@@ -891,25 +985,19 @@ Examples:
     parameters = {
         "type": "object",
         "properties": {
-            "path": {
-                "type": "string",
-                "description": "Path to project directory"
-            },
+            "path": {"type": "string", "description": "Path to project directory"},
             "format": {
                 "type": "string",
                 "description": "SBOM format: 'cyclonedx' or 'spdx'",
-                "enum": ["cyclonedx", "spdx"]
+                "enum": ["cyclonedx", "spdx"],
             },
-            "output": {
-                "type": "string",
-                "description": "Output file path (optional)"
-            },
+            "output": {"type": "string", "description": "Output file path (optional)"},
             "include_dev": {
                 "type": "boolean",
-                "description": "Include development dependencies"
-            }
+                "description": "Include development dependencies",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
@@ -918,7 +1006,7 @@ Examples:
         format: str = "cyclonedx",
         output: Optional[str] = None,
         include_dev: bool = True,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Generate SBOM.
 
@@ -934,16 +1022,14 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Project path does not exist: {project_path}"
+                error=f"Project path does not exist: {project_path}",
             )
 
         # Detect ecosystem
         ecosystem = self._detect_ecosystem(project_path)
         if not ecosystem:
             return ToolResult(
-                success=False,
-                output="",
-                error="Could not detect project ecosystem"
+                success=False, output="", error="Could not detect project ecosystem"
             )
 
         try:
@@ -971,14 +1057,12 @@ Examples:
                     "ecosystem": ecosystem,
                     "dependency_count": len(deps),
                     "output_file": output,
-                }
+                },
             )
 
         except Exception as e:
             return ToolResult(
-                success=False,
-                output="",
-                error=f"SBOM generation failed: {str(e)}"
+                success=False, output="", error=f"SBOM generation failed: {str(e)}"
             )
 
     def _detect_ecosystem(self, path: Path) -> Optional[str]:
@@ -994,10 +1078,7 @@ Examples:
         return None
 
     async def _gather_dependencies(
-        self,
-        path: Path,
-        ecosystem: str,
-        include_dev: bool
+        self, path: Path, ecosystem: str, include_dev: bool
     ) -> list[DependencyInfo]:
         """Gather dependencies for a project."""
         deps = []
@@ -1013,13 +1094,18 @@ Examples:
 
         return deps
 
-    async def _gather_python_deps(self, path: Path, include_dev: bool) -> list[DependencyInfo]:
+    async def _gather_python_deps(
+        self, path: Path, include_dev: bool
+    ) -> list[DependencyInfo]:
         """Gather Python dependencies."""
         deps = []
 
         try:
             process = await asyncio.create_subprocess_exec(
-                "pip", "list", "--format", "json",
+                "pip",
+                "list",
+                "--format",
+                "json",
                 cwd=str(path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -1029,17 +1115,21 @@ Examples:
             if stdout:
                 packages = json.loads(stdout.decode())
                 for pkg in packages:
-                    deps.append(DependencyInfo(
-                        name=pkg.get("name", "unknown"),
-                        version=pkg.get("version", "unknown"),
-                    ))
+                    deps.append(
+                        DependencyInfo(
+                            name=pkg.get("name", "unknown"),
+                            version=pkg.get("version", "unknown"),
+                        )
+                    )
 
         except Exception:
             pass
 
         return deps
 
-    async def _gather_node_deps(self, path: Path, include_dev: bool) -> list[DependencyInfo]:
+    async def _gather_node_deps(
+        self, path: Path, include_dev: bool
+    ) -> list[DependencyInfo]:
         """Gather Node.js dependencies."""
         deps = []
 
@@ -1049,19 +1139,23 @@ Examples:
                 data = json.loads(pkg_json.read_text())
 
                 for name, version in data.get("dependencies", {}).items():
-                    deps.append(DependencyInfo(
-                        name=name,
-                        version=version.lstrip("^~"),
-                        is_dev=False,
-                    ))
+                    deps.append(
+                        DependencyInfo(
+                            name=name,
+                            version=version.lstrip("^~"),
+                            is_dev=False,
+                        )
+                    )
 
                 if include_dev:
                     for name, version in data.get("devDependencies", {}).items():
-                        deps.append(DependencyInfo(
-                            name=name,
-                            version=version.lstrip("^~"),
-                            is_dev=True,
-                        ))
+                        deps.append(
+                            DependencyInfo(
+                                name=name,
+                                version=version.lstrip("^~"),
+                                is_dev=True,
+                            )
+                        )
 
         except Exception:
             pass
@@ -1074,7 +1168,10 @@ Examples:
 
         try:
             process = await asyncio.create_subprocess_exec(
-                "cargo", "tree", "--format", "{p} {l}",
+                "cargo",
+                "tree",
+                "--format",
+                "{p} {l}",
                 cwd=str(path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -1085,11 +1182,15 @@ Examples:
                 for line in stdout.decode().split("\n"):
                     match = re.match(r"(\S+)\s+v?(\S+)(?:\s+\((.+)\))?", line)
                     if match:
-                        deps.append(DependencyInfo(
-                            name=match.group(1),
-                            version=match.group(2),
-                            license=match.group(3) if match.lastindex >= 3 else None,
-                        ))
+                        deps.append(
+                            DependencyInfo(
+                                name=match.group(1),
+                                version=match.group(2),
+                                license=(
+                                    match.group(3) if match.lastindex >= 3 else None
+                                ),
+                            )
+                        )
 
         except Exception:
             pass
@@ -1102,7 +1203,11 @@ Examples:
 
         try:
             process = await asyncio.create_subprocess_exec(
-                "go", "list", "-m", "-json", "all",
+                "go",
+                "list",
+                "-m",
+                "-json",
+                "all",
                 cwd=str(path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
@@ -1116,10 +1221,12 @@ Examples:
                         continue
                     try:
                         mod = json.loads(line)
-                        deps.append(DependencyInfo(
-                            name=mod.get("Path", "unknown"),
-                            version=mod.get("Version", "unknown"),
-                        ))
+                        deps.append(
+                            DependencyInfo(
+                                name=mod.get("Path", "unknown"),
+                                version=mod.get("Version", "unknown"),
+                            )
+                        )
                     except json.JSONDecodeError:
                         continue
 
@@ -1134,12 +1241,14 @@ Examples:
 
         components = []
         for dep in deps:
-            components.append({
-                "type": "library",
-                "name": dep.name,
-                "version": dep.version,
-                "purl": self._get_purl(dep, ecosystem),
-            })
+            components.append(
+                {
+                    "type": "library",
+                    "name": dep.name,
+                    "version": dep.version,
+                    "purl": self._get_purl(dep, ecosystem),
+                }
+            )
 
         return {
             "bomFormat": "CycloneDX",
@@ -1148,13 +1257,15 @@ Examples:
             "version": 1,
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
-                "tools": [{
-                    "vendor": "Sindri",
-                    "name": "dependency-scanner",
-                    "version": "1.0.0"
-                }]
+                "tools": [
+                    {
+                        "vendor": "Sindri",
+                        "name": "dependency-scanner",
+                        "version": "1.0.0",
+                    }
+                ],
             },
-            "components": components
+            "components": components,
         }
 
     def _generate_spdx(self, deps: list[DependencyInfo], ecosystem: str) -> dict:
@@ -1163,18 +1274,22 @@ Examples:
 
         packages = []
         for dep in deps:
-            packages.append({
-                "SPDXID": f"SPDXRef-{dep.name.replace('/', '-')}",
-                "name": dep.name,
-                "versionInfo": dep.version,
-                "downloadLocation": "NOASSERTION",
-                "filesAnalyzed": False,
-                "externalRefs": [{
-                    "referenceCategory": "PACKAGE_MANAGER",
-                    "referenceType": "purl",
-                    "referenceLocator": self._get_purl(dep, ecosystem)
-                }]
-            })
+            packages.append(
+                {
+                    "SPDXID": f"SPDXRef-{dep.name.replace('/', '-')}",
+                    "name": dep.name,
+                    "versionInfo": dep.version,
+                    "downloadLocation": "NOASSERTION",
+                    "filesAnalyzed": False,
+                    "externalRefs": [
+                        {
+                            "referenceCategory": "PACKAGE_MANAGER",
+                            "referenceType": "purl",
+                            "referenceLocator": self._get_purl(dep, ecosystem),
+                        }
+                    ],
+                }
+            )
 
         return {
             "spdxVersion": "SPDX-2.3",
@@ -1184,9 +1299,9 @@ Examples:
             "documentNamespace": f"https://sindri.local/sbom/{uuid.uuid4()}",
             "creationInfo": {
                 "created": datetime.now().isoformat(),
-                "creators": ["Tool: sindri-dependency-scanner-1.0.0"]
+                "creators": ["Tool: sindri-dependency-scanner-1.0.0"],
             },
-            "packages": packages
+            "packages": packages,
         }
 
     def _get_purl(self, dep: DependencyInfo, ecosystem: str) -> str:
@@ -1220,23 +1335,17 @@ Examples:
     parameters = {
         "type": "object",
         "properties": {
-            "path": {
-                "type": "string",
-                "description": "Path to project directory"
-            },
+            "path": {"type": "string", "description": "Path to project directory"},
             "include_dev": {
                 "type": "boolean",
-                "description": "Include development dependencies"
-            }
+                "description": "Include development dependencies",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
-        self,
-        path: Optional[str] = None,
-        include_dev: bool = True,
-        **kwargs
+        self, path: Optional[str] = None, include_dev: bool = True, **kwargs
     ) -> ToolResult:
         """Check for outdated dependencies."""
         project_path = self._resolve_path(path or ".")
@@ -1245,16 +1354,14 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Project path does not exist: {project_path}"
+                error=f"Project path does not exist: {project_path}",
             )
 
         # Detect ecosystem
         ecosystem = self._detect_ecosystem(project_path)
         if not ecosystem:
             return ToolResult(
-                success=False,
-                output="",
-                error="Could not detect project ecosystem"
+                success=False, output="", error="Could not detect project ecosystem"
             )
 
         try:
@@ -1264,7 +1371,7 @@ Examples:
                 return ToolResult(
                     success=True,
                     output="All dependencies are up to date!",
-                    metadata={"outdated_count": 0, "ecosystem": ecosystem}
+                    metadata={"outdated_count": 0, "ecosystem": ecosystem},
                 )
 
             # Format output
@@ -1280,18 +1387,18 @@ Examples:
                     "outdated_count": len(outdated),
                     "ecosystem": ecosystem,
                     "packages": [
-                        {"name": d.name, "current": d.version, "latest": d.latest_version}
+                        {
+                            "name": d.name,
+                            "current": d.version,
+                            "latest": d.latest_version,
+                        }
                         for d in outdated
-                    ]
-                }
+                    ],
+                },
             )
 
         except Exception as e:
-            return ToolResult(
-                success=False,
-                output="",
-                error=f"Check failed: {str(e)}"
-            )
+            return ToolResult(success=False, output="", error=f"Check failed: {str(e)}")
 
     def _detect_ecosystem(self, path: Path) -> Optional[str]:
         """Detect project ecosystem."""
@@ -1306,10 +1413,7 @@ Examples:
         return None
 
     async def _check_outdated(
-        self,
-        path: Path,
-        ecosystem: str,
-        include_dev: bool
+        self, path: Path, ecosystem: str, include_dev: bool
     ) -> list[DependencyInfo]:
         """Check for outdated packages."""
         outdated = []
@@ -1317,7 +1421,11 @@ Examples:
         if ecosystem == "python":
             try:
                 process = await asyncio.create_subprocess_exec(
-                    "pip", "list", "--outdated", "--format", "json",
+                    "pip",
+                    "list",
+                    "--outdated",
+                    "--format",
+                    "json",
                     cwd=str(path),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -1326,19 +1434,23 @@ Examples:
 
                 if stdout:
                     for pkg in json.loads(stdout.decode()):
-                        outdated.append(DependencyInfo(
-                            name=pkg.get("name"),
-                            version=pkg.get("version"),
-                            latest_version=pkg.get("latest_version"),
-                            is_outdated=True,
-                        ))
+                        outdated.append(
+                            DependencyInfo(
+                                name=pkg.get("name"),
+                                version=pkg.get("version"),
+                                latest_version=pkg.get("latest_version"),
+                                is_outdated=True,
+                            )
+                        )
             except Exception:
                 pass
 
         elif ecosystem == "node":
             try:
                 process = await asyncio.create_subprocess_exec(
-                    "npm", "outdated", "--json",
+                    "npm",
+                    "outdated",
+                    "--json",
                     cwd=str(path),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -1349,12 +1461,14 @@ Examples:
                     try:
                         data = json.loads(stdout.decode())
                         for name, info in data.items():
-                            outdated.append(DependencyInfo(
-                                name=name,
-                                version=info.get("current", "unknown"),
-                                latest_version=info.get("latest"),
-                                is_outdated=True,
-                            ))
+                            outdated.append(
+                                DependencyInfo(
+                                    name=name,
+                                    version=info.get("current", "unknown"),
+                                    latest_version=info.get("latest"),
+                                    is_outdated=True,
+                                )
+                            )
                     except json.JSONDecodeError:
                         pass
             except Exception:
@@ -1364,7 +1478,10 @@ Examples:
             # cargo outdated requires cargo-outdated to be installed
             try:
                 process = await asyncio.create_subprocess_exec(
-                    "cargo", "outdated", "--format", "json",
+                    "cargo",
+                    "outdated",
+                    "--format",
+                    "json",
                     cwd=str(path),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -1376,12 +1493,14 @@ Examples:
                         data = json.loads(stdout.decode())
                         for dep in data.get("dependencies", []):
                             if dep.get("project") != dep.get("latest"):
-                                outdated.append(DependencyInfo(
-                                    name=dep.get("name"),
-                                    version=dep.get("project"),
-                                    latest_version=dep.get("latest"),
-                                    is_outdated=True,
-                                ))
+                                outdated.append(
+                                    DependencyInfo(
+                                        name=dep.get("name"),
+                                        version=dep.get("project"),
+                                        latest_version=dep.get("latest"),
+                                        is_outdated=True,
+                                    )
+                                )
                     except json.JSONDecodeError:
                         pass
             except Exception:
@@ -1390,7 +1509,12 @@ Examples:
         elif ecosystem == "go":
             try:
                 process = await asyncio.create_subprocess_exec(
-                    "go", "list", "-u", "-m", "-json", "all",
+                    "go",
+                    "list",
+                    "-u",
+                    "-m",
+                    "-json",
+                    "all",
                     cwd=str(path),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
@@ -1404,12 +1528,16 @@ Examples:
                         try:
                             mod = json.loads(line)
                             if mod.get("Update"):
-                                outdated.append(DependencyInfo(
-                                    name=mod.get("Path"),
-                                    version=mod.get("Version"),
-                                    latest_version=mod.get("Update", {}).get("Version"),
-                                    is_outdated=True,
-                                ))
+                                outdated.append(
+                                    DependencyInfo(
+                                        name=mod.get("Path"),
+                                        version=mod.get("Version"),
+                                        latest_version=mod.get("Update", {}).get(
+                                            "Version"
+                                        ),
+                                        is_outdated=True,
+                                    )
+                                )
                         except json.JSONDecodeError:
                             continue
             except Exception:

@@ -219,14 +219,16 @@ class TaskHistoryPanel(Static):
             iterations: Number of iterations
             model: Model used for the session
         """
-        self._session_items.append({
-            "session_id": session_id,
-            "task": task,
-            "status": status,
-            "created_at": created_at,
-            "iterations": iterations,
-            "model": model,
-        })
+        self._session_items.append(
+            {
+                "session_id": session_id,
+                "task": task,
+                "status": status,
+                "created_at": created_at,
+                "iterations": iterations,
+                "model": model,
+            }
+        )
         self._update_display()
 
     def clear_sessions(self) -> None:
@@ -248,14 +250,16 @@ class TaskHistoryPanel(Static):
         """
         self._session_items = []
         for s in sessions:
-            self._session_items.append({
-                "session_id": s.get("id", ""),
-                "task": s.get("task", "Unknown task"),
-                "status": s.get("status", "unknown"),
-                "created_at": s.get("created_at", ""),
-                "iterations": s.get("iterations", 0),
-                "model": s.get("model", "unknown"),
-            })
+            self._session_items.append(
+                {
+                    "session_id": s.get("id", ""),
+                    "task": s.get("task", "Unknown task"),
+                    "status": s.get("status", "unknown"),
+                    "created_at": s.get("created_at", ""),
+                    "iterations": s.get("iterations", 0),
+                    "model": s.get("model", "unknown"),
+                }
+            )
         self._update_display()
 
     def _update_display(self) -> None:

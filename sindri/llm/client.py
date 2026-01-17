@@ -1,7 +1,7 @@
 """Async Ollama client wrapper."""
 
 import ollama
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import AsyncIterator, Optional, Callable
 import structlog
 
@@ -25,6 +25,7 @@ class Response:
 @dataclass
 class StreamingResponse:
     """Response from streaming chat, accumulated over time."""
+
     content: str = ""
     tool_calls: Optional[list] = None
     model: str = ""
@@ -34,12 +35,10 @@ class StreamingResponse:
         """Convert to a standard Response object."""
         return Response(
             message=Message(
-                role="assistant",
-                content=self.content,
-                tool_calls=self.tool_calls
+                role="assistant", content=self.content, tool_calls=self.tool_calls
             ),
             model=self.model,
-            done=self.done
+            done=self.done,
         )
 
 
@@ -52,10 +51,7 @@ class OllamaClient:
         self._async_client = ollama.AsyncClient(host=host)
 
     async def chat(
-        self,
-        model: str,
-        messages: list[dict],
-        tools: list[dict] = None
+        self, model: str, messages: list[dict], tools: list[dict] = None
     ) -> Response:
         """Send chat request to Ollama."""
 
@@ -70,8 +66,18 @@ class OllamaClient:
 
         response = await self._async_client.chat(**kwargs)
 
-        log.debug("ollama_response_keys", keys=list(response.keys()) if isinstance(response, dict) else "not_dict")
-        log.debug("ollama_message_keys", keys=list(response.get("message", {}).keys()) if isinstance(response, dict) else "not_dict")
+        log.debug(
+            "ollama_response_keys",
+            keys=list(response.keys()) if isinstance(response, dict) else "not_dict",
+        )
+        log.debug(
+            "ollama_message_keys",
+            keys=(
+                list(response.get("message", {}).keys())
+                if isinstance(response, dict)
+                else "not_dict"
+            ),
+        )
 
         tool_calls = response["message"].get("tool_calls")
         log.info("ollama_tool_calls", tool_calls=tool_calls)
@@ -80,23 +86,17 @@ class OllamaClient:
             message=Message(
                 role=response["message"]["role"],
                 content=response["message"].get("content", ""),
-                tool_calls=tool_calls
+                tool_calls=tool_calls,
             ),
             model=response["model"],
-            done=response.get("done", True)
+            done=response.get("done", True),
         )
 
-    async def stream(
-        self,
-        model: str,
-        messages: list[dict]
-    ) -> AsyncIterator[str]:
+    async def stream(self, model: str, messages: list[dict]) -> AsyncIterator[str]:
         """Stream response tokens."""
 
         async for chunk in await self._async_client.chat(
-            model=model,
-            messages=messages,
-            stream=True
+            model=model, messages=messages, stream=True
         ):
             if chunk.get("message", {}).get("content"):
                 yield chunk["message"]["content"]
@@ -106,7 +106,7 @@ class OllamaClient:
         model: str,
         messages: list[dict],
         tools: list[dict] = None,
-        on_token: Optional[Callable[[str], None]] = None
+        on_token: Optional[Callable[[str], None]] = None,
     ) -> StreamingResponse:
         """Stream chat response with tool support.
 
@@ -119,11 +119,7 @@ class OllamaClient:
         Returns:
             StreamingResponse with accumulated content and tool calls
         """
-        kwargs = {
-            "model": model,
-            "messages": messages,
-            "stream": True
-        }
+        kwargs = {"model": model, "messages": messages, "stream": True}
         if tools:
             kwargs["tools"] = tools
 
@@ -149,10 +145,12 @@ class OllamaClient:
                 result.done = True
                 result.model = chunk.get("model", model)
 
-        log.info("ollama_stream_complete",
-                 model=model,
-                 content_length=len(result.content),
-                 has_tool_calls=result.tool_calls is not None)
+        log.info(
+            "ollama_stream_complete",
+            model=model,
+            content_length=len(result.content),
+            has_tool_calls=result.tool_calls is not None,
+        )
 
         return result
 

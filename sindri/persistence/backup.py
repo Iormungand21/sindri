@@ -14,6 +14,7 @@ log = structlog.get_logger()
 
 class BackupError(Exception):
     """Error during backup operations."""
+
     pass
 
 
@@ -29,9 +30,7 @@ class DatabaseBackup:
     """
 
     def __init__(
-        self,
-        db_path: Optional[Path] = None,
-        backup_dir: Optional[Path] = None
+        self, db_path: Optional[Path] = None, backup_dir: Optional[Path] = None
     ):
         """Initialize backup manager.
 
@@ -85,7 +84,7 @@ class DatabaseBackup:
                 "backup_created",
                 backup_path=str(backup_path),
                 reason=reason,
-                size_bytes=backup_path.stat().st_size
+                size_bytes=backup_path.stat().st_size,
             )
 
             return backup_path
@@ -187,7 +186,7 @@ class DatabaseBackup:
             log.info(
                 "database_restored",
                 backup_path=str(backup_path),
-                db_path=str(self.db_path)
+                db_path=str(self.db_path),
             )
 
             return True
@@ -214,7 +213,7 @@ class DatabaseBackup:
         for backup_file in sorted(
             self.backup_dir.glob("sindri_*.db"),
             key=lambda p: p.stat().st_mtime,
-            reverse=True  # Newest first
+            reverse=True,  # Newest first
         ):
             # Parse filename: sindri_YYYYMMDD_HHMMSS_reason.db
             parts = backup_file.stem.split("_", 3)
@@ -226,26 +225,29 @@ class DatabaseBackup:
                     reason = parts[3] if len(parts) > 3 else "unknown"
 
                     timestamp = datetime.strptime(
-                        f"{date_str}_{time_str}",
-                        "%Y%m%d_%H%M%S"
+                        f"{date_str}_{time_str}", "%Y%m%d_%H%M%S"
                     )
 
-                    backups.append({
-                        "path": backup_file,
-                        "timestamp": timestamp,
-                        "reason": reason,
-                        "size_bytes": backup_file.stat().st_size
-                    })
+                    backups.append(
+                        {
+                            "path": backup_file,
+                            "timestamp": timestamp,
+                            "reason": reason,
+                            "size_bytes": backup_file.stat().st_size,
+                        }
+                    )
                 except (ValueError, IndexError):
                     # Can't parse filename, include with defaults
-                    backups.append({
-                        "path": backup_file,
-                        "timestamp": datetime.fromtimestamp(
-                            backup_file.stat().st_mtime
-                        ),
-                        "reason": "unknown",
-                        "size_bytes": backup_file.stat().st_size
-                    })
+                    backups.append(
+                        {
+                            "path": backup_file,
+                            "timestamp": datetime.fromtimestamp(
+                                backup_file.stat().st_mtime
+                            ),
+                            "reason": "unknown",
+                            "size_bytes": backup_file.stat().st_size,
+                        }
+                    )
 
         return backups
 
@@ -274,9 +276,7 @@ class DatabaseBackup:
                 log.debug("backup_deleted", path=str(backup["path"]))
             except Exception as e:
                 log.warning(
-                    "backup_delete_failed",
-                    path=str(backup["path"]),
-                    error=str(e)
+                    "backup_delete_failed", path=str(backup["path"]), error=str(e)
                 )
 
         if deleted > 0:
@@ -297,16 +297,11 @@ class DatabaseBackup:
         backups = self.list_backups()
 
         if not backups:
-            return {
-                "count": 0,
-                "total_size_bytes": 0,
-                "oldest": None,
-                "newest": None
-            }
+            return {"count": 0, "total_size_bytes": 0, "oldest": None, "newest": None}
 
         return {
             "count": len(backups),
             "total_size_bytes": sum(b["size_bytes"] for b in backups),
             "oldest": backups[-1]["timestamp"],  # Last in list (sorted newest-first)
-            "newest": backups[0]["timestamp"]     # First in list
+            "newest": backups[0]["timestamp"],  # First in list
         }

@@ -31,13 +31,14 @@ class TaskTree(Tree):
         description: str,
         task_id: Optional[str] = None,
         parent_id: Optional[str] = None,
-        status: TaskStatus = TaskStatus.PENDING
+        status: TaskStatus = TaskStatus.PENDING,
     ) -> str:
         """Add a task to the tree.
 
         Returns: task_id
         """
         import uuid
+
         task_id = task_id or str(uuid.uuid4())[:8]
 
         # Truncate long descriptions

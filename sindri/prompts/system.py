@@ -1,6 +1,5 @@
 """System prompts for Sindri agents."""
 
-
 DEFAULT_SYSTEM_PROMPT = """You are Sindri, a local LLM orchestration agent.
 
 Your task: {task}

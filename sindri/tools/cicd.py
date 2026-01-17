@@ -18,6 +18,7 @@ log = structlog.get_logger()
 @dataclass
 class ProjectInfo:
     """Detected project information."""
+
     project_type: str  # python, node, rust, go, generic
     package_manager: Optional[str] = None  # pip, poetry, npm, yarn, pnpm, cargo, go
     test_framework: Optional[str] = None  # pytest, unittest, jest, vitest, cargo, go
@@ -57,55 +58,55 @@ Examples:
             "workflow_type": {
                 "type": "string",
                 "description": "Type of workflow to generate: 'test', 'lint', 'build', 'full', 'deploy', 'release'",
-                "enum": ["test", "lint", "build", "full", "deploy", "release"]
+                "enum": ["test", "lint", "build", "full", "deploy", "release"],
             },
             "path": {
                 "type": "string",
-                "description": "Path to project directory (default: current directory)"
+                "description": "Path to project directory (default: current directory)",
             },
             "output_file": {
                 "type": "string",
-                "description": "Output file path (default: .github/workflows/{workflow_type}.yml)"
+                "description": "Output file path (default: .github/workflows/{workflow_type}.yml)",
             },
             "project_type": {
                 "type": "string",
                 "description": "Override project type detection: 'python', 'node', 'rust', 'go', 'generic'",
-                "enum": ["python", "node", "rust", "go", "generic"]
+                "enum": ["python", "node", "rust", "go", "generic"],
             },
             "python_versions": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Python versions for matrix testing (e.g., ['3.10', '3.11', '3.12'])"
+                "description": "Python versions for matrix testing (e.g., ['3.10', '3.11', '3.12'])",
             },
             "node_versions": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Node.js versions for matrix testing (e.g., ['18', '20', '22'])"
+                "description": "Node.js versions for matrix testing (e.g., ['18', '20', '22'])",
             },
             "branches": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Branches to trigger on (default: ['main'])"
+                "description": "Branches to trigger on (default: ['main'])",
             },
             "deploy_target": {
                 "type": "string",
                 "description": "Deployment target: 'docker', 'pypi', 'npm', 'ghcr', 'heroku'",
-                "enum": ["docker", "pypi", "npm", "ghcr", "heroku"]
+                "enum": ["docker", "pypi", "npm", "ghcr", "heroku"],
             },
             "include_coverage": {
                 "type": "boolean",
-                "description": "Include test coverage reporting (default: true)"
+                "description": "Include test coverage reporting (default: true)",
             },
             "include_cache": {
                 "type": "boolean",
-                "description": "Include dependency caching (default: true)"
+                "description": "Include dependency caching (default: true)",
             },
             "dry_run": {
                 "type": "boolean",
-                "description": "Preview workflow without creating file"
-            }
+                "description": "Preview workflow without creating file",
+            },
         },
-        "required": ["workflow_type"]
+        "required": ["workflow_type"],
     }
 
     async def execute(
@@ -121,7 +122,7 @@ Examples:
         include_coverage: bool = True,
         include_cache: bool = True,
         dry_run: bool = False,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Generate a GitHub Actions workflow file.
 
@@ -144,7 +145,7 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Project path does not exist: {project_path}"
+                error=f"Project path does not exist: {project_path}",
             )
 
         # Detect project information
@@ -168,7 +169,7 @@ Examples:
             branches=trigger_branches,
             deploy_target=deploy_target,
             include_coverage=include_coverage,
-            include_cache=include_cache
+            include_cache=include_cache,
         )
 
         # Determine output file
@@ -184,8 +185,8 @@ Examples:
                 metadata={
                     "dry_run": True,
                     "project_type": info.project_type,
-                    "output_file": str(output_path)
-                }
+                    "output_file": str(output_path),
+                },
             )
 
         # Create directory if needed
@@ -198,7 +199,7 @@ Examples:
                 "workflow_generated",
                 workflow_type=workflow_type,
                 project_type=info.project_type,
-                output_file=str(output_path)
+                output_file=str(output_path),
             )
             return ToolResult(
                 success=True,
@@ -207,29 +208,31 @@ Examples:
                     "workflow_type": workflow_type,
                     "project_type": info.project_type,
                     "output_file": str(output_path),
-                    "branches": trigger_branches
-                }
+                    "branches": trigger_branches,
+                },
             )
         except Exception as e:
             log.error("workflow_write_failed", error=str(e))
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Failed to write workflow file: {str(e)}"
+                error=f"Failed to write workflow file: {str(e)}",
             )
 
     def _detect_project(self, path: Path) -> ProjectInfo:
         """Detect project type and configuration."""
         info = ProjectInfo(
-            project_type="generic",
-            python_versions=["3.11"],
-            node_versions=["20"]
+            project_type="generic", python_versions=["3.11"], node_versions=["20"]
         )
 
         # Python detection
         if (path / "pyproject.toml").exists():
             info.project_type = "python"
-            info.package_manager = "poetry" if "poetry" in (path / "pyproject.toml").read_text().lower() else "pip"
+            info.package_manager = (
+                "poetry"
+                if "poetry" in (path / "pyproject.toml").read_text().lower()
+                else "pip"
+            )
             info.test_framework = "pytest"  # Assume pytest
             # Check for common tools
             pyproject = (path / "pyproject.toml").read_text()
@@ -259,7 +262,10 @@ Examples:
             # Check for test framework and lint tools
             pkg_json = json.loads((path / "package.json").read_text())
             scripts = pkg_json.get("scripts", {})
-            deps = {**pkg_json.get("dependencies", {}), **pkg_json.get("devDependencies", {})}
+            deps = {
+                **pkg_json.get("dependencies", {}),
+                **pkg_json.get("devDependencies", {}),
+            }
 
             if "vitest" in deps:
                 info.test_framework = "vitest"
@@ -304,42 +310,58 @@ Examples:
         branches: list[str],
         deploy_target: Optional[str],
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate workflow YAML content."""
         if workflow_type == "test":
-            return self._generate_test_workflow(info, branches, include_coverage, include_cache)
+            return self._generate_test_workflow(
+                info, branches, include_coverage, include_cache
+            )
         elif workflow_type == "lint":
             return self._generate_lint_workflow(info, branches, include_cache)
         elif workflow_type == "build":
             return self._generate_build_workflow(info, branches, include_cache)
         elif workflow_type == "full":
-            return self._generate_full_workflow(info, branches, include_coverage, include_cache)
+            return self._generate_full_workflow(
+                info, branches, include_coverage, include_cache
+            )
         elif workflow_type == "deploy":
-            return self._generate_deploy_workflow(info, branches, deploy_target, include_cache)
+            return self._generate_deploy_workflow(
+                info, branches, deploy_target, include_cache
+            )
         elif workflow_type == "release":
             return self._generate_release_workflow(info, deploy_target)
         else:
-            return self._generate_full_workflow(info, branches, include_coverage, include_cache)
+            return self._generate_full_workflow(
+                info, branches, include_coverage, include_cache
+            )
 
     def _generate_test_workflow(
         self,
         info: ProjectInfo,
         branches: list[str],
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate test workflow."""
         branches_yaml = "\n".join(f"      - {b}" for b in branches)
 
         if info.project_type == "python":
-            return self._python_test_workflow(info, branches_yaml, include_coverage, include_cache)
+            return self._python_test_workflow(
+                info, branches_yaml, include_coverage, include_cache
+            )
         elif info.project_type == "node":
-            return self._node_test_workflow(info, branches_yaml, include_coverage, include_cache)
+            return self._node_test_workflow(
+                info, branches_yaml, include_coverage, include_cache
+            )
         elif info.project_type == "rust":
-            return self._rust_test_workflow(info, branches_yaml, include_coverage, include_cache)
+            return self._rust_test_workflow(
+                info, branches_yaml, include_coverage, include_cache
+            )
         elif info.project_type == "go":
-            return self._go_test_workflow(info, branches_yaml, include_coverage, include_cache)
+            return self._go_test_workflow(
+                info, branches_yaml, include_coverage, include_cache
+            )
         else:
             return self._generic_test_workflow(branches_yaml)
 
@@ -348,7 +370,7 @@ Examples:
         info: ProjectInfo,
         branches_yaml: str,
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate Python test workflow."""
         versions = info.python_versions or ["3.11"]
@@ -376,13 +398,21 @@ Examples:
           fail_ci_if_error: false
 """
 
-        install_cmd = "pip install -e .[dev]" if info.package_manager == "pip" else "poetry install"
-        test_cmd = "pytest tests/ -v --cov --cov-report=xml" if include_coverage else "pytest tests/ -v"
+        install_cmd = (
+            "pip install -e .[dev]"
+            if info.package_manager == "pip"
+            else "poetry install"
+        )
+        test_cmd = (
+            "pytest tests/ -v --cov --cov-report=xml"
+            if include_coverage
+            else "pytest tests/ -v"
+        )
 
         if info.package_manager == "poetry":
             test_cmd = f"poetry run {test_cmd}"
 
-        return f'''name: Tests
+        return f"""name: Tests
 
 on:
   push:
@@ -415,14 +445,14 @@ jobs:
 
       - name: Run tests
         run: {test_cmd}
-{coverage_step}'''
+{coverage_step}"""
 
     def _node_test_workflow(
         self,
         info: ProjectInfo,
         branches_yaml: str,
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate Node.js test workflow."""
         versions = info.node_versions or ["20"]
@@ -432,12 +462,16 @@ jobs:
         install_cmd = {
             "npm": "npm ci",
             "yarn": "yarn install --frozen-lockfile",
-            "pnpm": "pnpm install --frozen-lockfile"
+            "pnpm": "pnpm install --frozen-lockfile",
         }.get(pkg_manager, "npm ci")
 
         test_cmd = f"{pkg_manager} test"
         if include_coverage:
-            test_cmd = f"{pkg_manager} test -- --coverage" if pkg_manager == "npm" else f"{pkg_manager} test --coverage"
+            test_cmd = (
+                f"{pkg_manager} test -- --coverage"
+                if pkg_manager == "npm"
+                else f"{pkg_manager} test --coverage"
+            )
 
         cache_config = ""
         if include_cache:
@@ -453,7 +487,7 @@ jobs:
           fail_ci_if_error: false
 """
 
-        return f'''name: Tests
+        return f"""name: Tests
 
 on:
   push:
@@ -484,14 +518,14 @@ jobs:
 
       - name: Run tests
         run: {test_cmd}
-{coverage_step}'''
+{coverage_step}"""
 
     def _rust_test_workflow(
         self,
         info: ProjectInfo,
         branches_yaml: str,
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate Rust test workflow."""
         cache_step = ""
@@ -523,7 +557,7 @@ jobs:
           fail_ci_if_error: false
 """
 
-        return f'''name: Tests
+        return f"""name: Tests
 
 on:
   push:
@@ -545,14 +579,14 @@ jobs:
 {cache_step}
       - name: Run tests
         run: cargo test --verbose
-{coverage_step}'''
+{coverage_step}"""
 
     def _go_test_workflow(
         self,
         info: ProjectInfo,
         branches_yaml: str,
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate Go test workflow."""
         cache_step = ""
@@ -578,7 +612,7 @@ jobs:
           fail_ci_if_error: false
 """
 
-        return f'''name: Tests
+        return f"""name: Tests
 
 on:
   push:
@@ -602,11 +636,11 @@ jobs:
 {cache_step}
       - name: Run tests
         run: go test -v {coverage_flag} ./...
-{coverage_step}'''
+{coverage_step}"""
 
     def _generic_test_workflow(self, branches_yaml: str) -> str:
         """Generate generic test workflow."""
-        return f'''name: Tests
+        return f"""name: Tests
 
 on:
   push:
@@ -627,13 +661,10 @@ jobs:
         run: |
           echo "Add your test commands here"
           # Example: pytest, npm test, cargo test, etc.
-'''
+"""
 
     def _generate_lint_workflow(
-        self,
-        info: ProjectInfo,
-        branches: list[str],
-        include_cache: bool
+        self, info: ProjectInfo, branches: list[str], include_cache: bool
     ) -> str:
         """Generate lint workflow."""
         branches_yaml = "\n".join(f"      - {b}" for b in branches)
@@ -650,10 +681,7 @@ jobs:
             return self._generic_lint_workflow(branches_yaml)
 
     def _python_lint_workflow(
-        self,
-        info: ProjectInfo,
-        branches_yaml: str,
-        include_cache: bool
+        self, info: ProjectInfo, branches_yaml: str, include_cache: bool
     ) -> str:
         """Generate Python lint workflow."""
         lint_tool = info.lint_tool or "ruff"
@@ -669,7 +697,7 @@ jobs:
           key: ${{ runner.os }}-pip-lint
 """
 
-        return f'''name: Lint
+        return f"""name: Lint
 
 on:
   push:
@@ -704,20 +732,17 @@ jobs:
 
       - name: Type check
         run: mypy . --ignore-missing-imports || true
-'''
+"""
 
     def _node_lint_workflow(
-        self,
-        info: ProjectInfo,
-        branches_yaml: str,
-        include_cache: bool
+        self, info: ProjectInfo, branches_yaml: str, include_cache: bool
     ) -> str:
         """Generate Node.js lint workflow."""
         pkg_manager = info.package_manager or "npm"
         install_cmd = {
             "npm": "npm ci",
             "yarn": "yarn install --frozen-lockfile",
-            "pnpm": "pnpm install --frozen-lockfile"
+            "pnpm": "pnpm install --frozen-lockfile",
         }.get(pkg_manager, "npm ci")
 
         cache_config = ""
@@ -725,7 +750,7 @@ jobs:
             cache_config = f"""
           cache: '{pkg_manager}'"""
 
-        return f'''name: Lint
+        return f"""name: Lint
 
 on:
   push:
@@ -755,13 +780,10 @@ jobs:
 
       - name: Check formatting
         run: npx prettier --check . || true
-'''
+"""
 
     def _rust_lint_workflow(
-        self,
-        info: ProjectInfo,
-        branches_yaml: str,
-        include_cache: bool
+        self, info: ProjectInfo, branches_yaml: str, include_cache: bool
     ) -> str:
         """Generate Rust lint workflow."""
         cache_step = ""
@@ -777,7 +799,7 @@ jobs:
           key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
 """
 
-        return f'''name: Lint
+        return f"""name: Lint
 
 on:
   push:
@@ -804,13 +826,10 @@ jobs:
 
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
-'''
+"""
 
     def _go_lint_workflow(
-        self,
-        info: ProjectInfo,
-        branches_yaml: str,
-        include_cache: bool
+        self, info: ProjectInfo, branches_yaml: str, include_cache: bool
     ) -> str:
         """Generate Go lint workflow."""
         cache_step = ""
@@ -825,7 +844,7 @@ jobs:
           key: ${{ runner.os }}-go-lint-${{ hashFiles('**/go.sum') }}
 """
 
-        return f'''name: Lint
+        return f"""name: Lint
 
 on:
   push:
@@ -858,11 +877,11 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: latest
-'''
+"""
 
     def _generic_lint_workflow(self, branches_yaml: str) -> str:
         """Generate generic lint workflow."""
-        return f'''name: Lint
+        return f"""name: Lint
 
 on:
   push:
@@ -883,13 +902,10 @@ jobs:
         run: |
           echo "Add your lint commands here"
           # Example: ruff check ., npm run lint, cargo clippy, etc.
-'''
+"""
 
     def _generate_build_workflow(
-        self,
-        info: ProjectInfo,
-        branches: list[str],
-        include_cache: bool
+        self, info: ProjectInfo, branches: list[str], include_cache: bool
     ) -> str:
         """Generate build workflow."""
         branches_yaml = "\n".join(f"      - {b}" for b in branches)
@@ -906,13 +922,10 @@ jobs:
             return self._generic_build_workflow(branches_yaml)
 
     def _python_build_workflow(
-        self,
-        info: ProjectInfo,
-        branches_yaml: str,
-        include_cache: bool
+        self, info: ProjectInfo, branches_yaml: str, include_cache: bool
     ) -> str:
         """Generate Python build workflow."""
-        return f'''name: Build
+        return f"""name: Build
 
 on:
   push:
@@ -947,20 +960,17 @@ jobs:
         with:
           name: dist
           path: dist/
-'''
+"""
 
     def _node_build_workflow(
-        self,
-        info: ProjectInfo,
-        branches_yaml: str,
-        include_cache: bool
+        self, info: ProjectInfo, branches_yaml: str, include_cache: bool
     ) -> str:
         """Generate Node.js build workflow."""
         pkg_manager = info.package_manager or "npm"
         install_cmd = {
             "npm": "npm ci",
             "yarn": "yarn install --frozen-lockfile",
-            "pnpm": "pnpm install --frozen-lockfile"
+            "pnpm": "pnpm install --frozen-lockfile",
         }.get(pkg_manager, "npm ci")
 
         cache_config = ""
@@ -968,7 +978,7 @@ jobs:
             cache_config = f"""
           cache: '{pkg_manager}'"""
 
-        return f'''name: Build
+        return f"""name: Build
 
 on:
   push:
@@ -1001,13 +1011,10 @@ jobs:
         with:
           name: dist
           path: dist/
-'''
+"""
 
     def _rust_build_workflow(
-        self,
-        info: ProjectInfo,
-        branches_yaml: str,
-        include_cache: bool
+        self, info: ProjectInfo, branches_yaml: str, include_cache: bool
     ) -> str:
         """Generate Rust build workflow."""
         cache_step = ""
@@ -1023,7 +1030,7 @@ jobs:
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
 """
 
-        return f'''name: Build
+        return f"""name: Build
 
 on:
   push:
@@ -1051,13 +1058,10 @@ jobs:
         with:
           name: release
           path: target/release/
-'''
+"""
 
     def _go_build_workflow(
-        self,
-        info: ProjectInfo,
-        branches_yaml: str,
-        include_cache: bool
+        self, info: ProjectInfo, branches_yaml: str, include_cache: bool
     ) -> str:
         """Generate Go build workflow."""
         cache_step = ""
@@ -1072,7 +1076,7 @@ jobs:
           key: ${{ runner.os }}-go-build-${{ hashFiles('**/go.sum') }}
 """
 
-        return f'''name: Build
+        return f"""name: Build
 
 on:
   push:
@@ -1102,11 +1106,11 @@ jobs:
         with:
           name: build
           path: ./
-'''
+"""
 
     def _generic_build_workflow(self, branches_yaml: str) -> str:
         """Generate generic build workflow."""
-        return f'''name: Build
+        return f"""name: Build
 
 on:
   push:
@@ -1127,26 +1131,34 @@ jobs:
         run: |
           echo "Add your build commands here"
           # Example: python -m build, npm run build, cargo build, etc.
-'''
+"""
 
     def _generate_full_workflow(
         self,
         info: ProjectInfo,
         branches: list[str],
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate full CI workflow with test, lint, and build."""
         branches_yaml = "\n".join(f"      - {b}" for b in branches)
 
         if info.project_type == "python":
-            return self._python_full_workflow(info, branches_yaml, include_coverage, include_cache)
+            return self._python_full_workflow(
+                info, branches_yaml, include_coverage, include_cache
+            )
         elif info.project_type == "node":
-            return self._node_full_workflow(info, branches_yaml, include_coverage, include_cache)
+            return self._node_full_workflow(
+                info, branches_yaml, include_coverage, include_cache
+            )
         elif info.project_type == "rust":
-            return self._rust_full_workflow(info, branches_yaml, include_coverage, include_cache)
+            return self._rust_full_workflow(
+                info, branches_yaml, include_coverage, include_cache
+            )
         elif info.project_type == "go":
-            return self._go_full_workflow(info, branches_yaml, include_coverage, include_cache)
+            return self._go_full_workflow(
+                info, branches_yaml, include_coverage, include_cache
+            )
         else:
             return self._generic_full_workflow(branches_yaml)
 
@@ -1155,7 +1167,7 @@ jobs:
         info: ProjectInfo,
         branches_yaml: str,
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate Python full CI workflow."""
         versions = info.python_versions or ["3.11"]
@@ -1163,8 +1175,16 @@ jobs:
         lint_tool = info.lint_tool or "ruff"
         format_tool = info.format_tool or "black"
 
-        install_cmd = "pip install -e .[dev]" if info.package_manager == "pip" else "poetry install"
-        test_cmd = "pytest tests/ -v --cov --cov-report=xml" if include_coverage else "pytest tests/ -v"
+        install_cmd = (
+            "pip install -e .[dev]"
+            if info.package_manager == "pip"
+            else "poetry install"
+        )
+        test_cmd = (
+            "pytest tests/ -v --cov --cov-report=xml"
+            if include_coverage
+            else "pytest tests/ -v"
+        )
 
         if info.package_manager == "poetry":
             test_cmd = f"poetry run {test_cmd}"
@@ -1180,7 +1200,7 @@ jobs:
           fail_ci_if_error: false
 """
 
-        return f'''name: CI
+        return f"""name: CI
 
 on:
   push:
@@ -1257,14 +1277,14 @@ jobs:
         with:
           name: dist
           path: dist/
-'''
+"""
 
     def _node_full_workflow(
         self,
         info: ProjectInfo,
         branches_yaml: str,
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate Node.js full CI workflow."""
         versions = info.node_versions or ["20"]
@@ -1273,12 +1293,12 @@ jobs:
         install_cmd = {
             "npm": "npm ci",
             "yarn": "yarn install --frozen-lockfile",
-            "pnpm": "pnpm install --frozen-lockfile"
+            "pnpm": "pnpm install --frozen-lockfile",
         }.get(pkg_manager, "npm ci")
 
         test_cmd = f"{pkg_manager} test"
 
-        return f'''name: CI
+        return f"""name: CI
 
 on:
   push:
@@ -1355,17 +1375,17 @@ jobs:
         with:
           name: dist
           path: dist/
-'''
+"""
 
     def _rust_full_workflow(
         self,
         info: ProjectInfo,
         branches_yaml: str,
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate Rust full CI workflow."""
-        return f'''name: CI
+        return f"""name: CI
 
 on:
   push:
@@ -1430,17 +1450,17 @@ jobs:
         with:
           name: release
           path: target/release/
-'''
+"""
 
     def _go_full_workflow(
         self,
         info: ProjectInfo,
         branches_yaml: str,
         include_coverage: bool,
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate Go full CI workflow."""
-        return f'''name: CI
+        return f"""name: CI
 
 on:
   push:
@@ -1500,11 +1520,11 @@ jobs:
 
       - name: Build
         run: go build -v ./...
-'''
+"""
 
     def _generic_full_workflow(self, branches_yaml: str) -> str:
         """Generate generic full CI workflow."""
-        return f'''name: CI
+        return f"""name: CI
 
 on:
   push:
@@ -1543,14 +1563,14 @@ jobs:
       - name: Build
         run: |
           echo "Add your build commands here"
-'''
+"""
 
     def _generate_deploy_workflow(
         self,
         info: ProjectInfo,
         branches: list[str],
         deploy_target: Optional[str],
-        include_cache: bool
+        include_cache: bool,
     ) -> str:
         """Generate deployment workflow."""
         if deploy_target == "docker":
@@ -1570,7 +1590,7 @@ jobs:
         """Generate Docker deployment workflow."""
         branches_yaml = "\n".join(f"      - {b}" for b in branches)
 
-        return f'''name: Deploy
+        return f"""name: Deploy
 
 on:
   push:
@@ -1613,11 +1633,11 @@ jobs:
           labels: ${{{{ steps.meta.outputs.labels }}}}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-'''
+"""
 
     def _pypi_deploy_workflow(self, info: ProjectInfo) -> str:
         """Generate PyPI deployment workflow."""
-        return '''name: Publish to PyPI
+        return """name: Publish to PyPI
 
 on:
   release:
@@ -1648,13 +1668,13 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-'''
+"""
 
     def _npm_deploy_workflow(self, info: ProjectInfo) -> str:
         """Generate NPM deployment workflow."""
         pkg_manager = info.package_manager or "npm"
 
-        return f'''name: Publish to NPM
+        return f"""name: Publish to NPM
 
 on:
   release:
@@ -1683,13 +1703,13 @@ jobs:
         run: {pkg_manager} publish
         env:
           NODE_AUTH_TOKEN: ${{{{ secrets.NPM_TOKEN }}}}
-'''
+"""
 
     def _ghcr_deploy_workflow(self, info: ProjectInfo, branches: list[str]) -> str:
         """Generate GitHub Container Registry deployment workflow."""
         branches_yaml = "\n".join(f"      - {b}" for b in branches)
 
-        return f'''name: Deploy to GHCR
+        return f"""name: Deploy to GHCR
 
 on:
   push:
@@ -1737,11 +1757,11 @@ jobs:
           labels: ${{{{ steps.meta.outputs.labels }}}}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-'''
+"""
 
     def _heroku_deploy_workflow(self, info: ProjectInfo, branches: list[str]) -> str:
         """Generate Heroku deployment workflow."""
-        return '''name: Deploy to Heroku
+        return """name: Deploy to Heroku
 
 on:
   push:
@@ -1760,12 +1780,10 @@ jobs:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
           heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
           heroku_email: ${{ secrets.HEROKU_EMAIL }}
-'''
+"""
 
     def _generate_release_workflow(
-        self,
-        info: ProjectInfo,
-        deploy_target: Optional[str]
+        self, info: ProjectInfo, deploy_target: Optional[str]
     ) -> str:
         """Generate release workflow with changelog generation."""
         publish_step = ""
@@ -1796,7 +1814,7 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 """
 
-        return f'''name: Release
+        return f"""name: Release
 
 on:
   push:
@@ -1829,7 +1847,7 @@ jobs:
           body: ${{{{ steps.changelog.outputs.content }}}}
           draft: false
           prerelease: ${{{{ contains(github.ref, '-') }}}}
-{publish_step}'''
+{publish_step}"""
 
 
 class ValidateWorkflowTool(Tool):
@@ -1851,18 +1869,18 @@ Examples:
         "properties": {
             "file_path": {
                 "type": "string",
-                "description": "Path to workflow file to validate"
+                "description": "Path to workflow file to validate",
             },
             "path": {
                 "type": "string",
-                "description": "Directory containing workflow files to validate"
+                "description": "Directory containing workflow files to validate",
             },
             "content": {
                 "type": "string",
-                "description": "Workflow YAML content to validate directly"
-            }
+                "description": "Workflow YAML content to validate directly",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
@@ -1870,7 +1888,7 @@ Examples:
         file_path: Optional[str] = None,
         path: Optional[str] = None,
         content: Optional[str] = None,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Validate workflow file(s).
 
@@ -1885,7 +1903,7 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error="PyYAML is not installed. Install with: pip install pyyaml"
+                error="PyYAML is not installed. Install with: pip install pyyaml",
             )
 
         results = []
@@ -1905,7 +1923,7 @@ Examples:
                 return ToolResult(
                     success=False,
                     output="",
-                    error=f"Workflow file not found: {resolved}"
+                    error=f"Workflow file not found: {resolved}",
                 )
 
             content = resolved.read_text()
@@ -1921,7 +1939,7 @@ Examples:
                 return ToolResult(
                     success=False,
                     output="",
-                    error=f"Workflow directory not found: {workflow_dir}"
+                    error=f"Workflow directory not found: {workflow_dir}",
                 )
 
             for workflow_file in workflow_dir.glob("*.yml"):
@@ -1942,7 +1960,7 @@ Examples:
                 return ToolResult(
                     success=False,
                     output="",
-                    error=f"No workflow files found in: {workflow_dir}"
+                    error=f"No workflow files found in: {workflow_dir}",
                 )
 
         else:
@@ -1952,7 +1970,7 @@ Examples:
                 return ToolResult(
                     success=False,
                     output="",
-                    error="No .github/workflows directory found"
+                    error="No .github/workflows directory found",
                 )
 
             for workflow_file in workflow_dir.glob("*.yml"):
@@ -1992,18 +2010,13 @@ Examples:
             metadata={
                 "valid_count": valid_count,
                 "total_count": total_count,
-                "errors": errors
-            }
+                "errors": errors,
+            },
         )
 
     def _validate_content(self, content: str, file_name: str, yaml_module) -> dict:
         """Validate workflow YAML content."""
-        result = {
-            "file": file_name,
-            "valid": True,
-            "errors": [],
-            "warnings": []
-        }
+        result = {"file": file_name, "valid": True, "errors": [], "warnings": []}
 
         # Check YAML syntax
         try:
@@ -2052,11 +2065,15 @@ Examples:
 
             if "runs-on" not in job:
                 result["valid"] = False
-                result["errors"].append(f"Job '{job_name}' missing required 'runs-on' field")
+                result["errors"].append(
+                    f"Job '{job_name}' missing required 'runs-on' field"
+                )
 
             if "steps" not in job:
                 result["valid"] = False
-                result["errors"].append(f"Job '{job_name}' missing required 'steps' field")
+                result["errors"].append(
+                    f"Job '{job_name}' missing required 'steps' field"
+                )
                 continue
 
             steps = job.get("steps", [])
@@ -2072,13 +2089,17 @@ Examples:
             for i, step in enumerate(steps):
                 if not isinstance(step, dict):
                     result["valid"] = False
-                    result["errors"].append(f"Job '{job_name}' step {i+1} must be a mapping")
+                    result["errors"].append(
+                        f"Job '{job_name}' step {i+1} must be a mapping"
+                    )
                     continue
 
                 # Step must have 'uses' or 'run'
                 if "uses" not in step and "run" not in step:
                     result["valid"] = False
-                    result["errors"].append(f"Job '{job_name}' step {i+1} must have 'uses' or 'run'")
+                    result["errors"].append(
+                        f"Job '{job_name}' step {i+1} must have 'uses' or 'run'"
+                    )
 
         # Check for common issues
         content_lower = content.lower()
@@ -2100,10 +2121,16 @@ Examples:
 
         for old_action, new_action in deprecated_actions:
             if old_action.lower() in content_lower:
-                result["warnings"].append(f"Consider updating '{old_action}' to '{new_action}'")
+                result["warnings"].append(
+                    f"Consider updating '{old_action}' to '{new_action}'"
+                )
 
         # Check for hardcoded secrets
-        if re.search(r'(password|secret|token|key)\s*[:=]\s*["\'][^$]', content, re.IGNORECASE):
-            result["warnings"].append("Possible hardcoded secret detected - use ${{ secrets.* }} instead")
+        if re.search(
+            r'(password|secret|token|key)\s*[:=]\s*["\'][^$]', content, re.IGNORECASE
+        ):
+            result["warnings"].append(
+                "Possible hardcoded secret detected - use ${{ secrets.* }} instead"
+            )
 
         return result

@@ -11,7 +11,7 @@ from sindri.persistence.metrics import (
     TaskMetrics,
     SessionMetrics,
     MetricsCollector,
-    MetricsStore
+    MetricsStore,
 )
 from sindri.persistence.database import Database
 
@@ -20,16 +20,14 @@ from sindri.persistence.database import Database
 # Tool Execution Metrics Tests
 # ============================================================================
 
+
 class TestToolExecutionMetrics:
     """Tests for ToolExecutionMetrics dataclass."""
 
     def test_duration_calculation(self):
         """Test that duration is calculated correctly."""
         metrics = ToolExecutionMetrics(
-            tool_name="read_file",
-            start_time=100.0,
-            end_time=100.5,
-            success=True
+            tool_name="read_file", start_time=100.0, end_time=100.5, success=True
         )
         assert metrics.duration_seconds == 0.5
         assert metrics.duration_ms == 500.0
@@ -41,17 +39,14 @@ class TestToolExecutionMetrics:
             start_time=0.0,
             end_time=1.0,
             success=True,
-            arguments={"path": "/test.txt", "content": "hello"}
+            arguments={"path": "/test.txt", "content": "hello"},
         )
         assert metrics.arguments == {"path": "/test.txt", "content": "hello"}
 
     def test_failed_execution(self):
         """Test failed tool execution."""
         metrics = ToolExecutionMetrics(
-            tool_name="shell",
-            start_time=0.0,
-            end_time=2.0,
-            success=False
+            tool_name="shell", start_time=0.0, end_time=2.0, success=False
         )
         assert metrics.success is False
         assert metrics.duration_seconds == 2.0
@@ -60,6 +55,7 @@ class TestToolExecutionMetrics:
 # ============================================================================
 # Iteration Metrics Tests
 # ============================================================================
+
 
 class TestIterationMetrics:
     """Tests for IterationMetrics dataclass."""
@@ -71,7 +67,7 @@ class TestIterationMetrics:
             start_time=0.0,
             end_time=10.0,
             agent_name="huginn",
-            model_name="qwen2.5-coder:14b"
+            model_name="qwen2.5-coder:14b",
         )
         assert metrics.iteration_number == 1
         assert metrics.duration_seconds == 10.0
@@ -90,7 +86,7 @@ class TestIterationMetrics:
                 ToolExecutionMetrics("read_file", 1.0, 1.5, True),
                 ToolExecutionMetrics("write_file", 5.0, 6.0, True),
                 ToolExecutionMetrics("shell", 10.0, 12.0, False),
-            ]
+            ],
         )
         assert metrics.tool_count == 3
         assert metrics.total_tool_time == pytest.approx(3.5)  # 0.5 + 1.0 + 2.0
@@ -100,6 +96,7 @@ class TestIterationMetrics:
 # ============================================================================
 # Task Metrics Tests
 # ============================================================================
+
 
 class TestTaskMetrics:
     """Tests for TaskMetrics dataclass."""
@@ -113,7 +110,7 @@ class TestTaskMetrics:
             model_name="qwen2.5-coder:14b",
             start_time=0.0,
             end_time=30.0,
-            status="completed"
+            status="completed",
         )
         assert metrics.duration_seconds == 30.0
         assert metrics.iteration_count == 0
@@ -139,7 +136,7 @@ class TestTaskMetrics:
             model_name="model",
             start_time=0.0,
             end_time=25.0,
-            iterations=iterations
+            iterations=iterations,
         )
 
         assert metrics.iteration_count == 2
@@ -153,15 +150,19 @@ class TestTaskMetrics:
             IterationMetrics(1, 0.0, 10.0, "huginn", "model"),
             IterationMetrics(2, 10.0, 20.0, "huginn", "model"),
         ]
-        iterations[0].tool_executions.extend([
-            ToolExecutionMetrics("read_file", 1.0, 1.5, True),
-            ToolExecutionMetrics("read_file", 2.0, 2.3, True),
-        ])
-        iterations[1].tool_executions.extend([
-            ToolExecutionMetrics("read_file", 11.0, 11.2, True),
-            ToolExecutionMetrics("write_file", 12.0, 13.0, True),
-            ToolExecutionMetrics("write_file", 14.0, 14.5, False),
-        ])
+        iterations[0].tool_executions.extend(
+            [
+                ToolExecutionMetrics("read_file", 1.0, 1.5, True),
+                ToolExecutionMetrics("read_file", 2.0, 2.3, True),
+            ]
+        )
+        iterations[1].tool_executions.extend(
+            [
+                ToolExecutionMetrics("read_file", 11.0, 11.2, True),
+                ToolExecutionMetrics("write_file", 12.0, 13.0, True),
+                ToolExecutionMetrics("write_file", 14.0, 14.5, False),
+            ]
+        )
 
         metrics = TaskMetrics(
             task_id="task-003",
@@ -170,7 +171,7 @@ class TestTaskMetrics:
             model_name="model",
             start_time=0.0,
             end_time=20.0,
-            iterations=iterations
+            iterations=iterations,
         )
 
         breakdown = metrics.get_tool_breakdown()
@@ -189,6 +190,7 @@ class TestTaskMetrics:
 # Session Metrics Tests
 # ============================================================================
 
+
 class TestSessionMetrics:
     """Tests for SessionMetrics dataclass."""
 
@@ -199,7 +201,7 @@ class TestSessionMetrics:
             task_description="Hello world",
             model_name="model",
             start_time=0.0,
-            end_time=5.0
+            end_time=5.0,
         )
         assert metrics.duration_seconds == 5.0
         assert metrics.total_iterations == 0
@@ -214,11 +216,9 @@ class TestSessionMetrics:
             model_name="model",
             start_time=0.0,
             end_time=20.0,
-            model_load_time=2.0
+            model_load_time=2.0,
         )
-        task1.iterations.append(
-            IterationMetrics(1, 0.0, 20.0, "brokkr", "model")
-        )
+        task1.iterations.append(IterationMetrics(1, 0.0, 20.0, "brokkr", "model"))
 
         task2 = TaskMetrics(
             task_id="task-002",
@@ -227,12 +227,14 @@ class TestSessionMetrics:
             model_name="model2",
             start_time=20.0,
             end_time=40.0,
-            model_load_time=3.0
+            model_load_time=3.0,
         )
-        task2.iterations.extend([
-            IterationMetrics(1, 20.0, 28.0, "huginn", "model2"),
-            IterationMetrics(2, 28.0, 40.0, "huginn", "model2"),
-        ])
+        task2.iterations.extend(
+            [
+                IterationMetrics(1, 20.0, 28.0, "huginn", "model2"),
+                IterationMetrics(2, 28.0, 40.0, "huginn", "model2"),
+            ]
+        )
 
         metrics = SessionMetrics(
             session_id="session-002",
@@ -240,7 +242,7 @@ class TestSessionMetrics:
             model_name="model",
             start_time=0.0,
             end_time=40.0,
-            tasks=[task1, task2]
+            tasks=[task1, task2],
         )
 
         assert metrics.duration_seconds == 40.0
@@ -256,13 +258,15 @@ class TestSessionMetrics:
             model_name="model",
             start_time=0.0,
             end_time=60.0,
-            model_load_time=5.0
+            model_load_time=5.0,
         )
         iteration = IterationMetrics(1, 0.0, 60.0, "huginn", "model")
-        iteration.tool_executions.extend([
-            ToolExecutionMetrics("read_file", 10.0, 11.0, True),
-            ToolExecutionMetrics("write_file", 30.0, 32.0, True),
-        ])
+        iteration.tool_executions.extend(
+            [
+                ToolExecutionMetrics("read_file", 10.0, 11.0, True),
+                ToolExecutionMetrics("write_file", 30.0, 32.0, True),
+            ]
+        )
         task.iterations.append(iteration)
 
         metrics = SessionMetrics(
@@ -272,7 +276,7 @@ class TestSessionMetrics:
             start_time=0.0,
             end_time=60.0,
             status="completed",
-            tasks=[task]
+            tasks=[task],
         )
 
         summary = metrics.get_summary()
@@ -294,9 +298,11 @@ class TestSessionMetrics:
             start_time=0.0,
             end_time=30.0,
             status="completed",
-            model_load_time=2.5
+            model_load_time=2.5,
         )
-        iteration = IterationMetrics(1, 0.0, 30.0, "huginn", "model", tokens_generated=100)
+        iteration = IterationMetrics(
+            1, 0.0, 30.0, "huginn", "model", tokens_generated=100
+        )
         iteration.tool_executions.append(
             ToolExecutionMetrics("read_file", 5.0, 6.0, True, {"path": "/test.txt"})
         )
@@ -309,7 +315,7 @@ class TestSessionMetrics:
             start_time=0.0,
             end_time=30.0,
             status="completed",
-            tasks=[task]
+            tasks=[task],
         )
 
         # Serialize and deserialize
@@ -332,15 +338,14 @@ class TestSessionMetrics:
 # Metrics Collector Tests
 # ============================================================================
 
+
 class TestMetricsCollector:
     """Tests for MetricsCollector class."""
 
     def test_basic_collection(self):
         """Test basic metrics collection workflow."""
         collector = MetricsCollector(
-            session_id="session-001",
-            task_description="Test task",
-            model_name="model"
+            session_id="session-001", task_description="Test task", model_name="model"
         )
 
         # Start and end a task
@@ -362,7 +367,7 @@ class TestMetricsCollector:
         collector = MetricsCollector(
             session_id="session-002",
             task_description="Multi-iteration",
-            model_name="model"
+            model_name="model",
         )
 
         collector.start_task("task-001", "Task", "huginn", "model")
@@ -382,9 +387,7 @@ class TestMetricsCollector:
     def test_incomplete_task_handling(self):
         """Test that incomplete tasks/iterations are handled."""
         collector = MetricsCollector(
-            session_id="session-003",
-            task_description="Incomplete",
-            model_name="model"
+            session_id="session-003", task_description="Incomplete", model_name="model"
         )
 
         collector.start_task("task-001", "Task", "huginn", "model")
@@ -403,7 +406,7 @@ class TestMetricsCollector:
         collector = MetricsCollector(
             session_id="session-004",
             task_description="Duration test",
-            model_name="model"
+            model_name="model",
         )
 
         collector.start_task("task-001", "Task", "huginn", "model")
@@ -420,6 +423,7 @@ class TestMetricsCollector:
 # ============================================================================
 # Metrics Store Tests
 # ============================================================================
+
 
 class TestMetricsStore:
     """Tests for MetricsStore database operations."""
@@ -448,11 +452,9 @@ class TestMetricsStore:
             model_name="model",
             start_time=0.0,
             end_time=30.0,
-            status="completed"
+            status="completed",
         )
-        task.iterations.append(
-            IterationMetrics(1, 0.0, 30.0, "huginn", "model")
-        )
+        task.iterations.append(IterationMetrics(1, 0.0, 30.0, "huginn", "model"))
 
         original = SessionMetrics(
             session_id="test-session-001",
@@ -461,7 +463,7 @@ class TestMetricsStore:
             start_time=0.0,
             end_time=30.0,
             status="completed",
-            tasks=[task]
+            tasks=[task],
         )
 
         # Save
@@ -486,7 +488,7 @@ class TestMetricsStore:
                 model_name="model",
                 start_time=0.0,
                 end_time=float(10 + i),
-                status="completed"
+                status="completed",
             )
             await store.save_metrics(metrics)
 
@@ -505,15 +507,14 @@ class TestMetricsStore:
                 agent_name="huginn",
                 model_name="model",
                 start_time=0.0,
-                end_time=float(10 * (i + 1))
+                end_time=float(10 * (i + 1)),
             )
             task.iterations.append(
                 IterationMetrics(1, 0.0, float(10 * (i + 1)), "huginn", "model")
             )
-            task.iterations[0].tool_executions.extend([
-                ToolExecutionMetrics("tool", 0.0, 1.0, True)
-                for _ in range(i + 1)
-            ])
+            task.iterations[0].tool_executions.extend(
+                [ToolExecutionMetrics("tool", 0.0, 1.0, True) for _ in range(i + 1)]
+            )
 
             metrics = SessionMetrics(
                 session_id=f"session-{i:03d}",
@@ -522,7 +523,7 @@ class TestMetricsStore:
                 start_time=0.0,
                 end_time=float(10 * (i + 1)),
                 status="completed",
-                tasks=[task]
+                tasks=[task],
             )
             await store.save_metrics(metrics)
 
@@ -540,7 +541,7 @@ class TestMetricsStore:
             task_description="Delete me",
             model_name="model",
             start_time=0.0,
-            end_time=10.0
+            end_time=10.0,
         )
         await store.save_metrics(metrics)
 
@@ -566,6 +567,7 @@ class TestMetricsStore:
 # ============================================================================
 # Header Widget Tests
 # ============================================================================
+
 
 class TestHeaderMetricsDisplay:
     """Tests for header widget metrics display."""

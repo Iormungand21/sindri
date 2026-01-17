@@ -1,9 +1,7 @@
 """Tests for HTTP request tools."""
 
 import pytest
-import json
 from unittest.mock import AsyncMock, patch, MagicMock
-from pathlib import Path
 
 from sindri.tools.http import HttpRequestTool, HttpGetTool, HttpPostTool
 
@@ -11,6 +9,7 @@ from sindri.tools.http import HttpRequestTool, HttpGetTool, HttpPostTool
 # =============================================================================
 # Fixtures
 # =============================================================================
+
 
 @pytest.fixture
 def mock_response():
@@ -22,7 +21,7 @@ def mock_response():
         "content-type": "application/json",
         "content-length": "100",
         "date": "Mon, 15 Jan 2026 12:00:00 GMT",
-        "server": "TestServer"
+        "server": "TestServer",
     }
     response.url = "https://api.example.com/test"
     response.text = '{"message": "success", "data": [1, 2, 3]}'
@@ -58,6 +57,7 @@ def mock_error_response():
 # HttpRequestTool Tests - Basic Functionality
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_http_request_get_basic(mock_response):
     """Test basic GET request."""
@@ -87,9 +87,7 @@ async def test_http_request_post_with_json(mock_response):
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(
-            url="https://api.example.com/data",
-            method="POST",
-            json={"key": "value"}
+            url="https://api.example.com/data", method="POST", json={"key": "value"}
         )
 
         assert result.success is True
@@ -110,7 +108,7 @@ async def test_http_request_with_headers(mock_response):
 
         result = await tool.execute(
             url="https://api.example.com/test",
-            headers={"Authorization": "Bearer token123"}
+            headers={"Authorization": "Bearer token123"},
         )
 
         assert result.success is True
@@ -129,8 +127,7 @@ async def test_http_request_with_params(mock_response):
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(
-            url="https://api.example.com/search",
-            params={"q": "test", "page": "1"}
+            url="https://api.example.com/search", params={"q": "test", "page": "1"}
         )
 
         assert result.success is True
@@ -141,6 +138,7 @@ async def test_http_request_with_params(mock_response):
 # =============================================================================
 # HttpRequestTool Tests - HTTP Methods
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_http_request_put_method(mock_response):
@@ -155,13 +153,12 @@ async def test_http_request_put_method(mock_response):
         result = await tool.execute(
             url="https://api.example.com/resource/1",
             method="PUT",
-            json={"updated": True}
+            json={"updated": True},
         )
 
         assert result.success is True
         mock_client_instance.request.assert_called_with(
-            "PUT", "https://api.example.com/resource/1",
-            json={"updated": True}
+            "PUT", "https://api.example.com/resource/1", json={"updated": True}
         )
 
 
@@ -178,7 +175,7 @@ async def test_http_request_patch_method(mock_response):
         result = await tool.execute(
             url="https://api.example.com/resource/1",
             method="PATCH",
-            json={"field": "new_value"}
+            json={"field": "new_value"},
         )
 
         assert result.success is True
@@ -195,8 +192,7 @@ async def test_http_request_delete_method(mock_response):
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(
-            url="https://api.example.com/resource/1",
-            method="DELETE"
+            url="https://api.example.com/resource/1", method="DELETE"
         )
 
         assert result.success is True
@@ -214,8 +210,7 @@ async def test_http_request_head_method(mock_response):
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(
-            url="https://api.example.com/resource",
-            method="HEAD"
+            url="https://api.example.com/resource", method="HEAD"
         )
 
         assert result.success is True
@@ -224,6 +219,7 @@ async def test_http_request_head_method(mock_response):
 # =============================================================================
 # HttpRequestTool Tests - Validation
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_http_request_empty_url_error():
@@ -281,6 +277,7 @@ async def test_http_request_adds_https_prefix():
 # HttpRequestTool Tests - Security
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_http_request_blocks_localhost():
     """Test that localhost requests are blocked by default."""
@@ -330,6 +327,7 @@ async def test_http_request_allows_localhost_when_enabled(mock_response):
 # HttpRequestTool Tests - Error Handling
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_http_request_timeout_error():
     """Test timeout error handling."""
@@ -339,7 +337,9 @@ async def test_http_request_timeout_error():
 
     with patch("sindri.tools.http.httpx.AsyncClient") as mock_client:
         mock_client_instance = AsyncMock()
-        mock_client_instance.request.side_effect = real_httpx.TimeoutException("Request timed out")
+        mock_client_instance.request.side_effect = real_httpx.TimeoutException(
+            "Request timed out"
+        )
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(url="https://api.example.com/slow", timeout=5)
@@ -357,7 +357,9 @@ async def test_http_request_connection_error():
 
     with patch("sindri.tools.http.httpx.AsyncClient") as mock_client:
         mock_client_instance = AsyncMock()
-        mock_client_instance.request.side_effect = real_httpx.ConnectError("Connection refused")
+        mock_client_instance.request.side_effect = real_httpx.ConnectError(
+            "Connection refused"
+        )
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(url="https://api.example.com/down")
@@ -387,6 +389,7 @@ async def test_http_request_error_response(mock_error_response):
 # =============================================================================
 # HttpRequestTool Tests - Response Handling
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_http_request_json_response_formatting(mock_response):
@@ -427,6 +430,7 @@ async def test_http_request_metadata_includes_timing(mock_response):
 # HttpGetTool Tests
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_http_get_basic(mock_response):
     """Test HttpGetTool basic usage."""
@@ -456,8 +460,7 @@ async def test_http_get_with_headers(mock_response):
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(
-            url="https://api.example.com/users",
-            headers={"Accept": "application/json"}
+            url="https://api.example.com/users", headers={"Accept": "application/json"}
         )
 
         assert result.success is True
@@ -466,6 +469,7 @@ async def test_http_get_with_headers(mock_response):
 # =============================================================================
 # HttpPostTool Tests
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_http_post_basic(mock_response):
@@ -478,8 +482,7 @@ async def test_http_post_basic(mock_response):
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(
-            url="https://api.example.com/data",
-            json={"name": "test"}
+            url="https://api.example.com/data", json={"name": "test"}
         )
 
         assert result.success is True
@@ -501,7 +504,7 @@ async def test_http_post_with_headers(mock_response):
         result = await tool.execute(
             url="https://api.example.com/data",
             json={"name": "test"},
-            headers={"X-Custom": "header"}
+            headers={"X-Custom": "header"},
         )
 
         assert result.success is True
@@ -510,6 +513,7 @@ async def test_http_post_with_headers(mock_response):
 # =============================================================================
 # Tool Registry Integration Tests
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_http_tools_in_registry():
@@ -560,6 +564,7 @@ async def test_http_post_schema():
 # Agent Integration Tests
 # =============================================================================
 
+
 def test_agents_have_http_request():
     """Test that appropriate agents have http_request tool."""
     from sindri.agents.registry import AGENTS
@@ -581,6 +586,7 @@ def test_agents_have_http_request():
 # Edge Cases
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_http_request_with_raw_data(mock_response):
     """Test POST request with raw data body."""
@@ -592,9 +598,7 @@ async def test_http_request_with_raw_data(mock_response):
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(
-            url="https://api.example.com/raw",
-            method="POST",
-            data="raw body content"
+            url="https://api.example.com/raw", method="POST", data="raw body content"
         )
 
         assert result.success is True
@@ -644,8 +648,7 @@ async def test_http_request_follow_redirects_disabled(mock_response):
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
         result = await tool.execute(
-            url="https://api.example.com/redirect",
-            follow_redirects=False
+            url="https://api.example.com/redirect", follow_redirects=False
         )
 
         assert result.success is True
@@ -663,10 +666,7 @@ async def test_http_request_custom_timeout(mock_response):
         mock_client_instance.request.return_value = mock_response
         mock_client.return_value.__aenter__.return_value = mock_client_instance
 
-        result = await tool.execute(
-            url="https://api.example.com/slow",
-            timeout=60
-        )
+        result = await tool.execute(url="https://api.example.com/slow", timeout=60)
 
         assert result.success is True
         mock_client.assert_called_with(timeout=60, follow_redirects=True)

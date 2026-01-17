@@ -4,7 +4,6 @@ import json
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 import pytest
 
 from sindri.marketplace.metadata import (
@@ -20,8 +19,6 @@ from sindri.marketplace.index import (
 )
 from sindri.marketplace.installer import (
     PluginInstaller,
-    InstallResult,
-    UninstallResult,
 )
 from sindri.marketplace.search import (
     PluginSearcher,
@@ -211,7 +208,8 @@ class TestPluginMetadata:
         """Extract metadata from Python plugin file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             plugin_path = Path(tmpdir) / "my_tool.py"
-            plugin_path.write_text('''"""My amazing tool plugin.
+            plugin_path.write_text(
+                '''"""My amazing tool plugin.
 
 Extended description goes here.
 """
@@ -228,7 +226,8 @@ class MyTool(Tool):
 
     async def execute(self, **kwargs) -> ToolResult:
         return ToolResult(success=True, output="done")
-''')
+'''
+            )
             meta = PluginMetadata.from_plugin_file(plugin_path)
             assert meta is not None
             assert meta.name == "my_tool"
@@ -240,7 +239,8 @@ class MyTool(Tool):
         """Extract metadata from TOML agent config file."""
         with tempfile.TemporaryDirectory() as tmpdir:
             agent_path = Path(tmpdir) / "my_agent.toml"
-            agent_path.write_text('''[agent]
+            agent_path.write_text(
+                """[agent]
 name = "thor"
 role = "Performance Optimizer"
 description = "Optimizes code performance"
@@ -251,7 +251,8 @@ version = "2.0.0"
 author = "Test"
 category = "specialist"
 tags = ["performance", "optimization"]
-''')
+"""
+            )
             meta = PluginMetadata.from_plugin_file(agent_path)
             assert meta is not None
             assert meta.name == "thor"
@@ -441,10 +442,16 @@ class TestMarketplaceIndex:
         index.load()
 
         # Add plugins with different categories
-        for name, category in [("git_tool", PluginCategory.GIT), ("test_tool", PluginCategory.TESTING), ("git_tool2", PluginCategory.GIT)]:
+        for name, category in [
+            ("git_tool", PluginCategory.GIT),
+            ("test_tool", PluginCategory.TESTING),
+            ("git_tool2", PluginCategory.GIT),
+        ]:
             meta = PluginMetadata(name=name, category=category)
             source = PluginSource(type=SourceType.LOCAL, location="/path")
-            plugin = InstalledPlugin(metadata=meta, source=source, installed_path=Path("/path"))
+            plugin = InstalledPlugin(
+                metadata=meta, source=source, installed_path=Path("/path")
+            )
             index.add(plugin)
 
         git_plugins = index.get_by_category(PluginCategory.GIT)
@@ -458,7 +465,9 @@ class TestMarketplaceIndex:
         for name, ptype in [("tool1", "tool"), ("tool2", "tool"), ("agent1", "agent")]:
             meta = PluginMetadata(name=name, plugin_type=ptype)
             source = PluginSource(type=SourceType.LOCAL, location="/path")
-            plugin = InstalledPlugin(metadata=meta, source=source, installed_path=Path("/path"))
+            plugin = InstalledPlugin(
+                metadata=meta, source=source, installed_path=Path("/path")
+            )
             index.add(plugin)
 
         tools = index.get_by_type("tool")
@@ -497,14 +506,18 @@ class TestMarketplaceIndex:
         index.load()
 
         # Add some plugins
-        for i, (ptype, cat, src_type) in enumerate([
-            ("tool", PluginCategory.GIT, SourceType.GIT),
-            ("tool", PluginCategory.TESTING, SourceType.LOCAL),
-            ("agent", PluginCategory.CODER, SourceType.URL),
-        ]):
+        for i, (ptype, cat, src_type) in enumerate(
+            [
+                ("tool", PluginCategory.GIT, SourceType.GIT),
+                ("tool", PluginCategory.TESTING, SourceType.LOCAL),
+                ("agent", PluginCategory.CODER, SourceType.URL),
+            ]
+        ):
             meta = PluginMetadata(name=f"plugin{i}", category=cat, plugin_type=ptype)
             source = PluginSource(type=src_type, location="/path")
-            plugin = InstalledPlugin(metadata=meta, source=source, installed_path=Path("/path"))
+            plugin = InstalledPlugin(
+                metadata=meta, source=source, installed_path=Path("/path")
+            )
             index.add(plugin)
 
         stats = index.get_stats()
@@ -541,7 +554,8 @@ class TestPluginInstaller:
         source_dir.mkdir()
 
         plugin_path = source_dir / "sample_tool.py"
-        plugin_path.write_text('''"""Sample tool plugin."""
+        plugin_path.write_text(
+            '''"""Sample tool plugin."""
 
 __version__ = "1.0.0"
 __author__ = "Test"
@@ -555,7 +569,8 @@ class SampleTool(Tool):
 
     async def execute(self, **kwargs) -> ToolResult:
         return ToolResult(success=True, output="done")
-''')
+'''
+        )
         return plugin_path
 
     def test_detect_source_type_local(self, temp_dirs, sample_plugin_file):
@@ -571,7 +586,9 @@ class SampleTool(Tool):
         plugin_dir, agent_dir, _ = temp_dirs
         installer = PluginInstaller(plugin_dir=plugin_dir, agent_dir=agent_dir)
 
-        source_type, _ = installer._detect_source_type("https://github.com/user/repo.git")
+        source_type, _ = installer._detect_source_type(
+            "https://github.com/user/repo.git"
+        )
         assert source_type == SourceType.GIT
 
     def test_detect_source_type_github_shorthand(self, temp_dirs):
@@ -754,9 +771,27 @@ class TestPluginSearcher:
         index.load()
 
         plugins = [
-            ("git_helper", "1.0.0", "Git operations helper", PluginCategory.GIT, ["git", "vcs"]),
-            ("test_runner", "2.0.0", "Test runner tool", PluginCategory.TESTING, ["test", "runner"]),
-            ("security_audit", "1.5.0", "Security auditing", PluginCategory.SECURITY, ["security", "audit"]),
+            (
+                "git_helper",
+                "1.0.0",
+                "Git operations helper",
+                PluginCategory.GIT,
+                ["git", "vcs"],
+            ),
+            (
+                "test_runner",
+                "2.0.0",
+                "Test runner tool",
+                PluginCategory.TESTING,
+                ["test", "runner"],
+            ),
+            (
+                "security_audit",
+                "1.5.0",
+                "Security auditing",
+                PluginCategory.SECURITY,
+                ["security", "audit"],
+            ),
         ]
 
         for name, version, desc, cat, tags in plugins:
@@ -815,7 +850,9 @@ class TestPluginSearcher:
             agent_dir=agent_dir,
         )
 
-        results = searcher.search_by_category(PluginCategory.TESTING, installed_only=True)
+        results = searcher.search_by_category(
+            PluginCategory.TESTING, installed_only=True
+        )
 
         assert len(results) >= 1
         assert any(r.name == "test_runner" for r in results)
@@ -921,7 +958,8 @@ class TestMarketplaceIntegration:
 
             # Create a sample plugin in source
             plugin_file = source_dir / "my_tool.py"
-            plugin_file.write_text('''"""My tool plugin.
+            plugin_file.write_text(
+                '''"""My tool plugin.
 
 A useful tool for testing.
 """
@@ -943,7 +981,8 @@ class MyTool(Tool):
 
     async def execute(self, **kwargs) -> ToolResult:
         return ToolResult(success=True, output="Hello")
-''')
+'''
+            )
 
             yield {
                 "base_dir": base_dir,

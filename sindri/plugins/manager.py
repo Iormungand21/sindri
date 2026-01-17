@@ -3,7 +3,7 @@
 Coordinates plugin discovery, validation, loading, and registration.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum, auto
 from pathlib import Path
 from typing import Optional, Set
@@ -20,11 +20,12 @@ log = structlog.get_logger()
 
 class PluginState(Enum):
     """State of a plugin."""
-    DISCOVERED = auto()     # Found but not validated
-    VALIDATED = auto()      # Passed validation
-    LOADED = auto()         # Successfully loaded and registered
-    FAILED = auto()         # Failed validation or loading
-    DISABLED = auto()       # Explicitly disabled by user
+
+    DISCOVERED = auto()  # Found but not validated
+    VALIDATED = auto()  # Passed validation
+    LOADED = auto()  # Successfully loaded and registered
+    FAILED = auto()  # Failed validation or loading
+    DISABLED = auto()  # Explicitly disabled by user
 
 
 @dataclass
@@ -39,6 +40,7 @@ class LoadedPlugin:
         agent_definition: Agent definition (for agent plugins)
         error: Error message if loading failed
     """
+
     info: PluginInfo
     state: PluginState = PluginState.DISCOVERED
     validation: Optional[ValidationResult] = None
@@ -73,7 +75,7 @@ class PluginManager:
         self,
         plugin_dir: Optional[Path] = None,
         agent_dir: Optional[Path] = None,
-        strict_validation: bool = False
+        strict_validation: bool = False,
     ):
         """Initialize the plugin manager.
 
@@ -114,7 +116,7 @@ class PluginManager:
             "plugins_discovered",
             count=len(discovered),
             tools=len([p for p in discovered if p.type == PluginType.TOOL]),
-            agents=len([p for p in discovered if p.type == PluginType.AGENT])
+            agents=len([p for p in discovered if p.type == PluginType.AGENT]),
         )
 
         return discovered
@@ -123,7 +125,7 @@ class PluginManager:
         self,
         existing_tools: Optional[Set[str]] = None,
         existing_agents: Optional[Set[str]] = None,
-        available_models: Optional[Set[str]] = None
+        available_models: Optional[Set[str]] = None,
     ) -> dict[str, ValidationResult]:
         """Validate all discovered plugins.
 
@@ -151,7 +153,7 @@ class PluginManager:
             existing_tools=existing_tools or set(),  # Only check against core tools
             existing_agents=existing_agents or set(),  # Only check against core agents
             available_models=available_models,
-            strict=self.strict_validation
+            strict=self.strict_validation,
         )
 
         results = {}
@@ -178,20 +180,14 @@ class PluginManager:
             else:
                 loaded.state = PluginState.FAILED
                 loaded.error = "; ".join(msg for _, msg in result.errors)
-                log.warning(
-                    "plugin_validation_failed",
-                    key=key,
-                    errors=loaded.error
-                )
+                log.warning("plugin_validation_failed", key=key, errors=loaded.error)
 
             results[key] = result
 
         return results
 
     def register_tools(
-        self,
-        registry: ToolRegistry,
-        work_dir: Optional[Path] = None
+        self, registry: ToolRegistry, work_dir: Optional[Path] = None
     ) -> list[str]:
         """Register validated tool plugins with a ToolRegistry.
 
@@ -226,24 +222,19 @@ class PluginManager:
                 log.info(
                     "plugin_tool_registered",
                     name=loaded.info.name,
-                    path=str(loaded.info.path)
+                    path=str(loaded.info.path),
                 )
             except Exception as e:
                 loaded.state = PluginState.FAILED
                 loaded.error = f"Failed to instantiate: {e}"
                 log.error(
-                    "plugin_tool_register_failed",
-                    name=loaded.info.name,
-                    error=str(e)
+                    "plugin_tool_register_failed", name=loaded.info.name, error=str(e)
                 )
 
         self._tool_names.update(registered)
         return registered
 
-    def register_agents(
-        self,
-        agents: dict[str, AgentDefinition]
-    ) -> list[str]:
+    def register_agents(self, agents: dict[str, AgentDefinition]) -> list[str]:
         """Register validated agent plugins with an agent registry.
 
         Args:
@@ -295,15 +286,13 @@ class PluginManager:
                     "plugin_agent_registered",
                     name=config["name"],
                     model=config["model"],
-                    path=str(loaded.info.path)
+                    path=str(loaded.info.path),
                 )
             except Exception as e:
                 loaded.state = PluginState.FAILED
                 loaded.error = f"Failed to create agent: {e}"
                 log.error(
-                    "plugin_agent_register_failed",
-                    name=loaded.info.name,
-                    error=str(e)
+                    "plugin_agent_register_failed", name=loaded.info.name, error=str(e)
                 )
 
         self._agent_names.update(registered)
@@ -316,7 +305,8 @@ class PluginManager:
             List of LoadedPlugin for tools
         """
         return [
-            p for p in self._plugins.values()
+            p
+            for p in self._plugins.values()
             if p.info.type == PluginType.TOOL and p.state == PluginState.LOADED
         ]
 
@@ -327,7 +317,8 @@ class PluginManager:
             List of LoadedPlugin for agents
         """
         return [
-            p for p in self._plugins.values()
+            p
+            for p in self._plugins.values()
             if p.info.type == PluginType.AGENT and p.state == PluginState.LOADED
         ]
 
@@ -337,10 +328,7 @@ class PluginManager:
         Returns:
             List of LoadedPlugin in FAILED state
         """
-        return [
-            p for p in self._plugins.values()
-            if p.state == PluginState.FAILED
-        ]
+        return [p for p in self._plugins.values() if p.state == PluginState.FAILED]
 
     def get_all_plugins(self) -> list[LoadedPlugin]:
         """Get all plugins.
@@ -368,7 +356,7 @@ class PluginManager:
         log.debug(
             "plugin_directories_created",
             plugin_dir=str(self.plugin_dir),
-            agent_dir=str(self.agent_dir)
+            agent_dir=str(self.agent_dir),
         )
 
     def get_tool_names(self) -> Set[str]:
@@ -394,7 +382,7 @@ def load_plugins(
     plugin_dir: Optional[Path] = None,
     agent_dir: Optional[Path] = None,
     strict: bool = False,
-    available_models: Optional[Set[str]] = None
+    available_models: Optional[Set[str]] = None,
 ) -> PluginManager:
     """Convenience function to discover, validate, and register all plugins.
 
@@ -410,9 +398,7 @@ def load_plugins(
         PluginManager with loaded plugins
     """
     manager = PluginManager(
-        plugin_dir=plugin_dir,
-        agent_dir=agent_dir,
-        strict_validation=strict
+        plugin_dir=plugin_dir, agent_dir=agent_dir, strict_validation=strict
     )
 
     # Discover
@@ -426,7 +412,7 @@ def load_plugins(
     manager.validate_all(
         existing_tools=existing_tools,
         existing_agents=existing_agents,
-        available_models=available_models
+        available_models=available_models,
     )
 
     # Register

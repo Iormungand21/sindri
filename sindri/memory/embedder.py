@@ -12,9 +12,7 @@ class LocalEmbedder:
     """Generate embeddings locally via Ollama."""
 
     def __init__(
-        self,
-        model: str = "nomic-embed-text",
-        host: str = "http://localhost:11434"
+        self, model: str = "nomic-embed-text", host: str = "http://localhost:11434"
     ):
         self.model = model
         self.client = ollama.Client(host=host)
@@ -33,10 +31,7 @@ class LocalEmbedder:
     def embed(self, text: str) -> list[float]:
         """Embed a single text."""
         try:
-            response = self.client.embeddings(
-                model=self.model,
-                prompt=text
-            )
+            response = self.client.embeddings(model=self.model, prompt=text)
             return response["embedding"]
         except Exception as e:
             log.error("embedding_failed", error=str(e))

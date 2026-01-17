@@ -1,6 +1,5 @@
 """Tests for doctor health check functions."""
 
-import pytest
 from sindri.core.doctor import (
     check_python_version,
     check_database,
@@ -27,7 +26,11 @@ def test_check_database():
     assert result.name == "Database"
     # Should either exist or not be created yet (both are fine)
     # Don't assert passed value since it depends on system state
-    assert result.message in ["Not created yet", "OK", "Database error"] or result.message.startswith("OK (")
+    assert result.message in [
+        "Not created yet",
+        "OK",
+        "Database error",
+    ] or result.message.startswith("OK (")
 
 
 def test_check_ollama():
@@ -51,7 +54,10 @@ def test_check_required_models():
 
     # Should check for at least a few models
     from sindri.agents.registry import AGENTS
-    expected_count = len({agent.model for agent in AGENTS.values()}) + 1  # +1 for embedding model
+
+    expected_count = (
+        len({agent.model for agent in AGENTS.values()}) + 1
+    )  # +1 for embedding model
 
     total_found = len(available) + len(missing)
     assert total_found == expected_count
@@ -68,7 +74,15 @@ def test_get_all_checks():
     assert "overall" in results
 
     # Verify all expected checks are present
-    expected_checks = ["ollama", "python", "config", "database", "gpu", "models", "dependencies"]
+    expected_checks = [
+        "ollama",
+        "python",
+        "config",
+        "database",
+        "gpu",
+        "models",
+        "dependencies",
+    ]
     for check_name in expected_checks:
         assert check_name in results["checks"]
 

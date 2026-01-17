@@ -13,6 +13,7 @@ from sindri.tools.sql import ExecuteQueryTool, DescribeSchemaTool, ExplainQueryT
 # Fixtures
 # =============================================================================
 
+
 @pytest.fixture
 def temp_db():
     """Create a temporary SQLite database with test data."""
@@ -24,7 +25,8 @@ def temp_db():
     cursor = conn.cursor()
 
     # Create users table
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -33,10 +35,12 @@ def temp_db():
             active INTEGER DEFAULT 1,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
-    """)
+    """
+    )
 
     # Create orders table with foreign key
-    cursor.execute("""
+    cursor.execute(
+        """
         CREATE TABLE orders (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
@@ -45,7 +49,8 @@ def temp_db():
             price REAL NOT NULL,
             FOREIGN KEY (user_id) REFERENCES users(id)
         )
-    """)
+    """
+    )
 
     # Create index
     cursor.execute("CREATE INDEX idx_users_email ON users(email)")
@@ -60,7 +65,7 @@ def temp_db():
             ("Charlie", "charlie@example.com", 35, 0),
             ("Diana", "diana@example.com", 28, 1),
             ("Eve", "eve@example.com", 32, 1),
-        ]
+        ],
     )
 
     cursor.executemany(
@@ -71,7 +76,7 @@ def temp_db():
             (2, "Widget", 5, 19.99),
             (3, "Gizmo", 1, 99.99),
             (4, "Widget", 3, 19.99),
-        ]
+        ],
     )
 
     conn.commit()
@@ -102,6 +107,7 @@ def empty_db():
 # ExecuteQueryTool Tests - SELECT Queries
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_execute_query_select_all(temp_db):
     """Test basic SELECT * query."""
@@ -120,8 +126,7 @@ async def test_execute_query_select_with_where(temp_db):
     """Test SELECT with WHERE clause."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT name, email FROM users WHERE active = 1"
+        database=temp_db, query="SELECT name, email FROM users WHERE active = 1"
     )
 
     assert result.success is True
@@ -136,9 +141,7 @@ async def test_execute_query_select_with_params(temp_db):
     """Test SELECT with parameterized query."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users WHERE name = ?",
-        params=["Alice"]
+        database=temp_db, query="SELECT * FROM users WHERE name = ?", params=["Alice"]
     )
 
     assert result.success is True
@@ -158,7 +161,7 @@ async def test_execute_query_select_with_join(temp_db):
             FROM users u
             JOIN orders o ON u.id = o.user_id
             ORDER BY u.name
-        """
+        """,
     )
 
     assert result.success is True
@@ -172,9 +175,7 @@ async def test_execute_query_select_max_rows(temp_db):
     """Test max_rows limit."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users",
-        max_rows=2
+        database=temp_db, query="SELECT * FROM users", max_rows=2
     )
 
     assert result.success is True
@@ -188,8 +189,7 @@ async def test_execute_query_empty_result(temp_db):
     """Test query returning no results."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users WHERE name = 'NonExistent'"
+        database=temp_db, query="SELECT * FROM users WHERE name = 'NonExistent'"
     )
 
     assert result.success is True
@@ -203,7 +203,7 @@ async def test_execute_query_aggregate(temp_db):
     tool = ExecuteQueryTool()
     result = await tool.execute(
         database=temp_db,
-        query="SELECT COUNT(*) as total, AVG(age) as avg_age FROM users WHERE active = 1"
+        query="SELECT COUNT(*) as total, AVG(age) as avg_age FROM users WHERE active = 1",
     )
 
     assert result.success is True
@@ -215,13 +215,14 @@ async def test_execute_query_aggregate(temp_db):
 # ExecuteQueryTool Tests - Write Operations
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_execute_query_insert_blocked(temp_db):
     """Test INSERT blocked by default."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
         database=temp_db,
-        query="INSERT INTO users (name, email) VALUES ('Frank', 'frank@example.com')"
+        query="INSERT INTO users (name, email) VALUES ('Frank', 'frank@example.com')",
     )
 
     assert result.success is False
@@ -236,7 +237,7 @@ async def test_execute_query_insert_allowed(temp_db):
     result = await tool.execute(
         database=temp_db,
         query="INSERT INTO users (name, email, age) VALUES ('Frank', 'frank@example.com', 40)",
-        allow_write=True
+        allow_write=True,
     )
 
     assert result.success is True
@@ -250,8 +251,7 @@ async def test_execute_query_update_blocked(temp_db):
     """Test UPDATE blocked by default."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="UPDATE users SET age = 31 WHERE name = 'Alice'"
+        database=temp_db, query="UPDATE users SET age = 31 WHERE name = 'Alice'"
     )
 
     assert result.success is False
@@ -265,7 +265,7 @@ async def test_execute_query_update_allowed(temp_db):
     result = await tool.execute(
         database=temp_db,
         query="UPDATE users SET age = 31 WHERE name = 'Alice'",
-        allow_write=True
+        allow_write=True,
     )
 
     assert result.success is True
@@ -277,8 +277,7 @@ async def test_execute_query_delete_blocked(temp_db):
     """Test DELETE blocked by default."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="DELETE FROM users WHERE name = 'Charlie'"
+        database=temp_db, query="DELETE FROM users WHERE name = 'Charlie'"
     )
 
     assert result.success is False
@@ -292,7 +291,7 @@ async def test_execute_query_delete_allowed(temp_db):
     result = await tool.execute(
         database=temp_db,
         query="DELETE FROM users WHERE name = 'Charlie'",
-        allow_write=True
+        allow_write=True,
     )
 
     assert result.success is True
@@ -303,13 +302,13 @@ async def test_execute_query_delete_allowed(temp_db):
 # ExecuteQueryTool Tests - Error Cases
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_execute_query_database_not_found():
     """Test error when database doesn't exist."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
-        database="/nonexistent/path/database.db",
-        query="SELECT 1"
+        database="/nonexistent/path/database.db", query="SELECT 1"
     )
 
     assert result.success is False
@@ -321,8 +320,7 @@ async def test_execute_query_invalid_sql(temp_db):
     """Test error on invalid SQL."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELCT * FORM users"  # Intentional typos
+        database=temp_db, query="SELCT * FORM users"  # Intentional typos
     )
 
     assert result.success is False
@@ -334,8 +332,7 @@ async def test_execute_query_table_not_found(temp_db):
     """Test error when table doesn't exist."""
     tool = ExecuteQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT * FROM nonexistent_table"
+        database=temp_db, query="SELECT * FROM nonexistent_table"
     )
 
     assert result.success is False
@@ -349,10 +346,7 @@ async def test_execute_query_work_dir(temp_db):
     work_dir = Path(temp_db).parent
 
     tool = ExecuteQueryTool(work_dir=work_dir)
-    result = await tool.execute(
-        database=db_name,
-        query="SELECT COUNT(*) FROM users"
-    )
+    result = await tool.execute(database=db_name, query="SELECT COUNT(*) FROM users")
 
     assert result.success is True
 
@@ -360,6 +354,7 @@ async def test_execute_query_work_dir(temp_db):
 # =============================================================================
 # DescribeSchemaTool Tests
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_describe_schema_all_tables(temp_db):
@@ -465,14 +460,12 @@ async def test_describe_schema_database_not_found():
 # ExplainQueryTool Tests
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_explain_query_simple_select(temp_db):
     """Test explain simple SELECT."""
     tool = ExplainQueryTool()
-    result = await tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users"
-    )
+    result = await tool.execute(database=temp_db, query="SELECT * FROM users")
 
     assert result.success is True
     assert "Query Execution Plan" in result.output
@@ -485,13 +478,16 @@ async def test_explain_query_indexed_search(temp_db):
     """Test explain query using index."""
     tool = ExplainQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users WHERE email = 'alice@example.com'"
+        database=temp_db, query="SELECT * FROM users WHERE email = 'alice@example.com'"
     )
 
     assert result.success is True
     # Should use the email index
-    assert result.metadata.get("uses_index", False) or "SEARCH" in result.output or "INDEX" in result.output
+    assert (
+        result.metadata.get("uses_index", False)
+        or "SEARCH" in result.output
+        or "INDEX" in result.output
+    )
 
 
 @pytest.mark.asyncio
@@ -499,12 +495,15 @@ async def test_explain_query_table_scan(temp_db):
     """Test explain query with table scan."""
     tool = ExplainQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users WHERE age > 25"  # No index on age
+        database=temp_db, query="SELECT * FROM users WHERE age > 25"  # No index on age
     )
 
     assert result.success is True
-    assert "SCAN" in result.output or "full table scan" in result.output.lower() or "plan looks reasonable" in result.output
+    assert (
+        "SCAN" in result.output
+        or "full table scan" in result.output.lower()
+        or "plan looks reasonable" in result.output
+    )
 
 
 @pytest.mark.asyncio
@@ -517,7 +516,7 @@ async def test_explain_query_join(temp_db):
             SELECT u.name, o.product
             FROM users u
             JOIN orders o ON u.id = o.user_id
-        """
+        """,
     )
 
     assert result.success is True
@@ -529,9 +528,7 @@ async def test_explain_query_detailed(temp_db):
     """Test explain with detailed bytecode."""
     tool = ExplainQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users WHERE id = 1",
-        detailed=True
+        database=temp_db, query="SELECT * FROM users WHERE id = 1", detailed=True
     )
 
     assert result.success is True
@@ -545,29 +542,23 @@ async def test_explain_query_analysis_hints(temp_db):
 
     # Query that should trigger table scan hint
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT * FROM orders WHERE quantity > 2"
+        database=temp_db, query="SELECT * FROM orders WHERE quantity > 2"
     )
 
     assert result.success is True
     assert "Analysis:" in result.output
     # Should have some analysis hint
-    assert any(hint in result.output for hint in [
-        "table scan",
-        "index",
-        "efficient",
-        "plan looks reasonable"
-    ])
+    assert any(
+        hint in result.output
+        for hint in ["table scan", "index", "efficient", "plan looks reasonable"]
+    )
 
 
 @pytest.mark.asyncio
 async def test_explain_query_database_not_found():
     """Test error when database doesn't exist."""
     tool = ExplainQueryTool()
-    result = await tool.execute(
-        database="/nonexistent/database.db",
-        query="SELECT 1"
-    )
+    result = await tool.execute(database="/nonexistent/database.db", query="SELECT 1")
 
     assert result.success is False
     assert "Database not found" in result.error
@@ -578,8 +569,7 @@ async def test_explain_query_invalid_sql(temp_db):
     """Test error on invalid SQL."""
     tool = ExplainQueryTool()
     result = await tool.execute(
-        database=temp_db,
-        query="SELCT * FORM users"  # Intentional typos
+        database=temp_db, query="SELCT * FORM users"  # Intentional typos
     )
 
     assert result.success is False
@@ -589,6 +579,7 @@ async def test_explain_query_invalid_sql(temp_db):
 # =============================================================================
 # Integration Tests
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_full_workflow(temp_db):
@@ -604,15 +595,13 @@ async def test_full_workflow(temp_db):
 
     # 2. Explain a query
     plan = await explain_tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users WHERE email = 'alice@example.com'"
+        database=temp_db, query="SELECT * FROM users WHERE email = 'alice@example.com'"
     )
     assert plan.success is True
 
     # 3. Execute the query
     result = await query_tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users WHERE email = 'alice@example.com'"
+        database=temp_db, query="SELECT * FROM users WHERE email = 'alice@example.com'"
     )
     assert result.success is True
     assert "Alice" in result.output
@@ -621,14 +610,13 @@ async def test_full_workflow(temp_db):
     insert = await query_tool.execute(
         database=temp_db,
         query="INSERT INTO users (name, email, age) VALUES ('Zara', 'zara@example.com', 22)",
-        allow_write=True
+        allow_write=True,
     )
     assert insert.success is True
 
     # 5. Verify insertion
     verify = await query_tool.execute(
-        database=temp_db,
-        query="SELECT * FROM users WHERE name = 'Zara'"
+        database=temp_db, query="SELECT * FROM users WHERE name = 'Zara'"
     )
     assert verify.success is True
     assert "Zara" in verify.output
@@ -661,6 +649,7 @@ def test_fenrir_has_sql_tools():
 # =============================================================================
 # Tool Schema Tests
 # =============================================================================
+
 
 def test_execute_query_schema():
     """Test ExecuteQueryTool schema format."""
@@ -702,6 +691,7 @@ def test_explain_query_schema():
 # Edge Cases
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_execute_query_null_values(temp_db):
     """Test handling of NULL values in results."""
@@ -711,13 +701,12 @@ async def test_execute_query_null_values(temp_db):
     await tool.execute(
         database=temp_db,
         query="INSERT INTO users (name, email) VALUES ('NullAge', 'null@example.com')",
-        allow_write=True
+        allow_write=True,
     )
 
     # Query the row
     result = await tool.execute(
-        database=temp_db,
-        query="SELECT name, age FROM users WHERE name = 'NullAge'"
+        database=temp_db, query="SELECT name, age FROM users WHERE name = 'NullAge'"
     )
 
     assert result.success is True
@@ -733,12 +722,12 @@ async def test_execute_query_unicode(temp_db):
     await tool.execute(
         database=temp_db,
         query="INSERT INTO users (name, email) VALUES ('Tëst Üser', 'unicode@example.com')",
-        allow_write=True
+        allow_write=True,
     )
 
     result = await tool.execute(
         database=temp_db,
-        query="SELECT name FROM users WHERE email = 'unicode@example.com'"
+        query="SELECT name FROM users WHERE email = 'unicode@example.com'",
     )
 
     assert result.success is True
@@ -754,12 +743,12 @@ async def test_execute_query_long_text(temp_db):
     await tool.execute(
         database=temp_db,
         query=f"INSERT INTO users (name, email) VALUES ('{long_name}', 'long@example.com')",
-        allow_write=True
+        allow_write=True,
     )
 
     result = await tool.execute(
         database=temp_db,
-        query="SELECT name FROM users WHERE email = 'long@example.com'"
+        query="SELECT name FROM users WHERE email = 'long@example.com'",
     )
 
     assert result.success is True

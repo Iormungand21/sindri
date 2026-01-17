@@ -2,9 +2,8 @@
 
 import asyncio
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -116,8 +115,7 @@ class TestCreateBackup:
     async def test_raises_on_missing_database(self, backup_dir):
         """Should raise FileNotFoundError if database doesn't exist."""
         mgr = DatabaseBackup(
-            db_path=Path("/nonexistent/db.sqlite"),
-            backup_dir=backup_dir
+            db_path=Path("/nonexistent/db.sqlite"), backup_dir=backup_dir
         )
 
         with pytest.raises(FileNotFoundError):
@@ -151,8 +149,7 @@ class TestCheckIntegrity:
     async def test_nonexistent_database(self, backup_dir):
         """Should return healthy for nonexistent database."""
         mgr = DatabaseBackup(
-            db_path=Path("/nonexistent/db.sqlite"),
-            backup_dir=backup_dir
+            db_path=Path("/nonexistent/db.sqlite"), backup_dir=backup_dir
         )
 
         is_healthy, issues = await mgr.check_integrity()

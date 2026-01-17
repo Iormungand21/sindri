@@ -4,7 +4,7 @@ Provides search functionality across installed plugins and
 local plugin directories.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 import structlog
@@ -32,6 +32,7 @@ class SearchResult:
         source: Source location if installed
         score: Search relevance score (0-100)
     """
+
     name: str
     version: str
     description: str
@@ -50,7 +51,11 @@ class SearchResult:
             name=plugin.metadata.name,
             version=plugin.metadata.version,
             description=plugin.metadata.description,
-            category=plugin.metadata.category.value if isinstance(plugin.metadata.category, PluginCategory) else plugin.metadata.category,
+            category=(
+                plugin.metadata.category.value
+                if isinstance(plugin.metadata.category, PluginCategory)
+                else plugin.metadata.category
+            ),
             tags=plugin.metadata.tags,
             plugin_type=plugin.metadata.plugin_type,
             installed=True,
@@ -59,13 +64,19 @@ class SearchResult:
         )
 
     @classmethod
-    def from_metadata(cls, metadata: PluginMetadata, path: Optional[Path] = None) -> "SearchResult":
+    def from_metadata(
+        cls, metadata: PluginMetadata, path: Optional[Path] = None
+    ) -> "SearchResult":
         """Create from PluginMetadata."""
         return cls(
             name=metadata.name,
             version=metadata.version,
             description=metadata.description,
-            category=metadata.category.value if isinstance(metadata.category, PluginCategory) else metadata.category,
+            category=(
+                metadata.category.value
+                if isinstance(metadata.category, PluginCategory)
+                else metadata.category
+            ),
             tags=metadata.tags,
             plugin_type=metadata.plugin_type,
             installed_path=path,

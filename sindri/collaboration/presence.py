@@ -173,7 +173,9 @@ class PresenceManager:
         if session_id not in self._color_counters:
             self._color_counters[session_id] = 0
 
-        color = PARTICIPANT_COLORS[self._color_counters[session_id] % len(PARTICIPANT_COLORS)]
+        color = PARTICIPANT_COLORS[
+            self._color_counters[session_id] % len(PARTICIPANT_COLORS)
+        ]
         self._color_counters[session_id] += 1
         return color
 

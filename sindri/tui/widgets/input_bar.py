@@ -16,8 +16,7 @@ class InputBar(Input):
 
     def __init__(self, **kwargs):
         super().__init__(
-            placeholder="Enter message or command... (Ctrl+C to stop)",
-            **kwargs
+            placeholder="Enter message or command... (Ctrl+C to stop)", **kwargs
         )
 
     def on_input_submitted(self, event: Input.Submitted):

@@ -11,6 +11,7 @@ log = structlog.get_logger()
 
 class EventType(Enum):
     """Types of events emitted during task execution."""
+
     TASK_CREATED = auto()
     TASK_STATUS_CHANGED = auto()
     AGENT_OUTPUT = auto()
@@ -25,19 +26,19 @@ class EventType(Enum):
     PARALLEL_BATCH_END = auto()
     # Phase 5.6: New event types for error handling
     ITERATION_WARNING = auto()  # Warn agent about remaining iterations
-    MODEL_DEGRADED = auto()     # Agent falling back to smaller model
+    MODEL_DEGRADED = auto()  # Agent falling back to smaller model
     # Phase 6.3: Streaming output
-    STREAMING_TOKEN = auto()    # Individual token during streaming response
-    STREAMING_START = auto()    # Streaming response started
-    STREAMING_END = auto()      # Streaming response completed
+    STREAMING_TOKEN = auto()  # Individual token during streaming response
+    STREAMING_START = auto()  # Streaming response started
+    STREAMING_END = auto()  # Streaming response completed
     # Phase 7.3: Interactive planning
-    PLAN_PROPOSED = auto()      # Execution plan created
-    PLAN_APPROVED = auto()      # User approved the plan
-    PLAN_REJECTED = auto()      # User rejected the plan
+    PLAN_PROPOSED = auto()  # Execution plan created
+    PLAN_APPROVED = auto()  # User approved the plan
+    PLAN_REJECTED = auto()  # User rejected the plan
     # Phase 7.2: Learning from success
-    PATTERN_LEARNED = auto()    # New pattern extracted from successful task
+    PATTERN_LEARNED = auto()  # New pattern extracted from successful task
     # Phase 5.5: Performance metrics
-    METRICS_UPDATED = auto()    # Real-time metrics update for TUI
+    METRICS_UPDATED = auto()  # Real-time metrics update for TUI
 
 
 @dataclass
@@ -46,6 +47,7 @@ class Event:
 
     Phase 6.1: Added timestamp for coherent event ordering during parallel execution.
     """
+
     type: EventType
     data: Any
     timestamp: float = field(default_factory=time.time)  # For ordering parallel events
@@ -87,9 +89,9 @@ class EventBus:
             try:
                 handler(event.data)
             except Exception as e:
-                log.error("event_handler_failed",
-                         event_type=event.type.name,
-                         error=str(e))
+                log.error(
+                    "event_handler_failed", event_type=event.type.name, error=str(e)
+                )
 
     def clear(self):
         """Clear all handlers."""

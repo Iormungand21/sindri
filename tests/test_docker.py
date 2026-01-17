@@ -2,7 +2,6 @@
 
 import pytest
 import json
-from pathlib import Path
 
 from sindri.tools.docker import (
     GenerateDockerfileTool,
@@ -23,14 +22,16 @@ class TestDockerProjectDetection:
     def test_detect_python_pyproject(self, tool, tmp_path):
         """Test Python project detection with pyproject.toml."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text("""
+        pyproject.write_text(
+            """
 [tool.poetry]
 name = "myproject"
 
 [tool.poetry.dependencies]
 fastapi = "^0.100.0"
 uvicorn = "^0.23.0"
-""")
+"""
+        )
         (tmp_path / "main.py").write_text("# main app")
 
         info = tool._detect_project(tmp_path)
@@ -75,14 +76,15 @@ uvicorn = "^0.23.0"
 
     def test_detect_node_npm(self, tool, tmp_path):
         """Test Node.js project detection with npm."""
-        (tmp_path / "package.json").write_text(json.dumps({
-            "name": "myproject",
-            "main": "index.js",
-            "scripts": {
-                "start": "node index.js",
-                "build": "tsc"
-            }
-        }))
+        (tmp_path / "package.json").write_text(
+            json.dumps(
+                {
+                    "name": "myproject",
+                    "main": "index.js",
+                    "scripts": {"start": "node index.js", "build": "tsc"},
+                }
+            )
+        )
         (tmp_path / "package-lock.json").write_text("{}")
 
         info = tool._detect_project(tmp_path)
@@ -117,13 +119,14 @@ uvicorn = "^0.23.0"
 
     def test_detect_node_nextjs(self, tool, tmp_path):
         """Test Node.js project detection with Next.js."""
-        (tmp_path / "package.json").write_text(json.dumps({
-            "name": "nextapp",
-            "dependencies": {
-                "next": "^14.0.0",
-                "react": "^18.0.0"
-            }
-        }))
+        (tmp_path / "package.json").write_text(
+            json.dumps(
+                {
+                    "name": "nextapp",
+                    "dependencies": {"next": "^14.0.0", "react": "^18.0.0"},
+                }
+            )
+        )
 
         info = tool._detect_project(tmp_path)
 
@@ -133,11 +136,13 @@ uvicorn = "^0.23.0"
 
     def test_detect_rust(self, tool, tmp_path):
         """Test Rust project detection."""
-        (tmp_path / "Cargo.toml").write_text('''
+        (tmp_path / "Cargo.toml").write_text(
+            """
 [package]
 name = "myapp"
 version = "0.1.0"
-''')
+"""
+        )
 
         info = tool._detect_project(tmp_path)
 
@@ -200,10 +205,12 @@ class TestGenerateDockerfileTool:
     @pytest.mark.asyncio
     async def test_generate_python_poetry_dockerfile(self, tool, tmp_path):
         """Test generating Python Dockerfile with Poetry."""
-        (tmp_path / "pyproject.toml").write_text("""
+        (tmp_path / "pyproject.toml").write_text(
+            """
 [tool.poetry]
 name = "myproject"
-""")
+"""
+        )
 
         result = await tool.execute(dry_run=True)
 
@@ -234,10 +241,9 @@ name = "myproject"
     @pytest.mark.asyncio
     async def test_generate_node_dockerfile(self, tool, tmp_path):
         """Test generating Node.js Dockerfile."""
-        (tmp_path / "package.json").write_text(json.dumps({
-            "name": "myproject",
-            "main": "index.js"
-        }))
+        (tmp_path / "package.json").write_text(
+            json.dumps({"name": "myproject", "main": "index.js"})
+        )
 
         result = await tool.execute(dry_run=True)
 
@@ -249,13 +255,14 @@ name = "myproject"
     @pytest.mark.asyncio
     async def test_generate_node_dockerfile_with_build(self, tool, tmp_path):
         """Test generating Node.js Dockerfile with build step."""
-        (tmp_path / "package.json").write_text(json.dumps({
-            "name": "myproject",
-            "scripts": {
-                "build": "tsc",
-                "start": "node dist/index.js"
-            }
-        }))
+        (tmp_path / "package.json").write_text(
+            json.dumps(
+                {
+                    "name": "myproject",
+                    "scripts": {"build": "tsc", "start": "node dist/index.js"},
+                }
+            )
+        )
 
         result = await tool.execute(multi_stage=True, dry_run=True)
 
@@ -599,7 +606,7 @@ class TestValidateDockerfileTool:
     @pytest.mark.asyncio
     async def test_validate_valid_dockerfile(self, tool, tmp_path):
         """Test validating a valid Dockerfile."""
-        dockerfile_content = '''FROM python:3.11-slim
+        dockerfile_content = """FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -615,7 +622,7 @@ EXPOSE 8000
 HEALTHCHECK CMD curl --fail http://localhost:8000/health || exit 1
 
 CMD ["python", "main.py"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success
@@ -632,10 +639,10 @@ CMD ["python", "main.py"]
     @pytest.mark.asyncio
     async def test_validate_missing_from(self, tool, tmp_path):
         """Test validating Dockerfile without FROM."""
-        dockerfile_content = '''WORKDIR /app
+        dockerfile_content = """WORKDIR /app
 COPY . .
 CMD ["./app"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert not result.success
@@ -644,10 +651,10 @@ CMD ["./app"]
     @pytest.mark.asyncio
     async def test_validate_latest_tag_warning(self, tool, tmp_path):
         """Test warning for :latest tag."""
-        dockerfile_content = '''FROM python:latest
+        dockerfile_content = """FROM python:latest
 WORKDIR /app
 CMD ["python"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success  # Not an error
@@ -656,10 +663,10 @@ CMD ["python"]
     @pytest.mark.asyncio
     async def test_validate_missing_workdir(self, tool, tmp_path):
         """Test warning for missing WORKDIR."""
-        dockerfile_content = '''FROM python:3.11
+        dockerfile_content = """FROM python:3.11
 COPY . .
 CMD ["python", "main.py"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success  # Not an error
@@ -668,23 +675,25 @@ CMD ["python", "main.py"]
     @pytest.mark.asyncio
     async def test_validate_missing_user(self, tool, tmp_path):
         """Test suggestion for missing USER."""
-        dockerfile_content = '''FROM python:3.11
+        dockerfile_content = """FROM python:3.11
 WORKDIR /app
 CMD ["python", "main.py"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success
-        assert any("USER" in sug or "non-root" in sug for sug in result.metadata["suggestions"])
+        assert any(
+            "USER" in sug or "non-root" in sug for sug in result.metadata["suggestions"]
+        )
 
     @pytest.mark.asyncio
     async def test_validate_pip_no_cache(self, tool, tmp_path):
         """Test suggestion for pip without --no-cache-dir."""
-        dockerfile_content = '''FROM python:3.11
+        dockerfile_content = """FROM python:3.11
 WORKDIR /app
 RUN pip install requests
 CMD ["python", "main.py"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success
@@ -693,24 +702,26 @@ CMD ["python", "main.py"]
     @pytest.mark.asyncio
     async def test_validate_add_vs_copy(self, tool, tmp_path):
         """Test suggestion for ADD vs COPY."""
-        dockerfile_content = '''FROM python:3.11
+        dockerfile_content = """FROM python:3.11
 WORKDIR /app
 ADD . .
 CMD ["python", "main.py"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success
-        assert any("COPY" in sug and "ADD" in sug for sug in result.metadata["suggestions"])
+        assert any(
+            "COPY" in sug and "ADD" in sug for sug in result.metadata["suggestions"]
+        )
 
     @pytest.mark.asyncio
     async def test_validate_apt_cleanup(self, tool, tmp_path):
         """Test suggestion for apt-get cleanup."""
-        dockerfile_content = '''FROM debian:bookworm
+        dockerfile_content = """FROM debian:bookworm
 WORKDIR /app
 RUN apt-get update && apt-get install -y curl
 CMD ["./app"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success
@@ -719,12 +730,12 @@ CMD ["./app"]
     @pytest.mark.asyncio
     async def test_validate_missing_healthcheck(self, tool, tmp_path):
         """Test suggestion for missing HEALTHCHECK."""
-        dockerfile_content = '''FROM python:3.11
+        dockerfile_content = """FROM python:3.11
 WORKDIR /app
 COPY . .
 EXPOSE 8000
 CMD ["python", "main.py"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success
@@ -733,11 +744,11 @@ CMD ["python", "main.py"]
     @pytest.mark.asyncio
     async def test_validate_missing_expose(self, tool, tmp_path):
         """Test suggestion for missing EXPOSE."""
-        dockerfile_content = '''FROM python:3.11
+        dockerfile_content = """FROM python:3.11
 WORKDIR /app
 COPY . .
 CMD ["python", "main.py"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success
@@ -747,11 +758,13 @@ CMD ["python", "main.py"]
     async def test_validate_file_path(self, tool, tmp_path):
         """Test validating Dockerfile from file path."""
         dockerfile_path = tmp_path / "Dockerfile"
-        dockerfile_path.write_text('''FROM python:3.11
+        dockerfile_path.write_text(
+            """FROM python:3.11
 WORKDIR /app
 EXPOSE 8000
 CMD ["python", "main.py"]
-''')
+"""
+        )
 
         result = await tool.execute(file_path="Dockerfile")
 
@@ -769,7 +782,7 @@ CMD ["python", "main.py"]
     @pytest.mark.asyncio
     async def test_validate_multi_stage_dockerfile(self, tool, tmp_path):
         """Test validating multi-stage Dockerfile."""
-        dockerfile_content = '''FROM golang:1.21 AS builder
+        dockerfile_content = """FROM golang:1.21 AS builder
 WORKDIR /app
 COPY . .
 RUN go build -o main .
@@ -779,7 +792,7 @@ WORKDIR /app
 COPY --from=builder /app/main .
 EXPOSE 8080
 CMD ["./main"]
-'''
+"""
         result = await tool.execute(content=dockerfile_content)
 
         assert result.success
@@ -831,7 +844,7 @@ class TestDockerProjectInfo:
             node_version="18",
             port=3000,
             package_manager="yarn",
-            services=["postgres", "redis"]
+            services=["postgres", "redis"],
         )
 
         assert info.project_type == "node"

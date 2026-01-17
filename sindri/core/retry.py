@@ -2,18 +2,22 @@
 
 import asyncio
 from dataclasses import dataclass
-from typing import Callable, TypeVar, Optional
+from typing import TYPE_CHECKING, Callable, TypeVar, Optional
 from functools import wraps
 import structlog
 
+if TYPE_CHECKING:
+    from sindri.llm.client import OllamaClient
+
 log = structlog.get_logger()
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 @dataclass
 class RetryConfig:
     """Configuration for retry behavior."""
+
     max_attempts: int = 3
     base_delay: float = 1.0
     max_delay: float = 30.0
@@ -47,8 +51,8 @@ def with_retry(config: Optional[RetryConfig] = None):
 
                     if attempt < config.max_attempts - 1:
                         delay = min(
-                            config.base_delay * (config.exponential_base ** attempt),
-                            config.max_delay
+                            config.base_delay * (config.exponential_base**attempt),
+                            config.max_delay,
                         )
                         log.warning(
                             "retry_attempt",
@@ -56,7 +60,7 @@ def with_retry(config: Optional[RetryConfig] = None):
                             max_attempts=config.max_attempts,
                             delay=delay,
                             error=str(e),
-                            function=func.__name__
+                            function=func.__name__,
                         )
                         await asyncio.sleep(delay)
                     else:
@@ -64,12 +68,13 @@ def with_retry(config: Optional[RetryConfig] = None):
                             "retry_exhausted",
                             attempts=config.max_attempts,
                             error=str(e),
-                            function=func.__name__
+                            function=func.__name__,
                         )
 
             raise last_exception
 
         return wrapper
+
     return decorator
 
 
@@ -80,16 +85,17 @@ class RetryableOllamaClient:
     like connection errors and timeouts.
     """
 
-    def __init__(self, client: 'OllamaClient', config: Optional[RetryConfig] = None):
+    def __init__(self, client: "OllamaClient", config: Optional[RetryConfig] = None):
         self.client = client
         self.config = config or RetryConfig(
             max_attempts=3,
             base_delay=2.0,
-            retryable_exceptions=(ConnectionError, TimeoutError, OSError)
+            retryable_exceptions=(ConnectionError, TimeoutError, OSError),
         )
 
     async def chat(self, **kwargs):
         """Chat with retry logic."""
+
         @with_retry(self.config)
         async def _chat():
             return await self.client.chat(**kwargs)
@@ -98,6 +104,7 @@ class RetryableOllamaClient:
 
     async def stream(self, **kwargs):
         """Stream with retry logic."""
+
         @with_retry(self.config)
         async def _stream():
             return await self.client.stream(**kwargs)

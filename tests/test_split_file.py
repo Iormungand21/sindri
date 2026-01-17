@@ -137,7 +137,7 @@ DEBUG = True
 @pytest.fixture
 def lines_file(temp_dir):
     """Create a file for line-based splitting."""
-    content = '''# Part 1
+    content = """# Part 1
 line 1
 line 2
 line 3
@@ -155,7 +155,7 @@ line 12
 line 13
 line 14
 line 15
-'''
+"""
     file_path = temp_dir / "data.txt"
     file_path.write_text(content)
     return file_path
@@ -164,6 +164,7 @@ line 15
 # ============================================================
 # Split by Classes Tests
 # ============================================================
+
 
 class TestSplitByClasses:
     """Tests for split by classes strategy."""
@@ -179,7 +180,7 @@ class TestSplitByClasses:
             strategy="classes",
             output_dir=str(output_dir),
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -202,7 +203,7 @@ class TestSplitByClasses:
             file=str(python_classes_file),
             strategy="classes",
             output_dir=str(output_dir),
-            dry_run=True
+            dry_run=True,
         )
 
         assert result.success
@@ -224,7 +225,7 @@ class TestSplitByClasses:
             output_dir=str(output_dir),
             create_init=True,
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -251,7 +252,7 @@ class TestSplitByClasses:
             strategy="classes",
             output_dir=str(output_dir),
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -264,12 +265,12 @@ class TestSplitByClasses:
     @pytest.mark.asyncio
     async def test_split_classes_camelcase_to_snake(self, temp_dir):
         """Test CamelCase class names convert to snake_case filenames."""
-        content = '''class UserProfile:
+        content = """class UserProfile:
     pass
 
 class OrderHistory:
     pass
-'''
+"""
         file_path = temp_dir / "models.py"
         file_path.write_text(content)
 
@@ -279,7 +280,7 @@ class OrderHistory:
             file=str(file_path),
             strategy="classes",
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -290,6 +291,7 @@ class OrderHistory:
 # ============================================================
 # Split by Functions Tests
 # ============================================================
+
 
 class TestSplitByFunctions:
     """Tests for split by functions strategy."""
@@ -305,7 +307,7 @@ class TestSplitByFunctions:
             strategy="functions",
             output_dir=str(output_dir),
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -313,7 +315,9 @@ class TestSplitByFunctions:
         assert len(result.metadata["files_created"]) >= 3
 
     @pytest.mark.asyncio
-    async def test_split_functions_includes_async(self, python_functions_file, temp_dir):
+    async def test_split_functions_includes_async(
+        self, python_functions_file, temp_dir
+    ):
         """Test that async functions are included."""
         tool = SplitFileTool(work_dir=temp_dir)
         output_dir = temp_dir / "utils"
@@ -323,14 +327,16 @@ class TestSplitByFunctions:
             strategy="functions",
             output_dir=str(output_dir),
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
         assert (output_dir / "fetch_data.py").exists()
 
     @pytest.mark.asyncio
-    async def test_split_functions_preserves_imports(self, python_functions_file, temp_dir):
+    async def test_split_functions_preserves_imports(
+        self, python_functions_file, temp_dir
+    ):
         """Test that imports are preserved in split files."""
         tool = SplitFileTool(work_dir=temp_dir)
         output_dir = temp_dir / "utils"
@@ -340,7 +346,7 @@ class TestSplitByFunctions:
             strategy="functions",
             output_dir=str(output_dir),
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -353,6 +359,7 @@ class TestSplitByFunctions:
 # ============================================================
 # Split by Markers Tests
 # ============================================================
+
 
 class TestSplitByMarkers:
     """Tests for split by markers strategy."""
@@ -368,7 +375,7 @@ class TestSplitByMarkers:
             strategy="markers",
             output_dir=str(output_dir),
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -378,11 +385,11 @@ class TestSplitByMarkers:
     @pytest.mark.asyncio
     async def test_split_markers_custom_marker(self, temp_dir):
         """Test custom marker pattern."""
-        content = '''# ==== BEGIN: first.py ====
+        content = """# ==== BEGIN: first.py ====
 content1
 # ==== BEGIN: second.py ====
 content2
-'''
+"""
         file_path = temp_dir / "combined.py"
         file_path.write_text(content)
 
@@ -393,7 +400,7 @@ content2
             strategy="markers",
             marker="# ==== BEGIN: {filename} ====",
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -403,9 +410,9 @@ content2
     @pytest.mark.asyncio
     async def test_split_markers_no_markers(self, temp_dir):
         """Test file with no markers."""
-        content = '''# No markers here
+        content = """# No markers here
 just regular content
-'''
+"""
         file_path = temp_dir / "nomarkers.py"
         file_path.write_text(content)
 
@@ -415,7 +422,7 @@ just regular content
             file=str(file_path),
             strategy="markers",
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -425,6 +432,7 @@ just regular content
 # ============================================================
 # Split by Lines Tests
 # ============================================================
+
 
 class TestSplitByLines:
     """Tests for split by lines strategy."""
@@ -439,7 +447,7 @@ class TestSplitByLines:
             strategy="lines",
             lines=[5, 10],
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -456,7 +464,7 @@ class TestSplitByLines:
             strategy="lines",
             lines=[5, 10],
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -469,10 +477,7 @@ class TestSplitByLines:
         """Test that lines strategy requires lines parameter."""
         tool = SplitFileTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            file=str(lines_file),
-            strategy="lines"
-        )
+        result = await tool.execute(file=str(lines_file), strategy="lines")
 
         assert not result.success
         assert "requires 'lines' parameter" in result.error
@@ -482,11 +487,7 @@ class TestSplitByLines:
         """Test that empty lines list returns error."""
         tool = SplitFileTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            file=str(lines_file),
-            strategy="lines",
-            lines=[]
-        )
+        result = await tool.execute(file=str(lines_file), strategy="lines", lines=[])
 
         assert not result.success
 
@@ -494,6 +495,7 @@ class TestSplitByLines:
 # ============================================================
 # Re-export and Backward Compatibility Tests
 # ============================================================
+
 
 class TestReexportGeneration:
     """Tests for re-export generation."""
@@ -509,7 +511,7 @@ class TestReexportGeneration:
             strategy="classes",
             output_dir=str(output_dir),
             keep_original=True,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -523,6 +525,7 @@ class TestReexportGeneration:
 # Error Handling Tests
 # ============================================================
 
+
 class TestErrorHandling:
     """Tests for error handling."""
 
@@ -531,10 +534,7 @@ class TestErrorHandling:
         """Test error when file doesn't exist."""
         tool = SplitFileTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            file="nonexistent.py",
-            strategy="classes"
-        )
+        result = await tool.execute(file="nonexistent.py", strategy="classes")
 
         assert not result.success
         assert "not found" in result.error.lower()
@@ -544,10 +544,7 @@ class TestErrorHandling:
         """Test error for invalid strategy."""
         tool = SplitFileTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            file=str(python_classes_file),
-            strategy="invalid"
-        )
+        result = await tool.execute(file=str(python_classes_file), strategy="invalid")
 
         assert not result.success
         assert "Invalid strategy" in result.error
@@ -557,10 +554,7 @@ class TestErrorHandling:
         """Test error when path is a directory."""
         tool = SplitFileTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            file=str(temp_dir),
-            strategy="classes"
-        )
+        result = await tool.execute(file=str(temp_dir), strategy="classes")
 
         assert not result.success
         assert "Not a file" in result.error
@@ -570,15 +564,16 @@ class TestErrorHandling:
 # Edge Cases Tests
 # ============================================================
 
+
 class TestEdgeCases:
     """Tests for edge cases."""
 
     @pytest.mark.asyncio
     async def test_single_class_file(self, temp_dir):
         """Test file with only one class doesn't split."""
-        content = '''class OnlyOne:
+        content = """class OnlyOne:
     pass
-'''
+"""
         file_path = temp_dir / "single.py"
         file_path.write_text(content)
 
@@ -588,7 +583,7 @@ class TestEdgeCases:
             file=str(file_path),
             strategy="classes",
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -606,7 +601,7 @@ class TestEdgeCases:
             file=str(file_path),
             strategy="classes",
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -615,10 +610,10 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_no_functions_file(self, temp_dir):
         """Test file with no top-level functions."""
-        content = '''class MyClass:
+        content = """class MyClass:
     def method(self):
         pass
-'''
+"""
         file_path = temp_dir / "nofunction.py"
         file_path.write_text(content)
 
@@ -628,7 +623,7 @@ class TestEdgeCases:
             file=str(file_path),
             strategy="functions",
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -644,7 +639,7 @@ class TestEdgeCases:
             strategy="classes",
             # No output_dir - uses same directory
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -656,6 +651,7 @@ class TestEdgeCases:
 # ============================================================
 # Integration Tests
 # ============================================================
+
 
 class TestIntegration:
     """Integration tests for split_file."""
@@ -702,7 +698,7 @@ def create_user():
             output_dir=str(output_dir),
             create_init=True,
             update_imports=True,
-            keep_original=True
+            keep_original=True,
         )
 
         assert result.success
@@ -714,7 +710,7 @@ def create_user():
     @pytest.mark.asyncio
     async def test_typescript_classes_split(self, temp_dir):
         """Test splitting TypeScript file by classes."""
-        content = '''import { Component } from 'react';
+        content = """import { Component } from 'react';
 
 export class Header extends Component {
     render() {
@@ -727,7 +723,7 @@ export class Footer extends Component {
         return null;
     }
 }
-'''
+"""
         file_path = temp_dir / "components.ts"
         file_path.write_text(content)
 
@@ -737,7 +733,7 @@ export class Footer extends Component {
             file=str(file_path),
             strategy="classes",
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         # Note: TS support is regex-based, may have limitations
@@ -747,6 +743,7 @@ export class Footer extends Component {
 # ============================================================
 # Work Directory Tests
 # ============================================================
+
 
 class TestWorkDirectory:
     """Tests for work directory handling."""
@@ -758,12 +755,12 @@ class TestWorkDirectory:
         subdir = temp_dir / "src"
         subdir.mkdir()
 
-        content = '''class Foo:
+        content = """class Foo:
     pass
 
 class Bar:
     pass
-'''
+"""
         file_path = subdir / "models.py"
         file_path.write_text(content)
 
@@ -773,7 +770,7 @@ class Bar:
             file="src/models.py",
             strategy="classes",
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -784,6 +781,7 @@ class Bar:
 # ============================================================
 # Metadata Tests
 # ============================================================
+
 
 class TestMetadata:
     """Tests for result metadata."""
@@ -799,7 +797,7 @@ class TestMetadata:
             strategy="classes",
             output_dir=str(output_dir),
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -820,7 +818,7 @@ class TestMetadata:
             strategy="classes",
             output_dir=str(output_dir),
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success

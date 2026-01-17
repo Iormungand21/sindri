@@ -32,7 +32,7 @@ async def test_delegate_creates_child(scheduler, delegation_manager):
         task_description="Write some code",
         context={"language": "python"},
         constraints=["Use type hints"],
-        success_criteria=["Code runs without errors"]
+        success_criteria=["Code runs without errors"],
     )
 
     child = await delegation_manager.delegate(parent, request)
@@ -55,7 +55,7 @@ async def test_child_completed_resumes_parent(scheduler, delegation_manager):
         task_description="Write some code",
         context={},
         constraints=[],
-        success_criteria=[]
+        success_criteria=[],
     )
 
     child = await delegation_manager.delegate(parent, request)
@@ -80,7 +80,7 @@ async def test_child_failed_fails_parent(scheduler, delegation_manager):
         task_description="Write some code",
         context={},
         constraints=[],
-        success_criteria=[]
+        success_criteria=[],
     )
 
     child = await delegation_manager.delegate(parent, request)
@@ -107,7 +107,7 @@ async def test_invalid_delegation_target(scheduler, delegation_manager):
         task_description="Do something",
         context={},
         constraints=[],
-        success_criteria=[]
+        success_criteria=[],
     )
 
     with pytest.raises(ValueError, match="Unknown agent"):

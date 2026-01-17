@@ -4,7 +4,6 @@ import pytest
 from pathlib import Path
 import tempfile
 import shutil
-from unittest.mock import Mock, AsyncMock, patch
 
 from sindri.tools.refactoring import (
     RenameSymbolTool,
@@ -19,7 +18,8 @@ def temp_dir():
     temp = Path(tempfile.mkdtemp())
 
     # Create Python files
-    (temp / "main.py").write_text("""#!/usr/bin/env python
+    (temp / "main.py").write_text(
+        """#!/usr/bin/env python
 \"\"\"Main application module.\"\"\"
 
 def get_user(user_id: int) -> dict:
@@ -47,9 +47,11 @@ config = {
     "debug": True,
     "port": 8080
 }
-""")
+"""
+    )
 
-    (temp / "utils.py").write_text("""\"\"\"Utility functions.\"\"\"
+    (temp / "utils.py").write_text(
+        """\"\"\"Utility functions.\"\"\"
 
 from main import get_user, UserModel
 
@@ -69,10 +71,12 @@ def calculate_total(items: list) -> float:
 
 DEBUG = True
 MAX_RETRIES = 5  # Different value in this file
-""")
+"""
+    )
 
     # Create TypeScript file
-    (temp / "app.ts").write_text("""// Application entry point
+    (temp / "app.ts").write_text(
+        """// Application entry point
 
 export interface User {
     id: number;
@@ -96,10 +100,12 @@ export const MAX_RETRIES = 3;
 export function processUser(userId: number): void {
     console.log("Processing user", userId);
 }
-""")
+"""
+    )
 
     # Create JavaScript file
-    (temp / "helpers.js").write_text("""// Helper functions
+    (temp / "helpers.js").write_text(
+        """// Helper functions
 
 const API_URL = "http://api.example.com";
 
@@ -122,20 +128,23 @@ class DataManager {
         this.data.push(item);
     }
 }
-""")
+"""
+    )
 
     # Create a subdirectory with more files
     sub = temp / "src"
     sub.mkdir()
 
-    (sub / "module.py").write_text("""\"\"\"Module file.\"\"\"
+    (sub / "module.py").write_text(
+        """\"\"\"Module file.\"\"\"
 
 from main import get_user
 
 def get_user_info(user_id: int) -> str:
     user = get_user(user_id)
     return f"User: {user['name']}"
-""")
+"""
+    )
 
     yield temp
     shutil.rmtree(temp)
@@ -144,6 +153,7 @@ def get_user_info(user_id: int) -> str:
 # ============================================================
 # RenameSymbolTool Tests
 # ============================================================
+
 
 class TestRenameSymbolTool:
     """Tests for RenameSymbolTool."""
@@ -159,7 +169,7 @@ class TestRenameSymbolTool:
         result = await tool.execute(
             old_name="fetch_from_db",
             new_name="retrieve_from_database",
-            path=str(temp_dir / "main.py")
+            path=str(temp_dir / "main.py"),
         )
         assert result.success
         assert "occurrence(s)" in result.output
@@ -174,9 +184,7 @@ class TestRenameSymbolTool:
     async def test_rename_function_across_files(self, tool, temp_dir):
         """Test renaming a function used across multiple files."""
         result = await tool.execute(
-            old_name="get_user",
-            new_name="fetch_user_by_id",
-            path=str(temp_dir)
+            old_name="get_user", new_name="fetch_user_by_id", path=str(temp_dir)
         )
         assert result.success
         assert "file(s)" in result.output
@@ -196,9 +204,7 @@ class TestRenameSymbolTool:
     async def test_rename_class(self, tool, temp_dir):
         """Test renaming a class."""
         result = await tool.execute(
-            old_name="UserModel",
-            new_name="UserEntity",
-            path=str(temp_dir)
+            old_name="UserModel", new_name="UserEntity", path=str(temp_dir)
         )
         assert result.success
 
@@ -216,7 +222,7 @@ class TestRenameSymbolTool:
             old_name="MAX_RETRIES",
             new_name="MAX_ATTEMPTS",
             path=str(temp_dir),
-            file_types=["py"]
+            file_types=["py"],
         )
         assert result.success
 
@@ -235,10 +241,7 @@ class TestRenameSymbolTool:
         original_content = (temp_dir / "main.py").read_text()
 
         result = await tool.execute(
-            old_name="get_user",
-            new_name="fetch_user",
-            path=str(temp_dir),
-            dry_run=True
+            old_name="get_user", new_name="fetch_user", path=str(temp_dir), dry_run=True
         )
         assert result.success
         assert "Would modify" in result.output
@@ -254,7 +257,7 @@ class TestRenameSymbolTool:
             old_name="UserHandler",
             new_name="UserService",
             path=str(temp_dir),
-            file_types=["ts"]
+            file_types=["ts"],
         )
         assert result.success
 
@@ -266,17 +269,17 @@ class TestRenameSymbolTool:
     async def test_rename_respects_word_boundaries(self, tool, temp_dir):
         """Test that rename respects word boundaries (no partial matches)."""
         # Create a file with similar names
-        (temp_dir / "boundary.py").write_text("""
+        (temp_dir / "boundary.py").write_text(
+            """
 user = "test"
 user_id = 1
 user_name = "John"
 current_user = None
-""")
+"""
+        )
 
         result = await tool.execute(
-            old_name="user",
-            new_name="person",
-            path=str(temp_dir / "boundary.py")
+            old_name="user", new_name="person", path=str(temp_dir / "boundary.py")
         )
         assert result.success
 
@@ -290,9 +293,7 @@ current_user = None
     async def test_rename_no_occurrences(self, tool, temp_dir):
         """Test renaming when symbol doesn't exist."""
         result = await tool.execute(
-            old_name="nonexistent_function",
-            new_name="new_name",
-            path=str(temp_dir)
+            old_name="nonexistent_function", new_name="new_name", path=str(temp_dir)
         )
         assert result.success
         assert "No occurrences" in result.output
@@ -322,9 +323,7 @@ current_user = None
     async def test_rename_path_not_found(self, tool):
         """Test error when path doesn't exist."""
         result = await tool.execute(
-            old_name="test",
-            new_name="new_test",
-            path="/nonexistent/path"
+            old_name="test", new_name="new_test", path="/nonexistent/path"
         )
         assert not result.success
         assert "does not exist" in result.error
@@ -333,9 +332,7 @@ current_user = None
     async def test_rename_metadata(self, tool, temp_dir):
         """Test that result includes proper metadata."""
         result = await tool.execute(
-            old_name="get_user",
-            new_name="fetch_user",
-            path=str(temp_dir)
+            old_name="get_user", new_name="fetch_user", path=str(temp_dir)
         )
         assert result.success
         assert "files_modified" in result.metadata
@@ -346,6 +343,7 @@ current_user = None
 # ============================================================
 # ExtractFunctionTool Tests
 # ============================================================
+
 
 class TestExtractFunctionTool:
     """Tests for ExtractFunctionTool."""
@@ -377,7 +375,7 @@ class TestExtractFunctionTool:
             file=str(extract_test_file),
             start_line=3,
             end_line=7,
-            function_name="calculate_item_total"
+            function_name="calculate_item_total",
         )
         assert result.success
         assert "Extracted function" in result.output
@@ -395,7 +393,7 @@ class TestExtractFunctionTool:
             end_line=7,
             function_name="calculate_total",
             params=["items"],
-            return_value="total"
+            return_value="total",
         )
         assert result.success
 
@@ -411,7 +409,7 @@ class TestExtractFunctionTool:
             start_line=3,
             end_line=7,
             function_name="calculate_total",
-            docstring="Calculate the total price of items."
+            docstring="Calculate the total price of items.",
         )
         assert result.success
 
@@ -428,7 +426,7 @@ class TestExtractFunctionTool:
             start_line=3,
             end_line=7,
             function_name="calculate_total",
-            dry_run=True
+            dry_run=True,
         )
         assert result.success
         assert "Would extract" in result.output
@@ -440,7 +438,8 @@ class TestExtractFunctionTool:
     async def test_extract_javascript_function(self, tool, temp_dir):
         """Test extracting a JavaScript function."""
         js_file = temp_dir / "extract_test.js"
-        js_file.write_text("""function processData(data) {
+        js_file.write_text(
+            """function processData(data) {
     // Transform the data
     const result = [];
     for (const item of data) {
@@ -448,14 +447,15 @@ class TestExtractFunctionTool:
     }
     return result;
 }
-""")
+"""
+        )
         result = await tool.execute(
             file=str(js_file),
             start_line=3,
             end_line=6,
             function_name="transformData",
             params=["data"],
-            return_value="result"
+            return_value="result",
         )
         assert result.success
 
@@ -466,10 +466,7 @@ class TestExtractFunctionTool:
     async def test_extract_invalid_line_numbers(self, tool, extract_test_file):
         """Test error for invalid line numbers."""
         result = await tool.execute(
-            file=str(extract_test_file),
-            start_line=0,
-            end_line=5,
-            function_name="test"
+            file=str(extract_test_file), start_line=0, end_line=5, function_name="test"
         )
         assert not result.success
         assert "must be >= 1" in result.error
@@ -478,10 +475,7 @@ class TestExtractFunctionTool:
     async def test_extract_end_before_start(self, tool, extract_test_file):
         """Test error when end_line is before start_line."""
         result = await tool.execute(
-            file=str(extract_test_file),
-            start_line=5,
-            end_line=3,
-            function_name="test"
+            file=str(extract_test_file), start_line=5, end_line=3, function_name="test"
         )
         assert not result.success
         assert "must be >= start_line" in result.error
@@ -493,7 +487,7 @@ class TestExtractFunctionTool:
             file=str(extract_test_file),
             start_line=3,
             end_line=7,
-            function_name="123invalid"
+            function_name="123invalid",
         )
         assert not result.success
         assert "Invalid function name" in result.error
@@ -502,10 +496,7 @@ class TestExtractFunctionTool:
     async def test_extract_file_not_found(self, tool):
         """Test error when file doesn't exist."""
         result = await tool.execute(
-            file="/nonexistent/file.py",
-            start_line=1,
-            end_line=5,
-            function_name="test"
+            file="/nonexistent/file.py", start_line=1, end_line=5, function_name="test"
         )
         assert not result.success
         assert "not found" in result.error
@@ -517,7 +508,7 @@ class TestExtractFunctionTool:
             file=str(extract_test_file),
             start_line=1000,
             end_line=1005,
-            function_name="test"
+            function_name="test",
         )
         assert not result.success
         assert "exceeds file length" in result.error
@@ -529,7 +520,7 @@ class TestExtractFunctionTool:
             file=str(extract_test_file),
             start_line=3,
             end_line=7,
-            function_name="calculate_total"
+            function_name="calculate_total",
         )
         assert result.success
         assert "function_name" in result.metadata
@@ -541,6 +532,7 @@ class TestExtractFunctionTool:
 # ============================================================
 # InlineVariableTool Tests
 # ============================================================
+
 
 class TestInlineVariableTool:
     """Tests for InlineVariableTool."""
@@ -566,10 +558,7 @@ class TestInlineVariableTool:
     @pytest.mark.asyncio
     async def test_inline_simple_variable(self, tool, inline_test_file):
         """Test inlining a simple variable."""
-        result = await tool.execute(
-            file=str(inline_test_file),
-            variable="discount"
-        )
+        result = await tool.execute(file=str(inline_test_file), variable="discount")
         assert result.success
         assert "Inlined" in result.output
 
@@ -581,9 +570,7 @@ class TestInlineVariableTool:
     async def test_inline_keeps_assignment_when_requested(self, tool, inline_test_file):
         """Test keeping the assignment line when remove_assignment is False."""
         result = await tool.execute(
-            file=str(inline_test_file),
-            variable="discount",
-            remove_assignment=False
+            file=str(inline_test_file), variable="discount", remove_assignment=False
         )
         assert result.success
 
@@ -597,9 +584,7 @@ class TestInlineVariableTool:
         original_content = inline_test_file.read_text()
 
         result = await tool.execute(
-            file=str(inline_test_file),
-            variable="discount",
-            dry_run=True
+            file=str(inline_test_file), variable="discount", dry_run=True
         )
         assert result.success
         assert "Would inline" in result.output
@@ -611,16 +596,15 @@ class TestInlineVariableTool:
     async def test_inline_javascript_const(self, tool, temp_dir):
         """Test inlining a JavaScript const."""
         js_file = temp_dir / "inline_test.js"
-        js_file.write_text("""function calculate(x) {
+        js_file.write_text(
+            """function calculate(x) {
     const multiplier = 2;
     const result = x * multiplier;
     return result + multiplier;
 }
-""")
-        result = await tool.execute(
-            file=str(js_file),
-            variable="multiplier"
+"""
         )
+        result = await tool.execute(file=str(js_file), variable="multiplier")
         assert result.success
 
         content = js_file.read_text()
@@ -631,8 +615,7 @@ class TestInlineVariableTool:
     async def test_inline_variable_not_found(self, tool, inline_test_file):
         """Test error when variable is not found."""
         result = await tool.execute(
-            file=str(inline_test_file),
-            variable="nonexistent_variable"
+            file=str(inline_test_file), variable="nonexistent_variable"
         )
         assert not result.success
         assert "Could not find assignment" in result.error
@@ -641,34 +624,27 @@ class TestInlineVariableTool:
     async def test_inline_no_usages(self, tool, temp_dir):
         """Test when variable has no usages to inline."""
         test_file = temp_dir / "no_usage.py"
-        test_file.write_text("""def func():
+        test_file.write_text(
+            """def func():
     unused_var = 42
     return "nothing"
-""")
-        result = await tool.execute(
-            file=str(test_file),
-            variable="unused_var"
+"""
         )
+        result = await tool.execute(file=str(test_file), variable="unused_var")
         assert result.success
         assert "No usages" in result.output
 
     @pytest.mark.asyncio
     async def test_inline_invalid_variable_name(self, tool):
         """Test error for invalid variable name."""
-        result = await tool.execute(
-            file="/some/file.py",
-            variable="123invalid"
-        )
+        result = await tool.execute(file="/some/file.py", variable="123invalid")
         assert not result.success
         assert "Invalid variable name" in result.error
 
     @pytest.mark.asyncio
     async def test_inline_file_not_found(self, tool):
         """Test error when file doesn't exist."""
-        result = await tool.execute(
-            file="/nonexistent/file.py",
-            variable="test"
-        )
+        result = await tool.execute(file="/nonexistent/file.py", variable="test")
         assert not result.success
         assert "not found" in result.error
 
@@ -676,15 +652,14 @@ class TestInlineVariableTool:
     async def test_inline_wraps_complex_expressions(self, tool, temp_dir):
         """Test that complex expressions are wrapped in parentheses."""
         test_file = temp_dir / "wrap_test.py"
-        test_file.write_text("""def func():
+        test_file.write_text(
+            """def func():
     value = a + b
     result = value * 2
     return result
-""")
-        result = await tool.execute(
-            file=str(test_file),
-            variable="value"
+"""
         )
+        result = await tool.execute(file=str(test_file), variable="value")
         assert result.success
 
         content = test_file.read_text()
@@ -694,10 +669,7 @@ class TestInlineVariableTool:
     @pytest.mark.asyncio
     async def test_inline_metadata(self, tool, inline_test_file):
         """Test that result includes proper metadata."""
-        result = await tool.execute(
-            file=str(inline_test_file),
-            variable="discount"
-        )
+        result = await tool.execute(file=str(inline_test_file), variable="discount")
         assert result.success
         assert "variable" in result.metadata
         assert "value" in result.metadata
@@ -707,17 +679,15 @@ class TestInlineVariableTool:
     async def test_inline_specific_line(self, tool, temp_dir):
         """Test inlining variable from specific line."""
         test_file = temp_dir / "specific_line.py"
-        test_file.write_text("""def func():
+        test_file.write_text(
+            """def func():
     multiplier = 2
     result = value * multiplier
     return result + multiplier
-""")
-        # Inline the multiplier assignment (line 2)
-        result = await tool.execute(
-            file=str(test_file),
-            variable="multiplier",
-            line=2
+"""
         )
+        # Inline the multiplier assignment (line 2)
+        result = await tool.execute(file=str(test_file), variable="multiplier", line=2)
         assert result.success
 
         content = test_file.read_text()
@@ -730,6 +700,7 @@ class TestInlineVariableTool:
 # Integration Tests
 # ============================================================
 
+
 class TestRefactoringToolsIntegration:
     """Integration tests for refactoring tools."""
 
@@ -738,7 +709,8 @@ class TestRefactoringToolsIntegration:
         """Test combined rename and extract workflow."""
         # Create initial file
         test_file = temp_dir / "workflow.py"
-        test_file.write_text("""def process_data(data):
+        test_file.write_text(
+            """def process_data(data):
     # Calculate sum
     total = 0
     for item in data:
@@ -746,7 +718,8 @@ class TestRefactoringToolsIntegration:
     # Calculate average
     avg = total / len(data)
     return avg
-""")
+"""
+        )
 
         # First, extract the sum calculation
         extract_tool = ExtractFunctionTool(work_dir=temp_dir)
@@ -756,16 +729,14 @@ class TestRefactoringToolsIntegration:
             end_line=5,
             function_name="calculate_sum",
             params=["data"],
-            return_value="total"
+            return_value="total",
         )
         assert result.success
 
         # Then rename it to something better
         rename_tool = RenameSymbolTool(work_dir=temp_dir)
         result = await rename_tool.execute(
-            old_name="calculate_sum",
-            new_name="sum_items",
-            path=str(test_file)
+            old_name="calculate_sum", new_name="sum_items", path=str(test_file)
         )
         assert result.success
 
@@ -784,9 +755,7 @@ class TestRefactoringToolsIntegration:
         tool = RenameSymbolTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            old_name="x",
-            new_name="value",
-            path="sub/test.py"  # Relative path
+            old_name="x", new_name="value", path="sub/test.py"  # Relative path
         )
         assert result.success
 
@@ -797,6 +766,7 @@ class TestRefactoringToolsIntegration:
 # ============================================================
 # Registry Integration Tests
 # ============================================================
+
 
 class TestRefactoringToolsRegistry:
     """Test that refactoring tools are properly registered."""

@@ -1,7 +1,6 @@
 """Codebase analysis storage - Phase 7.4: Codebase Understanding."""
 
 import sqlite3
-import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional, List, Dict
@@ -9,9 +8,6 @@ import structlog
 
 from sindri.analysis.results import (
     CodebaseAnalysis,
-    DependencyInfo,
-    ArchitectureInfo,
-    StyleInfo,
 )
 from sindri.analysis.dependencies import DependencyAnalyzer
 from sindri.analysis.architecture import ArchitectureDetector
@@ -31,7 +27,8 @@ class CodebaseAnalysisStore:
     def _init_db(self) -> sqlite3.Connection:
         """Initialize database schema."""
         conn = sqlite3.connect(self.db_path)
-        conn.executescript("""
+        conn.executescript(
+            """
             CREATE TABLE IF NOT EXISTS codebase_analysis (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 project_id TEXT NOT NULL UNIQUE,
@@ -47,7 +44,8 @@ class CodebaseAnalysisStore:
             );
 
             CREATE INDEX IF NOT EXISTS idx_codebase_project ON codebase_analysis(project_id);
-        """)
+        """
+        )
         conn.commit()
         return conn
 
@@ -91,7 +89,7 @@ class CodebaseAnalysisStore:
                     analysis.total_lines,
                     analysis.analysis_version,
                     analysis.project_id,
-                )
+                ),
             )
             self.conn.commit()
             log.info("codebase_analysis_updated", project_id=analysis.project_id)
@@ -116,7 +114,7 @@ class CodebaseAnalysisStore:
                     analysis.total_files,
                     analysis.total_lines,
                     analysis.analysis_version,
-                )
+                ),
             )
             self.conn.commit()
             log.info("codebase_analysis_stored", project_id=analysis.project_id)
@@ -137,7 +135,7 @@ class CodebaseAnalysisStore:
             FROM codebase_analysis
             WHERE project_id = ?
             """,
-            (project_id,)
+            (project_id,),
         ).fetchone()
 
         if not row:
@@ -162,8 +160,7 @@ class CodebaseAnalysisStore:
             True if deleted, False if not found
         """
         cursor = self.conn.execute(
-            "DELETE FROM codebase_analysis WHERE project_id = ?",
-            (project_id,)
+            "DELETE FROM codebase_analysis WHERE project_id = ?", (project_id,)
         )
         self.conn.commit()
         deleted = cursor.rowcount > 0
@@ -219,10 +216,7 @@ class CodebaseAnalyzer:
         self.store = CodebaseAnalysisStore(db_path)
 
     def analyze_project(
-        self,
-        project_path: str,
-        project_id: Optional[str] = None,
-        force: bool = False
+        self, project_path: str, project_id: Optional[str] = None, force: bool = False
     ) -> CodebaseAnalysis:
         """Perform full codebase analysis.
 
@@ -248,12 +242,18 @@ class CodebaseAnalyzer:
                     analyzed_at = analyzed_at.replace(tzinfo=timezone.utc)
                 age_hours = (now_utc - analyzed_at).total_seconds() / 3600
                 if age_hours < 24:  # Use cached if less than 24 hours old
-                    log.info("using_cached_analysis",
-                            project_id=project_id,
-                            age_hours=round(age_hours, 1))
+                    log.info(
+                        "using_cached_analysis",
+                        project_id=project_id,
+                        age_hours=round(age_hours, 1),
+                    )
                     return existing
 
-        log.info("starting_codebase_analysis", project_path=project_path, project_id=project_id)
+        log.info(
+            "starting_codebase_analysis",
+            project_path=project_path,
+            project_id=project_id,
+        )
 
         # Run all analyzers
         dep_analyzer = DependencyAnalyzer(project_path)
@@ -336,7 +336,12 @@ class CodebaseAnalyzer:
 
             # Skip hidden and build directories
             parts = file_path.relative_to(path).parts
-            if any(p.startswith(".") or p in {"__pycache__", "node_modules", "venv", ".venv", "build", "dist"} for p in parts):
+            if any(
+                p.startswith(".")
+                or p
+                in {"__pycache__", "node_modules", "venv", ".venv", "build", "dist"}
+                for p in parts
+            ):
                 continue
 
             ext = file_path.suffix.lower()

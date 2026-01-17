@@ -33,12 +33,14 @@ class TaskScheduler:
         self.tasks[task.id] = task
         heapq.heappush(self.pending, (task.priority, task.id))
 
-        log.info("task_added",
-                 task_id=task.id,
-                 priority=task.priority,
-                 agent=task.assigned_agent,
-                 vram_required=task.vram_required,
-                 description=task.description[:50])
+        log.info(
+            "task_added",
+            task_id=task.id,
+            priority=task.priority,
+            agent=task.assigned_agent,
+            vram_required=task.vram_required,
+            description=task.description[:50],
+        )
 
         return task.id
 
@@ -55,10 +57,12 @@ class TaskScheduler:
                 continue
 
             if self._dependencies_satisfied(task) and self._resources_available(task):
-                log.info("task_selected",
-                         task_id=task.id,
-                         priority=priority,
-                         agent=task.assigned_agent)
+                log.info(
+                    "task_selected",
+                    task_id=task.id,
+                    priority=priority,
+                    agent=task.assigned_agent,
+                )
                 # Put back non-ready tasks before returning
                 for item in not_ready:
                     heapq.heappush(self.pending, item)
@@ -140,22 +144,26 @@ class TaskScheduler:
             if model:
                 models_used.add(model)
 
-            log.debug("task_added_to_batch",
-                      task_id=task.id,
-                      agent=task.assigned_agent,
-                      model=model,
-                      vram_needed=vram_needed,
-                      total_vram=vram_allocated)
+            log.debug(
+                "task_added_to_batch",
+                task_id=task.id,
+                agent=task.assigned_agent,
+                model=model,
+                vram_needed=vram_needed,
+                total_vram=vram_allocated,
+            )
 
         # Put back non-ready tasks
         for item in not_ready:
             heapq.heappush(self.pending, item)
 
         if ready_tasks:
-            log.info("batch_ready",
-                     task_count=len(ready_tasks),
-                     vram_allocated=vram_allocated,
-                     models=list(models_used))
+            log.info(
+                "batch_ready",
+                task_count=len(ready_tasks),
+                vram_allocated=vram_allocated,
+                models=list(models_used),
+            )
 
         return ready_tasks
 
@@ -164,9 +172,9 @@ class TaskScheduler:
         for dep_id in task.depends_on:
             dep = self.tasks.get(dep_id)
             if not dep or dep.status != TaskStatus.COMPLETE:
-                log.debug("dependency_not_satisfied",
-                          task_id=task.id,
-                          waiting_for=dep_id)
+                log.debug(
+                    "dependency_not_satisfied", task_id=task.id, waiting_for=dep_id
+                )
                 return False
         return True
 
@@ -182,11 +190,13 @@ class TaskScheduler:
         can_load = self.model_manager.can_load(agent.model, agent.estimated_vram_gb)
 
         if not can_load:
-            log.debug("insufficient_resources",
-                      task_id=task.id,
-                      agent=agent.name,
-                      model=agent.model,
-                      required_vram=agent.estimated_vram_gb)
+            log.debug(
+                "insufficient_resources",
+                task_id=task.id,
+                agent=agent.name,
+                model=agent.model,
+                required_vram=agent.estimated_vram_gb,
+            )
 
         return can_load
 
@@ -200,10 +210,12 @@ class TaskScheduler:
         if task:
             old_status = task.status
             task.status = status
-            log.info("task_status_updated",
-                     task_id=task_id,
-                     old_status=old_status.value,
-                     new_status=status.value)
+            log.info(
+                "task_status_updated",
+                task_id=task_id,
+                old_status=old_status.value,
+                new_status=status.value,
+            )
 
     def get_pending_count(self) -> int:
         """Get number of pending tasks."""

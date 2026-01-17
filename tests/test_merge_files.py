@@ -33,7 +33,8 @@ def temp_dir():
 def python_files(temp_dir):
     """Create multiple Python files for merging."""
     # user.py
-    (temp_dir / "user.py").write_text('''"""User module."""
+    (temp_dir / "user.py").write_text(
+        '''"""User module."""
 
 import json
 from typing import Optional
@@ -47,10 +48,12 @@ class User:
 
     def greet(self) -> str:
         return f"Hello, {self.name}!"
-''')
+'''
+    )
 
     # order.py
-    (temp_dir / "order.py").write_text('''"""Order module."""
+    (temp_dir / "order.py").write_text(
+        '''"""Order module."""
 
 import json
 from datetime import datetime
@@ -64,10 +67,12 @@ class Order:
 
     def get_total(self) -> float:
         return 0.0
-''')
+'''
+    )
 
     # product.py
-    (temp_dir / "product.py").write_text('''"""Product module."""
+    (temp_dir / "product.py").write_text(
+        '''"""Product module."""
 
 from typing import Optional
 from decimal import Decimal
@@ -81,7 +86,8 @@ class Product:
 
     def display(self) -> str:
         return f"{self.name}: ${self.price}"
-''')
+'''
+    )
 
     return temp_dir
 
@@ -90,21 +96,25 @@ class Product:
 def js_files(temp_dir):
     """Create multiple JavaScript files for merging."""
     # header.js
-    (temp_dir / "header.js").write_text('''import React from 'react';
+    (temp_dir / "header.js").write_text(
+        """import React from 'react';
 import { useEffect } from 'react';
 
 export function Header() {
     return <div>Header</div>;
 }
-''')
+"""
+    )
 
     # footer.js
-    (temp_dir / "footer.js").write_text('''import React from 'react';
+    (temp_dir / "footer.js").write_text(
+        """import React from 'react';
 
 export function Footer() {
     return <div>Footer</div>;
 }
-''')
+"""
+    )
 
     return temp_dir
 
@@ -112,6 +122,7 @@ export function Footer() {
 # ============================================================
 # Basic Merge Tests
 # ============================================================
+
 
 class TestBasicMerge:
     """Tests for basic file merging."""
@@ -124,7 +135,7 @@ class TestBasicMerge:
         result = await tool.execute(
             files=["user.py", "order.py", "product.py"],
             destination="models.py",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -154,7 +165,7 @@ class TestBasicMerge:
         result = await tool.execute(
             pattern="models/*.py",
             destination="models/combined.py",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -166,9 +177,7 @@ class TestBasicMerge:
         tool = MergeFilesTool(work_dir=python_files)
 
         result = await tool.execute(
-            files=["user.py", "order.py"],
-            destination="models.py",
-            dry_run=True
+            files=["user.py", "order.py"], destination="models.py", dry_run=True
         )
 
         assert result.success
@@ -184,6 +193,7 @@ class TestBasicMerge:
 # Python Merge Tests
 # ============================================================
 
+
 class TestPythonMerge:
     """Tests for Python-specific merge functionality."""
 
@@ -195,7 +205,7 @@ class TestPythonMerge:
         result = await tool.execute(
             files=["user.py", "order.py", "product.py"],
             destination="models.py",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -217,7 +227,7 @@ class TestPythonMerge:
             files=["user.py", "order.py"],
             destination="models.py",
             add_section_comments=True,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -235,7 +245,7 @@ class TestPythonMerge:
             files=["user.py", "order.py"],
             destination="models.py",
             add_section_comments=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -251,7 +261,7 @@ class TestPythonMerge:
         result = await tool.execute(
             files=["user.py", "order.py", "product.py"],
             destination="models.py",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -264,6 +274,7 @@ class TestPythonMerge:
 # JavaScript Merge Tests
 # ============================================================
 
+
 class TestJavaScriptMerge:
     """Tests for JavaScript-specific merge functionality."""
 
@@ -275,7 +286,7 @@ class TestJavaScriptMerge:
         result = await tool.execute(
             files=["header.js", "footer.js"],
             destination="components.js",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -292,7 +303,7 @@ class TestJavaScriptMerge:
         result = await tool.execute(
             files=["header.js", "footer.js"],
             destination="components.js",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -305,6 +316,7 @@ class TestJavaScriptMerge:
 # ============================================================
 # Sort Order Tests
 # ============================================================
+
 
 class TestSortOrder:
     """Tests for sort order options."""
@@ -321,7 +333,7 @@ class TestSortOrder:
             files=["z_file.py", "a_file.py"],
             destination="combined.py",
             sort_order="preserve",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -344,7 +356,7 @@ class TestSortOrder:
             files=["z_file.py", "a_file.py"],
             destination="combined.py",
             sort_order="alpha",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -359,18 +371,22 @@ class TestSortOrder:
     async def test_sort_dependency(self, temp_dir):
         """Test dependency sorting."""
         # base.py has no dependencies
-        (temp_dir / "base.py").write_text('''"""Base module."""
+        (temp_dir / "base.py").write_text(
+            '''"""Base module."""
 class Base:
     pass
-''')
+'''
+        )
 
         # child.py depends on base
-        (temp_dir / "child.py").write_text('''"""Child module."""
+        (temp_dir / "child.py").write_text(
+            '''"""Child module."""
 from base import Base
 
 class Child(Base):
     pass
-''')
+'''
+        )
 
         tool = MergeFilesTool(work_dir=temp_dir)
 
@@ -378,7 +394,7 @@ class Child(Base):
             files=["child.py", "base.py"],
             destination="combined.py",
             sort_order="dependency",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -394,6 +410,7 @@ class Child(Base):
 # Delete Sources Tests
 # ============================================================
 
+
 class TestDeleteSources:
     """Tests for delete_sources option."""
 
@@ -406,9 +423,7 @@ class TestDeleteSources:
         tool = MergeFilesTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            files=["a.py", "b.py"],
-            destination="combined.py",
-            update_imports=False
+            files=["a.py", "b.py"], destination="combined.py", update_imports=False
         )
 
         assert result.success
@@ -430,7 +445,7 @@ class TestDeleteSources:
             files=["a.py", "b.py"],
             destination="combined.py",
             delete_sources=True,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -449,6 +464,7 @@ class TestDeleteSources:
 # Error Handling Tests
 # ============================================================
 
+
 class TestErrorHandling:
     """Tests for error handling."""
 
@@ -457,9 +473,7 @@ class TestErrorHandling:
         """Test error when neither files nor pattern is specified."""
         tool = MergeFilesTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            destination="output.py"
-        )
+        result = await tool.execute(destination="output.py")
 
         assert not result.success
         assert "Either 'files' or 'pattern' must be specified" in result.error
@@ -470,9 +484,7 @@ class TestErrorHandling:
         tool = MergeFilesTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            files=["a.py", "b.py"],
-            pattern="*.py",
-            destination="output.py"
+            files=["a.py", "b.py"], pattern="*.py", destination="output.py"
         )
 
         assert not result.success
@@ -486,9 +498,7 @@ class TestErrorHandling:
         tool = MergeFilesTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            files=["a.py"],
-            destination="output.py",
-            sort_order="invalid"
+            files=["a.py"], destination="output.py", sort_order="invalid"
         )
 
         assert not result.success
@@ -499,10 +509,7 @@ class TestErrorHandling:
         """Test error when source file doesn't exist."""
         tool = MergeFilesTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            files=["nonexistent.py"],
-            destination="output.py"
-        )
+        result = await tool.execute(files=["nonexistent.py"], destination="output.py")
 
         assert not result.success
         assert "not found" in result.error.lower()
@@ -518,7 +525,7 @@ class TestErrorHandling:
         result = await tool.execute(
             files=["a.py", "b.py"],
             destination="a.py",  # Overwriting source
-            delete_sources=False
+            delete_sources=False,
         )
 
         assert not result.success
@@ -536,7 +543,7 @@ class TestErrorHandling:
             files=["main.py", "helper.py"],
             destination="main.py",
             delete_sources=True,
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -545,6 +552,7 @@ class TestErrorHandling:
 # ============================================================
 # Edge Cases Tests
 # ============================================================
+
 
 class TestEdgeCases:
     """Tests for edge cases."""
@@ -556,10 +564,7 @@ class TestEdgeCases:
 
         tool = MergeFilesTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            files=["only.py"],
-            destination="output.py"
-        )
+        result = await tool.execute(files=["only.py"], destination="output.py")
 
         assert result.success
         assert "Only one file" in result.output
@@ -569,10 +574,7 @@ class TestEdgeCases:
         """Test pattern that matches no files."""
         tool = MergeFilesTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            pattern="nonexistent/*.py",
-            destination="output.py"
-        )
+        result = await tool.execute(pattern="nonexistent/*.py", destination="output.py")
 
         assert result.success
         assert "No files found" in result.output
@@ -586,9 +588,7 @@ class TestEdgeCases:
         tool = MergeFilesTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            files=["a.txt", "b.txt"],
-            destination="combined.txt",
-            update_imports=False
+            files=["a.txt", "b.txt"], destination="combined.txt", update_imports=False
         )
 
         assert result.success
@@ -602,6 +602,7 @@ class TestEdgeCases:
 # Metadata Tests
 # ============================================================
 
+
 class TestMetadata:
     """Tests for result metadata."""
 
@@ -611,9 +612,7 @@ class TestMetadata:
         tool = MergeFilesTool(work_dir=python_files)
 
         result = await tool.execute(
-            files=["user.py", "order.py"],
-            destination="models.py",
-            update_imports=False
+            files=["user.py", "order.py"], destination="models.py", update_imports=False
         )
 
         assert result.success
@@ -633,7 +632,7 @@ class TestMetadata:
         result = await tool.execute(
             files=["user.py", "order.py", "product.py"],
             destination="models.py",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -646,6 +645,7 @@ class TestMetadata:
 # Integration Tests
 # ============================================================
 
+
 class TestIntegration:
     """Integration tests for merge_files."""
 
@@ -653,36 +653,40 @@ class TestIntegration:
     async def test_full_workflow(self, temp_dir):
         """Test full merge workflow with import updates."""
         # Create source files
-        (temp_dir / "user.py").write_text('''"""User module."""
+        (temp_dir / "user.py").write_text(
+            '''"""User module."""
 class User:
     def __init__(self, name: str):
         self.name = name
-''')
+'''
+        )
 
-        (temp_dir / "order.py").write_text('''"""Order module."""
+        (temp_dir / "order.py").write_text(
+            '''"""Order module."""
 from user import User
 
 class Order:
     def __init__(self, id: int, user: User):
         self.id = id
         self.user = user
-''')
+'''
+        )
 
         # Create a file that imports from user
-        (temp_dir / "app.py").write_text('''"""App module."""
+        (temp_dir / "app.py").write_text(
+            '''"""App module."""
 from user import User
 
 def create_user():
     return User("Test")
-''')
+'''
+        )
 
         # Merge user and order into models
         tool = MergeFilesTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            files=["user.py", "order.py"],
-            destination="models.py",
-            update_imports=True
+            files=["user.py", "order.py"], destination="models.py", update_imports=True
         )
 
         assert result.success
@@ -722,7 +726,7 @@ class Order:
             strategy="classes",
             output_dir=str(temp_dir / "split"),
             keep_original=False,
-            update_imports=False
+            update_imports=False,
         )
 
         assert split_result.success
@@ -731,9 +735,7 @@ class Order:
         # Merge back
         merge_tool = MergeFilesTool(work_dir=temp_dir)
         merge_result = await merge_tool.execute(
-            pattern="split/*.py",
-            destination="merged.py",
-            update_imports=False
+            pattern="split/*.py", destination="merged.py", update_imports=False
         )
 
         assert merge_result.success
@@ -747,6 +749,7 @@ class Order:
 # ============================================================
 # Work Directory Tests
 # ============================================================
+
 
 class TestWorkDirectory:
     """Tests for work directory handling."""
@@ -765,7 +768,7 @@ class TestWorkDirectory:
         result = await tool.execute(
             files=["src/a.py", "src/b.py"],
             destination="src/combined.py",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success

@@ -5,8 +5,7 @@ Phase 5.5: Track task duration, iteration timing, tool execution, and model load
 
 import json
 import time
-from dataclasses import dataclass, field, asdict
-from datetime import datetime
+from dataclasses import dataclass, field
 from typing import Optional, Any
 import structlog
 
@@ -125,7 +124,7 @@ class TaskMetrics:
                         "count": 0,
                         "total_time": 0.0,
                         "successes": 0,
-                        "failures": 0
+                        "failures": 0,
                     }
                 breakdown[tool.tool_name]["count"] += 1
                 breakdown[tool.tool_name]["total_time"] += tool.duration_seconds
@@ -136,7 +135,9 @@ class TaskMetrics:
 
         # Calculate averages
         for tool_name, data in breakdown.items():
-            data["avg_time"] = data["total_time"] / data["count"] if data["count"] > 0 else 0.0
+            data["avg_time"] = (
+                data["total_time"] / data["count"] if data["count"] > 0 else 0.0
+            )
 
         return breakdown
 
@@ -200,9 +201,13 @@ class SessionMetrics:
                 "tool_execution": round(self.total_tool_time, 2),
                 "model_loading": round(self.total_model_load_time, 2),
             },
-            "avg_iteration_time": round(
-                sum(t.avg_iteration_time for t in self.tasks) / len(self.tasks), 2
-            ) if self.tasks else 0.0,
+            "avg_iteration_time": (
+                round(
+                    sum(t.avg_iteration_time for t in self.tasks) / len(self.tasks), 2
+                )
+                if self.tasks
+                else 0.0
+            ),
         }
 
     def get_tool_breakdown(self) -> dict[str, dict]:
@@ -216,7 +221,7 @@ class SessionMetrics:
                         "count": 0,
                         "total_time": 0.0,
                         "successes": 0,
-                        "failures": 0
+                        "failures": 0,
                     }
                 combined[tool_name]["count"] += data["count"]
                 combined[tool_name]["total_time"] += data["total_time"]
@@ -225,7 +230,9 @@ class SessionMetrics:
 
         # Calculate averages
         for tool_name, data in combined.items():
-            data["avg_time"] = data["total_time"] / data["count"] if data["count"] > 0 else 0.0
+            data["avg_time"] = (
+                data["total_time"] / data["count"] if data["count"] > 0 else 0.0
+            )
 
         return combined
 
@@ -276,16 +283,16 @@ class SessionMetrics:
                                     "start_time": te.start_time,
                                     "end_time": te.end_time,
                                     "success": te.success,
-                                    "arguments": te.arguments
+                                    "arguments": te.arguments,
                                 }
                                 for te in it.tool_executions
-                            ]
+                            ],
                         }
                         for it in task.iterations
-                    ]
+                    ],
                 }
                 for task in self.tasks
-            ]
+            ],
         }
 
     @classmethod
@@ -301,31 +308,35 @@ class SessionMetrics:
                         start_time=te["start_time"],
                         end_time=te["end_time"],
                         success=te["success"],
-                        arguments=te.get("arguments")
+                        arguments=te.get("arguments"),
                     )
                     for te in it_data.get("tool_executions", [])
                 ]
-                iterations.append(IterationMetrics(
-                    iteration_number=it_data["iteration_number"],
-                    start_time=it_data["start_time"],
-                    end_time=it_data["end_time"],
-                    agent_name=it_data["agent_name"],
-                    model_name=it_data["model_name"],
-                    tokens_generated=it_data.get("tokens_generated", 0),
-                    tool_executions=tool_executions
-                ))
+                iterations.append(
+                    IterationMetrics(
+                        iteration_number=it_data["iteration_number"],
+                        start_time=it_data["start_time"],
+                        end_time=it_data["end_time"],
+                        agent_name=it_data["agent_name"],
+                        model_name=it_data["model_name"],
+                        tokens_generated=it_data.get("tokens_generated", 0),
+                        tool_executions=tool_executions,
+                    )
+                )
 
-            tasks.append(TaskMetrics(
-                task_id=task_data["task_id"],
-                task_description=task_data["task_description"],
-                agent_name=task_data["agent_name"],
-                model_name=task_data["model_name"],
-                start_time=task_data["start_time"],
-                end_time=task_data.get("end_time"),
-                status=task_data.get("status", "completed"),
-                model_load_time=task_data.get("model_load_time", 0.0),
-                iterations=iterations
-            ))
+            tasks.append(
+                TaskMetrics(
+                    task_id=task_data["task_id"],
+                    task_description=task_data["task_description"],
+                    agent_name=task_data["agent_name"],
+                    model_name=task_data["model_name"],
+                    start_time=task_data["start_time"],
+                    end_time=task_data.get("end_time"),
+                    status=task_data.get("status", "completed"),
+                    model_load_time=task_data.get("model_load_time", 0.0),
+                    iterations=iterations,
+                )
+            )
 
         return cls(
             session_id=data["session_id"],
@@ -334,7 +345,7 @@ class SessionMetrics:
             start_time=data["start_time"],
             end_time=data.get("end_time"),
             status=data.get("status", "completed"),
-            tasks=tasks
+            tasks=tasks,
         )
 
 
@@ -351,7 +362,7 @@ class MetricsCollector:
             session_id=session_id,
             task_description=task_description,
             model_name=model_name,
-            start_time=time.time()
+            start_time=time.time(),
         )
         self._current_task: Optional[TaskMetrics] = None
         self._current_iteration: Optional[IterationMetrics] = None
@@ -363,7 +374,7 @@ class MetricsCollector:
         description: str,
         agent_name: str,
         model_name: str,
-        model_load_time: float = 0.0
+        model_load_time: float = 0.0,
     ):
         """Start tracking a new task."""
         self._current_task = TaskMetrics(
@@ -372,7 +383,7 @@ class MetricsCollector:
             agent_name=agent_name,
             model_name=model_name,
             start_time=time.time(),
-            model_load_time=model_load_time
+            model_load_time=model_load_time,
         )
         log.debug("metrics_task_started", task_id=task_id, agent=agent_name)
 
@@ -384,7 +395,7 @@ class MetricsCollector:
             start_time=self._iteration_start,
             end_time=0.0,  # Will be set when iteration ends
             agent_name=agent_name,
-            model_name=model_name
+            model_name=model_name,
         )
         log.debug("metrics_iteration_started", iteration=iteration_number)
 
@@ -394,7 +405,7 @@ class MetricsCollector:
         start_time: float,
         end_time: float,
         success: bool,
-        arguments: Optional[dict] = None
+        arguments: Optional[dict] = None,
     ):
         """Record a tool execution."""
         if self._current_iteration:
@@ -403,12 +414,14 @@ class MetricsCollector:
                 start_time=start_time,
                 end_time=end_time,
                 success=success,
-                arguments=arguments
+                arguments=arguments,
             )
             self._current_iteration.tool_executions.append(tool_metrics)
-            log.debug("metrics_tool_recorded",
-                     tool=tool_name,
-                     duration_ms=tool_metrics.duration_ms)
+            log.debug(
+                "metrics_tool_recorded",
+                tool=tool_name,
+                duration_ms=tool_metrics.duration_ms,
+            )
 
     def end_iteration(self, tokens_generated: int = 0):
         """End the current iteration."""
@@ -416,9 +429,11 @@ class MetricsCollector:
             self._current_iteration.end_time = time.time()
             self._current_iteration.tokens_generated = tokens_generated
             self._current_task.iterations.append(self._current_iteration)
-            log.debug("metrics_iteration_ended",
-                     iteration=self._current_iteration.iteration_number,
-                     duration=self._current_iteration.duration_seconds)
+            log.debug(
+                "metrics_iteration_ended",
+                iteration=self._current_iteration.iteration_number,
+                duration=self._current_iteration.duration_seconds,
+            )
             self._current_iteration = None
 
     def end_task(self, status: str = "completed"):
@@ -427,10 +442,12 @@ class MetricsCollector:
             self._current_task.end_time = time.time()
             self._current_task.status = status
             self.session_metrics.tasks.append(self._current_task)
-            log.debug("metrics_task_ended",
-                     task_id=self._current_task.task_id,
-                     duration=self._current_task.duration_seconds,
-                     iterations=self._current_task.iteration_count)
+            log.debug(
+                "metrics_task_ended",
+                task_id=self._current_task.task_id,
+                duration=self._current_task.duration_seconds,
+                iterations=self._current_task.iteration_count,
+            )
             self._current_task = None
 
     def end_session(self, status: str = "completed"):
@@ -445,10 +462,12 @@ class MetricsCollector:
 
         self.session_metrics.end_time = time.time()
         self.session_metrics.status = status
-        log.info("metrics_session_ended",
-                session_id=self.session_metrics.session_id,
-                duration=self.session_metrics.duration_seconds,
-                tasks=len(self.session_metrics.tasks))
+        log.info(
+            "metrics_session_ended",
+            session_id=self.session_metrics.session_id,
+            duration=self.session_metrics.duration_seconds,
+            tasks=len(self.session_metrics.tasks),
+        )
 
     def get_metrics(self) -> SessionMetrics:
         """Get the collected session metrics."""
@@ -475,6 +494,7 @@ class MetricsStore:
             database: Database instance. If None, creates a new one.
         """
         from sindri.persistence.database import Database
+
         self.db = database or Database()
 
     async def save_metrics(self, metrics: SessionMetrics):
@@ -506,15 +526,17 @@ class MetricsStore:
                     summary["duration_seconds"],
                     summary["total_iterations"],
                     summary["total_tool_executions"],
-                    metrics.session_id  # For the subquery
-                )
+                    metrics.session_id,  # For the subquery
+                ),
             )
             await conn.commit()
 
-        log.info("metrics_saved",
-                session_id=metrics.session_id,
-                duration=summary["duration_seconds"],
-                iterations=summary["total_iterations"])
+        log.info(
+            "metrics_saved",
+            session_id=metrics.session_id,
+            duration=summary["duration_seconds"],
+            iterations=summary["total_iterations"],
+        )
 
     async def load_metrics(self, session_id: str) -> Optional[SessionMetrics]:
         """Load session metrics from database.
@@ -530,7 +552,7 @@ class MetricsStore:
         async with self.db.get_connection() as conn:
             async with conn.execute(
                 "SELECT metrics_json FROM session_metrics WHERE session_id = ?",
-                (session_id,)
+                (session_id,),
             ) as cursor:
                 row = await cursor.fetchone()
                 if not row:
@@ -561,20 +583,22 @@ class MetricsStore:
                 ORDER BY sm.created_at DESC
                 LIMIT ?
                 """,
-                (limit,)
+                (limit,),
             ) as cursor:
                 results = []
                 async for row in cursor:
-                    results.append({
-                        "session_id": row[0],
-                        "duration_seconds": row[1],
-                        "total_iterations": row[2],
-                        "total_tool_executions": row[3],
-                        "created_at": row[4],
-                        "task": row[5] or "Unknown",
-                        "model": row[6] or "Unknown",
-                        "status": row[7] or "Unknown"
-                    })
+                    results.append(
+                        {
+                            "session_id": row[0],
+                            "duration_seconds": row[1],
+                            "total_iterations": row[2],
+                            "total_tool_executions": row[3],
+                            "created_at": row[4],
+                            "task": row[5] or "Unknown",
+                            "model": row[6] or "Unknown",
+                            "status": row[7] or "Unknown",
+                        }
+                    )
                 return results
 
     async def get_aggregate_stats(self) -> dict:
@@ -606,7 +630,7 @@ class MetricsStore:
                         "avg_duration_seconds": row[2] or 0.0,
                         "total_iterations": row[3] or 0,
                         "avg_iterations": row[4] or 0.0,
-                        "total_tool_executions": row[5] or 0
+                        "total_tool_executions": row[5] or 0,
                     }
                 return {
                     "total_sessions": 0,
@@ -614,7 +638,7 @@ class MetricsStore:
                     "avg_duration_seconds": 0.0,
                     "total_iterations": 0,
                     "avg_iterations": 0.0,
-                    "total_tool_executions": 0
+                    "total_tool_executions": 0,
                 }
 
     async def delete_metrics(self, session_id: str) -> bool:
@@ -628,8 +652,7 @@ class MetricsStore:
         """
         async with self.db.get_connection() as conn:
             cursor = await conn.execute(
-                "DELETE FROM session_metrics WHERE session_id = ?",
-                (session_id,)
+                "DELETE FROM session_metrics WHERE session_id = ?", (session_id,)
             )
             await conn.commit()
             return cursor.rowcount > 0

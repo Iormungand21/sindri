@@ -6,7 +6,7 @@ like categories, tags, dependencies, and source information.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum, auto
+from enum import Enum
 from pathlib import Path
 from typing import Optional
 import json
@@ -16,35 +16,35 @@ class PluginCategory(str, Enum):
     """Categories for organizing plugins."""
 
     # Tool categories
-    FILESYSTEM = "filesystem"      # File operations
-    GIT = "git"                    # Git/VCS tools
-    HTTP = "http"                  # HTTP/API tools
-    DATABASE = "database"          # Database tools
-    TESTING = "testing"            # Test runners, assertions
-    FORMATTING = "formatting"      # Code formatting/linting
-    REFACTORING = "refactoring"    # Code refactoring
-    ANALYSIS = "analysis"          # Code analysis
-    SECURITY = "security"          # Security scanning
-    DEVOPS = "devops"              # CI/CD, deployment
-    DOCUMENTATION = "documentation" # Doc generation
+    FILESYSTEM = "filesystem"  # File operations
+    GIT = "git"  # Git/VCS tools
+    HTTP = "http"  # HTTP/API tools
+    DATABASE = "database"  # Database tools
+    TESTING = "testing"  # Test runners, assertions
+    FORMATTING = "formatting"  # Code formatting/linting
+    REFACTORING = "refactoring"  # Code refactoring
+    ANALYSIS = "analysis"  # Code analysis
+    SECURITY = "security"  # Security scanning
+    DEVOPS = "devops"  # CI/CD, deployment
+    DOCUMENTATION = "documentation"  # Doc generation
 
     # Agent categories
-    CODER = "coder"                # Code generation agents
-    REVIEWER = "reviewer"          # Code review agents
-    PLANNER = "planner"            # Planning/architecture agents
-    SPECIALIST = "specialist"      # Domain-specific agents
+    CODER = "coder"  # Code generation agents
+    REVIEWER = "reviewer"  # Code review agents
+    PLANNER = "planner"  # Planning/architecture agents
+    SPECIALIST = "specialist"  # Domain-specific agents
 
     # General
-    UTILITY = "utility"            # General utilities
-    OTHER = "other"                # Uncategorized
+    UTILITY = "utility"  # General utilities
+    OTHER = "other"  # Uncategorized
 
 
 class SourceType(str, Enum):
     """Types of plugin sources for installation."""
 
-    LOCAL = "local"          # Local file path
-    GIT = "git"              # Git repository URL
-    URL = "url"              # Direct download URL
+    LOCAL = "local"  # Local file path
+    GIT = "git"  # Git repository URL
+    URL = "url"  # Direct download URL
     MARKETPLACE = "marketplace"  # Community marketplace (future)
 
 
@@ -59,6 +59,7 @@ class PluginSource:
         installed_at: When the plugin was installed
         updated_at: When the plugin was last updated
     """
+
     type: SourceType
     location: str
     ref: Optional[str] = None
@@ -71,7 +72,9 @@ class PluginSource:
             "type": self.type.value,
             "location": self.location,
             "ref": self.ref,
-            "installed_at": self.installed_at.isoformat() if self.installed_at else None,
+            "installed_at": (
+                self.installed_at.isoformat() if self.installed_at else None
+            ),
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
         }
 
@@ -82,8 +85,16 @@ class PluginSource:
             type=SourceType(data["type"]),
             location=data["location"],
             ref=data.get("ref"),
-            installed_at=datetime.fromisoformat(data["installed_at"]) if data.get("installed_at") else None,
-            updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None,
+            installed_at=(
+                datetime.fromisoformat(data["installed_at"])
+                if data.get("installed_at")
+                else None
+            ),
+            updated_at=(
+                datetime.fromisoformat(data["updated_at"])
+                if data.get("updated_at")
+                else None
+            ),
         )
 
 
@@ -107,6 +118,7 @@ class PluginMetadata:
         readme: Full readme content (if available)
         changelog: Version history (if available)
     """
+
     name: str
     version: str = "0.1.0"
     description: str = ""
@@ -129,7 +141,11 @@ class PluginMetadata:
             "version": self.version,
             "description": self.description,
             "author": self.author,
-            "category": self.category.value if isinstance(self.category, PluginCategory) else self.category,
+            "category": (
+                self.category.value
+                if isinstance(self.category, PluginCategory)
+                else self.category
+            ),
             "tags": self.tags,
             "homepage": self.homepage,
             "repository": self.repository,
@@ -221,11 +237,17 @@ class PluginMetadata:
                         if name == "__metadata__" and isinstance(node.value, ast.Dict):
                             # Parse dict literal
                             for key, value in zip(node.value.keys, node.value.values):
-                                if isinstance(key, ast.Constant) and isinstance(value, ast.Constant):
+                                if isinstance(key, ast.Constant) and isinstance(
+                                    value, ast.Constant
+                                ):
                                     metadata[key.value] = value.value
-                        elif name == "__version__" and isinstance(node.value, ast.Constant):
+                        elif name == "__version__" and isinstance(
+                            node.value, ast.Constant
+                        ):
                             metadata["version"] = str(node.value.value)
-                        elif name == "__author__" and isinstance(node.value, ast.Constant):
+                        elif name == "__author__" and isinstance(
+                            node.value, ast.Constant
+                        ):
                             metadata["author"] = str(node.value.value)
 
         return cls.from_dict(metadata)
@@ -235,6 +257,7 @@ class PluginMetadata:
         """Extract metadata from TOML agent config file."""
         try:
             import toml
+
             config = toml.load(path)
         except Exception:
             return None
@@ -253,17 +276,19 @@ class PluginMetadata:
         # Get metadata section
         if "metadata" in config:
             meta = config["metadata"]
-            metadata.update({
-                "version": meta.get("version", "0.1.0"),
-                "author": meta.get("author", ""),
-                "category": meta.get("category", "specialist"),
-                "tags": meta.get("tags", []),
-                "homepage": meta.get("homepage", ""),
-                "repository": meta.get("repository", ""),
-                "license": meta.get("license", ""),
-                "dependencies": meta.get("dependencies", []),
-                "sindri_version": meta.get("sindri_version", ">=0.1.0"),
-            })
+            metadata.update(
+                {
+                    "version": meta.get("version", "0.1.0"),
+                    "author": meta.get("author", ""),
+                    "category": meta.get("category", "specialist"),
+                    "tags": meta.get("tags", []),
+                    "homepage": meta.get("homepage", ""),
+                    "repository": meta.get("repository", ""),
+                    "license": meta.get("license", ""),
+                    "dependencies": meta.get("dependencies", []),
+                    "sindri_version": meta.get("sindri_version", ">=0.1.0"),
+                }
+            )
 
         return cls.from_dict(metadata)
 

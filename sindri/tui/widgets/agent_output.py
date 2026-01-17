@@ -2,7 +2,6 @@
 
 from textual.widgets import RichLog
 from rich.syntax import Syntax
-from rich.text import Text
 import re
 
 
@@ -21,13 +20,13 @@ class AgentOutput(RichLog):
             self.write(f"\n[bold blue][{agent}][/bold blue]")
 
         # Detect and highlight code blocks
-        code_pattern = r'```(\w+)?\n(.*?)```'
+        code_pattern = r"```(\w+)?\n(.*?)```"
 
         last_end = 0
         for match in re.finditer(code_pattern, text, re.DOTALL):
             # Write text before code block
             if match.start() > last_end:
-                self.write(text[last_end:match.start()])
+                self.write(text[last_end : match.start()])
 
             # Write syntax highlighted code
             lang = match.group(1) or "python"

@@ -33,11 +33,11 @@ class SindriHeader(Static):
         """Get title and subtitle from app."""
         try:
             app = self.app
-            title = getattr(app, 'title', 'Sindri')
-            subtitle = getattr(app, 'sub_title', None)
+            title = getattr(app, "title", "Sindri")
+            subtitle = getattr(app, "sub_title", None)
             return title, subtitle
         except Exception:
-            return 'Sindri', None
+            return "Sindri", None
 
     def render(self) -> Text:
         """Render header with title and VRAM gauge."""
@@ -80,7 +80,10 @@ class SindriHeader(Static):
             # Show loaded models count if any
             if self.loaded_models:
                 models_count = len(self.loaded_models)
-                text.append(f" ({models_count} model{'s' if models_count != 1 else ''})", style="dim cyan")
+                text.append(
+                    f" ({models_count} model{'s' if models_count != 1 else ''})",
+                    style="dim cyan",
+                )
 
         # Phase 5.5: Show task metrics if running
         if self.task_duration > 0 or self.current_iteration > 0:

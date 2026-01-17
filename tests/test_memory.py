@@ -7,7 +7,7 @@ from pathlib import Path
 
 from sindri.memory.embedder import LocalEmbedder
 from sindri.persistence.vectors import VectorStore
-from sindri.memory.episodic import EpisodicMemory, Episode
+from sindri.memory.episodic import EpisodicMemory
 from sindri.memory.semantic import SemanticMemory
 from sindri.memory.system import MuninnMemory, MemoryConfig
 
@@ -38,15 +38,18 @@ def temp_codebase():
         code_dir = Path(tmpdir) / "src"
         code_dir.mkdir()
 
-        (code_dir / "main.py").write_text("""
+        (code_dir / "main.py").write_text(
+            """
 def hello():
     print("Hello from Sindri!")
 
 def add(a, b):
     return a + b
-""")
+"""
+        )
 
-        (code_dir / "utils.py").write_text("""
+        (code_dir / "utils.py").write_text(
+            """
 def multiply(a, b):
     return a * b
 
@@ -54,7 +57,8 @@ def divide(a, b):
     if b == 0:
         raise ValueError("Cannot divide by zero")
     return a / b
-""")
+"""
+        )
 
         yield tmpdir
 
@@ -171,7 +175,7 @@ class TestEpisodicMemory:
             project_id="test_project",
             event_type="task_complete",
             content="Successfully implemented feature X",
-            metadata={"iterations": 5}
+            metadata={"iterations": 5},
         )
 
         assert episode_id > 0
@@ -190,17 +194,23 @@ class TestEpisodicMemory:
         memory = EpisodicMemory(temp_db, embedder)
 
         # Store multiple episodes
-        memory.store("test_project", "task_complete", "Implemented authentication system")
+        memory.store(
+            "test_project", "task_complete", "Implemented authentication system"
+        )
         memory.store("test_project", "task_complete", "Fixed database connection bug")
         memory.store("test_project", "task_complete", "Added user login functionality")
 
         # Search for auth-related episodes
-        relevant = memory.retrieve_relevant("test_project", "authentication and login", limit=2)
+        relevant = memory.retrieve_relevant(
+            "test_project", "authentication and login", limit=2
+        )
 
         assert len(relevant) <= 2
         # Should find auth-related episodes
-        assert any("authentication" in ep.content.lower() or "login" in ep.content.lower()
-                   for ep in relevant)
+        assert any(
+            "authentication" in ep.content.lower() or "login" in ep.content.lower()
+            for ep in relevant
+        )
 
         memory.close()
 
@@ -230,11 +240,15 @@ class TestSemanticMemory:
         memory.index_directory(temp_codebase, "test_project")
 
         # Search for math-related functions
-        results = memory.search("test_project", "mathematical operations multiply divide", limit=5)
+        results = memory.search(
+            "test_project", "mathematical operations multiply divide", limit=5
+        )
 
         assert len(results) > 0
         # Should find the utils.py content with multiply/divide
-        assert any("multiply" in content or "divide" in content for content, _, _ in results)
+        assert any(
+            "multiply" in content or "divide" in content for content, _, _ in results
+        )
 
         store.close()
 
@@ -245,11 +259,10 @@ class TestMuninnMemory:
     @pytest.mark.asyncio
     async def test_build_context(self, temp_db, temp_codebase):
         """Test building context from all memory tiers."""
-        memory = MuninnMemory(temp_db, MemoryConfig(
-            episodic_limit=2,
-            semantic_limit=3,
-            max_context_tokens=1000
-        ))
+        memory = MuninnMemory(
+            temp_db,
+            MemoryConfig(episodic_limit=2, semantic_limit=3, max_context_tokens=1000),
+        )
 
         project_id = "test_project"
 
@@ -264,21 +277,21 @@ class TestMuninnMemory:
         # Build context
         conversation = [
             {"role": "user", "content": "Implement login"},
-            {"role": "assistant", "content": "I'll implement the login function"}
+            {"role": "assistant", "content": "I'll implement the login function"},
         ]
 
         context = memory.build_context(
             project_id=project_id,
             current_task="Add user login functionality",
             conversation=conversation,
-            max_tokens=2000
+            max_tokens=2000,
         )
 
         assert isinstance(context, list)
         assert len(context) > 0
 
         # Should have semantic and episodic context
-        context_str = " ".join(msg["content"] for msg in context)
+        " ".join(msg["content"] for msg in context)
         # May have codebase or past context, depending on relevance
 
     @pytest.mark.asyncio
@@ -291,14 +304,14 @@ class TestMuninnMemory:
         # Create a long conversation
         conversation = [
             {"role": "user", "content": "Test message " * 100},
-            {"role": "assistant", "content": "Response " * 100}
+            {"role": "assistant", "content": "Response " * 100},
         ] * 10  # Very long conversation
 
         context = memory.build_context(
             project_id=project_id,
             current_task="Simple task",
             conversation=conversation,
-            max_tokens=500
+            max_tokens=500,
         )
 
         # Context should fit in budget

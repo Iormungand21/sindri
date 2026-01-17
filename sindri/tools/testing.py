@@ -26,35 +26,35 @@ Returns test results with pass/fail counts and failure details."""
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to test file, directory, or pattern (default: current directory)"
+                "description": "Path to test file, directory, or pattern (default: current directory)",
             },
             "framework": {
                 "type": "string",
                 "description": "Testing framework to use (auto-detected if not specified)",
-                "enum": ["pytest", "unittest", "npm", "jest", "cargo", "go"]
+                "enum": ["pytest", "unittest", "npm", "jest", "cargo", "go"],
             },
             "pattern": {
                 "type": "string",
-                "description": "Test name pattern to filter (e.g., 'test_auth*' for pytest -k)"
+                "description": "Test name pattern to filter (e.g., 'test_auth*' for pytest -k)",
             },
             "verbose": {
                 "type": "boolean",
-                "description": "Enable verbose output (default: true)"
+                "description": "Enable verbose output (default: true)",
             },
             "timeout": {
                 "type": "integer",
-                "description": "Timeout in seconds (default: 300)"
+                "description": "Timeout in seconds (default: 300)",
             },
             "fail_fast": {
                 "type": "boolean",
-                "description": "Stop on first failure (default: false)"
+                "description": "Stop on first failure (default: false)",
             },
             "coverage": {
                 "type": "boolean",
-                "description": "Run with coverage reporting (default: false)"
-            }
+                "description": "Run with coverage reporting (default: false)",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
@@ -66,7 +66,7 @@ Returns test results with pass/fail counts and failure details."""
         timeout: int = 300,
         fail_fast: bool = False,
         coverage: bool = False,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Run tests and return results."""
         try:
@@ -75,7 +75,9 @@ Returns test results with pass/fail counts and failure details."""
 
             # Resolve test path
             if path:
-                test_path = work_dir / path if not Path(path).is_absolute() else Path(path)
+                test_path = (
+                    work_dir / path if not Path(path).is_absolute() else Path(path)
+                )
             else:
                 test_path = work_dir
 
@@ -87,10 +89,14 @@ Returns test results with pass/fail counts and failure details."""
                         success=False,
                         output="",
                         error="Could not auto-detect testing framework. Please specify 'framework' parameter.",
-                        metadata={"detected_files": await self._list_config_files(work_dir)}
+                        metadata={
+                            "detected_files": await self._list_config_files(work_dir)
+                        },
                     )
 
-            log.info("run_tests", framework=framework, path=str(test_path), pattern=pattern)
+            log.info(
+                "run_tests", framework=framework, path=str(test_path), pattern=pattern
+            )
 
             # Build command based on framework
             cmd = await self._build_command(
@@ -100,14 +106,14 @@ Returns test results with pass/fail counts and failure details."""
                 pattern=pattern,
                 verbose=verbose,
                 fail_fast=fail_fast,
-                coverage=coverage
+                coverage=coverage,
             )
 
             if not cmd:
                 return ToolResult(
                     success=False,
                     output="",
-                    error=f"Unsupported testing framework: {framework}"
+                    error=f"Unsupported testing framework: {framework}",
                 )
 
             log.info("run_tests_command", command=cmd)
@@ -118,12 +124,11 @@ Returns test results with pass/fail counts and failure details."""
                     cmd,
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
-                    cwd=str(work_dir)
+                    cwd=str(work_dir),
                 )
 
                 stdout, stderr = await asyncio.wait_for(
-                    process.communicate(),
-                    timeout=timeout
+                    process.communicate(), timeout=timeout
                 )
 
             except asyncio.TimeoutError:
@@ -132,7 +137,7 @@ Returns test results with pass/fail counts and failure details."""
                     success=False,
                     output="",
                     error=f"Tests timed out after {timeout} seconds",
-                    metadata={"timeout": timeout, "framework": framework}
+                    metadata={"timeout": timeout, "framework": framework},
                 )
 
             stdout_text = stdout.decode() if stdout else ""
@@ -140,7 +145,9 @@ Returns test results with pass/fail counts and failure details."""
             combined_output = stdout_text + ("\n" + stderr_text if stderr_text else "")
 
             # Parse test results
-            results = self._parse_results(framework, combined_output, process.returncode)
+            results = self._parse_results(
+                framework, combined_output, process.returncode
+            )
 
             # Determine success (tests passed)
             tests_passed = process.returncode == 0
@@ -148,36 +155,40 @@ Returns test results with pass/fail counts and failure details."""
             return ToolResult(
                 success=tests_passed,
                 output=combined_output,
-                error=None if tests_passed else f"Tests failed with {results.get('failed', 'unknown')} failure(s)",
+                error=(
+                    None
+                    if tests_passed
+                    else f"Tests failed with {results.get('failed', 'unknown')} failure(s)"
+                ),
                 metadata={
                     "framework": framework,
                     "returncode": process.returncode,
                     "path": str(test_path),
-                    **results
-                }
+                    **results,
+                },
             )
 
         except Exception as e:
             log.error("run_tests_error", error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to run tests: {str(e)}"
+                success=False, output="", error=f"Failed to run tests: {str(e)}"
             )
 
     async def _detect_framework(self, work_dir: Path) -> Optional[str]:
         """Auto-detect testing framework based on project files."""
         # Check for Python testing
-        if (work_dir / "pytest.ini").exists() or \
-           (work_dir / "pyproject.toml").exists() or \
-           (work_dir / "setup.py").exists() or \
-           (work_dir / "conftest.py").exists():
+        if (
+            (work_dir / "pytest.ini").exists()
+            or (work_dir / "pyproject.toml").exists()
+            or (work_dir / "setup.py").exists()
+            or (work_dir / "conftest.py").exists()
+        ):
             # Check if pytest is available
             proc = await asyncio.create_subprocess_shell(
                 "python -c 'import pytest'",
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
-                cwd=str(work_dir)
+                cwd=str(work_dir),
             )
             await proc.communicate()
             if proc.returncode == 0:
@@ -189,6 +200,7 @@ Returns test results with pass/fail counts and failure details."""
         if package_json.exists():
             try:
                 import json
+
                 content = package_json.read_text()
                 pkg = json.loads(content)
 
@@ -229,9 +241,15 @@ Returns test results with pass/fail counts and failure details."""
     async def _list_config_files(self, work_dir: Path) -> list[str]:
         """List config files that might indicate a testing framework."""
         config_patterns = [
-            "pytest.ini", "pyproject.toml", "setup.py", "conftest.py",
-            "package.json", "jest.config.js", "jest.config.ts",
-            "Cargo.toml", "go.mod"
+            "pytest.ini",
+            "pyproject.toml",
+            "setup.py",
+            "conftest.py",
+            "package.json",
+            "jest.config.js",
+            "jest.config.ts",
+            "Cargo.toml",
+            "go.mod",
         ]
         found = []
         for pattern in config_patterns:
@@ -247,7 +265,7 @@ Returns test results with pass/fail counts and failure details."""
         pattern: Optional[str],
         verbose: bool,
         fail_fast: bool,
-        coverage: bool
+        coverage: bool,
     ) -> Optional[str]:
         """Build the test command for the specified framework."""
 
@@ -364,20 +382,14 @@ Returns test results with pass/fail counts and failure details."""
 
     def _parse_results(self, framework: str, output: str, returncode: int) -> dict:
         """Parse test output to extract results summary."""
-        results = {
-            "passed": 0,
-            "failed": 0,
-            "skipped": 0,
-            "errors": 0,
-            "total": 0
-        }
+        results = {"passed": 0, "failed": 0, "skipped": 0, "errors": 0, "total": 0}
 
         if framework == "pytest":
             # Match pytest summary line: "5 passed, 2 failed, 1 skipped in 0.5s"
             summary_match = re.search(
                 r"(\d+)\s+passed(?:.*?(\d+)\s+failed)?(?:.*?(\d+)\s+skipped)?(?:.*?(\d+)\s+error)?",
                 output,
-                re.IGNORECASE
+                re.IGNORECASE,
             )
             if summary_match:
                 results["passed"] = int(summary_match.group(1) or 0)
@@ -413,13 +425,15 @@ Returns test results with pass/fail counts and failure details."""
                     results["failed"] = int(failures_match.group(1))
                 if errors_match:
                     results["errors"] = int(errors_match.group(1))
-                results["passed"] = results["total"] - results["failed"] - results["errors"]
+                results["passed"] = (
+                    results["total"] - results["failed"] - results["errors"]
+                )
 
         elif framework in ("npm", "jest"):
             # Match jest summary: "Tests: 2 failed, 5 passed, 7 total"
             tests_match = re.search(
                 r"Tests:\s*(?:(\d+)\s+failed,?\s*)?(?:(\d+)\s+skipped,?\s*)?(?:(\d+)\s+passed,?\s*)?(\d+)\s+total",
-                output
+                output,
             )
             if tests_match:
                 results["failed"] = int(tests_match.group(1) or 0)
@@ -431,7 +445,7 @@ Returns test results with pass/fail counts and failure details."""
             # Match cargo test summary: "test result: ok. 5 passed; 0 failed; 0 ignored"
             result_match = re.search(
                 r"test result:.*?(\d+)\s+passed;\s*(\d+)\s+failed;\s*(\d+)\s+ignored",
-                output
+                output,
             )
             if result_match:
                 results["passed"] = int(result_match.group(1))
@@ -451,7 +465,12 @@ Returns test results with pass/fail counts and failure details."""
 
         # Calculate total if not set
         if results["total"] == 0:
-            results["total"] = results["passed"] + results["failed"] + results["skipped"] + results["errors"]
+            results["total"] = (
+                results["passed"]
+                + results["failed"]
+                + results["skipped"]
+                + results["errors"]
+            )
 
         return results
 
@@ -470,15 +489,15 @@ Rust (cargo check), Go (go build)."""
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to file or directory to check"
+                "description": "Path to file or directory to check",
             },
             "language": {
                 "type": "string",
                 "description": "Language to check (auto-detected from extension if not specified)",
-                "enum": ["python", "javascript", "typescript", "rust", "go"]
-            }
+                "enum": ["python", "javascript", "typescript", "rust", "go"],
+            },
         },
-        "required": ["path"]
+        "required": ["path"],
     }
 
     # File extension to language mapping
@@ -490,14 +509,11 @@ Rust (cargo check), Go (go build)."""
         ".ts": "typescript",
         ".tsx": "typescript",
         ".rs": "rust",
-        ".go": "go"
+        ".go": "go",
     }
 
     async def execute(
-        self,
-        path: str,
-        language: Optional[str] = None,
-        **kwargs
+        self, path: str, language: Optional[str] = None, **kwargs
     ) -> ToolResult:
         """Check syntax of the specified file(s)."""
         try:
@@ -506,9 +522,7 @@ Rust (cargo check), Go (go build)."""
 
             if not file_path.exists():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Path does not exist: {file_path}"
+                    success=False, output="", error=f"Path does not exist: {file_path}"
                 )
 
             # Auto-detect language from extension
@@ -519,13 +533,13 @@ Rust (cargo check), Go (go build)."""
                     return ToolResult(
                         success=False,
                         output="",
-                        error=f"Could not detect language for extension: {ext}. Please specify 'language' parameter."
+                        error=f"Could not detect language for extension: {ext}. Please specify 'language' parameter.",
                     )
             elif not language:
                 return ToolResult(
                     success=False,
                     output="",
-                    error="Cannot auto-detect language for directory. Please specify 'language' parameter."
+                    error="Cannot auto-detect language for directory. Please specify 'language' parameter.",
                 )
 
             log.info("check_syntax", path=str(file_path), language=language)
@@ -543,17 +557,13 @@ Rust (cargo check), Go (go build)."""
                 return await self._check_go(file_path, work_dir)
             else:
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Unsupported language: {language}"
+                    success=False, output="", error=f"Unsupported language: {language}"
                 )
 
         except Exception as e:
             log.error("check_syntax_error", error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to check syntax: {str(e)}"
+                success=False, output="", error=f"Failed to check syntax: {str(e)}"
             )
 
     async def _check_python(self, file_path: Path) -> ToolResult:
@@ -574,29 +584,30 @@ Rust (cargo check), Go (go build)."""
                 ast.parse(source, filename=str(f))
                 checked_files.append(str(f))
             except SyntaxError as e:
-                errors.append({
-                    "file": str(f),
-                    "line": e.lineno,
-                    "column": e.offset,
-                    "message": e.msg
-                })
+                errors.append(
+                    {
+                        "file": str(f),
+                        "line": e.lineno,
+                        "column": e.offset,
+                        "message": e.msg,
+                    }
+                )
 
         if errors:
             error_msgs = [
-                f"{e['file']}:{e['line']}:{e['column']}: {e['message']}"
-                for e in errors
+                f"{e['file']}:{e['line']}:{e['column']}: {e['message']}" for e in errors
             ]
             return ToolResult(
                 success=False,
                 output="\n".join(error_msgs),
                 error=f"Syntax errors found in {len(errors)} location(s)",
-                metadata={"errors": errors, "checked_files": len(checked_files)}
+                metadata={"errors": errors, "checked_files": len(checked_files)},
             )
 
         return ToolResult(
             success=True,
             output=f"Syntax OK: {len(checked_files)} file(s) checked",
-            metadata={"checked_files": checked_files}
+            metadata={"checked_files": checked_files},
         )
 
     async def _check_javascript(self, file_path: Path) -> ToolResult:
@@ -609,7 +620,7 @@ Rust (cargo check), Go (go build)."""
                 proc = await asyncio.create_subprocess_shell(
                     f"node --check {f}",
                     stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE
+                    stderr=asyncio.subprocess.PIPE,
                 )
                 _, stderr = await proc.communicate()
                 if proc.returncode != 0:
@@ -619,34 +630,28 @@ Rust (cargo check), Go (go build)."""
                 return ToolResult(
                     success=False,
                     output="\n".join(errors),
-                    error=f"Syntax errors in {len(errors)} file(s)"
+                    error=f"Syntax errors in {len(errors)} file(s)",
                 )
             return ToolResult(
-                success=True,
-                output=f"Syntax OK: {len(files)} file(s) checked"
+                success=True, output=f"Syntax OK: {len(files)} file(s) checked"
             )
         else:
             proc = await asyncio.create_subprocess_shell(
                 f"node --check {file_path}",
                 stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                stderr=asyncio.subprocess.PIPE,
             )
             _, stderr = await proc.communicate()
 
             if proc.returncode != 0:
                 return ToolResult(
-                    success=False,
-                    output=stderr.decode(),
-                    error="Syntax error found"
+                    success=False, output=stderr.decode(), error="Syntax error found"
                 )
-            return ToolResult(
-                success=True,
-                output=f"Syntax OK: {file_path}"
-            )
+            return ToolResult(success=True, output=f"Syntax OK: {file_path}")
 
     async def _check_typescript(self, file_path: Path, work_dir: Path) -> ToolResult:
         """Check TypeScript syntax using tsc --noEmit."""
-        cmd = f"npx tsc --noEmit"
+        cmd = "npx tsc --noEmit"
         if file_path.is_file():
             cmd += f" {file_path}"
 
@@ -654,7 +659,7 @@ Rust (cargo check), Go (go build)."""
             cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=str(work_dir)
+            cwd=str(work_dir),
         )
         stdout, stderr = await proc.communicate()
         output = stdout.decode() + stderr.decode()
@@ -666,12 +671,9 @@ Rust (cargo check), Go (go build)."""
                 success=False,
                 output=output,
                 error=f"TypeScript errors: {error_count}",
-                metadata={"error_count": error_count}
+                metadata={"error_count": error_count},
             )
-        return ToolResult(
-            success=True,
-            output="TypeScript syntax OK"
-        )
+        return ToolResult(success=True, output="TypeScript syntax OK")
 
     async def _check_rust(self, work_dir: Path) -> ToolResult:
         """Check Rust syntax using cargo check."""
@@ -679,7 +681,7 @@ Rust (cargo check), Go (go build)."""
             "cargo check --message-format=short",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=str(work_dir)
+            cwd=str(work_dir),
         )
         stdout, stderr = await proc.communicate()
         output = stdout.decode() + stderr.decode()
@@ -690,12 +692,9 @@ Rust (cargo check), Go (go build)."""
                 success=False,
                 output=output,
                 error=f"Rust compilation errors: {error_count}",
-                metadata={"error_count": error_count}
+                metadata={"error_count": error_count},
             )
-        return ToolResult(
-            success=True,
-            output="Rust syntax OK"
-        )
+        return ToolResult(success=True, output="Rust syntax OK")
 
     async def _check_go(self, file_path: Path, work_dir: Path) -> ToolResult:
         """Check Go syntax using go build."""
@@ -708,18 +707,13 @@ Rust (cargo check), Go (go build)."""
             cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=str(work_dir)
+            cwd=str(work_dir),
         )
         stdout, stderr = await proc.communicate()
         output = stdout.decode() + stderr.decode()
 
         if proc.returncode != 0:
             return ToolResult(
-                success=False,
-                output=output,
-                error="Go compilation errors"
+                success=False, output=output, error="Go compilation errors"
             )
-        return ToolResult(
-            success=True,
-            output="Go syntax OK"
-        )
+        return ToolResult(success=True, output="Go syntax OK")

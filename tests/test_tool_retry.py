@@ -1,8 +1,6 @@
 """Tests for tool execution retry functionality."""
 
-import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock
 
 from sindri.tools.base import Tool, ToolResult
 from sindri.tools.registry import ToolRegistry, ToolRetryConfig
@@ -52,10 +50,7 @@ class TestToolRetryConfig:
     def test_custom_values(self):
         """Should accept custom values."""
         config = ToolRetryConfig(
-            max_attempts=5,
-            base_delay=1.0,
-            max_delay=10.0,
-            exponential_base=3.0
+            max_attempts=5, base_delay=1.0, max_delay=10.0, exponential_base=3.0
         )
         assert config.max_attempts == 5
         assert config.base_delay == 1.0
@@ -71,15 +66,13 @@ class TestToolRegistryRetry:
             max_attempts=3,
             base_delay=0.001,  # 1ms for fast tests
             max_delay=0.01,
-            exponential_base=2.0
+            exponential_base=2.0,
         )
 
     @pytest.mark.asyncio
     async def test_success_on_first_try(self, fast_retry_config):
         """Should return immediately on success."""
-        tool = MockTool(results=[
-            ToolResult(success=True, output="success")
-        ])
+        tool = MockTool(results=[ToolResult(success=True, output="success")])
         registry = ToolRegistry(retry_config=fast_retry_config)
         registry.register(tool)
 
@@ -93,9 +86,13 @@ class TestToolRegistryRetry:
     @pytest.mark.asyncio
     async def test_fatal_error_no_retry(self, fast_retry_config):
         """Should not retry on fatal errors."""
-        tool = MockTool(results=[
-            ToolResult(success=False, output="", error="File not found: missing.txt")
-        ])
+        tool = MockTool(
+            results=[
+                ToolResult(
+                    success=False, output="", error="File not found: missing.txt"
+                )
+            ]
+        )
         registry = ToolRegistry(retry_config=fast_retry_config)
         registry.register(tool)
 
@@ -109,11 +106,13 @@ class TestToolRegistryRetry:
     @pytest.mark.asyncio
     async def test_transient_error_retries(self, fast_retry_config):
         """Should retry on transient errors."""
-        tool = MockTool(results=[
-            ToolResult(success=False, output="", error="Connection refused"),
-            ToolResult(success=False, output="", error="Connection refused"),
-            ToolResult(success=True, output="success after retries")
-        ])
+        tool = MockTool(
+            results=[
+                ToolResult(success=False, output="", error="Connection refused"),
+                ToolResult(success=False, output="", error="Connection refused"),
+                ToolResult(success=True, output="success after retries"),
+            ]
+        )
         registry = ToolRegistry(retry_config=fast_retry_config)
         registry.register(tool)
 
@@ -127,11 +126,13 @@ class TestToolRegistryRetry:
     @pytest.mark.asyncio
     async def test_exhausted_retries(self, fast_retry_config):
         """Should return failure after exhausting retries."""
-        tool = MockTool(results=[
-            ToolResult(success=False, output="", error="Connection refused"),
-            ToolResult(success=False, output="", error="Connection refused"),
-            ToolResult(success=False, output="", error="Connection refused"),
-        ])
+        tool = MockTool(
+            results=[
+                ToolResult(success=False, output="", error="Connection refused"),
+                ToolResult(success=False, output="", error="Connection refused"),
+                ToolResult(success=False, output="", error="Connection refused"),
+            ]
+        )
         registry = ToolRegistry(retry_config=fast_retry_config)
         registry.register(tool)
 
@@ -145,9 +146,7 @@ class TestToolRegistryRetry:
     @pytest.mark.asyncio
     async def test_exception_fatal_no_retry(self, fast_retry_config):
         """Should not retry fatal exceptions."""
-        tool = MockTool(exceptions=[
-            FileNotFoundError("No such file")
-        ])
+        tool = MockTool(exceptions=[FileNotFoundError("No such file")])
         registry = ToolRegistry(retry_config=fast_retry_config)
         registry.register(tool)
 
@@ -160,14 +159,14 @@ class TestToolRegistryRetry:
     @pytest.mark.asyncio
     async def test_exception_transient_retries(self, fast_retry_config):
         """Should retry on transient exceptions."""
-        tool = MockTool(exceptions=[
-            ConnectionError("Connection failed"),
-            ConnectionError("Connection failed"),
-            None  # Success on third try
-        ], results=[
-            None, None,
-            ToolResult(success=True, output="recovered")
-        ])
+        tool = MockTool(
+            exceptions=[
+                ConnectionError("Connection failed"),
+                ConnectionError("Connection failed"),
+                None,  # Success on third try
+            ],
+            results=[None, None, ToolResult(success=True, output="recovered")],
+        )
         registry = ToolRegistry(retry_config=fast_retry_config)
         registry.register(tool)
 
@@ -204,10 +203,12 @@ class TestToolRegistryRetry:
     @pytest.mark.asyncio
     async def test_retry_count_tracking(self, fast_retry_config):
         """Should track number of retries attempted."""
-        tool = MockTool(results=[
-            ToolResult(success=False, output="", error="timeout"),
-            ToolResult(success=True, output="success")
-        ])
+        tool = MockTool(
+            results=[
+                ToolResult(success=False, output="", error="timeout"),
+                ToolResult(success=True, output="success"),
+            ]
+        )
         registry = ToolRegistry(retry_config=fast_retry_config)
         registry.register(tool)
 
@@ -219,9 +220,13 @@ class TestToolRegistryRetry:
     @pytest.mark.asyncio
     async def test_error_category_set(self, fast_retry_config):
         """Should set error category on failed results."""
-        tool = MockTool(results=[
-            ToolResult(success=False, output="", error="Permission denied: /etc/shadow")
-        ])
+        tool = MockTool(
+            results=[
+                ToolResult(
+                    success=False, output="", error="Permission denied: /etc/shadow"
+                )
+            ]
+        )
         registry = ToolRegistry(retry_config=fast_retry_config)
         registry.register(tool)
 
@@ -233,9 +238,11 @@ class TestToolRegistryRetry:
     @pytest.mark.asyncio
     async def test_suggestion_set(self, fast_retry_config):
         """Should set suggestion for known error patterns."""
-        tool = MockTool(results=[
-            ToolResult(success=False, output="", error="No such file: config.yaml")
-        ])
+        tool = MockTool(
+            results=[
+                ToolResult(success=False, output="", error="No such file: config.yaml")
+            ]
+        )
         registry = ToolRegistry(retry_config=fast_retry_config)
         registry.register(tool)
 

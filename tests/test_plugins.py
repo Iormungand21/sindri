@@ -3,22 +3,18 @@
 import pytest
 import tempfile
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
-from sindri.plugins.loader import PluginLoader, PluginInfo, PluginType
+from sindri.plugins.loader import PluginLoader, PluginType
 from sindri.plugins.validator import (
     PluginValidator,
-    ValidationResult,
     ValidationError,
-    validate_plugin_file,
 )
 from sindri.plugins.manager import (
     PluginManager,
     PluginState,
-    LoadedPlugin,
     load_plugins,
 )
-from sindri.tools.base import Tool, ToolResult
 from sindri.tools.registry import ToolRegistry
 from sindri.agents.definitions import AgentDefinition
 
@@ -117,7 +113,7 @@ class DangerousTool(Tool):
 @pytest.fixture
 def valid_agent_config(temp_agent_dir):
     """Create a valid agent TOML config."""
-    config = '''[metadata]
+    config = """[metadata]
 version = "1.0.0"
 author = "Test Author"
 
@@ -133,7 +129,7 @@ can_delegate = false
 
 [prompt]
 content = "You are Thor, the performance optimizer."
-'''
+"""
     config_path = temp_agent_dir / "thor.toml"
     config_path.write_text(config)
     return config_path
@@ -142,10 +138,10 @@ content = "You are Thor, the performance optimizer."
 @pytest.fixture
 def invalid_agent_config(temp_agent_dir):
     """Create an invalid agent config (missing required fields)."""
-    config = '''[agent]
+    config = """[agent]
 name = "incomplete"
 # Missing: role, model
-'''
+"""
     config_path = temp_agent_dir / "incomplete.toml"
     config_path.write_text(config)
     return config_path
@@ -167,28 +163,21 @@ class TestPluginLoader:
 
     def test_init_custom_dirs(self, temp_plugin_dir, temp_agent_dir):
         """Test loader with custom directories."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         assert loader.plugin_dir == temp_plugin_dir
         assert loader.agent_dir == temp_agent_dir
 
     def test_discover_empty_dirs(self, temp_plugin_dir, temp_agent_dir):
         """Test discovering with empty directories."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
         assert plugins == []
 
-    def test_discover_tool_plugin(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin):
+    def test_discover_tool_plugin(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin
+    ):
         """Test discovering a valid tool plugin."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         assert len(plugins) == 1
@@ -201,12 +190,11 @@ class TestPluginLoader:
         assert plugin.enabled is True
         assert plugin.tool_class is not None
 
-    def test_discover_agent_config(self, temp_plugin_dir, temp_agent_dir, valid_agent_config):
+    def test_discover_agent_config(
+        self, temp_plugin_dir, temp_agent_dir, valid_agent_config
+    ):
         """Test discovering a valid agent config."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         assert len(plugins) == 1
@@ -218,12 +206,11 @@ class TestPluginLoader:
         assert plugin.agent_config is not None
         assert plugin.agent_config["model"] == "qwen2.5-coder:7b"
 
-    def test_discover_syntax_error(self, temp_plugin_dir, temp_agent_dir, invalid_syntax_plugin):
+    def test_discover_syntax_error(
+        self, temp_plugin_dir, temp_agent_dir, invalid_syntax_plugin
+    ):
         """Test handling syntax errors in plugins."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         assert len(plugins) == 1
@@ -238,31 +225,26 @@ class TestPluginLoader:
         hidden_plugin = temp_plugin_dir / "_hidden.py"
         hidden_plugin.write_text("# hidden")
 
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
         assert plugins == []
 
-    def test_get_tools(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config):
+    def test_get_tools(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config
+    ):
         """Test get_tools filters correctly."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         loader.discover()
 
         tools = loader.get_tools()
         assert len(tools) == 1
         assert tools[0].type == PluginType.TOOL
 
-    def test_get_agents(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config):
+    def test_get_agents(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config
+    ):
         """Test get_agents filters correctly."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         loader.discover()
 
         agents = loader.get_agents()
@@ -273,7 +255,7 @@ class TestPluginLoader:
         """Test discovering from nonexistent directories."""
         loader = PluginLoader(
             plugin_dir=Path("/nonexistent/plugins"),
-            agent_dir=Path("/nonexistent/agents")
+            agent_dir=Path("/nonexistent/agents"),
         )
         plugins = loader.discover()
         assert plugins == []
@@ -287,12 +269,11 @@ class TestPluginLoader:
 class TestPluginValidator:
     """Tests for PluginValidator."""
 
-    def test_validate_valid_tool(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin):
+    def test_validate_valid_tool(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin
+    ):
         """Test validating a valid tool plugin."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         validator = PluginValidator()
@@ -301,12 +282,11 @@ class TestPluginValidator:
         assert result.valid is True
         assert len(result.errors) == 0
 
-    def test_validate_dangerous_imports(self, temp_plugin_dir, temp_agent_dir, dangerous_plugin):
+    def test_validate_dangerous_imports(
+        self, temp_plugin_dir, temp_agent_dir, dangerous_plugin
+    ):
         """Test detecting dangerous imports."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         validator = PluginValidator()
@@ -316,12 +296,11 @@ class TestPluginValidator:
         error_types = [e[0] for e in result.errors]
         assert ValidationError.SECURITY_VIOLATION in error_types
 
-    def test_validate_name_conflict_tool(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin):
+    def test_validate_name_conflict_tool(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin
+    ):
         """Test detecting tool name conflicts."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         validator = PluginValidator(existing_tools={"echo"})
@@ -331,12 +310,11 @@ class TestPluginValidator:
         error_types = [e[0] for e in result.errors]
         assert ValidationError.NAME_CONFLICT in error_types
 
-    def test_validate_name_conflict_agent(self, temp_plugin_dir, temp_agent_dir, valid_agent_config):
+    def test_validate_name_conflict_agent(
+        self, temp_plugin_dir, temp_agent_dir, valid_agent_config
+    ):
         """Test detecting agent name conflicts."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         validator = PluginValidator(existing_agents={"thor"})
@@ -346,12 +324,11 @@ class TestPluginValidator:
         error_types = [e[0] for e in result.errors]
         assert ValidationError.NAME_CONFLICT in error_types
 
-    def test_validate_missing_model_warning(self, temp_plugin_dir, temp_agent_dir, valid_agent_config):
+    def test_validate_missing_model_warning(
+        self, temp_plugin_dir, temp_agent_dir, valid_agent_config
+    ):
         """Test warning for unavailable model."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         validator = PluginValidator(available_models={"llama3.1:8b"})
@@ -361,12 +338,11 @@ class TestPluginValidator:
         assert len(result.warnings) > 0
         assert any("not in available models" in w for w in result.warnings)
 
-    def test_validate_invalid_agent_config(self, temp_plugin_dir, temp_agent_dir, invalid_agent_config):
+    def test_validate_invalid_agent_config(
+        self, temp_plugin_dir, temp_agent_dir, invalid_agent_config
+    ):
         """Test validating invalid agent config."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         assert len(plugins) == 1
@@ -374,16 +350,10 @@ class TestPluginValidator:
 
     def test_strict_mode(self, temp_plugin_dir, temp_agent_dir, valid_agent_config):
         """Test strict mode treats warnings as errors."""
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
-        validator = PluginValidator(
-            available_models={"different:model"},
-            strict=True
-        )
+        validator = PluginValidator(available_models={"different:model"}, strict=True)
         result = validator.validate(plugins[0])
 
         # Strict mode should fail due to model warning
@@ -403,10 +373,7 @@ class BadTool(Tool):
         plugin_path = temp_plugin_dir / "bad_tool.py"
         plugin_path.write_text(bad_tool_code)
 
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         validator = PluginValidator()
@@ -430,12 +397,11 @@ class TestPluginManager:
         assert manager.plugin_dir == Path.home() / ".sindri" / "plugins"
         assert manager.agent_dir == Path.home() / ".sindri" / "agents"
 
-    def test_discover_and_validate(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config):
+    def test_discover_and_validate(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config
+    ):
         """Test full discovery and validation flow."""
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
 
         # Discover
         discovered = manager.discover()
@@ -451,10 +417,7 @@ class TestPluginManager:
 
     def test_register_tools(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin):
         """Test registering tool plugins with ToolRegistry."""
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.discover()
         manager.validate_all()
 
@@ -466,10 +429,7 @@ class TestPluginManager:
 
     def test_register_agents(self, temp_plugin_dir, temp_agent_dir, valid_agent_config):
         """Test registering agent plugins with agent registry."""
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.discover()
         manager.validate_all()
 
@@ -481,12 +441,11 @@ class TestPluginManager:
         assert agents["thor"].model == "qwen2.5-coder:7b"
         assert agents["thor"].role == "Performance Optimizer"
 
-    def test_get_loaded_tools(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config):
+    def test_get_loaded_tools(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config
+    ):
         """Test get_loaded_tools returns correct plugins."""
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.discover()
         manager.validate_all()
 
@@ -498,12 +457,11 @@ class TestPluginManager:
         assert loaded[0].info.name == "echo"
         assert loaded[0].state == PluginState.LOADED
 
-    def test_get_loaded_agents(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config):
+    def test_get_loaded_agents(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config
+    ):
         """Test get_loaded_agents returns correct plugins."""
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.discover()
         manager.validate_all()
 
@@ -515,12 +473,11 @@ class TestPluginManager:
         assert loaded[0].info.name == "thor"
         assert loaded[0].state == PluginState.LOADED
 
-    def test_get_failed_plugins(self, temp_plugin_dir, temp_agent_dir, invalid_syntax_plugin):
+    def test_get_failed_plugins(
+        self, temp_plugin_dir, temp_agent_dir, invalid_syntax_plugin
+    ):
         """Test get_failed_plugins returns failed plugins."""
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.discover()
         manager.validate_all()
 
@@ -528,12 +485,11 @@ class TestPluginManager:
         assert len(failed) == 1
         assert failed[0].state == PluginState.FAILED
 
-    def test_get_plugin_count(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config):
+    def test_get_plugin_count(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config
+    ):
         """Test get_plugin_count returns correct counts."""
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.discover()
         manager.validate_all()
 
@@ -551,10 +507,7 @@ class TestPluginManager:
         if temp_agent_dir.exists():
             shutil.rmtree(temp_agent_dir)
 
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.ensure_directories()
 
         assert temp_plugin_dir.exists()
@@ -569,7 +522,9 @@ class TestPluginManager:
 class TestLoadPluginsFunction:
     """Tests for the load_plugins convenience function."""
 
-    def test_load_plugins_full_flow(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config):
+    def test_load_plugins_full_flow(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin, valid_agent_config
+    ):
         """Test full plugin loading flow."""
         registry = ToolRegistry.default()
         agents = {"brokkr": MagicMock(spec=AgentDefinition)}
@@ -578,7 +533,7 @@ class TestLoadPluginsFunction:
             tool_registry=registry,
             agents=agents,
             plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
+            agent_dir=temp_agent_dir,
         )
 
         # Check tools were registered
@@ -606,21 +561,18 @@ class TestPluginEdgeCases:
         prompt_file = temp_agent_dir / "custom_prompt.txt"
         prompt_file.write_text(prompt_content)
 
-        config = '''[agent]
+        config = """[agent]
 name = "custom"
 role = "Custom Agent"
 model = "llama3.1:8b"
 
 [prompt]
 file = "custom_prompt.txt"
-'''
+"""
         config_path = temp_agent_dir / "custom.toml"
         config_path.write_text(config)
 
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         assert len(plugins) == 1
@@ -628,7 +580,7 @@ file = "custom_prompt.txt"
 
     def test_plugin_with_delegation(self, temp_plugin_dir, temp_agent_dir):
         """Test agent config with delegation enabled."""
-        config = '''[agent]
+        config = """[agent]
 name = "delegator"
 role = "Delegating Agent"
 model = "qwen2.5-coder:14b"
@@ -638,14 +590,11 @@ delegate_to = ["huginn", "mimir"]
 
 [prompt]
 content = "You can delegate to other agents."
-'''
+"""
         config_path = temp_agent_dir / "delegator.toml"
         config_path.write_text(config)
 
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         assert plugins[0].agent_config["can_delegate"] is True
@@ -675,10 +624,7 @@ class SecondTool(Tool):
         plugin_path = temp_plugin_dir / "multi_tools.py"
         plugin_path.write_text(plugin_code)
 
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         assert len(plugins) == 1
@@ -701,10 +647,7 @@ class EvalTool(Tool):
         plugin_path = temp_plugin_dir / "eval_tool.py"
         plugin_path.write_text(plugin_code)
 
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         validator = PluginValidator()
@@ -732,10 +675,7 @@ class FileOpenTool(Tool):
         plugin_path = temp_plugin_dir / "file_open.py"
         plugin_path.write_text(plugin_code)
 
-        loader = PluginLoader(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        loader = PluginLoader(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         plugins = loader.discover()
 
         validator = PluginValidator()
@@ -756,12 +696,11 @@ class TestPluginToolExecution:
     """Tests for executing plugin tools."""
 
     @pytest.mark.asyncio
-    async def test_execute_plugin_tool(self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin):
+    async def test_execute_plugin_tool(
+        self, temp_plugin_dir, temp_agent_dir, valid_tool_plugin
+    ):
         """Test executing a loaded plugin tool."""
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.discover()
         manager.validate_all()
 
@@ -790,10 +729,7 @@ class ErrorTool(Tool):
         plugin_path = temp_plugin_dir / "error_tool.py"
         plugin_path.write_text(error_tool_code)
 
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.discover()
         manager.validate_all()
 
@@ -842,7 +778,9 @@ class TestPluginCLI:
             MockManager.return_value = mock_instance
 
             # Also patch the import in the function's namespace
-            with patch.dict("sys.modules", {"sindri.plugins": MagicMock(PluginManager=MockManager)}):
+            with patch.dict(
+                "sys.modules", {"sindri.plugins": MagicMock(PluginManager=MockManager)}
+            ):
                 result = runner.invoke(cli, ["plugins", "list"])
 
         # Just check it runs without error - actual output depends on real manager
@@ -857,10 +795,7 @@ class TestPluginCLI:
         runner = CliRunner()
 
         # Create a real manager with temp dirs
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.ensure_directories()
 
         with patch("sindri.plugins.PluginManager", return_value=manager):
@@ -878,10 +813,7 @@ class TestPluginCLI:
         runner = CliRunner()
 
         # Create a real manager with temp dirs
-        manager = PluginManager(
-            plugin_dir=temp_plugin_dir,
-            agent_dir=temp_agent_dir
-        )
+        manager = PluginManager(plugin_dir=temp_plugin_dir, agent_dir=temp_agent_dir)
         manager.ensure_directories()
 
         with patch("sindri.plugins.PluginManager", return_value=manager):

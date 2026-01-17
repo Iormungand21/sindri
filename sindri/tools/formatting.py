@@ -29,36 +29,56 @@ Can format a single file, directory, or inline code string."""
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to file or directory to format (mutually exclusive with 'code')"
+                "description": "Path to file or directory to format (mutually exclusive with 'code')",
             },
             "code": {
                 "type": "string",
-                "description": "Code string to format (mutually exclusive with 'path')"
+                "description": "Code string to format (mutually exclusive with 'path')",
             },
             "language": {
                 "type": "string",
                 "description": "Language to format as (auto-detected from extension if path provided)",
-                "enum": ["python", "javascript", "typescript", "rust", "go", "json", "yaml", "css", "html", "markdown"]
+                "enum": [
+                    "python",
+                    "javascript",
+                    "typescript",
+                    "rust",
+                    "go",
+                    "json",
+                    "yaml",
+                    "css",
+                    "html",
+                    "markdown",
+                ],
             },
             "formatter": {
                 "type": "string",
                 "description": "Specific formatter to use (auto-selected if not specified)",
-                "enum": ["black", "autopep8", "ruff", "prettier", "rustfmt", "gofmt", "json", "yamlfmt"]
+                "enum": [
+                    "black",
+                    "autopep8",
+                    "ruff",
+                    "prettier",
+                    "rustfmt",
+                    "gofmt",
+                    "json",
+                    "yamlfmt",
+                ],
             },
             "check_only": {
                 "type": "boolean",
-                "description": "Only check if formatting needed, don't modify (default: false)"
+                "description": "Only check if formatting needed, don't modify (default: false)",
             },
             "line_length": {
                 "type": "integer",
-                "description": "Maximum line length (default: 88 for Python, 80 for others)"
+                "description": "Maximum line length (default: 88 for Python, 80 for others)",
             },
             "indent_size": {
                 "type": "integer",
-                "description": "Indentation size in spaces (default: 4 for Python, 2 for JS/TS)"
-            }
+                "description": "Indentation size in spaces (default: 4 for Python, 2 for JS/TS)",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     # File extension to language mapping
@@ -82,7 +102,7 @@ Can format a single file, directory, or inline code string."""
         ".html": "html",
         ".htm": "html",
         ".md": "markdown",
-        ".markdown": "markdown"
+        ".markdown": "markdown",
     }
 
     # Default formatters per language
@@ -96,7 +116,7 @@ Can format a single file, directory, or inline code string."""
         "yaml": "prettier",
         "css": "prettier",
         "html": "prettier",
-        "markdown": "prettier"
+        "markdown": "prettier",
     }
 
     async def execute(
@@ -108,7 +128,7 @@ Can format a single file, directory, or inline code string."""
         check_only: bool = False,
         line_length: Optional[int] = None,
         indent_size: Optional[int] = None,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Format code using the appropriate formatter."""
         try:
@@ -117,14 +137,14 @@ Can format a single file, directory, or inline code string."""
                 return ToolResult(
                     success=False,
                     output="",
-                    error="Cannot specify both 'path' and 'code'. Use one or the other."
+                    error="Cannot specify both 'path' and 'code'. Use one or the other.",
                 )
 
             if not path and not code:
                 return ToolResult(
                     success=False,
                     output="",
-                    error="Must specify either 'path' or 'code' to format."
+                    error="Must specify either 'path' or 'code' to format.",
                 )
 
             work_dir = self.work_dir or Path.cwd()
@@ -135,7 +155,7 @@ Can format a single file, directory, or inline code string."""
                     return ToolResult(
                         success=False,
                         output="",
-                        error="Must specify 'language' when formatting inline code."
+                        error="Must specify 'language' when formatting inline code.",
                     )
                 return await self._format_inline(
                     code=code,
@@ -143,7 +163,7 @@ Can format a single file, directory, or inline code string."""
                     formatter=formatter,
                     line_length=line_length,
                     indent_size=indent_size,
-                    work_dir=work_dir
+                    work_dir=work_dir,
                 )
 
             # Handle file/directory formatting
@@ -151,9 +171,7 @@ Can format a single file, directory, or inline code string."""
 
             if not file_path.exists():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Path does not exist: {file_path}"
+                    success=False, output="", error=f"Path does not exist: {file_path}"
                 )
 
             # Auto-detect language from extension if not specified
@@ -164,14 +182,14 @@ Can format a single file, directory, or inline code string."""
                     return ToolResult(
                         success=False,
                         output="",
-                        error=f"Could not detect language for extension: {ext}. Please specify 'language' parameter."
+                        error=f"Could not detect language for extension: {ext}. Please specify 'language' parameter.",
                     )
 
             if not language:
                 return ToolResult(
                     success=False,
                     output="",
-                    error="Cannot auto-detect language for directory. Please specify 'language' parameter."
+                    error="Cannot auto-detect language for directory. Please specify 'language' parameter.",
                 )
 
             # Select formatter
@@ -181,10 +199,15 @@ Can format a single file, directory, or inline code string."""
                     return ToolResult(
                         success=False,
                         output="",
-                        error=f"No default formatter for language: {language}"
+                        error=f"No default formatter for language: {language}",
                     )
 
-            log.info("format_code", path=str(file_path), language=language, formatter=formatter)
+            log.info(
+                "format_code",
+                path=str(file_path),
+                language=language,
+                formatter=formatter,
+            )
 
             # Format based on formatter
             if formatter == "black":
@@ -194,7 +217,9 @@ Can format a single file, directory, or inline code string."""
             elif formatter == "ruff":
                 return await self._format_ruff(file_path, check_only, line_length)
             elif formatter == "prettier":
-                return await self._format_prettier(file_path, check_only, line_length, indent_size)
+                return await self._format_prettier(
+                    file_path, check_only, line_length, indent_size
+                )
             elif formatter == "rustfmt":
                 return await self._format_rustfmt(file_path, check_only)
             elif formatter == "gofmt":
@@ -205,17 +230,13 @@ Can format a single file, directory, or inline code string."""
                 return await self._format_yamlfmt(file_path, check_only)
             else:
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Unknown formatter: {formatter}"
+                    success=False, output="", error=f"Unknown formatter: {formatter}"
                 )
 
         except Exception as e:
             log.error("format_code_error", error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to format code: {str(e)}"
+                success=False, output="", error=f"Failed to format code: {str(e)}"
             )
 
     async def _format_inline(
@@ -225,7 +246,7 @@ Can format a single file, directory, or inline code string."""
         formatter: Optional[str],
         line_length: Optional[int],
         indent_size: Optional[int],
-        work_dir: Path
+        work_dir: Path,
     ) -> ToolResult:
         """Format inline code string."""
         if not formatter:
@@ -240,42 +261,40 @@ Can format a single file, directory, or inline code string."""
                 return ToolResult(
                     success=True,
                     output=formatted,
-                    metadata={"formatter": "json", "language": language}
+                    metadata={"formatter": "json", "language": language},
                 )
             except json.JSONDecodeError as e:
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Invalid JSON: {str(e)}"
+                    success=False, output="", error=f"Invalid JSON: {str(e)}"
                 )
 
         # For Python with black
         if language == "python" and formatter in ("black", None):
             try:
                 import black
+
                 mode = black.Mode(
                     line_length=line_length or 88,
                     string_normalization=True,
-                    is_pyi=False
+                    is_pyi=False,
                 )
                 formatted = black.format_str(code, mode=mode)
                 return ToolResult(
                     success=True,
                     output=formatted,
-                    metadata={"formatter": "black", "language": language}
+                    metadata={"formatter": "black", "language": language},
                 )
             except ImportError:
                 # Fall back to subprocess
                 pass
             except Exception as e:
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Black formatting failed: {str(e)}"
+                    success=False, output="", error=f"Black formatting failed: {str(e)}"
                 )
 
         # Use subprocess for other formatters
         import tempfile
+
         ext_map = {
             "python": ".py",
             "javascript": ".js",
@@ -286,11 +305,11 @@ Can format a single file, directory, or inline code string."""
             "yaml": ".yaml",
             "css": ".css",
             "html": ".html",
-            "markdown": ".md"
+            "markdown": ".md",
         }
         ext = ext_map.get(language, ".txt")
 
-        with tempfile.NamedTemporaryFile(mode='w', suffix=ext, delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode="w", suffix=ext, delete=False) as f:
             f.write(code)
             temp_path = Path(f.name)
 
@@ -303,7 +322,9 @@ Can format a single file, directory, or inline code string."""
             elif formatter == "ruff":
                 result = await self._format_ruff(temp_path, False, line_length)
             elif formatter == "prettier":
-                result = await self._format_prettier(temp_path, False, line_length, indent_size)
+                result = await self._format_prettier(
+                    temp_path, False, line_length, indent_size
+                )
             elif formatter == "rustfmt":
                 result = await self._format_rustfmt(temp_path, False)
             elif formatter == "gofmt":
@@ -312,7 +333,7 @@ Can format a single file, directory, or inline code string."""
                 return ToolResult(
                     success=False,
                     output="",
-                    error=f"Cannot format inline code with formatter: {formatter}"
+                    error=f"Cannot format inline code with formatter: {formatter}",
                 )
 
             if result.success:
@@ -321,17 +342,14 @@ Can format a single file, directory, or inline code string."""
                 return ToolResult(
                     success=True,
                     output=formatted,
-                    metadata={"formatter": formatter, "language": language}
+                    metadata={"formatter": formatter, "language": language},
                 )
             return result
         finally:
             temp_path.unlink(missing_ok=True)
 
     async def _format_black(
-        self,
-        file_path: Path,
-        check_only: bool,
-        line_length: Optional[int]
+        self, file_path: Path, check_only: bool, line_length: Optional[int]
     ) -> ToolResult:
         """Format Python code using black."""
         cmd_parts = ["python", "-m", "black"]
@@ -347,10 +365,7 @@ Can format a single file, directory, or inline code string."""
         return await self._run_formatter(cmd_parts, "black", file_path, check_only)
 
     async def _format_autopep8(
-        self,
-        file_path: Path,
-        check_only: bool,
-        line_length: Optional[int]
+        self, file_path: Path, check_only: bool, line_length: Optional[int]
     ) -> ToolResult:
         """Format Python code using autopep8."""
         cmd_parts = ["python", "-m", "autopep8"]
@@ -368,10 +383,7 @@ Can format a single file, directory, or inline code string."""
         return await self._run_formatter(cmd_parts, "autopep8", file_path, check_only)
 
     async def _format_ruff(
-        self,
-        file_path: Path,
-        check_only: bool,
-        line_length: Optional[int]
+        self, file_path: Path, check_only: bool, line_length: Optional[int]
     ) -> ToolResult:
         """Format Python code using ruff."""
         cmd_parts = ["ruff", "format"]
@@ -391,7 +403,7 @@ Can format a single file, directory, or inline code string."""
         file_path: Path,
         check_only: bool,
         line_length: Optional[int],
-        indent_size: Optional[int]
+        indent_size: Optional[int],
     ) -> ToolResult:
         """Format code using prettier."""
         cmd_parts = ["npx", "prettier"]
@@ -411,11 +423,7 @@ Can format a single file, directory, or inline code string."""
 
         return await self._run_formatter(cmd_parts, "prettier", file_path, check_only)
 
-    async def _format_rustfmt(
-        self,
-        file_path: Path,
-        check_only: bool
-    ) -> ToolResult:
+    async def _format_rustfmt(self, file_path: Path, check_only: bool) -> ToolResult:
         """Format Rust code using rustfmt."""
         cmd_parts = ["rustfmt"]
 
@@ -426,11 +434,7 @@ Can format a single file, directory, or inline code string."""
 
         return await self._run_formatter(cmd_parts, "rustfmt", file_path, check_only)
 
-    async def _format_gofmt(
-        self,
-        file_path: Path,
-        check_only: bool
-    ) -> ToolResult:
+    async def _format_gofmt(self, file_path: Path, check_only: bool) -> ToolResult:
         """Format Go code using gofmt."""
         if check_only:
             # gofmt -d shows diff
@@ -442,10 +446,7 @@ Can format a single file, directory, or inline code string."""
         return await self._run_formatter(cmd_parts, "gofmt", file_path, check_only)
 
     async def _format_json(
-        self,
-        file_path: Path,
-        check_only: bool,
-        indent_size: Optional[int]
+        self, file_path: Path, check_only: bool, indent_size: Optional[int]
     ) -> ToolResult:
         """Format JSON using built-in Python json module."""
         try:
@@ -458,30 +459,35 @@ Can format a single file, directory, or inline code string."""
                 needs_formatting = content != formatted
                 return ToolResult(
                     success=not needs_formatting,
-                    output="File would be reformatted" if needs_formatting else "File is properly formatted",
-                    metadata={"formatter": "json", "needs_formatting": needs_formatting}
+                    output=(
+                        "File would be reformatted"
+                        if needs_formatting
+                        else "File is properly formatted"
+                    ),
+                    metadata={
+                        "formatter": "json",
+                        "needs_formatting": needs_formatting,
+                    },
                 )
             else:
                 file_path.write_text(formatted)
                 changed = content != formatted
                 return ToolResult(
                     success=True,
-                    output=f"Formatted {file_path}" if changed else f"No changes needed for {file_path}",
-                    metadata={"formatter": "json", "changed": changed}
+                    output=(
+                        f"Formatted {file_path}"
+                        if changed
+                        else f"No changes needed for {file_path}"
+                    ),
+                    metadata={"formatter": "json", "changed": changed},
                 )
 
         except json.JSONDecodeError as e:
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Invalid JSON in {file_path}: {str(e)}"
+                success=False, output="", error=f"Invalid JSON in {file_path}: {str(e)}"
             )
 
-    async def _format_yamlfmt(
-        self,
-        file_path: Path,
-        check_only: bool
-    ) -> ToolResult:
+    async def _format_yamlfmt(self, file_path: Path, check_only: bool) -> ToolResult:
         """Format YAML using yamlfmt or prettier."""
         # Try yamlfmt first
         cmd_parts = ["yamlfmt"]
@@ -492,15 +498,19 @@ Can format a single file, directory, or inline code string."""
         proc = await asyncio.create_subprocess_shell(
             " ".join(cmd_parts),
             stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            stderr=asyncio.subprocess.PIPE,
         )
         stdout, stderr = await proc.communicate()
 
         if proc.returncode == 0:
             return ToolResult(
                 success=True,
-                output=f"Formatted {file_path}" if not check_only else "File is properly formatted",
-                metadata={"formatter": "yamlfmt"}
+                output=(
+                    f"Formatted {file_path}"
+                    if not check_only
+                    else "File is properly formatted"
+                ),
+                metadata={"formatter": "yamlfmt"},
             )
 
         # Fall back to prettier
@@ -511,15 +521,13 @@ Can format a single file, directory, or inline code string."""
         cmd_parts: list[str],
         formatter_name: str,
         file_path: Path,
-        check_only: bool
+        check_only: bool,
     ) -> ToolResult:
         """Run a formatter command and return results."""
         cmd = " ".join(cmd_parts)
 
         proc = await asyncio.create_subprocess_shell(
-            cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await proc.communicate()
 
@@ -533,14 +541,14 @@ Can format a single file, directory, or inline code string."""
                 return ToolResult(
                     success=True,
                     output="File is properly formatted",
-                    metadata={"formatter": formatter_name, "needs_formatting": False}
+                    metadata={"formatter": formatter_name, "needs_formatting": False},
                 )
             else:
                 return ToolResult(
                     success=False,
                     output=combined or "File needs formatting",
                     error="File needs formatting",
-                    metadata={"formatter": formatter_name, "needs_formatting": True}
+                    metadata={"formatter": formatter_name, "needs_formatting": True},
                 )
         else:
             # For format mode
@@ -548,14 +556,17 @@ Can format a single file, directory, or inline code string."""
                 return ToolResult(
                     success=True,
                     output=f"Formatted {file_path}",
-                    metadata={"formatter": formatter_name}
+                    metadata={"formatter": formatter_name},
                 )
             else:
                 return ToolResult(
                     success=False,
                     output=combined,
                     error=f"{formatter_name} failed: {combined}",
-                    metadata={"formatter": formatter_name, "returncode": proc.returncode}
+                    metadata={
+                        "formatter": formatter_name,
+                        "returncode": proc.returncode,
+                    },
                 )
 
 
@@ -573,24 +584,33 @@ Rust (clippy), Go (golint/staticcheck)."""
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to file or directory to lint"
+                "description": "Path to file or directory to lint",
             },
             "language": {
                 "type": "string",
                 "description": "Language to lint (auto-detected from extension if not specified)",
-                "enum": ["python", "javascript", "typescript", "rust", "go"]
+                "enum": ["python", "javascript", "typescript", "rust", "go"],
             },
             "linter": {
                 "type": "string",
                 "description": "Specific linter to use (auto-selected if not specified)",
-                "enum": ["ruff", "flake8", "pylint", "mypy", "eslint", "clippy", "golint", "staticcheck"]
+                "enum": [
+                    "ruff",
+                    "flake8",
+                    "pylint",
+                    "mypy",
+                    "eslint",
+                    "clippy",
+                    "golint",
+                    "staticcheck",
+                ],
             },
             "fix": {
                 "type": "boolean",
-                "description": "Automatically fix issues where possible (default: false)"
-            }
+                "description": "Automatically fix issues where possible (default: false)",
+            },
         },
-        "required": ["path"]
+        "required": ["path"],
     }
 
     EXTENSION_MAP = {
@@ -602,7 +622,7 @@ Rust (clippy), Go (golint/staticcheck)."""
         ".ts": "typescript",
         ".tsx": "typescript",
         ".rs": "rust",
-        ".go": "go"
+        ".go": "go",
     }
 
     DEFAULT_LINTERS = {
@@ -610,7 +630,7 @@ Rust (clippy), Go (golint/staticcheck)."""
         "javascript": "eslint",
         "typescript": "eslint",
         "rust": "clippy",
-        "go": "staticcheck"
+        "go": "staticcheck",
     }
 
     async def execute(
@@ -619,7 +639,7 @@ Rust (clippy), Go (golint/staticcheck)."""
         language: Optional[str] = None,
         linter: Optional[str] = None,
         fix: bool = False,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Run linter on the specified code."""
         try:
@@ -628,9 +648,7 @@ Rust (clippy), Go (golint/staticcheck)."""
 
             if not file_path.exists():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Path does not exist: {file_path}"
+                    success=False, output="", error=f"Path does not exist: {file_path}"
                 )
 
             # Auto-detect language
@@ -641,13 +659,13 @@ Rust (clippy), Go (golint/staticcheck)."""
                     return ToolResult(
                         success=False,
                         output="",
-                        error=f"Could not detect language for extension: {ext}"
+                        error=f"Could not detect language for extension: {ext}",
                     )
             elif not language:
                 return ToolResult(
                     success=False,
                     output="",
-                    error="Cannot auto-detect language for directory. Please specify 'language'."
+                    error="Cannot auto-detect language for directory. Please specify 'language'.",
                 )
 
             # Select linter
@@ -673,17 +691,13 @@ Rust (clippy), Go (golint/staticcheck)."""
                 return await self._lint_go(file_path, linter)
             else:
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Unknown linter: {linter}"
+                    success=False, output="", error=f"Unknown linter: {linter}"
                 )
 
         except Exception as e:
             log.error("lint_code_error", error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to lint code: {str(e)}"
+                success=False, output="", error=f"Failed to lint code: {str(e)}"
             )
 
     async def _lint_ruff(self, file_path: Path, fix: bool) -> ToolResult:
@@ -719,7 +733,9 @@ Rust (clippy), Go (golint/staticcheck)."""
 
         return await self._run_linter(cmd_parts, "eslint")
 
-    async def _lint_clippy(self, file_path: Path, fix: bool, work_dir: Path) -> ToolResult:
+    async def _lint_clippy(
+        self, file_path: Path, fix: bool, work_dir: Path
+    ) -> ToolResult:
         """Lint Rust code using clippy."""
         cmd_parts = ["cargo", "clippy"]
         if fix:
@@ -730,7 +746,7 @@ Rust (clippy), Go (golint/staticcheck)."""
             " ".join(cmd_parts),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
-            cwd=str(work_dir)
+            cwd=str(work_dir),
         )
         stdout, stderr = await proc.communicate()
         combined = stdout.decode() + stderr.decode()
@@ -743,13 +759,13 @@ Rust (clippy), Go (golint/staticcheck)."""
                 success=False,
                 output=combined,
                 error=f"Found {issues['errors']} error(s) and {issues['warnings']} warning(s)",
-                metadata={"linter": "clippy", **issues}
+                metadata={"linter": "clippy", **issues},
             )
 
         return ToolResult(
             success=True,
             output=combined or "No issues found",
-            metadata={"linter": "clippy", **issues}
+            metadata={"linter": "clippy", **issues},
         )
 
     async def _lint_go(self, file_path: Path, linter: str) -> ToolResult:
@@ -766,9 +782,7 @@ Rust (clippy), Go (golint/staticcheck)."""
         cmd = " ".join(cmd_parts)
 
         proc = await asyncio.create_subprocess_shell(
-            cmd,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE
+            cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
         )
         stdout, stderr = await proc.communicate()
 
@@ -783,21 +797,21 @@ Rust (clippy), Go (golint/staticcheck)."""
             return ToolResult(
                 success=True,
                 output="No issues found",
-                metadata={"linter": linter_name, **issues}
+                metadata={"linter": linter_name, **issues},
             )
         elif proc.returncode == 0:
             # Some linters return 0 even with warnings
             return ToolResult(
                 success=True,
                 output=combined,
-                metadata={"linter": linter_name, **issues}
+                metadata={"linter": linter_name, **issues},
             )
         else:
             return ToolResult(
                 success=False,
                 output=combined,
                 error=f"Found {issues['total']} issue(s)",
-                metadata={"linter": linter_name, **issues}
+                metadata={"linter": linter_name, **issues},
             )
 
     def _parse_lint_output(self, output: str, linter: str) -> dict:

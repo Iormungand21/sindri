@@ -69,7 +69,9 @@ class MarkdownExporter:
         # Footer
         lines.append("---")
         lines.append("")
-        lines.append(f"*Exported from Sindri on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*")
+        lines.append(
+            f"*Exported from Sindri on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*"
+        )
         lines.append("")
 
         return "\n".join(lines)
@@ -95,9 +97,13 @@ class MarkdownExporter:
             lines.append(f"- **Duration**: {duration}")
 
         # Timestamps
-        lines.append(f"- **Created**: {session.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+        lines.append(
+            f"- **Created**: {session.created_at.strftime('%Y-%m-%d %H:%M:%S')}"
+        )
         if session.completed_at:
-            lines.append(f"- **Completed**: {session.completed_at.strftime('%Y-%m-%d %H:%M:%S')}")
+            lines.append(
+                f"- **Completed**: {session.completed_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
 
         # Session ID (useful for debugging/resuming)
         lines.append(f"- **Session ID**: `{session.id}`")
@@ -142,9 +148,9 @@ class MarkdownExporter:
         for i, call in enumerate(tool_calls, 1):
             if isinstance(call, dict):
                 # Extract function info
-                func = call.get('function', call)
-                name = func.get('name', 'unknown')
-                args = func.get('arguments', {})
+                func = call.get("function", call)
+                name = func.get("name", "unknown")
+                args = func.get("arguments", {})
 
                 lines.append(f"**{i}. `{name}`**")
                 lines.append("")
@@ -219,7 +225,7 @@ class MarkdownExporter:
             "session_exported",
             session_id=session.id,
             path=str(path),
-            turns=len(session.turns)
+            turns=len(session.turns),
         )
 
         return path

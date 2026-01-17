@@ -5,7 +5,6 @@ Uses faster-whisper for efficient CPU/GPU inference.
 """
 
 import asyncio
-import io
 import os
 import tempfile
 from dataclasses import dataclass, field
@@ -22,11 +21,11 @@ log = structlog.get_logger()
 class WhisperModel(Enum):
     """Available Whisper model sizes."""
 
-    TINY = "tiny"           # ~39M params, fastest
-    BASE = "base"           # ~74M params
-    SMALL = "small"         # ~244M params
-    MEDIUM = "medium"       # ~769M params
-    LARGE = "large-v3"      # ~1.55B params, most accurate
+    TINY = "tiny"  # ~39M params, fastest
+    BASE = "base"  # ~74M params
+    SMALL = "small"  # ~244M params
+    MEDIUM = "medium"  # ~769M params
+    LARGE = "large-v3"  # ~1.55B params, most accurate
 
     @property
     def vram_mb(self) -> int:
@@ -63,9 +62,9 @@ class AudioConfig:
     """Configuration for audio capture."""
 
     sample_rate: int = 16000  # Whisper expects 16kHz
-    channels: int = 1         # Mono
+    channels: int = 1  # Mono
     chunk_duration_ms: int = 30  # Chunk size for streaming
-    vad_threshold: float = 0.5   # Voice activity detection threshold
+    vad_threshold: float = 0.5  # Voice activity detection threshold
     silence_duration_ms: int = 1500  # Silence before stopping
     max_duration_seconds: float = 30.0  # Maximum recording length
 
@@ -128,6 +127,7 @@ class SpeechToText:
             if device == "auto":
                 try:
                     import torch
+
                     device = "cuda" if torch.cuda.is_available() else "cpu"
                 except ImportError:
                     device = "cpu"
@@ -152,7 +152,7 @@ class SpeechToText:
                     self.model_size.value,
                     device=device,
                     compute_type=compute_type,
-                )
+                ),
             )
 
             log.info("whisper_model_loaded", model=self.model_size.value)
@@ -221,19 +221,25 @@ class SpeechToText:
 
             for segment in segments:
                 text_parts.append(segment.text)
-                segment_data.append({
-                    "start": segment.start,
-                    "end": segment.end,
-                    "text": segment.text,
-                    "confidence": segment.avg_logprob,
-                })
+                segment_data.append(
+                    {
+                        "start": segment.start,
+                        "end": segment.end,
+                        "text": segment.text,
+                        "confidence": segment.avg_logprob,
+                    }
+                )
 
             processing_time = (datetime.now() - start_time).total_seconds() * 1000
 
             return TranscriptionResult(
                 text=" ".join(text_parts).strip(),
                 language=info.language,
-                confidence=sum(s.avg_logprob for s in segments) / len(segments) if segments else 0,
+                confidence=(
+                    sum(s.avg_logprob for s in segments) / len(segments)
+                    if segments
+                    else 0
+                ),
                 duration_seconds=info.duration,
                 segments=segment_data,
                 processing_time_ms=processing_time,
@@ -265,6 +271,7 @@ class SpeechToText:
 
             # Write WAV header and data
             import wave
+
             with wave.open(f, "wb") as wav:
                 wav.setnchannels(1)
                 wav.setsampwidth(2)  # 16-bit
@@ -309,8 +316,7 @@ class SpeechToText:
 
         # Audio capture configuration
         chunk_size = int(
-            self._audio_config.sample_rate *
-            self._audio_config.chunk_duration_ms / 1000
+            self._audio_config.sample_rate * self._audio_config.chunk_duration_ms / 1000
         )
 
         audio = pyaudio.PyAudio()
@@ -333,12 +339,10 @@ class SpeechToText:
             frames = []
             silence_chunks = 0
             speech_detected = False
-            max_chunks = int(
-                max_duration * 1000 / self._audio_config.chunk_duration_ms
-            )
+            max_chunks = int(max_duration * 1000 / self._audio_config.chunk_duration_ms)
             silence_threshold_chunks = int(
-                self._audio_config.silence_duration_ms /
-                self._audio_config.chunk_duration_ms
+                self._audio_config.silence_duration_ms
+                / self._audio_config.chunk_duration_ms
             )
 
             for _ in range(max_chunks):
@@ -347,7 +351,8 @@ class SpeechToText:
 
                 # Simple energy-based VAD
                 import array
-                audio_array = array.array('h', data)
+
+                audio_array = array.array("h", data)
                 energy = sum(abs(x) for x in audio_array) / len(audio_array)
 
                 # Adaptive threshold

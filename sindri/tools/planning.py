@@ -7,7 +7,6 @@ Phase 7.3: Interactive Planning Mode
 """
 
 from dataclasses import dataclass, field
-from typing import Optional
 from sindri.tools.base import Tool, ToolResult
 
 
@@ -23,6 +22,7 @@ class PlanStep:
         dependencies: Step numbers this depends on (optional)
         tool_hints: Tools likely to be used (optional)
     """
+
     step_number: int
     description: str
     agent: str
@@ -38,7 +38,7 @@ class PlanStep:
             "agent": self.agent,
             "estimated_iterations": self.estimated_iterations,
             "dependencies": self.dependencies,
-            "tool_hints": self.tool_hints
+            "tool_hints": self.tool_hints,
         }
 
     @classmethod
@@ -50,7 +50,7 @@ class PlanStep:
             agent=data.get("agent", "huginn"),
             estimated_iterations=data.get("estimated_iterations", 5),
             dependencies=data.get("dependencies", []),
-            tool_hints=data.get("tool_hints", [])
+            tool_hints=data.get("tool_hints", []),
         )
 
 
@@ -65,6 +65,7 @@ class ExecutionPlan:
         rationale: Why this approach was chosen
         risks: Potential risks or challenges
     """
+
     task_summary: str
     steps: list[PlanStep]
     total_estimated_vram_gb: float = 0.0
@@ -78,7 +79,7 @@ class ExecutionPlan:
             "steps": [s.to_dict() for s in self.steps],
             "total_estimated_vram_gb": self.total_estimated_vram_gb,
             "rationale": self.rationale,
-            "risks": self.risks
+            "risks": self.risks,
         }
 
     @classmethod
@@ -90,7 +91,7 @@ class ExecutionPlan:
             steps=steps,
             total_estimated_vram_gb=data.get("total_estimated_vram_gb", 0.0),
             rationale=data.get("rationale", ""),
-            risks=data.get("risks", [])
+            risks=data.get("risks", []),
         )
 
     def format_display(self) -> str:
@@ -100,8 +101,14 @@ class ExecutionPlan:
         lines.append("")
 
         for step in self.steps:
-            deps = f" (after step {', '.join(map(str, step.dependencies))})" if step.dependencies else ""
-            lines.append(f"  {step.step_number}. [{step.agent}] {step.description}{deps}")
+            deps = (
+                f" (after step {', '.join(map(str, step.dependencies))})"
+                if step.dependencies
+                else ""
+            )
+            lines.append(
+                f"  {step.step_number}. [{step.agent}] {step.description}{deps}"
+            )
             if step.tool_hints:
                 lines.append(f"     Tools: {', '.join(step.tool_hints)}")
 
@@ -136,7 +143,7 @@ class ProposePlanTool(Tool):
         "properties": {
             "task_summary": {
                 "type": "string",
-                "description": "Brief summary of the overall task"
+                "description": "Brief summary of the overall task",
             },
             "steps": {
                 "type": "array",
@@ -145,39 +152,46 @@ class ProposePlanTool(Tool):
                     "properties": {
                         "description": {
                             "type": "string",
-                            "description": "What this step accomplishes"
+                            "description": "What this step accomplishes",
                         },
                         "agent": {
                             "type": "string",
-                            "enum": ["huginn", "mimir", "skald", "fenrir", "odin", "ratatoskr"],
-                            "description": "Agent to execute this step"
+                            "enum": [
+                                "huginn",
+                                "mimir",
+                                "skald",
+                                "fenrir",
+                                "odin",
+                                "ratatoskr",
+                            ],
+                            "description": "Agent to execute this step",
                         },
                         "dependencies": {
                             "type": "array",
                             "items": {"type": "integer"},
-                            "description": "Step numbers this depends on"
+                            "description": "Step numbers this depends on",
                         },
                         "tool_hints": {
                             "type": "array",
                             "items": {"type": "string"},
-                            "description": "Tools likely to be used"
-                        }
+                            "description": "Tools likely to be used",
+                        },
                     },
-                    "required": ["description", "agent"]
+                    "required": ["description", "agent"],
                 },
-                "description": "List of steps in the plan"
+                "description": "List of steps in the plan",
             },
             "rationale": {
                 "type": "string",
-                "description": "Why this approach was chosen"
+                "description": "Why this approach was chosen",
             },
             "risks": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Potential risks or challenges"
-            }
+                "description": "Potential risks or challenges",
+            },
         },
-        "required": ["task_summary", "steps"]
+        "required": ["task_summary", "steps"],
     }
 
     # Agent VRAM estimates (from agent registry)
@@ -188,7 +202,7 @@ class ProposePlanTool(Tool):
         "skald": 5.0,
         "fenrir": 5.0,
         "odin": 9.0,
-        "ratatoskr": 3.0
+        "ratatoskr": 3.0,
     }
 
     async def execute(
@@ -196,7 +210,7 @@ class ProposePlanTool(Tool):
         task_summary: str,
         steps: list[dict],
         rationale: str = "",
-        risks: list[str] = None
+        risks: list[str] = None,
     ) -> ToolResult:
         """Create an execution plan.
 
@@ -214,28 +228,26 @@ class ProposePlanTool(Tool):
         # Build plan steps
         plan_steps = []
         for i, step_data in enumerate(steps, 1):
-            plan_steps.append(PlanStep(
-                step_number=i,
-                description=step_data.get("description", ""),
-                agent=step_data.get("agent", "huginn"),
-                estimated_iterations=step_data.get("estimated_iterations", 5),
-                dependencies=step_data.get("dependencies", []),
-                tool_hints=step_data.get("tool_hints", [])
-            ))
+            plan_steps.append(
+                PlanStep(
+                    step_number=i,
+                    description=step_data.get("description", ""),
+                    agent=step_data.get("agent", "huginn"),
+                    estimated_iterations=step_data.get("estimated_iterations", 5),
+                    dependencies=step_data.get("dependencies", []),
+                    tool_hints=step_data.get("tool_hints", []),
+                )
+            )
 
         # Calculate peak VRAM (max of concurrent steps)
         # For simplicity, assume max 2 agents run in parallel
         agents_used = set(s.agent for s in plan_steps)
-        max_vram = max(
-            (self.AGENT_VRAM.get(a, 5.0) for a in agents_used),
-            default=0.0
-        )
+        max_vram = max((self.AGENT_VRAM.get(a, 5.0) for a in agents_used), default=0.0)
 
         # If multiple agents, might run 2 in parallel
         if len(agents_used) > 1:
             agent_vrams = sorted(
-                [self.AGENT_VRAM.get(a, 5.0) for a in agents_used],
-                reverse=True
+                [self.AGENT_VRAM.get(a, 5.0) for a in agents_used], reverse=True
             )
             # Top 2 might run together
             max_vram = sum(agent_vrams[:2])
@@ -246,7 +258,7 @@ class ProposePlanTool(Tool):
             steps=plan_steps,
             total_estimated_vram_gb=max_vram,
             rationale=rationale,
-            risks=risks
+            risks=risks,
         )
 
         # Format output
@@ -259,6 +271,6 @@ class ProposePlanTool(Tool):
                 "plan": plan.to_dict(),
                 "step_count": len(plan_steps),
                 "agents": list(agents_used),
-                "estimated_vram_gb": max_vram
-            }
+                "estimated_vram_gb": max_vram,
+            },
         )

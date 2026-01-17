@@ -2,7 +2,6 @@
 
 import pytest
 import json
-from pathlib import Path
 
 from sindri.tools.api_spec import (
     GenerateApiSpecTool,
@@ -23,11 +22,13 @@ class TestFrameworkDetection:
     def test_detect_fastapi_from_pyproject(self, tool, tmp_path):
         """Test FastAPI detection from pyproject.toml."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text("""
+        pyproject.write_text(
+            """
 [project]
 name = "myapi"
 dependencies = ["fastapi", "uvicorn"]
-""")
+"""
+        )
 
         info = tool._detect_framework(tmp_path)
         assert info.framework == "fastapi"
@@ -45,11 +46,13 @@ dependencies = ["fastapi", "uvicorn"]
     def test_detect_flask_from_pyproject(self, tool, tmp_path):
         """Test Flask detection from pyproject.toml."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text("""
+        pyproject.write_text(
+            """
 [project]
 name = "myapi"
 dependencies = ["flask"]
-""")
+"""
+        )
 
         info = tool._detect_framework(tmp_path)
         assert info.framework == "flask"
@@ -76,12 +79,9 @@ dependencies = ["flask"]
     def test_detect_express_from_package_json(self, tool, tmp_path):
         """Test Express.js detection from package.json."""
         package_json = tmp_path / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "myapi",
-            "dependencies": {
-                "express": "^4.18.0"
-            }
-        }))
+        package_json.write_text(
+            json.dumps({"name": "myapi", "dependencies": {"express": "^4.18.0"}})
+        )
 
         info = tool._detect_framework(tmp_path)
         assert info.framework == "express"
@@ -90,15 +90,15 @@ dependencies = ["flask"]
     def test_detect_express_typescript(self, tool, tmp_path):
         """Test Express.js with TypeScript detection."""
         package_json = tmp_path / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "myapi",
-            "dependencies": {
-                "express": "^4.18.0"
-            },
-            "devDependencies": {
-                "typescript": "^5.0.0"
-            }
-        }))
+        package_json.write_text(
+            json.dumps(
+                {
+                    "name": "myapi",
+                    "dependencies": {"express": "^4.18.0"},
+                    "devDependencies": {"typescript": "^5.0.0"},
+                }
+            )
+        )
 
         info = tool._detect_framework(tmp_path)
         assert info.framework == "express"
@@ -107,13 +107,15 @@ dependencies = ["flask"]
     def test_detect_gin_from_go_mod(self, tool, tmp_path):
         """Test Gin (Go) detection from go.mod."""
         go_mod = tmp_path / "go.mod"
-        go_mod.write_text("""
+        go_mod.write_text(
+            """
 module myapi
 
 go 1.21
 
 require github.com/gin-gonic/gin v1.9.0
-""")
+"""
+        )
 
         info = tool._detect_framework(tmp_path)
         assert info.framework == "gin"
@@ -122,13 +124,15 @@ require github.com/gin-gonic/gin v1.9.0
     def test_detect_echo_from_go_mod(self, tool, tmp_path):
         """Test Echo (Go) detection from go.mod."""
         go_mod = tmp_path / "go.mod"
-        go_mod.write_text("""
+        go_mod.write_text(
+            """
 module myapi
 
 go 1.21
 
 require github.com/labstack/echo/v4 v4.11.0
-""")
+"""
+        )
 
         info = tool._detect_framework(tmp_path)
         assert info.framework == "echo"
@@ -137,13 +141,15 @@ require github.com/labstack/echo/v4 v4.11.0
     def test_detect_actix_from_cargo_toml(self, tool, tmp_path):
         """Test Actix (Rust) detection from Cargo.toml."""
         cargo_toml = tmp_path / "Cargo.toml"
-        cargo_toml.write_text("""
+        cargo_toml.write_text(
+            """
 [package]
 name = "myapi"
 
 [dependencies]
 actix-web = "4.0"
-""")
+"""
+        )
 
         info = tool._detect_framework(tmp_path)
         assert info.framework == "actix"
@@ -152,7 +158,8 @@ actix-web = "4.0"
     def test_detect_fastapi_from_source(self, tool, tmp_path):
         """Test FastAPI detection from source code."""
         main_py = tmp_path / "main.py"
-        main_py.write_text("""
+        main_py.write_text(
+            """
 from fastapi import FastAPI
 
 app = FastAPI()
@@ -160,7 +167,8 @@ app = FastAPI()
 @app.get("/health")
 def health():
     return {"status": "ok"}
-""")
+"""
+        )
 
         info = tool._detect_framework(tmp_path)
         assert info.framework == "fastapi"
@@ -170,7 +178,8 @@ def health():
     def test_detect_flask_from_source(self, tool, tmp_path):
         """Test Flask detection from source code."""
         app_py = tmp_path / "app.py"
-        app_py.write_text("""
+        app_py.write_text(
+            """
 from flask import Flask
 
 app = Flask(__name__)
@@ -178,7 +187,8 @@ app = Flask(__name__)
 @app.route("/")
 def index():
     return "Hello"
-""")
+"""
+        )
 
         info = tool._detect_framework(tmp_path)
         assert info.framework == "flask"
@@ -202,7 +212,8 @@ class TestRouteExtraction:
     def test_extract_fastapi_routes(self, tool, tmp_path):
         """Test FastAPI route extraction."""
         main_py = tmp_path / "main.py"
-        main_py.write_text("""
+        main_py.write_text(
+            """
 from fastapi import FastAPI
 
 app = FastAPI()
@@ -222,7 +233,8 @@ def get_user(user_id: int):
 @app.delete("/users/{user_id}")
 def delete_user(user_id: int):
     pass
-""")
+"""
+        )
 
         fw_info = FrameworkInfo(framework="fastapi", language="python")
         routes = tool._extract_routes(tmp_path, fw_info, None, None)
@@ -238,7 +250,8 @@ def delete_user(user_id: int):
     def test_extract_fastapi_router_routes(self, tool, tmp_path):
         """Test FastAPI APIRouter route extraction."""
         routes_py = tmp_path / "routes.py"
-        routes_py.write_text("""
+        routes_py.write_text(
+            """
 from fastapi import APIRouter
 
 router = APIRouter()
@@ -254,7 +267,8 @@ def create_item():
 @router.put("/items/{item_id}")
 def update_item(item_id: int):
     pass
-""")
+"""
+        )
 
         fw_info = FrameworkInfo(framework="fastapi", language="python")
         routes = tool._extract_routes(tmp_path, fw_info, None, None)
@@ -268,7 +282,8 @@ def update_item(item_id: int):
     def test_extract_flask_routes(self, tool, tmp_path):
         """Test Flask route extraction."""
         app_py = tmp_path / "app.py"
-        app_py.write_text("""
+        app_py.write_text(
+            """
 from flask import Flask
 
 app = Flask(__name__)
@@ -284,7 +299,8 @@ def users():
 @app.route("/users/<int:user_id>")
 def get_user(user_id):
     return {"id": user_id}
-""")
+"""
+        )
 
         fw_info = FrameworkInfo(framework="flask", language="python")
         routes = tool._extract_routes(tmp_path, fw_info, None, None)
@@ -299,7 +315,8 @@ def get_user(user_id):
     def test_extract_flask_blueprint_routes(self, tool, tmp_path):
         """Test Flask Blueprint route extraction."""
         bp_py = tmp_path / "blueprints.py"
-        bp_py.write_text("""
+        bp_py.write_text(
+            """
 from flask import Blueprint
 
 api = Blueprint('api', __name__)
@@ -311,7 +328,8 @@ def health():
 @api.route("/items", methods=["GET"])
 def list_items():
     return []
-""")
+"""
+        )
 
         fw_info = FrameworkInfo(framework="flask", language="python")
         routes = tool._extract_routes(tmp_path, fw_info, None, None)
@@ -324,7 +342,8 @@ def list_items():
     def test_extract_django_routes(self, tool, tmp_path):
         """Test Django route extraction."""
         urls_py = tmp_path / "urls.py"
-        urls_py.write_text("""
+        urls_py.write_text(
+            """
 from django.urls import path
 from . import views
 
@@ -334,7 +353,8 @@ urlpatterns = [
     path('users/<int:pk>/', views.user_detail, name='user_detail'),
     path('items/<slug:slug>/', views.item_detail, name='item_detail'),
 ]
-""")
+"""
+        )
 
         fw_info = FrameworkInfo(framework="django", language="python")
         routes = tool._extract_routes(tmp_path, fw_info, None, None)
@@ -347,7 +367,8 @@ urlpatterns = [
     def test_extract_express_routes(self, tool, tmp_path):
         """Test Express.js route extraction."""
         routes_js = tmp_path / "routes.js"
-        routes_js.write_text("""
+        routes_js.write_text(
+            """
 const express = require('express');
 const router = express.Router();
 
@@ -368,7 +389,8 @@ app.delete('/users/:userId', (req, res) => {
 });
 
 module.exports = router;
-""")
+"""
+        )
 
         fw_info = FrameworkInfo(framework="express", language="javascript")
         routes = tool._extract_routes(tmp_path, fw_info, None, None)
@@ -382,7 +404,8 @@ module.exports = router;
     def test_extract_express_typescript_routes(self, tool, tmp_path):
         """Test Express.js TypeScript route extraction."""
         routes_ts = tmp_path / "routes.ts"
-        routes_ts.write_text("""
+        routes_ts.write_text(
+            """
 import { Router, Request, Response } from 'express';
 
 const router = Router();
@@ -400,7 +423,8 @@ router.patch('/items/:id', (req: Request, res: Response) => {
 });
 
 export default router;
-""")
+"""
+        )
 
         fw_info = FrameworkInfo(framework="express", language="typescript")
         routes = tool._extract_routes(tmp_path, fw_info, None, None)
@@ -414,7 +438,8 @@ export default router;
     def test_extract_gin_routes(self, tool, tmp_path):
         """Test Gin (Go) route extraction."""
         main_go = tmp_path / "main.go"
-        main_go.write_text("""
+        main_go.write_text(
+            """
 package main
 
 import "github.com/gin-gonic/gin"
@@ -428,7 +453,8 @@ func main() {
     r.PUT("/users/:id", updateUser)
     r.DELETE("/users/:id", deleteUser)
 }
-""")
+"""
+        )
 
         fw_info = FrameworkInfo(framework="gin", language="go")
         routes = tool._extract_routes(tmp_path, fw_info, None, None)
@@ -443,7 +469,8 @@ func main() {
     def test_extract_echo_routes(self, tool, tmp_path):
         """Test Echo (Go) route extraction."""
         main_go = tmp_path / "main.go"
-        main_go.write_text("""
+        main_go.write_text(
+            """
 package main
 
 import "github.com/labstack/echo/v4"
@@ -456,7 +483,8 @@ func main() {
     e.POST("/users", createUser)
     e.PUT("/users/:id", updateUser)
 }
-""")
+"""
+        )
 
         fw_info = FrameworkInfo(framework="echo", language="go")
         routes = tool._extract_routes(tmp_path, fw_info, None, None)
@@ -544,7 +572,7 @@ class TestOpenAPIGeneration:
             version="1.0.0",
             description="Test description",
             servers=None,
-            framework_info=fw_info
+            framework_info=fw_info,
         )
 
         assert spec["openapi"] == "3.0.3"
@@ -562,12 +590,14 @@ class TestOpenAPIGeneration:
                 path="/users/{user_id}",
                 method="GET",
                 handler="get_user",
-                parameters=[{
-                    "name": "user_id",
-                    "in": "path",
-                    "required": True,
-                    "schema": {"type": "integer"}
-                }]
+                parameters=[
+                    {
+                        "name": "user_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "integer"},
+                    }
+                ],
             ),
         ]
         fw_info = FrameworkInfo(framework="fastapi", language="python")
@@ -578,7 +608,7 @@ class TestOpenAPIGeneration:
             version="1.0.0",
             description=None,
             servers=None,
-            framework_info=fw_info
+            framework_info=fw_info,
         )
 
         assert "/users/{user_id}" in spec["paths"]
@@ -598,7 +628,7 @@ class TestOpenAPIGeneration:
             version="1.0.0",
             description=None,
             servers=["https://api.example.com", "http://localhost:8000"],
-            framework_info=fw_info
+            framework_info=fw_info,
         )
 
         assert len(spec["servers"]) == 2
@@ -620,7 +650,7 @@ class TestOpenAPIGeneration:
             version="1.0.0",
             description=None,
             servers=None,
-            framework_info=fw_info
+            framework_info=fw_info,
         )
 
         assert "requestBody" in spec["paths"]["/users"]["post"]
@@ -651,7 +681,8 @@ class TestGenerateApiSpecTool:
         """Test executing tool on a FastAPI project."""
         # Create a FastAPI project structure
         main_py = tmp_path / "main.py"
-        main_py.write_text("""
+        main_py.write_text(
+            """
 from fastapi import FastAPI
 
 app = FastAPI()
@@ -671,15 +702,14 @@ def create_user():
 @app.get("/users/{user_id}")
 def get_user(user_id: int):
     return {"id": user_id}
-""")
+"""
+        )
 
         requirements = tmp_path / "requirements.txt"
         requirements.write_text("fastapi\nuvicorn\n")
 
         result = await tool.execute(
-            path=str(tmp_path),
-            title="Test FastAPI",
-            dry_run=True
+            path=str(tmp_path), title="Test FastAPI", dry_run=True
         )
 
         assert result.success
@@ -691,7 +721,8 @@ def get_user(user_id: int):
     async def test_execute_flask_project(self, tool, tmp_path):
         """Test executing tool on a Flask project."""
         app_py = tmp_path / "app.py"
-        app_py.write_text("""
+        app_py.write_text(
+            """
 from flask import Flask
 
 app = Flask(__name__)
@@ -703,15 +734,13 @@ def index():
 @app.route("/api/users", methods=["GET", "POST"])
 def users():
     return []
-""")
+"""
+        )
 
         requirements = tmp_path / "requirements.txt"
         requirements.write_text("flask\n")
 
-        result = await tool.execute(
-            path=str(tmp_path),
-            dry_run=True
-        )
+        result = await tool.execute(path=str(tmp_path), dry_run=True)
 
         assert result.success
         assert result.metadata["framework"] == "flask"
@@ -721,13 +750,13 @@ def users():
     async def test_execute_express_project(self, tool, tmp_path):
         """Test executing tool on an Express project."""
         package_json = tmp_path / "package.json"
-        package_json.write_text(json.dumps({
-            "name": "test-api",
-            "dependencies": {"express": "^4.18.0"}
-        }))
+        package_json.write_text(
+            json.dumps({"name": "test-api", "dependencies": {"express": "^4.18.0"}})
+        )
 
         routes_js = tmp_path / "routes.js"
-        routes_js.write_text("""
+        routes_js.write_text(
+            """
 const express = require('express');
 const router = express.Router();
 
@@ -736,12 +765,10 @@ router.post('/items', (req, res) => res.json({id: 1}));
 router.get('/items/:id', (req, res) => res.json({id: req.params.id}));
 
 module.exports = router;
-""")
-
-        result = await tool.execute(
-            path=str(tmp_path),
-            dry_run=True
+"""
         )
+
+        result = await tool.execute(path=str(tmp_path), dry_run=True)
 
         assert result.success
         assert result.metadata["framework"] == "express"
@@ -751,22 +778,22 @@ module.exports = router;
     async def test_execute_with_output_file(self, tool, tmp_path):
         """Test executing tool and writing output file."""
         main_py = tmp_path / "main.py"
-        main_py.write_text("""
+        main_py.write_text(
+            """
 from fastapi import FastAPI
 app = FastAPI()
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
-""")
+"""
+        )
 
         requirements = tmp_path / "requirements.txt"
         requirements.write_text("fastapi\n")
 
         result = await tool.execute(
-            path=str(tmp_path),
-            output="api.json",
-            dry_run=False
+            path=str(tmp_path), output="api.json", dry_run=False
         )
 
         assert result.success
@@ -780,23 +807,21 @@ def health():
     async def test_execute_yaml_output(self, tool, tmp_path):
         """Test executing tool with YAML output."""
         main_py = tmp_path / "main.py"
-        main_py.write_text("""
+        main_py.write_text(
+            """
 from fastapi import FastAPI
 app = FastAPI()
 
 @app.get("/test")
 def test():
     return {}
-""")
+"""
+        )
 
         requirements = tmp_path / "requirements.txt"
         requirements.write_text("fastapi\n")
 
-        result = await tool.execute(
-            path=str(tmp_path),
-            format="yaml",
-            dry_run=True
-        )
+        result = await tool.execute(path=str(tmp_path), format="yaml", dry_run=True)
 
         assert result.success
         # YAML output should contain openapi version
@@ -841,20 +866,18 @@ def test():
     async def test_execute_with_framework_override(self, tool, tmp_path):
         """Test framework override."""
         app_py = tmp_path / "app.py"
-        app_py.write_text("""
+        app_py.write_text(
+            """
 from flask import Flask
 app = Flask(__name__)
 
 @app.route("/test")
 def test():
     return "test"
-""")
-
-        result = await tool.execute(
-            path=str(tmp_path),
-            framework="flask",
-            dry_run=True
+"""
         )
+
+        result = await tool.execute(path=str(tmp_path), framework="flask", dry_run=True)
 
         assert result.success
         assert result.metadata["framework"] == "flask"
@@ -872,24 +895,19 @@ class TestValidateApiSpecTool:
     async def test_validate_valid_spec(self, tool, tmp_path):
         """Test validation of a valid OpenAPI spec."""
         spec_file = tmp_path / "openapi.json"
-        spec_file.write_text(json.dumps({
-            "openapi": "3.0.3",
-            "info": {
-                "title": "Test API",
-                "version": "1.0.0"
-            },
-            "paths": {
-                "/users": {
-                    "get": {
-                        "responses": {
-                            "200": {
-                                "description": "Success"
-                            }
+        spec_file.write_text(
+            json.dumps(
+                {
+                    "openapi": "3.0.3",
+                    "info": {"title": "Test API", "version": "1.0.0"},
+                    "paths": {
+                        "/users": {
+                            "get": {"responses": {"200": {"description": "Success"}}}
                         }
-                    }
+                    },
                 }
-            }
-        }))
+            )
+        )
 
         result = await tool.execute(file_path=str(spec_file))
 
@@ -900,13 +918,9 @@ class TestValidateApiSpecTool:
     async def test_validate_missing_openapi_field(self, tool, tmp_path):
         """Test validation error for missing openapi field."""
         spec_file = tmp_path / "openapi.json"
-        spec_file.write_text(json.dumps({
-            "info": {
-                "title": "Test API",
-                "version": "1.0.0"
-            },
-            "paths": {}
-        }))
+        spec_file.write_text(
+            json.dumps({"info": {"title": "Test API", "version": "1.0.0"}, "paths": {}})
+        )
 
         result = await tool.execute(file_path=str(spec_file))
 
@@ -917,10 +931,7 @@ class TestValidateApiSpecTool:
     async def test_validate_missing_info(self, tool, tmp_path):
         """Test validation error for missing info field."""
         spec_file = tmp_path / "openapi.json"
-        spec_file.write_text(json.dumps({
-            "openapi": "3.0.3",
-            "paths": {}
-        }))
+        spec_file.write_text(json.dumps({"openapi": "3.0.3", "paths": {}}))
 
         result = await tool.execute(file_path=str(spec_file))
 
@@ -931,13 +942,11 @@ class TestValidateApiSpecTool:
     async def test_validate_missing_paths(self, tool, tmp_path):
         """Test validation error for missing paths field."""
         spec_file = tmp_path / "openapi.json"
-        spec_file.write_text(json.dumps({
-            "openapi": "3.0.3",
-            "info": {
-                "title": "Test API",
-                "version": "1.0.0"
-            }
-        }))
+        spec_file.write_text(
+            json.dumps(
+                {"openapi": "3.0.3", "info": {"title": "Test API", "version": "1.0.0"}}
+            )
+        )
 
         result = await tool.execute(file_path=str(spec_file))
 
@@ -958,20 +967,21 @@ class TestValidateApiSpecTool:
     async def test_validate_invalid_http_method(self, tool, tmp_path):
         """Test validation error for invalid HTTP method."""
         spec_file = tmp_path / "openapi.json"
-        spec_file.write_text(json.dumps({
-            "openapi": "3.0.3",
-            "info": {
-                "title": "Test API",
-                "version": "1.0.0"
-            },
-            "paths": {
-                "/users": {
-                    "invalid_method": {
-                        "responses": {"200": {"description": "OK"}}
-                    }
+        spec_file.write_text(
+            json.dumps(
+                {
+                    "openapi": "3.0.3",
+                    "info": {"title": "Test API", "version": "1.0.0"},
+                    "paths": {
+                        "/users": {
+                            "invalid_method": {
+                                "responses": {"200": {"description": "OK"}}
+                            }
+                        }
+                    },
                 }
-            }
-        }))
+            )
+        )
 
         result = await tool.execute(file_path=str(spec_file))
 
@@ -982,20 +992,15 @@ class TestValidateApiSpecTool:
     async def test_validate_missing_responses(self, tool, tmp_path):
         """Test validation warning for missing responses."""
         spec_file = tmp_path / "openapi.json"
-        spec_file.write_text(json.dumps({
-            "openapi": "3.0.3",
-            "info": {
-                "title": "Test API",
-                "version": "1.0.0"
-            },
-            "paths": {
-                "/users": {
-                    "get": {
-                        "operationId": "listUsers"
-                    }
+        spec_file.write_text(
+            json.dumps(
+                {
+                    "openapi": "3.0.3",
+                    "info": {"title": "Test API", "version": "1.0.0"},
+                    "paths": {"/users": {"get": {"operationId": "listUsers"}}},
                 }
-            }
-        }))
+            )
+        )
 
         result = await tool.execute(file_path=str(spec_file))
 
@@ -1006,21 +1011,22 @@ class TestValidateApiSpecTool:
     async def test_validate_path_param_warning(self, tool, tmp_path):
         """Test validation warning for undefined path parameters."""
         spec_file = tmp_path / "openapi.json"
-        spec_file.write_text(json.dumps({
-            "openapi": "3.0.3",
-            "info": {
-                "title": "Test API",
-                "version": "1.0.0"
-            },
-            "paths": {
-                "/users/{userId}": {
-                    "get": {
-                        "responses": {"200": {"description": "OK"}}
-                        # Missing parameters definition
-                    }
+        spec_file.write_text(
+            json.dumps(
+                {
+                    "openapi": "3.0.3",
+                    "info": {"title": "Test API", "version": "1.0.0"},
+                    "paths": {
+                        "/users/{userId}": {
+                            "get": {
+                                "responses": {"200": {"description": "OK"}}
+                                # Missing parameters definition
+                            }
+                        }
+                    },
                 }
-            }
-        }))
+            )
+        )
 
         result = await tool.execute(file_path=str(spec_file))
 
@@ -1031,20 +1037,15 @@ class TestValidateApiSpecTool:
     @pytest.mark.asyncio
     async def test_validate_content_directly(self, tool):
         """Test validation of content passed directly."""
-        content = json.dumps({
-            "openapi": "3.0.3",
-            "info": {
-                "title": "Test API",
-                "version": "1.0.0"
-            },
-            "paths": {
-                "/health": {
-                    "get": {
-                        "responses": {"200": {"description": "OK"}}
-                    }
-                }
+        content = json.dumps(
+            {
+                "openapi": "3.0.3",
+                "info": {"title": "Test API", "version": "1.0.0"},
+                "paths": {
+                    "/health": {"get": {"responses": {"200": {"description": "OK"}}}}
+                },
             }
-        })
+        )
 
         result = await tool.execute(content=content)
 
@@ -1078,10 +1079,12 @@ class TestProjectNameDetection:
     def test_detect_name_from_pyproject(self, tool, tmp_path):
         """Test project name detection from pyproject.toml."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text('''
+        pyproject.write_text(
+            """
 [project]
 name = "my-awesome-api"
-''')
+"""
+        )
 
         name = tool._detect_project_name(tmp_path)
         assert name == "My Awesome Api"
@@ -1105,10 +1108,12 @@ name = "my-awesome-api"
     def test_detect_name_from_cargo_toml(self, tool, tmp_path):
         """Test project name detection from Cargo.toml."""
         cargo_toml = tmp_path / "Cargo.toml"
-        cargo_toml.write_text('''
+        cargo_toml.write_text(
+            """
 [package]
 name = "rust_api_server"
-''')
+"""
+        )
 
         name = tool._detect_project_name(tmp_path)
         assert name == "Rust Api Server"

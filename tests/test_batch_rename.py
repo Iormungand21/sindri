@@ -24,7 +24,8 @@ def temp_dir():
     temp = Path(tempfile.mkdtemp())
 
     # Create Python test files with test_ prefix
-    (temp / "test_users.py").write_text("""\"\"\"User tests.\"\"\"
+    (temp / "test_users.py").write_text(
+        """\"\"\"User tests.\"\"\"
 
 import pytest
 from users import User
@@ -32,9 +33,11 @@ from users import User
 def test_create_user():
     user = User("John")
     assert user.name == "John"
-""")
+"""
+    )
 
-    (temp / "test_orders.py").write_text("""\"\"\"Order tests.\"\"\"
+    (temp / "test_orders.py").write_text(
+        """\"\"\"Order tests.\"\"\"
 
 import pytest
 from orders import Order
@@ -42,9 +45,11 @@ from orders import Order
 def test_create_order():
     order = Order(123)
     assert order.id == 123
-""")
+"""
+    )
 
-    (temp / "test_products.py").write_text("""\"\"\"Product tests.\"\"\"
+    (temp / "test_products.py").write_text(
+        """\"\"\"Product tests.\"\"\"
 
 import pytest
 from products import Product
@@ -52,32 +57,40 @@ from products import Product
 def test_create_product():
     product = Product("Widget")
     assert product.name == "Widget"
-""")
+"""
+    )
 
     # Create corresponding source files
-    (temp / "users.py").write_text("""\"\"\"User module.\"\"\"
+    (temp / "users.py").write_text(
+        """\"\"\"User module.\"\"\"
 
 class User:
     def __init__(self, name: str):
         self.name = name
-""")
+"""
+    )
 
-    (temp / "orders.py").write_text("""\"\"\"Orders module.\"\"\"
+    (temp / "orders.py").write_text(
+        """\"\"\"Orders module.\"\"\"
 
 class Order:
     def __init__(self, id: int):
         self.id = id
-""")
+"""
+    )
 
-    (temp / "products.py").write_text("""\"\"\"Products module.\"\"\"
+    (temp / "products.py").write_text(
+        """\"\"\"Products module.\"\"\"
 
 class Product:
     def __init__(self, name: str):
         self.name = name
-""")
+"""
+    )
 
     # Create TypeScript test files with .test.ts suffix
-    (temp / "utils.test.ts").write_text("""// Utils tests
+    (temp / "utils.test.ts").write_text(
+        """// Utils tests
 import { helper } from './utils';
 
 describe('helper', () => {
@@ -85,9 +98,11 @@ describe('helper', () => {
         expect(helper('test')).toBe('test');
     });
 });
-""")
+"""
+    )
 
-    (temp / "api.test.ts").write_text("""// API tests
+    (temp / "api.test.ts").write_text(
+        """// API tests
 import { fetch } from './api';
 
 describe('fetch', () => {
@@ -95,33 +110,41 @@ describe('fetch', () => {
         expect(fetch()).toBeDefined();
     });
 });
-""")
+"""
+    )
 
     # Source files for TS
-    (temp / "utils.ts").write_text("""// Utils module
+    (temp / "utils.ts").write_text(
+        """// Utils module
 export function helper(data: string): string {
     return data;
 }
-""")
+"""
+    )
 
-    (temp / "api.ts").write_text("""// API module
+    (temp / "api.ts").write_text(
+        """// API module
 export function fetch(): any {
     return {};
 }
-""")
+"""
+    )
 
     # Create subdirectories
     (temp / "src").mkdir()
     (temp / "lib").mkdir()
 
     # Files in subdirectory
-    (temp / "src" / "test_helpers.py").write_text("""\"\"\"Helper tests.\"\"\"
+    (temp / "src" / "test_helpers.py").write_text(
+        """\"\"\"Helper tests.\"\"\"
 
 def test_something():
     pass
-""")
+"""
+    )
 
-    (temp / "src" / "config.test.ts").write_text("""// Config tests
+    (temp / "src" / "config.test.ts").write_text(
+        """// Config tests
 import { config } from '../config';
 
 describe('config', () => {
@@ -129,16 +152,21 @@ describe('config', () => {
         expect(config).toBeDefined();
     });
 });
-""")
+"""
+    )
 
     # Create old_ prefixed files for regex testing
-    (temp / "old_module.py").write_text("""\"\"\"Old module.\"\"\"
+    (temp / "old_module.py").write_text(
+        """\"\"\"Old module.\"\"\"
 pass
-""")
+"""
+    )
 
-    (temp / "old_helper.py").write_text("""\"\"\"Old helper.\"\"\"
+    (temp / "old_helper.py").write_text(
+        """\"\"\"Old helper.\"\"\"
 pass
-""")
+"""
+    )
 
     yield temp
     shutil.rmtree(temp)
@@ -147,6 +175,7 @@ pass
 # ============================================================
 # Basic Glob Pattern Tests
 # ============================================================
+
 
 class TestBatchRenameGlob:
     """Tests for glob pattern matching."""
@@ -245,6 +274,7 @@ class TestBatchRenameGlob:
 # Regex Pattern Tests
 # ============================================================
 
+
 class TestBatchRenameRegex:
     """Tests for regex pattern matching."""
 
@@ -303,6 +333,7 @@ class TestBatchRenameRegex:
 # ============================================================
 # Output Pattern Tests
 # ============================================================
+
 
 class TestBatchRenameOutput:
     """Tests for output pattern placeholders."""
@@ -378,6 +409,7 @@ class TestBatchRenameOutput:
 # Dry Run Tests
 # ============================================================
 
+
 class TestBatchRenameDryRun:
     """Tests for dry run mode."""
 
@@ -430,6 +462,7 @@ class TestBatchRenameDryRun:
 # Import Update Tests
 # ============================================================
 
+
 class TestBatchRenameImports:
     """Tests for import update functionality."""
 
@@ -450,7 +483,7 @@ class TestBatchRenameImports:
         assert (temp_dir / "user_model.py").exists()
 
         # Check that test file was updated
-        test_content = (temp_dir / "test_users.py").read_text()
+        (temp_dir / "test_users.py").read_text()
         # The test file imports from users, which should now be user_model
         # Note: The import update happens if the module path changes
 
@@ -474,6 +507,7 @@ class TestBatchRenameImports:
 # ============================================================
 # Error Handling Tests
 # ============================================================
+
 
 class TestBatchRenameErrors:
     """Tests for error handling."""
@@ -602,6 +636,7 @@ class TestBatchRenameErrors:
 # Edge Cases
 # ============================================================
 
+
 class TestBatchRenameEdgeCases:
     """Tests for edge cases."""
 
@@ -708,6 +743,7 @@ class TestBatchRenameEdgeCases:
 # ============================================================
 # Integration Tests
 # ============================================================
+
 
 class TestBatchRenameIntegration:
     """Integration tests with real file operations."""

@@ -22,7 +22,8 @@ def temp_dir():
     temp = Path(tempfile.mkdtemp())
 
     # Create Python files
-    (temp / "main.py").write_text("""#!/usr/bin/env python
+    (temp / "main.py").write_text(
+        """#!/usr/bin/env python
 \"\"\"Main application module.\"\"\"
 
 from utils import helper_function
@@ -32,16 +33,20 @@ def main():
     user = User("John")
     result = helper_function(user)
     return result
-""")
+"""
+    )
 
-    (temp / "utils.py").write_text("""\"\"\"Utility functions.\"\"\"
+    (temp / "utils.py").write_text(
+        """\"\"\"Utility functions.\"\"\"
 
 def helper_function(data):
     \"\"\"Process data.\"\"\"
     return str(data)
-""")
+"""
+    )
 
-    (temp / "models.py").write_text("""\"\"\"Data models.\"\"\"
+    (temp / "models.py").write_text(
+        """\"\"\"Data models.\"\"\"
 
 class User:
     \"\"\"User model.\"\"\"
@@ -50,10 +55,12 @@ class User:
 
     def __str__(self):
         return f"User({self.name})"
-""")
+"""
+    )
 
     # Create a file that imports from another file
-    (temp / "app.py").write_text("""\"\"\"Application entry.\"\"\"
+    (temp / "app.py").write_text(
+        """\"\"\"Application entry.\"\"\"
 
 from utils import helper_function
 import models
@@ -61,7 +68,8 @@ import models
 def run():
     user = models.User("Jane")
     return helper_function(user)
-""")
+"""
+    )
 
     # Create subdirectories
     (temp / "src").mkdir()
@@ -69,7 +77,8 @@ def run():
     (temp / "lib").mkdir()
 
     # Python file in subdirectory
-    (temp / "src" / "service.py").write_text("""\"\"\"Service module.\"\"\"
+    (temp / "src" / "service.py").write_text(
+        """\"\"\"Service module.\"\"\"
 
 from utils import helper_function
 from models import User
@@ -77,10 +86,12 @@ from models import User
 class UserService:
     def get_user(self, name: str) -> User:
         return User(name)
-""")
+"""
+    )
 
     # TypeScript files
-    (temp / "index.ts").write_text("""// Main entry point
+    (temp / "index.ts").write_text(
+        """// Main entry point
 import { helper } from './utils';
 import { User } from './models';
 
@@ -88,9 +99,11 @@ export function main(): void {
     const user = new User('John');
     helper(user);
 }
-""")
+"""
+    )
 
-    (temp / "utils.ts").write_text("""// Utility functions
+    (temp / "utils.ts").write_text(
+        """// Utility functions
 export function helper(data: any): string {
     return String(data);
 }
@@ -98,9 +111,11 @@ export function helper(data: any): string {
 export function formatDate(date: Date): string {
     return date.toISOString();
 }
-""")
+"""
+    )
 
-    (temp / "models.ts").write_text("""// Data models
+    (temp / "models.ts").write_text(
+        """// Data models
 export class User {
     constructor(public name: string) {}
 
@@ -108,10 +123,12 @@ export class User {
         return `User(${this.name})`;
     }
 }
-""")
+"""
+    )
 
     # JavaScript file
-    (temp / "app.js").write_text("""// Application
+    (temp / "app.js").write_text(
+        """// Application
 const { helper } = require('./utils');
 import { User } from './models';
 
@@ -121,10 +138,12 @@ function run() {
 }
 
 module.exports = { run };
-""")
+"""
+    )
 
     # TypeScript file in subdirectory
-    (temp / "src" / "api.ts").write_text("""// API module
+    (temp / "src" / "api.ts").write_text(
+        """// API module
 import { helper } from '../utils';
 import { User } from '../models';
 
@@ -133,7 +152,8 @@ export class Api {
         return new User(name);
     }
 }
-""")
+"""
+    )
 
     yield temp
     shutil.rmtree(temp)
@@ -142,6 +162,7 @@ export class Api {
 # ============================================================
 # Basic Move Operations
 # ============================================================
+
 
 class TestMoveFileBasic:
     """Tests for basic file move operations."""
@@ -155,9 +176,7 @@ class TestMoveFileBasic:
         (temp_dir / "simple.txt").write_text("Hello World")
 
         result = await tool.execute(
-            source="simple.txt",
-            destination="moved.txt",
-            update_imports=False
+            source="simple.txt", destination="moved.txt", update_imports=False
         )
 
         assert result.success
@@ -174,9 +193,7 @@ class TestMoveFileBasic:
         (temp_dir / "file.py").write_text("# Test file\n")
 
         result = await tool.execute(
-            source="file.py",
-            destination="lib/file.py",
-            update_imports=False
+            source="file.py", destination="lib/file.py", update_imports=False
         )
 
         assert result.success
@@ -195,7 +212,7 @@ class TestMoveFileBasic:
             source="file.py",
             destination="new_dir/subdir/file.py",
             update_imports=False,
-            create_dirs=True
+            create_dirs=True,
         )
 
         assert result.success
@@ -207,9 +224,7 @@ class TestMoveFileBasic:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="utils.py",
-            destination="helpers.py",
-            update_imports=False
+            source="utils.py", destination="helpers.py", update_imports=False
         )
 
         assert result.success
@@ -221,6 +236,7 @@ class TestMoveFileBasic:
 # Dry Run Tests
 # ============================================================
 
+
 class TestMoveFileDryRun:
     """Tests for dry run mode."""
 
@@ -230,9 +246,7 @@ class TestMoveFileDryRun:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="utils.py",
-            destination="moved_utils.py",
-            dry_run=True
+            source="utils.py", destination="moved_utils.py", dry_run=True
         )
 
         assert result.success
@@ -247,9 +261,7 @@ class TestMoveFileDryRun:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="utils.py",
-            destination="helpers/utils.py",
-            dry_run=True
+            source="utils.py", destination="helpers/utils.py", dry_run=True
         )
 
         assert result.success
@@ -262,6 +274,7 @@ class TestMoveFileDryRun:
 # Python Import Update Tests
 # ============================================================
 
+
 class TestMoveFilePythonImports:
     """Tests for Python import updates."""
 
@@ -271,16 +284,17 @@ class TestMoveFilePythonImports:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="models.py",
-            destination="data/models.py",
-            update_imports=True
+            source="models.py", destination="data/models.py", update_imports=True
         )
 
         assert result.success
 
         # Check that app.py import was updated
         app_content = (temp_dir / "app.py").read_text()
-        assert "import data.models" in app_content or "from data.models import" in app_content
+        assert (
+            "import data.models" in app_content
+            or "from data.models import" in app_content
+        )
 
     @pytest.mark.asyncio
     async def test_update_python_from_import(self, temp_dir):
@@ -288,9 +302,7 @@ class TestMoveFilePythonImports:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="utils.py",
-            destination="helpers/utils.py",
-            update_imports=True
+            source="utils.py", destination="helpers/utils.py", update_imports=True
         )
 
         assert result.success
@@ -306,9 +318,7 @@ class TestMoveFilePythonImports:
 
         # utils.py is imported by multiple files
         result = await tool.execute(
-            source="utils.py",
-            destination="lib/utils.py",
-            update_imports=True
+            source="utils.py", destination="lib/utils.py", update_imports=True
         )
 
         assert result.success
@@ -320,6 +330,7 @@ class TestMoveFilePythonImports:
 # JavaScript/TypeScript Import Update Tests
 # ============================================================
 
+
 class TestMoveFileJsImports:
     """Tests for JavaScript/TypeScript import updates."""
 
@@ -329,9 +340,7 @@ class TestMoveFileJsImports:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="utils.ts",
-            destination="lib/utils.ts",
-            update_imports=True
+            source="utils.ts", destination="lib/utils.ts", update_imports=True
         )
 
         assert result.success
@@ -343,9 +352,7 @@ class TestMoveFileJsImports:
 
         # Move utils.ts which is required by app.js
         result = await tool.execute(
-            source="utils.ts",
-            destination="helpers/utils.ts",
-            update_imports=True
+            source="utils.ts", destination="helpers/utils.ts", update_imports=True
         )
 
         assert result.success
@@ -356,9 +363,7 @@ class TestMoveFileJsImports:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="models.ts",
-            destination="data/models.ts",
-            update_imports=True
+            source="models.ts", destination="data/models.ts", update_imports=True
         )
 
         assert result.success
@@ -368,6 +373,7 @@ class TestMoveFileJsImports:
 # Error Handling Tests
 # ============================================================
 
+
 class TestMoveFileErrors:
     """Tests for error handling."""
 
@@ -376,10 +382,7 @@ class TestMoveFileErrors:
         """Test error when source file doesn't exist."""
         tool = MoveFileTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            source="nonexistent.py",
-            destination="moved.py"
-        )
+        result = await tool.execute(source="nonexistent.py", destination="moved.py")
 
         assert not result.success
         assert "not found" in result.error.lower()
@@ -390,8 +393,7 @@ class TestMoveFileErrors:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="utils.py",
-            destination="models.py"  # Already exists
+            source="utils.py", destination="models.py"  # Already exists
         )
 
         assert not result.success
@@ -403,8 +405,7 @@ class TestMoveFileErrors:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="src",  # This is a directory
-            destination="new_src"
+            source="src", destination="new_src"  # This is a directory
         )
 
         assert not result.success
@@ -416,9 +417,7 @@ class TestMoveFileErrors:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="utils.py",
-            destination="lib/utils.py",
-            search_path="nonexistent_dir"
+            source="utils.py", destination="lib/utils.py", search_path="nonexistent_dir"
         )
 
         assert not result.success
@@ -428,6 +427,7 @@ class TestMoveFileErrors:
 # ============================================================
 # Edge Cases
 # ============================================================
+
 
 class TestMoveFileEdgeCases:
     """Tests for edge cases."""
@@ -441,9 +441,7 @@ class TestMoveFileEdgeCases:
         (temp_dir / "isolated.py").write_text("# No imports reference this\n")
 
         result = await tool.execute(
-            source="isolated.py",
-            destination="lib/isolated.py",
-            update_imports=True
+            source="isolated.py", destination="lib/isolated.py", update_imports=True
         )
 
         assert result.success
@@ -455,9 +453,7 @@ class TestMoveFileEdgeCases:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="utils.py",
-            destination="utility.py",
-            update_imports=True
+            source="utils.py", destination="utility.py", update_imports=True
         )
 
         assert result.success
@@ -472,9 +468,7 @@ class TestMoveFileEdgeCases:
         original_content = (temp_dir / "utils.py").read_text()
 
         result = await tool.execute(
-            source="utils.py",
-            destination="lib/utils.py",
-            update_imports=False
+            source="utils.py", destination="lib/utils.py", update_imports=False
         )
 
         assert result.success
@@ -492,7 +486,7 @@ class TestMoveFileEdgeCases:
         result = await tool.execute(
             source="my_special_file.py",
             destination="lib/my_special_file.py",
-            update_imports=False
+            update_imports=False,
         )
 
         assert result.success
@@ -507,9 +501,7 @@ class TestMoveFileEdgeCases:
         original_main = (temp_dir / "main.py").read_text()
 
         result = await tool.execute(
-            source="utils.py",
-            destination="helpers/utils.py",
-            update_imports=False
+            source="utils.py", destination="helpers/utils.py", update_imports=False
         )
 
         assert result.success
@@ -521,10 +513,7 @@ class TestMoveFileEdgeCases:
         """Test that result metadata has expected fields."""
         tool = MoveFileTool(work_dir=temp_dir)
 
-        result = await tool.execute(
-            source="utils.py",
-            destination="lib/utils.py"
-        )
+        result = await tool.execute(source="utils.py", destination="lib/utils.py")
 
         assert result.success
         assert "source" in result.metadata
@@ -538,6 +527,7 @@ class TestMoveFileEdgeCases:
 # Integration Tests
 # ============================================================
 
+
 class TestMoveFileIntegration:
     """Integration tests for MoveFileTool."""
 
@@ -547,9 +537,7 @@ class TestMoveFileIntegration:
         tool = MoveFileTool(work_dir=temp_dir)
 
         result = await tool.execute(
-            source="models.py",
-            destination="data/models.py",
-            update_imports=True
+            source="models.py", destination="data/models.py", update_imports=True
         )
 
         assert result.success
@@ -559,6 +547,7 @@ class TestMoveFileIntegration:
 
         # Verify we can still import (syntax check)
         import ast
+
         moved_content = (temp_dir / "data" / "models.py").read_text()
         ast.parse(moved_content)  # Should not raise
 
@@ -569,17 +558,13 @@ class TestMoveFileIntegration:
 
         # First move
         result1 = await tool.execute(
-            source="utils.py",
-            destination="lib/utils.py",
-            update_imports=False
+            source="utils.py", destination="lib/utils.py", update_imports=False
         )
         assert result1.success
 
         # Second move
         result2 = await tool.execute(
-            source="lib/utils.py",
-            destination="helpers/utils.py",
-            update_imports=False
+            source="lib/utils.py", destination="helpers/utils.py", update_imports=False
         )
         assert result2.success
 
@@ -592,6 +577,7 @@ class TestMoveFileIntegration:
 # ============================================================
 # Tool Schema Tests
 # ============================================================
+
 
 class TestMoveFileSchema:
     """Tests for tool schema and registration."""

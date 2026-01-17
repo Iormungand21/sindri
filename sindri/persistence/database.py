@@ -1,6 +1,5 @@
 """SQLite database setup for Sindri."""
 
-import sqlite3
 import aiosqlite
 from pathlib import Path
 from typing import Optional
@@ -38,6 +37,7 @@ class Database:
         """Lazy-load backup manager."""
         if self._backup_manager is None:
             from sindri.persistence.backup import DatabaseBackup
+
             self._backup_manager = DatabaseBackup(self.db_path)
         return self._backup_manager
 
@@ -80,7 +80,8 @@ class Database:
                 # Continue with migration anyway
 
         async with aiosqlite.connect(self.db_path) as db:
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE TABLE IF NOT EXISTS sessions (
                     id TEXT PRIMARY KEY,
                     task TEXT NOT NULL,
@@ -90,9 +91,11 @@ class Database:
                     completed_at TIMESTAMP,
                     iterations INTEGER DEFAULT 0
                 )
-            """)
+            """
+            )
 
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE TABLE IF NOT EXISTS turns (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT NOT NULL,
@@ -102,15 +105,19 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES sessions(id)
                 )
-            """)
+            """
+            )
 
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_turns_session
                 ON turns(session_id)
-            """)
+            """
+            )
 
             # Phase 5.5: Performance metrics table
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE TABLE IF NOT EXISTS session_metrics (
                     session_id TEXT PRIMARY KEY,
                     metrics_json TEXT NOT NULL,
@@ -121,10 +128,12 @@ class Database:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES sessions(id)
                 )
-            """)
+            """
+            )
 
             # Phase 9.4: Session feedback for fine-tuning
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE TABLE IF NOT EXISTS session_feedback (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT NOT NULL,
@@ -136,20 +145,26 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES sessions(id)
                 )
-            """)
+            """
+            )
 
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_feedback_session
                 ON session_feedback(session_id)
-            """)
+            """
+            )
 
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_feedback_rating
                 ON session_feedback(rating)
-            """)
+            """
+            )
 
             # Phase 9.2: Remote collaboration - Session sharing
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE TABLE IF NOT EXISTS session_shares (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT NOT NULL,
@@ -163,20 +178,26 @@ class Database:
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES sessions(id)
                 )
-            """)
+            """
+            )
 
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_shares_token
                 ON session_shares(share_token)
-            """)
+            """
+            )
 
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_shares_session
                 ON session_shares(session_id)
-            """)
+            """
+            )
 
             # Phase 9.2: Remote collaboration - Review comments
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE TABLE IF NOT EXISTS session_comments (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT NOT NULL,
@@ -192,17 +213,22 @@ class Database:
                     FOREIGN KEY (session_id) REFERENCES sessions(id),
                     FOREIGN KEY (parent_id) REFERENCES session_comments(id)
                 )
-            """)
+            """
+            )
 
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_comments_session
                 ON session_comments(session_id)
-            """)
+            """
+            )
 
-            await db.execute("""
+            await db.execute(
+                """
                 CREATE INDEX IF NOT EXISTS idx_comments_turn
                 ON session_comments(session_id, turn_index)
-            """)
+            """
+            )
 
             # Update schema version
             await self._set_schema_version(db, SCHEMA_VERSION)

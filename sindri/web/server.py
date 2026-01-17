@@ -13,20 +13,31 @@ import json
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 from pathlib import Path
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Query, BackgroundTasks
+if TYPE_CHECKING:
+    from sindri.collaboration.sharing import ShareStore
+    from sindri.collaboration.comments import CommentStore
+    from sindri.collaboration.presence import PresenceManager
+
+from fastapi import (
+    FastAPI,
+    WebSocket,
+    WebSocketDisconnect,
+    HTTPException,
+    Query,
+    BackgroundTasks,
+)
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 import structlog
 
-from sindri.agents.registry import AGENTS, get_agent, list_agents
+from sindri.agents.registry import get_agent, list_agents
 from sindri.persistence.state import SessionState
-from sindri.persistence.database import Database
-from sindri.core.events import EventBus, EventType, Event
+from sindri.core.events import EventBus, EventType
 from sindri.llm.manager import ModelManager
 
 log = structlog.get_logger()
@@ -35,6 +46,7 @@ log = structlog.get_logger()
 # Pydantic models for API
 class AgentResponse(BaseModel):
     """Agent information response."""
+
     name: str
     role: str
     model: str
@@ -48,6 +60,7 @@ class AgentResponse(BaseModel):
 
 class SessionResponse(BaseModel):
     """Session information response."""
+
     id: str
     task: str
     model: str
@@ -59,11 +72,13 @@ class SessionResponse(BaseModel):
 
 class SessionDetailResponse(SessionResponse):
     """Detailed session response with turns."""
+
     turns: list[dict[str, Any]] = []
 
 
 class TaskCreateRequest(BaseModel):
     """Request to create a new task."""
+
     description: str = Field(..., min_length=1, description="Task description")
     agent: str = Field(default="brokkr", description="Starting agent")
     max_iterations: int = Field(default=30, ge=1, le=100)
@@ -73,6 +88,7 @@ class TaskCreateRequest(BaseModel):
 
 class TaskResponse(BaseModel):
     """Task execution response."""
+
     task_id: str
     status: str
     message: str
@@ -80,6 +96,7 @@ class TaskResponse(BaseModel):
 
 class TaskStatusResponse(BaseModel):
     """Task status response."""
+
     task_id: str
     status: str
     result: Optional[str] = None
@@ -89,6 +106,7 @@ class TaskStatusResponse(BaseModel):
 
 class MetricsResponse(BaseModel):
     """System metrics response."""
+
     total_sessions: int
     completed_sessions: int
     failed_sessions: int
@@ -101,6 +119,7 @@ class MetricsResponse(BaseModel):
 
 class HealthResponse(BaseModel):
     """Health check response."""
+
     status: str
     version: str
     ollama_connected: bool
@@ -110,6 +129,7 @@ class HealthResponse(BaseModel):
 
 class FileChangeResponse(BaseModel):
     """Individual file change from a session."""
+
     file_path: str
     operation: str  # 'read', 'write', 'edit'
     turn_index: int
@@ -127,6 +147,7 @@ class FileChangeResponse(BaseModel):
 
 class FileChangesResponse(BaseModel):
     """All file changes from a session."""
+
     session_id: str
     file_changes: list[FileChangeResponse]
     files_modified: list[str]
@@ -135,6 +156,7 @@ class FileChangesResponse(BaseModel):
 
 class WebSocketMessage(BaseModel):
     """WebSocket message format."""
+
     type: str
     data: dict[str, Any]
     timestamp: float
@@ -143,14 +165,20 @@ class WebSocketMessage(BaseModel):
 # Collaboration models
 class ShareCreateRequest(BaseModel):
     """Request to create a session share."""
-    permission: str = Field(default="read", description="Permission level: read, comment, write")
-    expires_in_hours: Optional[float] = Field(default=None, description="Hours until expiration")
+
+    permission: str = Field(
+        default="read", description="Permission level: read, comment, write"
+    )
+    expires_in_hours: Optional[float] = Field(
+        default=None, description="Hours until expiration"
+    )
     max_uses: Optional[int] = Field(default=None, description="Maximum number of uses")
     created_by: Optional[str] = Field(default=None, description="Creator identifier")
 
 
 class ShareResponse(BaseModel):
     """Session share response."""
+
     id: int
     session_id: str
     share_token: str
@@ -166,16 +194,27 @@ class ShareResponse(BaseModel):
 
 class CommentCreateRequest(BaseModel):
     """Request to create a comment."""
+
     author: str = Field(..., min_length=1, description="Comment author")
-    content: str = Field(..., min_length=1, description="Comment text (markdown supported)")
-    turn_index: Optional[int] = Field(default=None, description="Turn to attach comment to")
+    content: str = Field(
+        ..., min_length=1, description="Comment text (markdown supported)"
+    )
+    turn_index: Optional[int] = Field(
+        default=None, description="Turn to attach comment to"
+    )
     line_number: Optional[int] = Field(default=None, description="Line within turn")
-    comment_type: str = Field(default="comment", description="Type: comment, suggestion, question, issue, praise, note")
-    parent_id: Optional[int] = Field(default=None, description="Parent comment ID for replies")
+    comment_type: str = Field(
+        default="comment",
+        description="Type: comment, suggestion, question, issue, praise, note",
+    )
+    parent_id: Optional[int] = Field(
+        default=None, description="Parent comment ID for replies"
+    )
 
 
 class CommentResponse(BaseModel):
     """Comment response."""
+
     id: int
     session_id: str
     author: str
@@ -193,12 +232,16 @@ class CommentResponse(BaseModel):
 
 class CommentUpdateRequest(BaseModel):
     """Request to update a comment."""
+
     content: Optional[str] = Field(default=None, description="New content")
-    status: Optional[str] = Field(default=None, description="New status: open, resolved, wontfix, outdated")
+    status: Optional[str] = Field(
+        default=None, description="New status: open, resolved, wontfix, outdated"
+    )
 
 
 class ParticipantResponse(BaseModel):
     """Participant in a collaborative session."""
+
     user_id: str
     display_name: str
     session_id: str
@@ -212,12 +255,14 @@ class ParticipantResponse(BaseModel):
 
 class JoinSessionRequest(BaseModel):
     """Request to join a session for collaboration."""
+
     user_id: str = Field(..., min_length=1, description="Unique user identifier")
     display_name: str = Field(..., min_length=1, description="Display name")
 
 
 class CursorUpdateRequest(BaseModel):
     """Request to update cursor position."""
+
     turn_index: Optional[int] = Field(default=None, description="Turn being viewed")
     line_number: Optional[int] = Field(default=None, description="Line within turn")
 
@@ -271,7 +316,9 @@ class SindriAPI:
         for event_type in EventType:
             self.event_bus.subscribe(event_type, self._broadcast_event_sync)
 
-        log.info("sindri_api_initialized", vram_gb=self.vram_gb, collaboration_enabled=True)
+        log.info(
+            "sindri_api_initialized", vram_gb=self.vram_gb, collaboration_enabled=True
+        )
 
     def _broadcast_event_sync(self, data: Any):
         """Synchronous wrapper for event broadcast (called from EventBus)."""
@@ -286,7 +333,7 @@ class SindriAPI:
         message = {
             "type": "event",
             "data": data if isinstance(data, dict) else str(data),
-            "timestamp": time.time()
+            "timestamp": time.time(),
         }
         message_json = json.dumps(message, default=str)
 
@@ -304,24 +351,30 @@ class SindriAPI:
 
     async def _broadcast_presence_join(self, participant: Any):
         """Broadcast participant join event."""
-        await self._broadcast_event({
-            "event_type": "presence_join",
-            "participant": participant.to_dict(),
-        })
+        await self._broadcast_event(
+            {
+                "event_type": "presence_join",
+                "participant": participant.to_dict(),
+            }
+        )
 
     async def _broadcast_presence_leave(self, participant: Any):
         """Broadcast participant leave event."""
-        await self._broadcast_event({
-            "event_type": "presence_leave",
-            "participant": participant.to_dict(),
-        })
+        await self._broadcast_event(
+            {
+                "event_type": "presence_leave",
+                "participant": participant.to_dict(),
+            }
+        )
 
     async def _broadcast_presence_update(self, participant: Any):
         """Broadcast participant update event."""
-        await self._broadcast_event({
-            "event_type": "presence_update",
-            "participant": participant.to_dict(),
-        })
+        await self._broadcast_event(
+            {
+                "event_type": "presence_update",
+                "participant": participant.to_dict(),
+            }
+        )
 
     async def shutdown(self):
         """Clean shutdown of API components."""
@@ -363,7 +416,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         title="Sindri API",
         description="Local LLM Orchestration API - forge code with Ollama",
         version="0.1.0",
-        lifespan=lifespan
+        lifespan=lifespan,
     )
 
     # Add CORS middleware for frontend access
@@ -407,7 +460,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             version="0.1.0",
             ollama_connected=ollama_ok,
             database_ok=db_ok,
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
 
     @app.get("/health", response_model=HealthResponse, tags=["System"])
@@ -428,17 +481,19 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         agents = []
         for name in list_agents():
             agent = get_agent(name)
-            agents.append(AgentResponse(
-                name=agent.name,
-                role=agent.role,
-                model=agent.model,
-                tools=agent.tools,
-                can_delegate=agent.can_delegate,
-                delegate_to=agent.delegate_to,
-                estimated_vram_gb=agent.estimated_vram_gb,
-                max_iterations=agent.max_iterations,
-                fallback_model=agent.fallback_model
-            ))
+            agents.append(
+                AgentResponse(
+                    name=agent.name,
+                    role=agent.role,
+                    model=agent.model,
+                    tools=agent.tools,
+                    can_delegate=agent.can_delegate,
+                    delegate_to=agent.delegate_to,
+                    estimated_vram_gb=agent.estimated_vram_gb,
+                    max_iterations=agent.max_iterations,
+                    fallback_model=agent.fallback_model,
+                )
+            )
         return agents
 
     @app.get("/api/agents/{agent_name}", response_model=AgentResponse, tags=["Agents"])
@@ -455,17 +510,24 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
                 delegate_to=agent.delegate_to,
                 estimated_vram_gb=agent.estimated_vram_gb,
                 max_iterations=agent.max_iterations,
-                fallback_model=agent.fallback_model
+                fallback_model=agent.fallback_model,
             )
         except ValueError:
-            raise HTTPException(status_code=404, detail=f"Agent '{agent_name}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Agent '{agent_name}' not found"
+            )
 
     # ===== Session Endpoints =====
 
     @app.get("/api/sessions", response_model=list[SessionResponse], tags=["Sessions"])
     async def list_sessions(
-        limit: int = Query(default=20, ge=1, le=100, description="Maximum sessions to return"),
-        status: Optional[str] = Query(default=None, description="Filter by status (active, completed, failed, cancelled)")
+        limit: int = Query(
+            default=20, ge=1, le=100, description="Maximum sessions to return"
+        ),
+        status: Optional[str] = Query(
+            default=None,
+            description="Filter by status (active, completed, failed, cancelled)",
+        ),
     ):
         """List recent sessions."""
         sessions = await api.state.list_sessions(limit=limit)
@@ -480,12 +542,16 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
                 model=s["model"],
                 status=s["status"],
                 created_at=s["created_at"],
-                iterations=s["iterations"]
+                iterations=s["iterations"],
             )
             for s in sessions
         ]
 
-    @app.get("/api/sessions/{session_id}", response_model=SessionDetailResponse, tags=["Sessions"])
+    @app.get(
+        "/api/sessions/{session_id}",
+        response_model=SessionDetailResponse,
+        tags=["Sessions"],
+    )
     async def get_session_detail(session_id: str):
         """Get detailed session information including turns."""
         # Handle short session IDs
@@ -494,17 +560,21 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             sessions = await api.state.list_sessions(limit=100)
             matching = [s for s in sessions if s["id"].startswith(session_id)]
             if not matching:
-                raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+                raise HTTPException(
+                    status_code=404, detail=f"Session '{session_id}' not found"
+                )
             if len(matching) > 1:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Ambiguous session ID '{session_id}', matches: {[m['id'][:8] for m in matching]}"
+                    detail=f"Ambiguous session ID '{session_id}', matches: {[m['id'][:8] for m in matching]}",
                 )
             full_id = matching[0]["id"]
 
         session = await api.state.load_session(full_id)
         if not session:
-            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Session '{session_id}' not found"
+            )
 
         return SessionDetailResponse(
             id=session.id,
@@ -512,23 +582,31 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             model=session.model,
             status=session.status,
             created_at=session.created_at.isoformat(),
-            completed_at=session.completed_at.isoformat() if session.completed_at else None,
+            completed_at=(
+                session.completed_at.isoformat() if session.completed_at else None
+            ),
             iterations=session.iterations,
             turns=[
                 {
                     "role": turn.role,
                     "content": turn.content,
                     "tool_calls": turn.tool_calls,
-                    "created_at": turn.created_at.isoformat()
+                    "created_at": turn.created_at.isoformat(),
                 }
                 for turn in session.turns
-            ]
+            ],
         )
 
-    @app.get("/api/sessions/{session_id}/file-changes", response_model=FileChangesResponse, tags=["Sessions"])
+    @app.get(
+        "/api/sessions/{session_id}/file-changes",
+        response_model=FileChangesResponse,
+        tags=["Sessions"],
+    )
     async def get_session_file_changes(
         session_id: str,
-        include_content: bool = Query(default=True, description="Include file content in response")
+        include_content: bool = Query(
+            default=True, description="Include file content in response"
+        ),
     ):
         """Get all file changes from a session for diff visualization.
 
@@ -541,17 +619,21 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             sessions = await api.state.list_sessions(limit=100)
             matching = [s for s in sessions if s["id"].startswith(session_id)]
             if not matching:
-                raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+                raise HTTPException(
+                    status_code=404, detail=f"Session '{session_id}' not found"
+                )
             if len(matching) > 1:
                 raise HTTPException(
                     status_code=400,
-                    detail=f"Ambiguous session ID '{session_id}', matches: {[m['id'][:8] for m in matching]}"
+                    detail=f"Ambiguous session ID '{session_id}', matches: {[m['id'][:8] for m in matching]}",
                 )
             full_id = matching[0]["id"]
 
         session = await api.state.load_session(full_id)
         if not session:
-            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Session '{session_id}' not found"
+            )
 
         # Extract file changes from turns
         file_changes: list[FileChangeResponse] = []
@@ -586,29 +668,33 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
                     if file_path:
                         # For reads, we store content for context (before state)
                         # Content will be in tool result, but we capture the path
-                        file_changes.append(FileChangeResponse(
-                            file_path=file_path,
-                            operation="read",
-                            turn_index=turn_index,
-                            timestamp=turn.created_at.isoformat(),
-                            success=True,  # Assume success if in tool_calls
-                            read_content=None  # Would need tool result parsing
-                        ))
+                        file_changes.append(
+                            FileChangeResponse(
+                                file_path=file_path,
+                                operation="read",
+                                turn_index=turn_index,
+                                timestamp=turn.created_at.isoformat(),
+                                success=True,  # Assume success if in tool_calls
+                                read_content=None,  # Would need tool result parsing
+                            )
+                        )
 
                 elif tool_name == "write_file":
                     file_path = args.get("path", "")
                     content = args.get("content", "") if include_content else None
                     if file_path:
                         files_modified.add(file_path)
-                        file_changes.append(FileChangeResponse(
-                            file_path=file_path,
-                            operation="write",
-                            turn_index=turn_index,
-                            timestamp=turn.created_at.isoformat(),
-                            success=True,
-                            new_content=content,
-                            content_size=len(args.get("content", ""))
-                        ))
+                        file_changes.append(
+                            FileChangeResponse(
+                                file_path=file_path,
+                                operation="write",
+                                turn_index=turn_index,
+                                timestamp=turn.created_at.isoformat(),
+                                success=True,
+                                new_content=content,
+                                content_size=len(args.get("content", "")),
+                            )
+                        )
 
                 elif tool_name == "edit_file":
                     file_path = args.get("path", "")
@@ -616,27 +702,31 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
                     new_text = args.get("new_text", "") if include_content else None
                     if file_path:
                         files_modified.add(file_path)
-                        file_changes.append(FileChangeResponse(
-                            file_path=file_path,
-                            operation="edit",
-                            turn_index=turn_index,
-                            timestamp=turn.created_at.isoformat(),
-                            success=True,
-                            old_text=old_text,
-                            new_text=new_text
-                        ))
+                        file_changes.append(
+                            FileChangeResponse(
+                                file_path=file_path,
+                                operation="edit",
+                                turn_index=turn_index,
+                                timestamp=turn.created_at.isoformat(),
+                                success=True,
+                                old_text=old_text,
+                                new_text=new_text,
+                            )
+                        )
 
         return FileChangesResponse(
             session_id=full_id,
             file_changes=file_changes,
             files_modified=sorted(files_modified),
-            total_changes=len(file_changes)
+            total_changes=len(file_changes),
         )
 
     # ===== Task Endpoints =====
 
     @app.post("/api/tasks", response_model=TaskResponse, tags=["Tasks"])
-    async def create_task(request: TaskCreateRequest, background_tasks: BackgroundTasks):
+    async def create_task(
+        request: TaskCreateRequest, background_tasks: BackgroundTasks
+    ):
         """Create and start a new task."""
         from sindri.core.orchestrator import Orchestrator
         from sindri.core.loop import LoopConfig
@@ -645,22 +735,27 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         try:
             get_agent(request.agent)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Unknown agent: {request.agent}")
+            raise HTTPException(
+                status_code=400, detail=f"Unknown agent: {request.agent}"
+            )
 
         # Create orchestrator
         config = LoopConfig(max_iterations=request.max_iterations)
-        work_path = Path(request.work_dir).resolve() if request.work_dir else api.work_dir
+        work_path = (
+            Path(request.work_dir).resolve() if request.work_dir else api.work_dir
+        )
 
         orchestrator = Orchestrator(
             config=config,
             total_vram_gb=api.vram_gb,
             enable_memory=request.enable_memory,
             work_dir=work_path,
-            event_bus=api.event_bus
+            event_bus=api.event_bus,
         )
 
         # Generate task ID
         import uuid
+
         task_id = str(uuid.uuid4())
 
         # Track task
@@ -670,14 +765,16 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             "agent": request.agent,
             "started_at": time.time(),
             "result": None,
-            "error": None
+            "error": None,
         }
 
         # Run task in background
         async def run_task():
             try:
                 result = await orchestrator.run(request.description)
-                api.active_tasks[task_id]["status"] = "completed" if result.get("success") else "failed"
+                api.active_tasks[task_id]["status"] = (
+                    "completed" if result.get("success") else "failed"
+                )
                 api.active_tasks[task_id]["result"] = result.get("result")
                 api.active_tasks[task_id]["error"] = result.get("error")
                 api.active_tasks[task_id]["subtasks"] = result.get("subtasks", 0)
@@ -691,7 +788,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         return TaskResponse(
             task_id=task_id,
             status="running",
-            message=f"Task started with agent '{request.agent}'"
+            message=f"Task started with agent '{request.agent}'",
         )
 
     @app.get("/api/tasks/{task_id}", response_model=TaskStatusResponse, tags=["Tasks"])
@@ -706,7 +803,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             status=task["status"],
             result=task.get("result"),
             error=task.get("error"),
-            subtasks=task.get("subtasks", 0)
+            subtasks=task.get("subtasks", 0),
         )
 
     @app.get("/api/tasks", response_model=list[TaskStatusResponse], tags=["Tasks"])
@@ -718,13 +815,15 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         for task_id, task in api.active_tasks.items():
             if status and task["status"] != status:
                 continue
-            tasks.append(TaskStatusResponse(
-                task_id=task_id,
-                status=task["status"],
-                result=task.get("result"),
-                error=task.get("error"),
-                subtasks=task.get("subtasks", 0)
-            ))
+            tasks.append(
+                TaskStatusResponse(
+                    task_id=task_id,
+                    status=task["status"],
+                    result=task.get("result"),
+                    error=task.get("error"),
+                    subtasks=task.get("subtasks", 0),
+                )
+            )
         return tasks
 
     # ===== Metrics Endpoints =====
@@ -745,7 +844,11 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         if api.model_manager:
             vram_stats = api.model_manager.get_vram_stats()
             vram_used = vram_stats.get("used_gb", 0.0)
-            loaded_models = list(api.model_manager._loaded_models.keys()) if hasattr(api.model_manager, '_loaded_models') else []
+            loaded_models = (
+                list(api.model_manager._loaded_models.keys())
+                if hasattr(api.model_manager, "_loaded_models")
+                else []
+            )
 
         return MetricsResponse(
             total_sessions=len(sessions),
@@ -755,7 +858,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             total_iterations=total_iterations,
             vram_used_gb=vram_used,
             vram_total_gb=api.vram_gb,
-            loaded_models=loaded_models
+            loaded_models=loaded_models,
         )
 
     @app.get("/api/metrics/sessions/{session_id}", tags=["Metrics"])
@@ -771,23 +874,30 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             sessions = await api.state.list_sessions(limit=100)
             matching = [s for s in sessions if s["id"].startswith(session_id)]
             if not matching:
-                raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+                raise HTTPException(
+                    status_code=404, detail=f"Session '{session_id}' not found"
+                )
             if len(matching) > 1:
                 raise HTTPException(
-                    status_code=400,
-                    detail=f"Ambiguous session ID '{session_id}'"
+                    status_code=400, detail=f"Ambiguous session ID '{session_id}'"
                 )
             full_id = matching[0]["id"]
 
         metrics = await store.get_metrics(full_id)
         if not metrics:
-            raise HTTPException(status_code=404, detail=f"Metrics not found for session '{session_id}'")
+            raise HTTPException(
+                status_code=404, detail=f"Metrics not found for session '{session_id}'"
+            )
 
         return metrics.to_dict()
 
     # ===== Collaboration Endpoints =====
 
-    @app.post("/api/sessions/{session_id}/share", response_model=ShareResponse, tags=["Collaboration"])
+    @app.post(
+        "/api/sessions/{session_id}/share",
+        response_model=ShareResponse,
+        tags=["Collaboration"],
+    )
     async def create_share(session_id: str, request: ShareCreateRequest):
         """Create a share link for a session.
 
@@ -803,7 +913,9 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         try:
             permission = SharePermission(request.permission)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid permission: {request.permission}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid permission: {request.permission}"
+            )
 
         share = await api.share_store.create_share(
             session_id=full_id,
@@ -827,7 +939,11 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             created_at=share.created_at.isoformat(),
         )
 
-    @app.get("/api/sessions/{session_id}/shares", response_model=list[ShareResponse], tags=["Collaboration"])
+    @app.get(
+        "/api/sessions/{session_id}/shares",
+        response_model=list[ShareResponse],
+        tags=["Collaboration"],
+    )
     async def list_shares(session_id: str):
         """List all share links for a session."""
         full_id = await _resolve_session_id(api, session_id)
@@ -859,7 +975,9 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         """
         share = await api.share_store.validate_and_use_share(share_token)
         if not share:
-            raise HTTPException(status_code=404, detail="Share link not found or expired")
+            raise HTTPException(
+                status_code=404, detail="Share link not found or expired"
+            )
 
         # Load the session
         session = await api.state.load_session(share.session_id)
@@ -874,7 +992,9 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
                 "model": session.model,
                 "status": session.status,
                 "created_at": session.created_at.isoformat(),
-                "completed_at": session.completed_at.isoformat() if session.completed_at else None,
+                "completed_at": (
+                    session.completed_at.isoformat() if session.completed_at else None
+                ),
                 "iterations": session.iterations,
                 "turns": [
                     {
@@ -898,7 +1018,11 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
 
     # ===== Comments Endpoints =====
 
-    @app.post("/api/sessions/{session_id}/comments", response_model=CommentResponse, tags=["Collaboration"])
+    @app.post(
+        "/api/sessions/{session_id}/comments",
+        response_model=CommentResponse,
+        tags=["Collaboration"],
+    )
     async def create_comment(session_id: str, request: CommentCreateRequest):
         """Add a review comment to a session."""
         from sindri.collaboration.comments import SessionComment, CommentType
@@ -908,7 +1032,9 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         try:
             comment_type = CommentType(request.comment_type)
         except ValueError:
-            raise HTTPException(status_code=400, detail=f"Invalid comment type: {request.comment_type}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid comment type: {request.comment_type}"
+            )
 
         comment = SessionComment(
             session_id=full_id,
@@ -923,10 +1049,12 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         comment = await api.comment_store.add_comment(comment)
 
         # Broadcast comment event
-        await api._broadcast_event({
-            "event_type": "comment_added",
-            "comment": comment.to_dict(),
-        })
+        await api._broadcast_event(
+            {
+                "event_type": "comment_added",
+                "comment": comment.to_dict(),
+            }
+        )
 
         return CommentResponse(
             id=comment.id,
@@ -944,15 +1072,23 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             updated_at=comment.updated_at.isoformat(),
         )
 
-    @app.get("/api/sessions/{session_id}/comments", response_model=list[CommentResponse], tags=["Collaboration"])
+    @app.get(
+        "/api/sessions/{session_id}/comments",
+        response_model=list[CommentResponse],
+        tags=["Collaboration"],
+    )
     async def list_comments(
         session_id: str,
-        include_resolved: bool = Query(default=True, description="Include resolved comments"),
+        include_resolved: bool = Query(
+            default=True, description="Include resolved comments"
+        ),
     ):
         """List all comments for a session."""
         full_id = await _resolve_session_id(api, session_id)
 
-        comments = await api.comment_store.get_comments_for_session(full_id, include_resolved)
+        comments = await api.comment_store.get_comments_for_session(
+            full_id, include_resolved
+        )
 
         return [
             CommentResponse(
@@ -973,7 +1109,11 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             for c in comments
         ]
 
-    @app.put("/api/comments/{comment_id}", response_model=CommentResponse, tags=["Collaboration"])
+    @app.put(
+        "/api/comments/{comment_id}",
+        response_model=CommentResponse,
+        tags=["Collaboration"],
+    )
     async def update_comment(comment_id: int, request: CommentUpdateRequest):
         """Update a comment's content or status."""
         from sindri.collaboration.comments import CommentStatus
@@ -983,7 +1123,9 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             try:
                 status = CommentStatus(request.status)
             except ValueError:
-                raise HTTPException(status_code=400, detail=f"Invalid status: {request.status}")
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid status: {request.status}"
+                )
 
         success = await api.comment_store.update_comment(
             comment_id, content=request.content, status=status
@@ -995,10 +1137,12 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         comment = await api.comment_store.get_comment(comment_id)
 
         # Broadcast update
-        await api._broadcast_event({
-            "event_type": "comment_updated",
-            "comment": comment.to_dict(),
-        })
+        await api._broadcast_event(
+            {
+                "event_type": "comment_updated",
+                "comment": comment.to_dict(),
+            }
+        )
 
         return CommentResponse(
             id=comment.id,
@@ -1024,16 +1168,22 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             raise HTTPException(status_code=404, detail="Comment not found")
 
         # Broadcast deletion
-        await api._broadcast_event({
-            "event_type": "comment_deleted",
-            "comment_id": comment_id,
-        })
+        await api._broadcast_event(
+            {
+                "event_type": "comment_deleted",
+                "comment_id": comment_id,
+            }
+        )
 
         return {"message": "Comment deleted", "comment_id": comment_id}
 
     # ===== Presence Endpoints =====
 
-    @app.post("/api/sessions/{session_id}/join", response_model=ParticipantResponse, tags=["Collaboration"])
+    @app.post(
+        "/api/sessions/{session_id}/join",
+        response_model=ParticipantResponse,
+        tags=["Collaboration"],
+    )
     async def join_session(session_id: str, request: JoinSessionRequest):
         """Join a session for real-time collaboration."""
         full_id = await _resolve_session_id(api, session_id)
@@ -1057,7 +1207,9 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         )
 
     @app.post("/api/sessions/{session_id}/leave", tags=["Collaboration"])
-    async def leave_session(session_id: str, user_id: str = Query(..., description="User ID")):
+    async def leave_session(
+        session_id: str, user_id: str = Query(..., description="User ID")
+    ):
         """Leave a collaborative session."""
         participant = await api.presence_manager.leave_session(user_id)
         if not participant:
@@ -1065,7 +1217,11 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
 
         return {"message": "Left session", "session_id": session_id}
 
-    @app.get("/api/sessions/{session_id}/participants", response_model=list[ParticipantResponse], tags=["Collaboration"])
+    @app.get(
+        "/api/sessions/{session_id}/participants",
+        response_model=list[ParticipantResponse],
+        tags=["Collaboration"],
+    )
     async def list_participants(session_id: str):
         """List all participants in a session."""
         full_id = await _resolve_session_id(api, session_id)
@@ -1124,9 +1280,13 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         matching = [s for s in sessions if s["id"].startswith(session_id)]
 
         if not matching:
-            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+            raise HTTPException(
+                status_code=404, detail=f"Session '{session_id}' not found"
+            )
         if len(matching) > 1:
-            raise HTTPException(status_code=400, detail=f"Ambiguous session ID '{session_id}'")
+            raise HTTPException(
+                status_code=400, detail=f"Ambiguous session ID '{session_id}'"
+            )
 
         return matching[0]["id"]
 
@@ -1137,43 +1297,44 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         """WebSocket endpoint for real-time event streaming."""
         await websocket.accept()
         api.websocket_connections.append(websocket)
-        log.info("websocket_connected", total_connections=len(api.websocket_connections))
+        log.info(
+            "websocket_connected", total_connections=len(api.websocket_connections)
+        )
 
         try:
             # Send initial state
-            await websocket.send_json({
-                "type": "connected",
-                "data": {
-                    "message": "Connected to Sindri API",
-                    "version": "0.1.0",
-                    "active_connections": len(api.websocket_connections)
-                },
-                "timestamp": time.time()
-            })
+            await websocket.send_json(
+                {
+                    "type": "connected",
+                    "data": {
+                        "message": "Connected to Sindri API",
+                        "version": "0.1.0",
+                        "active_connections": len(api.websocket_connections),
+                    },
+                    "timestamp": time.time(),
+                }
+            )
 
             # Keep connection alive and handle incoming messages
             while True:
                 try:
                     # Wait for messages (with timeout for heartbeat)
                     data = await asyncio.wait_for(
-                        websocket.receive_text(),
-                        timeout=30.0
+                        websocket.receive_text(), timeout=30.0
                     )
 
                     # Handle ping/pong
                     message = json.loads(data)
                     if message.get("type") == "ping":
-                        await websocket.send_json({
-                            "type": "pong",
-                            "timestamp": time.time()
-                        })
+                        await websocket.send_json(
+                            {"type": "pong", "timestamp": time.time()}
+                        )
 
                 except asyncio.TimeoutError:
                     # Send heartbeat
-                    await websocket.send_json({
-                        "type": "heartbeat",
-                        "timestamp": time.time()
-                    })
+                    await websocket.send_json(
+                        {"type": "heartbeat", "timestamp": time.time()}
+                    )
 
         except WebSocketDisconnect:
             log.info("websocket_disconnected")
@@ -1182,7 +1343,10 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         finally:
             if websocket in api.websocket_connections:
                 api.websocket_connections.remove(websocket)
-            log.info("websocket_cleanup", remaining_connections=len(api.websocket_connections))
+            log.info(
+                "websocket_cleanup",
+                remaining_connections=len(api.websocket_connections),
+            )
 
     # ===== Static Files & SPA Support =====
 
@@ -1191,14 +1355,20 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
 
     if static_dir.exists():
         # Mount static assets (JS, CSS, images)
-        app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+        app.mount(
+            "/assets", StaticFiles(directory=static_dir / "assets"), name="assets"
+        )
 
         # Serve index.html for SPA routing (catch-all for non-API routes)
         @app.get("/{full_path:path}", include_in_schema=False)
         async def serve_spa(full_path: str):
             """Serve the SPA for all non-API routes."""
             # Don't catch API or WebSocket routes
-            if full_path.startswith("api/") or full_path == "ws" or full_path == "health":
+            if (
+                full_path.startswith("api/")
+                or full_path == "ws"
+                or full_path == "health"
+            ):
                 raise HTTPException(status_code=404, detail="Not found")
 
             # Try to serve static file first
@@ -1220,7 +1390,12 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
     return app
 
 
-def run_server(host: str = "0.0.0.0", port: int = 8000, vram_gb: float = 16.0, work_dir: Optional[Path] = None):
+def run_server(
+    host: str = "0.0.0.0",
+    port: int = 8000,
+    vram_gb: float = 16.0,
+    work_dir: Optional[Path] = None,
+):
     """Run the Sindri API server.
 
     Args:

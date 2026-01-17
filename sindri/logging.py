@@ -8,9 +8,7 @@ import structlog
 
 
 def setup_logging(
-    level: str = "INFO",
-    log_file: Optional[str] = None,
-    json_format: bool = False
+    level: str = "INFO", log_file: Optional[str] = None, json_format: bool = False
 ):
     """Configure structured logging.
 
@@ -24,11 +22,7 @@ def setup_logging(
     numeric_level = getattr(logging, level.upper(), logging.INFO)
 
     # Configure stdlib logging
-    logging.basicConfig(
-        format="%(message)s",
-        level=numeric_level,
-        stream=sys.stdout
-    )
+    logging.basicConfig(format="%(message)s", level=numeric_level, stream=sys.stdout)
 
     # Structlog processors
     processors = [
@@ -66,7 +60,7 @@ def setup_logging(
         file_handler.setLevel(numeric_level)
 
         # Use JSON format for file logs
-        file_formatter = logging.Formatter('%(message)s')
+        file_formatter = logging.Formatter("%(message)s")
         file_handler.setFormatter(file_formatter)
 
         # Add to root logger

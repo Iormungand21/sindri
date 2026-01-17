@@ -3,9 +3,12 @@
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 import json
 import structlog
+
+if TYPE_CHECKING:
+    from sindri.memory.embedder import LocalEmbedder
 
 log = structlog.get_logger()
 
@@ -13,9 +16,10 @@ log = structlog.get_logger()
 @dataclass
 class Episode:
     """A stored memory episode."""
+
     id: int
     project_id: str
-    event_type: str      # task_complete, decision, error, milestone
+    event_type: str  # task_complete, decision, error, milestone
     content: str
     metadata: dict
     timestamp: datetime
@@ -25,7 +29,7 @@ class Episode:
 class EpisodicMemory:
     """Stores and retrieves project history."""
 
-    def __init__(self, db_path: str, embedder: 'LocalEmbedder'):
+    def __init__(self, db_path: str, embedder: "LocalEmbedder"):
         self.db_path = db_path
         self.embedder = embedder
         self.conn = self._init_db()
@@ -33,7 +37,8 @@ class EpisodicMemory:
 
     def _init_db(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path)
-        conn.executescript("""
+        conn.executescript(
+            """
             CREATE TABLE IF NOT EXISTS episodes (
                 id INTEGER PRIMARY KEY,
                 project_id TEXT NOT NULL,
@@ -45,7 +50,8 @@ class EpisodicMemory:
 
             CREATE INDEX IF NOT EXISTS idx_project ON episodes(project_id);
             CREATE INDEX IF NOT EXISTS idx_event_type ON episodes(event_type);
-        """)
+        """
+        )
         conn.commit()
         return conn
 
@@ -54,7 +60,7 @@ class EpisodicMemory:
         project_id: str,
         event_type: str,
         content: str,
-        metadata: Optional[dict] = None
+        metadata: Optional[dict] = None,
     ) -> int:
         """Store an episode."""
         cursor = self.conn.execute(
@@ -66,23 +72,19 @@ class EpisodicMemory:
                 project_id,
                 event_type,
                 content,
-                json.dumps(metadata) if metadata else None
-            )
+                json.dumps(metadata) if metadata else None,
+            ),
         )
         self.conn.commit()
         log.info(
             "episode_stored",
             episode_id=cursor.lastrowid,
             project_id=project_id,
-            event_type=event_type
+            event_type=event_type,
         )
         return cursor.lastrowid
 
-    def retrieve_recent(
-        self,
-        project_id: str,
-        limit: int = 10
-    ) -> list[Episode]:
+    def retrieve_recent(self, project_id: str, limit: int = 10) -> list[Episode]:
         """Get recent episodes for a project."""
         rows = self.conn.execute(
             """
@@ -92,7 +94,7 @@ class EpisodicMemory:
             ORDER BY timestamp DESC
             LIMIT ?
             """,
-            (project_id, limit)
+            (project_id, limit),
         ).fetchall()
 
         return [
@@ -102,16 +104,13 @@ class EpisodicMemory:
                 event_type=r[2],
                 content=r[3],
                 metadata=json.loads(r[4]) if r[4] else {},
-                timestamp=datetime.fromisoformat(r[5])
+                timestamp=datetime.fromisoformat(r[5]),
             )
             for r in rows
         ]
 
     def retrieve_relevant(
-        self,
-        project_id: str,
-        query: str,
-        limit: int = 5
+        self, project_id: str, query: str, limit: int = 5
     ) -> list[Episode]:
         """Retrieve episodes semantically similar to query."""
         # Get all episodes for project
@@ -142,7 +141,7 @@ class EpisodicMemory:
             FROM episodes
             WHERE id = ?
             """,
-            (episode_id,)
+            (episode_id,),
         ).fetchone()
 
         if not row:
@@ -154,7 +153,7 @@ class EpisodicMemory:
             event_type=row[2],
             content=row[3],
             metadata=json.loads(row[4]) if row[4] else {},
-            timestamp=datetime.fromisoformat(row[5])
+            timestamp=datetime.fromisoformat(row[5]),
         )
 
     def get_episode_count(self) -> int:

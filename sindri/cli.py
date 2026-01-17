@@ -17,12 +17,12 @@ structlog.configure(
     processors=[
         structlog.processors.TimeStamper(fmt="iso"),
         structlog.processors.add_log_level,
-        structlog.dev.ConsoleRenderer()
+        structlog.dev.ConsoleRenderer(),
     ],
     wrapper_class=structlog.make_filtering_bound_logger(logging.INFO),
     context_class=dict,
     logger_factory=structlog.PrintLoggerFactory(),
-    cache_logger_on_first_use=True
+    cache_logger_on_first_use=True,
 )
 
 console = Console()
@@ -39,7 +39,9 @@ def cli():
 @click.argument("task")
 @click.option("--model", "-m", default="qwen2.5-coder:14b", help="Ollama model to use")
 @click.option("--max-iter", default=50, help="Maximum iterations")
-@click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")
+@click.option(
+    "--work-dir", "-w", type=click.Path(), help="Working directory for file operations"
+)
 def run(task: str, model: str, max_iter: int, work_dir: str = None):
     """Run a task with Sindri."""
 
@@ -65,7 +67,9 @@ def run(task: str, model: str, max_iter: int, work_dir: str = None):
             console.print(f"[green]✓ Completed in {result.iterations} iterations[/]")
             console.print(f"\n[dim]{result.final_output}[/]")
         else:
-            console.print(f"[red]✗ {result.reason} after {result.iterations} iterations[/]")
+            console.print(
+                f"[red]✗ {result.reason} after {result.iterations} iterations[/]"
+            )
 
         return result
 
@@ -77,8 +81,12 @@ def run(task: str, model: str, max_iter: int, work_dir: str = None):
 @click.option("--max-iter", default=30, help="Maximum iterations per agent")
 @click.option("--vram-gb", default=16.0, help="Total VRAM in GB")
 @click.option("--no-memory", is_flag=True, help="Disable memory system")
-@click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")
-def orchestrate(task: str, max_iter: int, vram_gb: float, no_memory: bool, work_dir: str = None):
+@click.option(
+    "--work-dir", "-w", type=click.Path(), help="Working directory for file operations"
+)
+def orchestrate(
+    task: str, max_iter: int, vram_gb: float, no_memory: bool, work_dir: str = None
+):
     """Run a task with hierarchical agents (Brokkr → Huginn/Mimir/Ratatoskr)."""
 
     from pathlib import Path
@@ -103,14 +111,14 @@ def orchestrate(task: str, max_iter: int, vram_gb: float, no_memory: bool, work_
             config=config,
             total_vram_gb=vram_gb,
             enable_memory=enable_memory,
-            work_dir=work_path
+            work_dir=work_path,
         )
 
         with console.status("[bold green]Orchestrating..."):
             result = await orchestrator.run(task)
 
         if result["success"]:
-            console.print(f"[green]✓ Completed successfully[/]")
+            console.print("[green]✓ Completed successfully[/]")
             console.print(f"Task ID: {result['task_id']}")
             console.print(f"Subtasks: {result.get('subtasks', 0)}")
             if result.get("result"):
@@ -149,7 +157,9 @@ def resume(session_id: str, max_iter: int, vram_gb: float):
 
             if not matching:
                 console.print(f"[red]✗ No session found starting with {session_id}[/]")
-                console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
+                console.print(
+                    "[dim]Use 'sindri sessions' to list available sessions[/dim]"
+                )
                 return
             elif len(matching) > 1:
                 console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
@@ -168,20 +178,20 @@ def resume(session_id: str, max_iter: int, vram_gb: float):
             console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
             return
 
-        console.print(Panel(
-            f"[bold blue]Session:[/] {full_session_id[:8]}\n"
-            f"[dim]Task:[/] {session.task[:60]}...\n"
-            f"[dim]Model:[/] {session.model}\n"
-            f"[dim]Iterations:[/] {session.iterations}",
-            title="🔨 Resuming Sindri Session"
-        ))
+        console.print(
+            Panel(
+                f"[bold blue]Session:[/] {full_session_id[:8]}\n"
+                f"[dim]Task:[/] {session.task[:60]}...\n"
+                f"[dim]Model:[/] {session.model}\n"
+                f"[dim]Iterations:[/] {session.iterations}",
+                title="🔨 Resuming Sindri Session",
+            )
+        )
 
         # Create orchestrator
         config = LoopConfig(max_iterations=max_iter)
         orchestrator = Orchestrator(
-            config=config,
-            total_vram_gb=vram_gb,
-            enable_memory=True
+            config=config, total_vram_gb=vram_gb, enable_memory=True
         )
 
         # Create a task with the existing session_id to resume
@@ -189,7 +199,7 @@ def resume(session_id: str, max_iter: int, vram_gb: float):
             description=session.task,
             assigned_agent="brokkr",
             session_id=full_session_id,
-            priority=0
+            priority=0,
         )
 
         # Add to scheduler and execute
@@ -207,18 +217,22 @@ def resume(session_id: str, max_iter: int, vram_gb: float):
                 result = await orchestrator.loop.run_task(next_task)
 
                 if result.success:
-                    console.print(f"[green]✓ Task completed[/]")
+                    console.print("[green]✓ Task completed[/]")
                 else:
                     console.print(f"[red]✗ Task failed: {result.reason}[/]")
                     break
 
         # Show final status
         if resume_task.status.value == "complete":
-            console.print(f"\n[green]✓ Session {full_session_id[:8]} completed successfully[/]")
+            console.print(
+                f"\n[green]✓ Session {full_session_id[:8]} completed successfully[/]"
+            )
             if resume_task.result:
                 console.print(f"\n[dim]{resume_task.result}[/]")
         else:
-            console.print(f"\n[yellow]Session {full_session_id[:8]} status: {resume_task.status.value}[/]")
+            console.print(
+                f"\n[yellow]Session {full_session_id[:8]} status: {resume_task.status.value}[/]"
+            )
 
     asyncio.run(execute_resume())
 
@@ -229,7 +243,9 @@ def agents():
     from sindri.agents.registry import AGENTS
     from rich.table import Table
 
-    table = Table(title="🔨 Sindri Agents", show_header=True, header_style="bold magenta")
+    table = Table(
+        title="🔨 Sindri Agents", show_header=True, header_style="bold magenta"
+    )
     table.add_column("Agent", style="cyan", width=12)
     table.add_column("Role", style="white", width=35)
     table.add_column("Model", style="yellow", width=25)
@@ -243,7 +259,7 @@ def agents():
             agent.role,
             agent.model,
             f"{agent.estimated_vram_gb:.1f} GB",
-            delegates
+            delegates,
         )
 
     console.print(table)
@@ -252,7 +268,11 @@ def agents():
 
 @cli.command()
 @click.option("--cleanup", is_flag=True, help="Mark stale active sessions as failed")
-@click.option("--max-age", default=1.0, help="Max age in hours before session is stale (default: 1.0)")
+@click.option(
+    "--max-age",
+    default=1.0,
+    help="Max age in hours before session is stale (default: 1.0)",
+)
 def sessions(cleanup: bool = False, max_age: float = 1.0):
     """List recent sessions.
 
@@ -266,7 +286,9 @@ def sessions(cleanup: bool = False, max_age: float = 1.0):
             # Cleanup stale sessions
             cleaned = await state.cleanup_stale_sessions(max_age_hours=max_age)
             if cleaned > 0:
-                console.print(f"[green]✓ Marked {cleaned} stale session(s) as failed[/]")
+                console.print(
+                    f"[green]✓ Marked {cleaned} stale session(s) as failed[/]"
+                )
             else:
                 console.print("[dim]No stale sessions to clean up[/dim]")
             console.print()
@@ -293,24 +315,40 @@ def sessions(cleanup: bool = False, max_age: float = 1.0):
                 status_color = "yellow"
                 status_icon = "○"
 
-            console.print(f"[{status_color}]{status_icon}[/] {session['id'][:8]} - {session['task'][:50]}")
-            console.print(f"   Model: {session['model']} | Iterations: {session['iterations']} | {session['created_at']}")
+            console.print(
+                f"[{status_color}]{status_icon}[/] {session['id'][:8]} - {session['task'][:50]}"
+            )
+            console.print(
+                f"   Model: {session['model']} | Iterations: {session['iterations']} | {session['created_at']}"
+            )
             console.print()
 
         # Show cleanup hint if there are active sessions
         active_count = sum(1 for s in sessions if s["status"] == "active")
         if active_count > 0 and not cleanup:
-            console.print(f"[dim]Found {active_count} active session(s). Use --cleanup to mark stale ones as failed.[/dim]")
+            console.print(
+                f"[dim]Found {active_count} active session(s). Use --cleanup to mark stale ones as failed.[/dim]"
+            )
 
     asyncio.run(show_sessions())
 
 
 @cli.command()
 @click.argument("session_id", required=False)
-@click.option("--aggregate", "-a", is_flag=True, help="Show aggregate statistics across all sessions")
+@click.option(
+    "--aggregate",
+    "-a",
+    is_flag=True,
+    help="Show aggregate statistics across all sessions",
+)
 @click.option("--tools", "-t", is_flag=True, help="Show tool breakdown")
 @click.option("--limit", "-l", default=10, help="Number of sessions to list")
-def metrics(session_id: str = None, aggregate: bool = False, tools: bool = False, limit: int = 10):
+def metrics(
+    session_id: str = None,
+    aggregate: bool = False,
+    tools: bool = False,
+    limit: int = 10,
+):
     """View performance metrics for sessions.
 
     Without arguments, lists recent sessions with their metrics.
@@ -327,7 +365,7 @@ def metrics(session_id: str = None, aggregate: bool = False, tools: bool = False
         sindri metrics abc12345 -t      # Show tool breakdown
     """
     from rich.table import Table
-    from sindri.persistence.metrics import MetricsStore, SessionMetrics
+    from sindri.persistence.metrics import MetricsStore
 
     async def show_metrics():
         store = MetricsStore()
@@ -378,11 +416,17 @@ def metrics(session_id: str = None, aggregate: bool = False, tools: bool = False
             full_session_id = session_id
             if len(session_id) < 36:
                 all_sessions = await store.list_metrics(limit=100)
-                matching = [s for s in all_sessions if s["session_id"].startswith(session_id)]
+                matching = [
+                    s for s in all_sessions if s["session_id"].startswith(session_id)
+                ]
 
                 if not matching:
-                    console.print(f"[red]✗ No metrics found for session {session_id}[/]")
-                    console.print("[dim]Use 'sindri metrics' to list sessions with metrics[/dim]")
+                    console.print(
+                        f"[red]✗ No metrics found for session {session_id}[/]"
+                    )
+                    console.print(
+                        "[dim]Use 'sindri metrics' to list sessions with metrics[/dim]"
+                    )
                     return
                 elif len(matching) > 1:
                     console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
@@ -414,9 +458,15 @@ def metrics(session_id: str = None, aggregate: bool = False, tools: bool = False
             time_table.add_column("Time", style="bold")
 
             time_table.add_row("Total Duration", summary["duration_formatted"])
-            time_table.add_row("LLM Inference", f"{summary['time_breakdown']['llm_inference']:.2f}s")
-            time_table.add_row("Tool Execution", f"{summary['time_breakdown']['tool_execution']:.2f}s")
-            time_table.add_row("Model Loading", f"{summary['time_breakdown']['model_loading']:.2f}s")
+            time_table.add_row(
+                "LLM Inference", f"{summary['time_breakdown']['llm_inference']:.2f}s"
+            )
+            time_table.add_row(
+                "Tool Execution", f"{summary['time_breakdown']['tool_execution']:.2f}s"
+            )
+            time_table.add_row(
+                "Model Loading", f"{summary['time_breakdown']['model_loading']:.2f}s"
+            )
 
             console.print(time_table)
             console.print()
@@ -443,15 +493,25 @@ def metrics(session_id: str = None, aggregate: bool = False, tools: bool = False
                     tool_table.add_column("Avg Time", justify="right")
                     tool_table.add_column("Success Rate", justify="right")
 
-                    for tool_name, data in sorted(breakdown.items(), key=lambda x: x[1]["count"], reverse=True):
-                        success_rate = data["successes"] / data["count"] * 100 if data["count"] > 0 else 0
-                        success_color = "green" if success_rate == 100 else ("yellow" if success_rate >= 50 else "red")
+                    for tool_name, data in sorted(
+                        breakdown.items(), key=lambda x: x[1]["count"], reverse=True
+                    ):
+                        success_rate = (
+                            data["successes"] / data["count"] * 100
+                            if data["count"] > 0
+                            else 0
+                        )
+                        success_color = (
+                            "green"
+                            if success_rate == 100
+                            else ("yellow" if success_rate >= 50 else "red")
+                        )
                         tool_table.add_row(
                             tool_name,
                             str(data["count"]),
                             f"{data['total_time']:.2f}s",
                             f"{data['avg_time']:.3f}s",
-                            f"[{success_color}]{success_rate:.0f}%[/{success_color}]"
+                            f"[{success_color}]{success_rate:.0f}%[/{success_color}]",
                         )
 
                     console.print(tool_table)
@@ -495,11 +555,11 @@ def metrics(session_id: str = None, aggregate: bool = False, tools: bool = False
                 duration_str,
                 str(s["total_iterations"]),
                 str(s["total_tool_executions"]),
-                f"[{status_color}]{status_short}[/{status_color}]"
+                f"[{status_color}]{status_short}[/{status_color}]",
             )
 
         console.print(table)
-        console.print(f"\n[dim]Use 'sindri metrics <session_id>' for details[/dim]")
+        console.print("\n[dim]Use 'sindri metrics <session_id>' for details[/dim]")
         console.print("[dim]Use 'sindri metrics -a' for aggregate statistics[/dim]")
 
     asyncio.run(show_metrics())
@@ -510,7 +570,12 @@ def metrics(session_id: str = None, aggregate: bool = False, tools: bool = False
 @click.argument("output", required=False, type=click.Path())
 @click.option("--no-metadata", is_flag=True, help="Exclude metadata section")
 @click.option("--no-timestamps", is_flag=True, help="Exclude timestamps from turns")
-def export(session_id: str, output: str = None, no_metadata: bool = False, no_timestamps: bool = False):
+def export(
+    session_id: str,
+    output: str = None,
+    no_metadata: bool = False,
+    no_timestamps: bool = False,
+):
     """Export a session to Markdown.
 
     SESSION_ID can be the full UUID or first 8 characters.
@@ -538,7 +603,9 @@ def export(session_id: str, output: str = None, no_metadata: bool = False, no_ti
 
             if not matching:
                 console.print(f"[red]✗ No session found starting with {session_id}[/]")
-                console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
+                console.print(
+                    "[dim]Use 'sindri sessions' to list available sessions[/dim]"
+                )
                 return False
             elif len(matching) > 1:
                 console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
@@ -558,8 +625,7 @@ def export(session_id: str, output: str = None, no_metadata: bool = False, no_ti
 
         # Create exporter
         exporter = MarkdownExporter(
-            include_timestamps=not no_timestamps,
-            include_metadata=not no_metadata
+            include_timestamps=not no_timestamps, include_metadata=not no_metadata
         )
 
         # Determine output path
@@ -575,7 +641,9 @@ def export(session_id: str, output: str = None, no_metadata: bool = False, no_ti
         # Show success message
         console.print(f"[green]✓ Exported session to {output_path}[/]")
         console.print(f"[dim]Session: {session.task[:60]}...[/dim]")
-        console.print(f"[dim]Turns: {len(session.turns)} | Model: {session.model}[/dim]")
+        console.print(
+            f"[dim]Turns: {len(session.turns)} | Model: {session.model}[/dim]"
+        )
 
         return True
 
@@ -585,7 +653,9 @@ def export(session_id: str, output: str = None, no_metadata: bool = False, no_ti
 @cli.command()
 @click.argument("task", required=False)
 @click.option("--no-memory", is_flag=True, help="Disable memory system")
-@click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")
+@click.option(
+    "--work-dir", "-w", type=click.Path(), help="Working directory for file operations"
+)
 def tui(task: str = None, no_memory: bool = False, work_dir: str = None):
     """Launch the interactive TUI."""
 
@@ -598,11 +668,14 @@ def tui(task: str = None, no_memory: bool = False, work_dir: str = None):
         # Create shared event bus for TUI and orchestrator
         event_bus = EventBus()
         work_path = Path(work_dir).resolve() if work_dir else None
-        orchestrator = Orchestrator(enable_memory=not no_memory, event_bus=event_bus, work_dir=work_path)
+        orchestrator = Orchestrator(
+            enable_memory=not no_memory, event_bus=event_bus, work_dir=work_path
+        )
         run_tui(task=task, orchestrator=orchestrator, event_bus=event_bus)
     except Exception as e:
         console.print(f"[red]Error launching TUI: {str(e)}[/]")
         import traceback
+
         traceback.print_exc()
 
 
@@ -612,7 +685,6 @@ def recover(session_id: str = None):
     """List and recover interrupted sessions."""
 
     from sindri.core.recovery import RecoveryManager
-    from sindri.persistence.database import Database
     from rich.table import Table
     from pathlib import Path
 
@@ -630,7 +702,7 @@ def recover(session_id: str = None):
         state = recovery.load_checkpoint(session_id)
 
         if state:
-            console.print(f"[green]✓ Checkpoint loaded[/]")
+            console.print("[green]✓ Checkpoint loaded[/]")
             console.print(f"Task: {state.get('task', 'Unknown')}")
             console.print(f"Iteration: {state.get('iteration', 0)}")
             console.print(f"Agent: {state.get('agent', 'Unknown')}")
@@ -654,12 +726,14 @@ def recover(session_id: str = None):
             table.add_row(
                 s["session_id"][:8],
                 s.get("task", "Unknown")[:40],
-                s.get("timestamp", "")[:19]
+                s.get("timestamp", "")[:19],
             )
 
         console.print(table)
-        console.print(f"\n[dim]Use 'sindri recover --session-id <id>' to load a checkpoint[/]")
-        console.print(f"[dim]Use 'sindri resume <id>' to continue execution[/]")
+        console.print(
+            "\n[dim]Use 'sindri recover --session-id <id>' to load a checkpoint[/]"
+        )
+        console.print("[dim]Use 'sindri resume <id>' to continue execution[/]")
 
 
 @cli.command()
@@ -669,8 +743,6 @@ def doctor(config_path: str = None, verbose: bool = False):
     """Check Sindri installation and configuration."""
 
     from sindri.core.doctor import get_all_checks
-    from rich.table import Table
-    from pathlib import Path
 
     console.print("[bold cyan]🔨 Sindri Doctor[/bold cyan]\n")
     console.print("[dim]Checking system health...[/dim]\n")
@@ -709,7 +781,9 @@ def doctor(config_path: str = None, verbose: bool = False):
         for model in sorted(results["models"]["available"])[:5]:
             console.print(f"     • {model}")
         if len(results["models"]["available"]) > 5:
-            console.print(f"     [dim]... and {len(results['models']['available']) - 5} more[/dim]")
+            console.print(
+                f"     [dim]... and {len(results['models']['available']) - 5} more[/dim]"
+            )
 
     console.print()
     check_num += 1
@@ -736,7 +810,11 @@ def doctor(config_path: str = None, verbose: bool = False):
     if verbose:
         console.print()
         for module, description, is_optional, installed in results["dependencies"]:
-            status = "[green]✓[/green]" if installed else ("[yellow]⚠[/yellow]" if is_optional else "[red]✗[/red]")
+            status = (
+                "[green]✓[/green]"
+                if installed
+                else ("[yellow]⚠[/yellow]" if is_optional else "[red]✗[/red]")
+            )
             optional_tag = " [dim](optional)[/dim]" if is_optional else ""
             console.print(f"     {status} {description} ({module}){optional_tag}")
 
@@ -745,22 +823,25 @@ def doctor(config_path: str = None, verbose: bool = False):
     if results["overall"]["all_passed"]:
         console.print("[bold green]✓ All checks passed - Sindri is ready![/bold green]")
     elif results["overall"]["critical_passed"]:
-        console.print("[bold yellow]⚠ Some optional checks failed - Sindri should work[/bold yellow]")
+        console.print(
+            "[bold yellow]⚠ Some optional checks failed - Sindri should work[/bold yellow]"
+        )
     else:
-        console.print("[bold red]✗ Critical checks failed - Sindri may not work correctly[/bold red]")
+        console.print(
+            "[bold red]✗ Critical checks failed - Sindri may not work correctly[/bold red]"
+        )
         console.print("[dim]Fix the issues above and run 'sindri doctor' again[/dim]")
 
 
 def _print_check(num: int, check):
     """Helper to print a health check result."""
-    from sindri.core.doctor import HealthCheck
 
     status = "[green]✓[/green]" if check.passed else "[red]✗[/red]"
     console.print(f"[bold]{num}. {check.name}:[/] {status} {check.message}")
 
     if check.details:
         # Indent details
-        for line in check.details.split('\n'):
+        for line in check.details.split("\n"):
             console.print(f"   [dim]{line}[/dim]")
 
 
@@ -774,7 +855,6 @@ def plugins():
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
 def plugins_list(verbose: bool = False):
     """List installed plugins."""
-    from pathlib import Path
     from rich.table import Table
     from sindri.plugins import PluginManager, PluginType, PluginState
 
@@ -801,7 +881,9 @@ def plugins_list(verbose: bool = False):
         console.print("[yellow]No plugins found.[/yellow]")
         console.print(f"\n[dim]Plugin directory: {manager.plugin_dir}[/dim]")
         console.print(f"[dim]Agent config directory: {manager.agent_dir}[/dim]")
-        console.print("\n[dim]Create plugins in these directories to extend Sindri.[/dim]")
+        console.print(
+            "\n[dim]Create plugins in these directories to extend Sindri.[/dim]"
+        )
         return
 
     # Group by type
@@ -810,7 +892,9 @@ def plugins_list(verbose: bool = False):
 
     # Tool plugins table
     if tools:
-        table = Table(title="🔧 Tool Plugins", show_header=True, header_style="bold cyan")
+        table = Table(
+            title="🔧 Tool Plugins", show_header=True, header_style="bold cyan"
+        )
         table.add_column("Name", style="cyan", width=20)
         table.add_column("Status", width=12)
         table.add_column("Description", width=40)
@@ -836,7 +920,9 @@ def plugins_list(verbose: bool = False):
 
     # Agent plugins table
     if agents:
-        table = Table(title="🤖 Agent Plugins", show_header=True, header_style="bold magenta")
+        table = Table(
+            title="🤖 Agent Plugins", show_header=True, header_style="bold magenta"
+        )
         table.add_column("Name", style="magenta", width=15)
         table.add_column("Status", width=12)
         table.add_column("Model", style="yellow", width=25)
@@ -876,7 +962,9 @@ def plugins_list(verbose: bool = False):
 
     # Summary
     counts = manager.get_plugin_count()
-    console.print(f"\n[dim]Total: {len(plugins)} plugins ({counts.get('VALIDATED', 0)} validated, {counts.get('FAILED', 0)} failed)[/dim]")
+    console.print(
+        f"\n[dim]Total: {len(plugins)} plugins ({counts.get('VALIDATED', 0)} validated, {counts.get('FAILED', 0)} failed)[/dim]"
+    )
 
 
 @plugins.command("validate")
@@ -899,7 +987,7 @@ def plugins_validate(path: str, strict: bool = False):
         plugin_path,
         existing_tools=existing_tools,
         existing_agents=existing_agents,
-        strict=strict
+        strict=strict,
     )
 
     # Show errors
@@ -936,7 +1024,6 @@ def plugins_validate(path: str, strict: bool = False):
 @click.argument("name", required=False)
 def plugins_init(tool: bool, agent: bool, name: str = None):
     """Create a plugin template."""
-    from pathlib import Path
     from sindri.plugins import PluginManager
 
     manager = PluginManager()
@@ -1010,7 +1097,7 @@ class {plugin_name.title().replace("_", "")}Tool(Tool):
 '''
         plugin_path.write_text(template)
         console.print(f"[green]✓ Created tool template: {plugin_path}[/green]")
-        console.print(f"\n[dim]Edit the file to implement your custom tool.[/dim]")
+        console.print("\n[dim]Edit the file to implement your custom tool.[/dim]")
 
     if agent:
         agent_name = name or "example_agent"
@@ -1059,7 +1146,7 @@ When your task is complete, include <sindri:complete/> in your response.
 '''
         agent_path.write_text(template)
         console.print(f"[green]✓ Created agent template: {agent_path}[/green]")
-        console.print(f"\n[dim]Edit the file to customize your agent.[/dim]")
+        console.print("\n[dim]Edit the file to customize your agent.[/dim]")
 
 
 @plugins.command("dirs")
@@ -1080,15 +1167,23 @@ def plugins_dirs():
     console.print()
     if tool_exists:
         tool_count = len(list(manager.plugin_dir.glob("*.py")))
-        console.print(f"  [green]✓[/green] Tool directory exists ({tool_count} .py files)")
+        console.print(
+            f"  [green]✓[/green] Tool directory exists ({tool_count} .py files)"
+        )
     else:
-        console.print(f"  [yellow]⚠[/yellow] Tool directory doesn't exist (run 'sindri plugins init' to create)")
+        console.print(
+            "  [yellow]⚠[/yellow] Tool directory doesn't exist (run 'sindri plugins init' to create)"
+        )
 
     if agent_exists:
         agent_count = len(list(manager.agent_dir.glob("*.toml")))
-        console.print(f"  [green]✓[/green] Agent directory exists ({agent_count} .toml files)")
+        console.print(
+            f"  [green]✓[/green] Agent directory exists ({agent_count} .toml files)"
+        )
     else:
-        console.print(f"  [yellow]⚠[/yellow] Agent directory doesn't exist (run 'sindri plugins init' to create)")
+        console.print(
+            "  [yellow]⚠[/yellow] Agent directory doesn't exist (run 'sindri plugins init' to create)"
+        )
 
 
 # ============================================
@@ -1104,7 +1199,13 @@ def marketplace():
 
 @marketplace.command("search")
 @click.argument("query", required=False, default="")
-@click.option("--type", "-t", "plugin_type", type=click.Choice(["tool", "agent"]), help="Filter by type")
+@click.option(
+    "--type",
+    "-t",
+    "plugin_type",
+    type=click.Choice(["tool", "agent"]),
+    help="Filter by type",
+)
 @click.option("--category", "-c", help="Filter by category")
 @click.option("--tags", help="Filter by tags (comma-separated)")
 @click.option("--installed", "-i", is_flag=True, help="Only show installed plugins")
@@ -1113,7 +1214,7 @@ def marketplace_search(
     plugin_type: str = None,
     category: str = None,
     tags: str = None,
-    installed: bool = False
+    installed: bool = False,
 ):
     """Search for plugins by name, description, or tags.
 
@@ -1135,7 +1236,9 @@ def marketplace_search(
             cat = PluginCategory(category.lower())
         except ValueError:
             console.print(f"[red]Invalid category: {category}[/red]")
-            console.print(f"[dim]Valid categories: {', '.join(c.value for c in PluginCategory)}[/dim]")
+            console.print(
+                f"[dim]Valid categories: {', '.join(c.value for c in PluginCategory)}[/dim]"
+            )
             return
 
     # Handle tag-based search
@@ -1143,7 +1246,9 @@ def marketplace_search(
         tag_list = [t.strip() for t in tags.split(",")]
         results = searcher.search_by_tags(tag_list, installed_only=installed)
     elif query:
-        results = searcher.search(query, plugin_type=plugin_type, category=cat, installed_only=installed)
+        results = searcher.search(
+            query, plugin_type=plugin_type, category=cat, installed_only=installed
+        )
     elif plugin_type:
         results = searcher.search_by_type(plugin_type, installed_only=installed)
     elif cat:
@@ -1155,7 +1260,11 @@ def marketplace_search(
         console.print("[yellow]No plugins found matching your criteria.[/yellow]")
         return
 
-    table = Table(title=f"🔍 Plugin Search Results ({len(results)})", show_header=True, header_style="bold cyan")
+    table = Table(
+        title=f"🔍 Plugin Search Results ({len(results)})",
+        show_header=True,
+        header_style="bold cyan",
+    )
     table.add_column("Name", style="cyan", width=20)
     table.add_column("Type", width=8)
     table.add_column("Version", width=10)
@@ -1168,14 +1277,7 @@ def marketplace_search(
         plugin_type_str = "🔧 tool" if r.plugin_type == "tool" else "🤖 agent"
         desc = r.description[:32] + "..." if len(r.description) > 35 else r.description
 
-        table.add_row(
-            r.name,
-            plugin_type_str,
-            r.version,
-            r.category,
-            status,
-            desc
-        )
+        table.add_row(r.name, plugin_type_str, r.version, r.category, status, desc)
 
     console.print(table)
 
@@ -1191,7 +1293,7 @@ def marketplace_install(
     name: str = None,
     ref: str = None,
     no_validate: bool = False,
-    strict: bool = False
+    strict: bool = False,
 ):
     """Install a plugin from a source.
 
@@ -1220,7 +1322,9 @@ def marketplace_install(
 
     if result.success:
         plugin = result.plugin
-        console.print(f"[green]✓ Successfully installed: {plugin.metadata.name} v{plugin.metadata.version}[/green]")
+        console.print(
+            f"[green]✓ Successfully installed: {plugin.metadata.name} v{plugin.metadata.version}[/green]"
+        )
         console.print(f"  [dim]Type: {plugin.metadata.plugin_type}[/dim]")
         console.print(f"  [dim]Path: {plugin.installed_path}[/dim]")
 
@@ -1239,7 +1343,9 @@ def marketplace_install(
 
 @marketplace.command("uninstall")
 @click.argument("name")
-@click.option("--force", "-f", is_flag=True, help="Force uninstall without confirmation")
+@click.option(
+    "--force", "-f", is_flag=True, help="Force uninstall without confirmation"
+)
 def marketplace_uninstall(name: str, force: bool = False):
     """Uninstall an installed plugin.
 
@@ -1291,7 +1397,9 @@ def marketplace_update(name: str = None, update_all: bool = False):
     from sindri.marketplace import PluginInstaller, MarketplaceIndex
 
     if not name and not update_all:
-        console.print("[red]Specify a plugin name or use --all to update all plugins.[/red]")
+        console.print(
+            "[red]Specify a plugin name or use --all to update all plugins.[/red]"
+        )
         return
 
     index = MarketplaceIndex()
@@ -1303,7 +1411,9 @@ def marketplace_update(name: str = None, update_all: bool = False):
             console.print(f"[red]Plugin '{name}' is not installed.[/red]")
             return
         if plugin.pinned:
-            console.print(f"[yellow]Plugin '{name}' is pinned. Use 'sindri marketplace pin --unpin {name}' first.[/yellow]")
+            console.print(
+                f"[yellow]Plugin '{name}' is pinned. Use 'sindri marketplace pin --unpin {name}' first.[/yellow]"
+            )
             return
 
     installer = PluginInstaller(index=index)
@@ -1319,7 +1429,9 @@ def marketplace_update(name: str = None, update_all: bool = False):
     failures = [r for r in results if not r.success]
 
     for r in successes:
-        console.print(f"[green]✓ Updated: {r.plugin.metadata.name} → v{r.plugin.metadata.version}[/green]")
+        console.print(
+            f"[green]✓ Updated: {r.plugin.metadata.name} → v{r.plugin.metadata.version}[/green]"
+        )
 
     for r in failures:
         console.print(f"[red]✗ Failed: {r.error}[/red]")
@@ -1347,9 +1459,13 @@ def marketplace_info(name: str):
     console.print(f"[bold cyan]Plugin: {result.name}[/bold cyan]\n")
 
     console.print(f"  [bold]Version:[/bold]     {result.version}")
-    console.print(f"  [bold]Type:[/bold]        {'🔧 Tool' if result.plugin_type == 'tool' else '🤖 Agent'}")
+    console.print(
+        f"  [bold]Type:[/bold]        {'🔧 Tool' if result.plugin_type == 'tool' else '🤖 Agent'}"
+    )
     console.print(f"  [bold]Category:[/bold]    {result.category}")
-    console.print(f"  [bold]Status:[/bold]      {'[green]Installed[/green]' if result.installed else '[dim]Not installed[/dim]'}")
+    console.print(
+        f"  [bold]Status:[/bold]      {'[green]Installed[/green]' if result.installed else '[dim]Not installed[/dim]'}"
+    )
 
     if result.description:
         console.print(f"\n  [bold]Description:[/bold]\n  {result.description}")
@@ -1388,12 +1504,16 @@ def marketplace_pin(name: str, unpin: bool = False):
         index.set_pinned(name, False)
         index.save()
         console.print(f"[green]✓ Unpinned: {name}[/green]")
-        console.print("[dim]This plugin will be included in 'marketplace update --all'[/dim]")
+        console.print(
+            "[dim]This plugin will be included in 'marketplace update --all'[/dim]"
+        )
     else:
         index.set_pinned(name, True)
         index.save()
         console.print(f"[green]✓ Pinned: {name}[/green]")
-        console.print("[dim]This plugin will not be updated by 'marketplace update --all'[/dim]")
+        console.print(
+            "[dim]This plugin will not be updated by 'marketplace update --all'[/dim]"
+        )
 
 
 @marketplace.command("enable")
@@ -1431,7 +1551,6 @@ def marketplace_enable(name: str, disable: bool = False):
 @marketplace.command("stats")
 def marketplace_stats():
     """Show marketplace statistics."""
-    from rich.table import Table
     from sindri.marketplace import MarketplaceIndex
 
     index = MarketplaceIndex()
@@ -1441,7 +1560,9 @@ def marketplace_stats():
 
     if stats["total"] == 0:
         console.print("[yellow]No plugins installed from marketplace.[/yellow]")
-        console.print("[dim]Install plugins with: sindri marketplace install <source>[/dim]")
+        console.print(
+            "[dim]Install plugins with: sindri marketplace install <source>[/dim]"
+        )
         return
 
     console.print("[bold]📊 Marketplace Statistics[/bold]\n")
@@ -1478,7 +1599,9 @@ def marketplace_categories():
 
     categories = get_categories()
 
-    table = Table(title="📂 Plugin Categories", show_header=True, header_style="bold cyan")
+    table = Table(
+        title="📂 Plugin Categories", show_header=True, header_style="bold cyan"
+    )
     table.add_column("Category", style="cyan", width=15)
     table.add_column("Description", width=45)
 
@@ -1520,7 +1643,7 @@ def projects_list(tags: str = None, enabled_only: bool = False, verbose: bool = 
     table = Table(
         title=f"📁 Registered Projects ({len(projects)})",
         show_header=True,
-        header_style="bold cyan"
+        header_style="bold cyan",
     )
     table.add_column("Name", style="cyan", width=20)
     table.add_column("Status", width=10)
@@ -1531,7 +1654,11 @@ def projects_list(tags: str = None, enabled_only: bool = False, verbose: bool = 
 
     for p in projects:
         status = "[green]enabled[/green]" if p.enabled else "[yellow]disabled[/yellow]"
-        indexed = f"[green]{p.file_count} files[/green]" if p.indexed else "[dim]not indexed[/dim]"
+        indexed = (
+            f"[green]{p.file_count} files[/green]"
+            if p.indexed
+            else "[dim]not indexed[/dim]"
+        )
         tags_str = ", ".join(p.tags[:3]) if p.tags else "[dim]none[/dim]"
         if len(p.tags) > 3:
             tags_str += f" (+{len(p.tags)-3})"
@@ -1550,7 +1677,9 @@ def projects_list(tags: str = None, enabled_only: bool = False, verbose: bool = 
         "enabled": sum(1 for p in projects if p.enabled),
         "indexed": sum(1 for p in projects if p.indexed),
     }
-    console.print(f"\n[dim]Total: {stats['total']} | Enabled: {stats['enabled']} | Indexed: {stats['indexed']}[/dim]")
+    console.print(
+        f"\n[dim]Total: {stats['total']} | Enabled: {stats['enabled']} | Indexed: {stats['indexed']}[/dim]"
+    )
 
 
 @projects.command("add")
@@ -1560,7 +1689,6 @@ def projects_list(tags: str = None, enabled_only: bool = False, verbose: bool = 
 @click.option("--no-index", is_flag=True, help="Don't index immediately")
 def projects_add(path: str, name: str = None, tags: str = None, no_index: bool = False):
     """Add a project to the registry."""
-    from pathlib import Path
     from sindri.memory.projects import ProjectRegistry
     from sindri.memory.global_memory import GlobalMemoryStore
 
@@ -1583,7 +1711,9 @@ def projects_add(path: str, name: str = None, tags: str = None, no_index: bool =
                 console.print(f"[green]✓[/green] Indexed {chunks} chunks")
             except Exception as e:
                 console.print(f"[yellow]⚠[/yellow] Indexing failed: {e}")
-                console.print("[dim]You can index later with: sindri projects index <path>[/dim]")
+                console.print(
+                    "[dim]You can index later with: sindri projects index <path>[/dim]"
+                )
         else:
             console.print("\n[dim]Index with: sindri projects index <path>[/dim]")
 
@@ -1624,7 +1754,7 @@ def projects_remove(path: str, yes: bool = False):
     if registry.remove_project(path):
         console.print(f"[green]✓[/green] Removed project: {project.name}")
     else:
-        console.print(f"[red]✗[/red] Failed to remove project")
+        console.print("[red]✗[/red] Failed to remove project")
 
 
 @projects.command("tag")
@@ -1670,8 +1800,6 @@ def projects_search(query: str, limit: int, tags: str = None, exclude: str = Non
         sindri projects search "authentication handler"
         sindri projects search "API endpoint" --tags "python,fastapi"
     """
-    from rich.table import Table
-    from rich.syntax import Syntax
     from sindri.memory.global_memory import GlobalMemoryStore
 
     console.print(f"[dim]Searching for: {query}[/dim]\n")
@@ -1680,41 +1808,52 @@ def projects_search(query: str, limit: int, tags: str = None, exclude: str = Non
         global_memory = GlobalMemoryStore()
         tag_list = [t.strip() for t in tags.split(",")] if tags else None
         results = global_memory.search(
-            query,
-            limit=limit,
-            tags=tag_list,
-            exclude_current=exclude
+            query, limit=limit, tags=tag_list, exclude_current=exclude
         )
 
         if not results:
             console.print("[yellow]No results found.[/yellow]")
             stats = global_memory.get_stats()
-            console.print(f"\n[dim]Indexed: {stats['indexed_projects']} projects, {stats['total_chunks']} chunks[/dim]")
+            console.print(
+                f"\n[dim]Indexed: {stats['indexed_projects']} projects, {stats['total_chunks']} chunks[/dim]"
+            )
             return
 
         console.print(f"[green]Found {len(results)} results:[/green]\n")
 
         for i, result in enumerate(results, 1):
-            console.print(f"[bold cyan]{i}. [{result.project_name}][/bold cyan] {result.file_path}")
-            console.print(f"   Lines {result.start_line}-{result.end_line} | Similarity: {result.similarity:.2%}")
+            console.print(
+                f"[bold cyan]{i}. [{result.project_name}][/bold cyan] {result.file_path}"
+            )
+            console.print(
+                f"   Lines {result.start_line}-{result.end_line} | Similarity: {result.similarity:.2%}"
+            )
             if result.tags:
                 console.print(f"   Tags: {', '.join(result.tags)}")
 
             # Show code preview (truncated)
-            preview = result.content[:200] + "..." if len(result.content) > 200 else result.content
-            console.print(f"   [dim]─────[/dim]")
-            for line in preview.split('\n')[:5]:
+            preview = (
+                result.content[:200] + "..."
+                if len(result.content) > 200
+                else result.content
+            )
+            console.print("   [dim]─────[/dim]")
+            for line in preview.split("\n")[:5]:
                 console.print(f"   [dim]{line}[/dim]")
             console.print()
 
     except Exception as e:
         console.print(f"[red]✗[/red] Search failed: {e}")
-        console.print("[dim]Make sure projects are indexed: sindri projects index --all[/dim]")
+        console.print(
+            "[dim]Make sure projects are indexed: sindri projects index --all[/dim]"
+        )
 
 
 @projects.command("index")
 @click.argument("path", type=click.Path(), required=False)
-@click.option("--all", "-a", "index_all", is_flag=True, help="Index all registered projects")
+@click.option(
+    "--all", "-a", "index_all", is_flag=True, help="Index all registered projects"
+)
 @click.option("--force", "-f", is_flag=True, help="Force re-index")
 def projects_index(path: str = None, index_all: bool = False, force: bool = False):
     """Index project(s) for cross-project search.
@@ -1742,7 +1881,9 @@ def projects_index(path: str = None, index_all: bool = False, force: bool = Fals
             return
 
         total_chunks = sum(results.values())
-        console.print(f"\n[green]✓[/green] Indexed {len(results)} projects, {total_chunks} total chunks")
+        console.print(
+            f"\n[green]✓[/green] Indexed {len(results)} projects, {total_chunks} total chunks"
+        )
 
         for proj_path, chunks in results.items():
             proj_name = global_memory.registry.get_project(proj_path)
@@ -1820,9 +1961,20 @@ def projects_stats():
 @click.argument("rating", type=click.IntRange(1, 5))
 @click.option("--notes", "-n", help="Optional notes about the session")
 @click.option("--tag", "-t", multiple=True, help="Quality tags (can repeat)")
-@click.option("--turn", type=int, help="Rate specific turn index instead of whole session")
-@click.option("--exclude-training", is_flag=True, help="Exclude from training data export")
-def feedback(session_id: str, rating: int, notes: str = None, tag: tuple = None, turn: int = None, exclude_training: bool = False):
+@click.option(
+    "--turn", type=int, help="Rate specific turn index instead of whole session"
+)
+@click.option(
+    "--exclude-training", is_flag=True, help="Exclude from training data export"
+)
+def feedback(
+    session_id: str,
+    rating: int,
+    notes: str = None,
+    tag: tuple = None,
+    turn: int = None,
+    exclude_training: bool = False,
+):
     """Add feedback rating to a session (1-5 stars).
 
     SESSION_ID can be the full UUID or first 8 characters.
@@ -1854,7 +2006,9 @@ def feedback(session_id: str, rating: int, notes: str = None, tag: tuple = None,
 
             if not matching:
                 console.print(f"[red]✗ No session found starting with {session_id}[/]")
-                console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
+                console.print(
+                    "[dim]Use 'sindri sessions' to list available sessions[/dim]"
+                )
                 return False
             elif len(matching) > 1:
                 console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
@@ -1874,7 +2028,9 @@ def feedback(session_id: str, rating: int, notes: str = None, tag: tuple = None,
         # Validate turn index if provided
         if turn is not None:
             if turn < 0 or turn >= len(session.turns):
-                console.print(f"[red]✗ Invalid turn index {turn}. Session has {len(session.turns)} turns (0-{len(session.turns)-1})[/]")
+                console.print(
+                    f"[red]✗ Invalid turn index {turn}. Session has {len(session.turns)} turns (0-{len(session.turns)-1})[/]"
+                )
                 return False
 
         # Create feedback
@@ -1900,7 +2056,7 @@ def feedback(session_id: str, rating: int, notes: str = None, tag: tuple = None,
         if notes:
             console.print(f"  Notes: {notes[:50]}...")
         if exclude_training:
-            console.print(f"  [dim]Excluded from training export[/dim]")
+            console.print("  [dim]Excluded from training export[/dim]")
 
         return True
 
@@ -1926,7 +2082,9 @@ def feedback_stats():
 
         if stats["total_feedback"] == 0:
             console.print("[yellow]No feedback collected yet[/]")
-            console.print("[dim]Use 'sindri feedback <session_id> <rating>' to add feedback[/dim]")
+            console.print(
+                "[dim]Use 'sindri feedback <session_id> <rating>' to add feedback[/dim]"
+            )
             return
 
         console.print("[bold]📊 Feedback Statistics[/bold]\n")
@@ -1934,7 +2092,9 @@ def feedback_stats():
         console.print(f"  Total feedback entries: {stats['total_feedback']}")
         console.print(f"  Sessions with feedback: {stats['sessions_with_feedback']}")
         console.print(f"  Average rating: {stats['average_rating']:.1f}/5")
-        console.print(f"  Training candidates (4+ stars): [green]{stats['training_candidates']}[/green]")
+        console.print(
+            f"  Training candidates (4+ stars): [green]{stats['training_candidates']}[/green]"
+        )
 
         # Rating distribution
         if stats["rating_distribution"]:
@@ -1951,20 +2111,44 @@ def feedback_stats():
             for tag, count in list(stats["top_quality_tags"].items())[:5]:
                 console.print(f"  • {tag}: {count}")
 
-        console.print("\n[dim]Export training data: sindri export-training output.jsonl[/dim]")
+        console.print(
+            "\n[dim]Export training data: sindri export-training output.jsonl[/dim]"
+        )
 
     asyncio.run(show_stats())
 
 
 @cli.command("export-training")
 @click.argument("output", type=click.Path())
-@click.option("--format", "-f", type=click.Choice(["jsonl", "chatml", "ollama"]), default="jsonl", help="Export format")
-@click.option("--min-rating", "-r", default=4, type=click.IntRange(1, 5), help="Minimum rating to include")
-@click.option("--max-sessions", "-m", default=1000, type=int, help="Maximum sessions to export")
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["jsonl", "chatml", "ollama"]),
+    default="jsonl",
+    help="Export format",
+)
+@click.option(
+    "--min-rating",
+    "-r",
+    default=4,
+    type=click.IntRange(1, 5),
+    help="Minimum rating to include",
+)
+@click.option(
+    "--max-sessions", "-m", default=1000, type=int, help="Maximum sessions to export"
+)
 @click.option("--no-system-prompt", is_flag=True, help="Exclude system prompts")
 @click.option("--no-tools", is_flag=True, help="Exclude tool calls and results")
 @click.option("--agent", "-a", help="Export only sessions for specific agent/model")
-def export_training(output: str, format: str, min_rating: int, max_sessions: int, no_system_prompt: bool, no_tools: bool, agent: str = None):
+def export_training(
+    output: str,
+    format: str,
+    min_rating: int,
+    max_sessions: int,
+    no_system_prompt: bool,
+    no_tools: bool,
+    agent: str = None,
+):
     """Export high-quality sessions for LLM fine-tuning.
 
     Exports sessions rated 4+ stars in formats suitable for fine-tuning:
@@ -1997,7 +2181,7 @@ def export_training(output: str, format: str, min_rating: int, max_sessions: int
         }
         export_format = format_map[format]
 
-        console.print(f"[bold]📦 Exporting Training Data[/bold]\n")
+        console.print("[bold]📦 Exporting Training Data[/bold]\n")
         console.print(f"  Format: {format}")
         console.print(f"  Min rating: {min_rating}+ stars")
         console.print(f"  Max sessions: {max_sessions}")
@@ -2025,11 +2209,15 @@ def export_training(output: str, format: str, min_rating: int, max_sessions: int
 
         if stats.sessions_exported == 0:
             console.print("\n[yellow]⚠ No sessions exported[/]")
-            console.print("[dim]Add feedback with 'sindri feedback <session_id> <rating>'[/dim]")
-            console.print(f"[dim]Need sessions rated {min_rating}+ stars marked for training[/dim]")
+            console.print(
+                "[dim]Add feedback with 'sindri feedback <session_id> <rating>'[/dim]"
+            )
+            console.print(
+                f"[dim]Need sessions rated {min_rating}+ stars marked for training[/dim]"
+            )
             return
 
-        console.print(f"\n[green]✓ Export complete![/green]")
+        console.print("\n[green]✓ Export complete![/green]")
         console.print(f"  Sessions: {stats.sessions_exported}")
         console.print(f"  Conversations: {stats.conversations_exported}")
         console.print(f"  Turns: {stats.turns_exported}")
@@ -2037,17 +2225,35 @@ def export_training(output: str, format: str, min_rating: int, max_sessions: int
         console.print(f"  Output: {output_path}")
 
         if format == "ollama":
-            console.print(f"\n[dim]To create model: ollama create sindri-custom -f {output_path}[/dim]")
+            console.print(
+                f"\n[dim]To create model: ollama create sindri-custom -f {output_path}[/dim]"
+            )
         else:
-            console.print(f"\n[dim]Use this file for fine-tuning your preferred model[/dim]")
+            console.print(
+                "\n[dim]Use this file for fine-tuning your preferred model[/dim]"
+            )
 
     asyncio.run(do_export())
 
 
 @cli.command("feedback-list")
-@click.option("--min-rating", "-r", default=1, type=click.IntRange(1, 5), help="Minimum rating filter")
-@click.option("--max-rating", "-R", default=5, type=click.IntRange(1, 5), help="Maximum rating filter")
-@click.option("--training-only", is_flag=True, help="Only show sessions marked for training")
+@click.option(
+    "--min-rating",
+    "-r",
+    default=1,
+    type=click.IntRange(1, 5),
+    help="Minimum rating filter",
+)
+@click.option(
+    "--max-rating",
+    "-R",
+    default=5,
+    type=click.IntRange(1, 5),
+    help="Maximum rating filter",
+)
+@click.option(
+    "--training-only", is_flag=True, help="Only show sessions marked for training"
+)
 @click.option("--limit", "-l", default=20, type=int, help="Maximum sessions to show")
 def feedback_list(min_rating: int, max_rating: int, training_only: bool, limit: int):
     """List sessions with feedback.
@@ -2113,7 +2319,9 @@ def feedback_list(min_rating: int, max_rating: int, training_only: bool, limit: 
             )
 
         console.print(table)
-        console.print(f"\n[dim]Use 'sindri feedback <session_id> <rating>' to add more feedback[/dim]")
+        console.print(
+            "\n[dim]Use 'sindri feedback <session_id> <rating>' to add more feedback[/dim]"
+        )
 
     asyncio.run(list_feedback())
 
@@ -2125,11 +2333,23 @@ def feedback_list(min_rating: int, max_rating: int, training_only: bool, limit: 
 
 @cli.command()
 @click.argument("session_id")
-@click.option("--permission", "-p", type=click.Choice(["read", "comment", "write"]), default="read", help="Permission level")
+@click.option(
+    "--permission",
+    "-p",
+    type=click.Choice(["read", "comment", "write"]),
+    default="read",
+    help="Permission level",
+)
 @click.option("--expires", "-e", type=float, help="Hours until link expires")
 @click.option("--max-uses", "-m", type=int, help="Maximum number of uses")
 @click.option("--user", "-u", help="Your username (optional)")
-def share(session_id: str, permission: str, expires: float = None, max_uses: int = None, user: str = None):
+def share(
+    session_id: str,
+    permission: str,
+    expires: float = None,
+    max_uses: int = None,
+    user: str = None,
+):
     """Create a share link for a session.
 
     SESSION_ID can be the full UUID or first 8 characters.
@@ -2161,7 +2381,9 @@ def share(session_id: str, permission: str, expires: float = None, max_uses: int
 
             if not matching:
                 console.print(f"[red]✗ No session found starting with {session_id}[/]")
-                console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
+                console.print(
+                    "[dim]Use 'sindri sessions' to list available sessions[/dim]"
+                )
                 return False
             elif len(matching) > 1:
                 console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
@@ -2196,7 +2418,7 @@ def share(session_id: str, permission: str, expires: float = None, max_uses: int
 
         # Display share link
         share_url = share_obj.get_share_url()
-        console.print(f"[green]✓ Share link created![/green]\n")
+        console.print("[green]✓ Share link created![/green]\n")
         console.print(f"[bold cyan]{share_url}[/bold cyan]\n")
         console.print(f"  Session: {full_session_id[:8]} - {session.task[:40]}...")
         console.print(f"  Permission: {permission}")
@@ -2205,7 +2427,9 @@ def share(session_id: str, permission: str, expires: float = None, max_uses: int
         if max_uses:
             console.print(f"  Max uses: {max_uses}")
 
-        console.print("\n[dim]Share this link to give others access to the session[/dim]")
+        console.print(
+            "\n[dim]Share this link to give others access to the session[/dim]"
+        )
         return True
 
     asyncio.run(do_share())
@@ -2249,7 +2473,9 @@ def share_list(session_id: str):
         shares = await share_store.get_shares_for_session(full_session_id)
 
         if not shares:
-            console.print(f"[yellow]No shares found for session {full_session_id[:8]}[/]")
+            console.print(
+                f"[yellow]No shares found for session {full_session_id[:8]}[/]"
+            )
             console.print("[dim]Create one with: sindri share <session_id>[/dim]")
             return
 
@@ -2287,7 +2513,7 @@ def share_list(session_id: str):
             )
 
         console.print(table)
-        console.print(f"\n[dim]Revoke a share: sindri share-revoke <id>[/dim]")
+        console.print("\n[dim]Revoke a share: sindri share-revoke <id>[/dim]")
 
     asyncio.run(list_shares())
 
@@ -2324,9 +2550,23 @@ def share_revoke(share_id: int):
 @click.argument("content")
 @click.option("--turn", "-t", type=int, help="Turn index to attach comment to")
 @click.option("--line", "-l", type=int, help="Line number within turn")
-@click.option("--type", "-T", "comment_type", type=click.Choice(["comment", "suggestion", "question", "issue", "praise", "note"]), default="comment", help="Comment type")
+@click.option(
+    "--type",
+    "-T",
+    "comment_type",
+    type=click.Choice(["comment", "suggestion", "question", "issue", "praise", "note"]),
+    default="comment",
+    help="Comment type",
+)
 @click.option("--author", "-a", default="cli", help="Author name")
-def comment(session_id: str, content: str, turn: int = None, line: int = None, comment_type: str = "comment", author: str = "cli"):
+def comment(
+    session_id: str,
+    content: str,
+    turn: int = None,
+    line: int = None,
+    comment_type: str = "comment",
+    author: str = "cli",
+):
     """Add a review comment to a session.
 
     SESSION_ID can be the full UUID or first 8 characters.
@@ -2371,7 +2611,9 @@ def comment(session_id: str, content: str, turn: int = None, line: int = None, c
 
         # Validate turn index if provided
         if turn is not None and (turn < 0 or turn >= len(session.turns)):
-            console.print(f"[red]✗ Invalid turn {turn}. Session has {len(session.turns)} turns (0-{len(session.turns)-1})[/]")
+            console.print(
+                f"[red]✗ Invalid turn {turn}. Session has {len(session.turns)} turns (0-{len(session.turns)-1})[/]"
+            )
             return False
 
         # Map type string to enum
@@ -2394,7 +2636,7 @@ def comment(session_id: str, content: str, turn: int = None, line: int = None, c
             comment_type=type_map[comment_type],
         )
 
-        saved = await comment_store.add_comment(c)
+        await comment_store.add_comment(c)
 
         # Type icons
         type_icons = {
@@ -2406,8 +2648,10 @@ def comment(session_id: str, content: str, turn: int = None, line: int = None, c
             "note": "📝",
         }
 
-        console.print(f"[green]✓ Comment added![/green]")
-        console.print(f"  {type_icons.get(comment_type, '💬')} [{comment_type}] by {author}")
+        console.print("[green]✓ Comment added![/green]")
+        console.print(
+            f"  {type_icons.get(comment_type, '💬')} [{comment_type}] by {author}"
+        )
         if turn is not None:
             loc = f"Turn {turn}"
             if line is not None:
@@ -2422,7 +2666,9 @@ def comment(session_id: str, content: str, turn: int = None, line: int = None, c
 
 @cli.command("comment-list")
 @click.argument("session_id")
-@click.option("--include-resolved", "-r", is_flag=True, help="Include resolved comments")
+@click.option(
+    "--include-resolved", "-r", is_flag=True, help="Include resolved comments"
+)
 @click.option("--turn", "-t", type=int, help="Filter by turn index")
 def comment_list(session_id: str, include_resolved: bool = False, turn: int = None):
     """List comments on a session.
@@ -2464,11 +2710,17 @@ def comment_list(session_id: str, include_resolved: bool = False, turn: int = No
         if turn is not None:
             comments = await comment_store.get_comments_for_turn(full_session_id, turn)
         else:
-            comments = await comment_store.get_comments_for_session(full_session_id, include_resolved=include_resolved)
+            comments = await comment_store.get_comments_for_session(
+                full_session_id, include_resolved=include_resolved
+            )
 
         if not comments:
-            console.print(f"[yellow]No comments found for session {full_session_id[:8]}[/]")
-            console.print("[dim]Add one with: sindri comment <session_id> \"comment text\"[/dim]")
+            console.print(
+                f"[yellow]No comments found for session {full_session_id[:8]}[/]"
+            )
+            console.print(
+                '[dim]Add one with: sindri comment <session_id> "comment text"[/dim]'
+            )
             return
 
         # Type icons
@@ -2509,7 +2761,9 @@ def comment_list(session_id: str, include_resolved: bool = False, turn: int = No
                 status = f"[dim]{c.status.value}[/dim]"
 
             # Content preview
-            content_preview = c.content[:37] + "..." if len(c.content) > 40 else c.content
+            content_preview = (
+                c.content[:37] + "..." if len(c.content) > 40 else c.content
+            )
             content_preview = content_preview.replace("\n", " ")
 
             table.add_row(
@@ -2590,7 +2844,9 @@ def collab_stats():
         # Comment stats
         console.print("[bold]💬 Review Comments:[/bold]")
         console.print(f"  Total comments: {comment_stats['total_comments']}")
-        console.print(f"  Sessions with comments: {comment_stats['sessions_commented']}")
+        console.print(
+            f"  Sessions with comments: {comment_stats['sessions_commented']}"
+        )
         console.print(f"  Unique authors: {comment_stats['unique_authors']}")
 
         if comment_stats["status_breakdown"]:
@@ -2612,11 +2868,31 @@ def collab_stats():
 
 
 @cli.command()
-@click.option("--model", "-m", type=click.Choice(["tiny", "base", "small", "medium", "large"]), default="base", help="Whisper model size")
-@click.option("--mode", type=click.Choice(["push_to_talk", "wake_word", "continuous"]), default="push_to_talk", help="Voice mode")
-@click.option("--wake-word", "-w", default="sindri", help="Wake word for wake_word mode")
-@click.option("--tts", type=click.Choice(["pyttsx3", "piper", "espeak"]), default="pyttsx3", help="TTS engine")
-@click.option("--work-dir", type=click.Path(), help="Working directory for file operations")
+@click.option(
+    "--model",
+    "-m",
+    type=click.Choice(["tiny", "base", "small", "medium", "large"]),
+    default="base",
+    help="Whisper model size",
+)
+@click.option(
+    "--mode",
+    type=click.Choice(["push_to_talk", "wake_word", "continuous"]),
+    default="push_to_talk",
+    help="Voice mode",
+)
+@click.option(
+    "--wake-word", "-w", default="sindri", help="Wake word for wake_word mode"
+)
+@click.option(
+    "--tts",
+    type=click.Choice(["pyttsx3", "piper", "espeak"]),
+    default="pyttsx3",
+    help="TTS engine",
+)
+@click.option(
+    "--work-dir", type=click.Path(), help="Working directory for file operations"
+)
 def voice(model: str, mode: str, wake_word: str, tts: str, work_dir: str = None):
     """Start voice-controlled interface.
 
@@ -2636,7 +2912,13 @@ def voice(model: str, mode: str, wake_word: str, tts: str, work_dir: str = None)
         sindri voice --model small --tts espeak
     """
     try:
-        from sindri.voice import VoiceInterface, VoiceMode, WhisperModel, VoiceConfig, TTSEngine
+        from sindri.voice import (
+            VoiceInterface,
+            VoiceMode,
+            WhisperModel,
+            VoiceConfig,
+            TTSEngine,
+        )
     except ImportError as e:
         console.print("[red]✗ Voice dependencies not installed[/red]")
         console.print(f"[dim]Error: {e}[/dim]")
@@ -2668,14 +2950,16 @@ def voice(model: str, mode: str, wake_word: str, tts: str, work_dir: str = None)
     voice_mode = mode_map[mode]
     tts_engine = tts_map[tts]
 
-    console.print(Panel(
-        f"[bold blue]Voice Interface[/bold blue]\n\n"
-        f"STT Model: Whisper {model}\n"
-        f"TTS Engine: {tts}\n"
-        f"Mode: {mode}\n"
-        f"Wake Word: {wake_word if mode == 'wake_word' else 'N/A'}",
-        title="🎤 Starting Voice Mode"
-    ))
+    console.print(
+        Panel(
+            f"[bold blue]Voice Interface[/bold blue]\n\n"
+            f"STT Model: Whisper {model}\n"
+            f"TTS Engine: {tts}\n"
+            f"Mode: {mode}\n"
+            f"Wake Word: {wake_word if mode == 'wake_word' else 'N/A'}",
+            title="🎤 Starting Voice Mode",
+        )
+    )
 
     async def run_voice():
         from sindri.core.orchestrator import Orchestrator
@@ -2685,7 +2969,7 @@ def voice(model: str, mode: str, wake_word: str, tts: str, work_dir: str = None)
 
         # Create orchestrator for executing commands
         config = LoopConfig(max_iterations=30)
-        orchestrator = Orchestrator(config=config, work_dir=work_path)
+        Orchestrator(config=config, work_dir=work_path)
 
         def handle_command(text: str) -> str:
             """Handle voice command by running through orchestrator."""
@@ -2772,9 +3056,17 @@ def voice(model: str, mode: str, wake_word: str, tts: str, work_dir: str = None)
 
 @cli.command()
 @click.argument("text")
-@click.option("--engine", "-e", type=click.Choice(["pyttsx3", "piper", "espeak"]), default="pyttsx3", help="TTS engine")
+@click.option(
+    "--engine",
+    "-e",
+    type=click.Choice(["pyttsx3", "piper", "espeak"]),
+    default="pyttsx3",
+    help="TTS engine",
+)
 @click.option("--rate", "-r", default=175, help="Speech rate (words per minute)")
-@click.option("--output", "-o", type=click.Path(), help="Save to WAV file instead of playing")
+@click.option(
+    "--output", "-o", type=click.Path(), help="Save to WAV file instead of playing"
+)
 def say(text: str, engine: str, rate: int, output: str = None):
     """Speak text using text-to-speech.
 
@@ -2811,6 +3103,7 @@ def say(text: str, engine: str, rate: int, output: str = None):
         if output:
             # Save to file
             from pathlib import Path
+
             success = await tts.synthesize_to_file(text, Path(output))
             if success:
                 console.print(f"[green]✓ Saved to {output}[/green]")
@@ -2827,7 +3120,13 @@ def say(text: str, engine: str, rate: int, output: str = None):
 
 @cli.command()
 @click.argument("audio_file", type=click.Path(exists=True))
-@click.option("--model", "-m", type=click.Choice(["tiny", "base", "small", "medium", "large"]), default="base", help="Whisper model size")
+@click.option(
+    "--model",
+    "-m",
+    type=click.Choice(["tiny", "base", "small", "medium", "large"]),
+    default="base",
+    help="Whisper model size",
+)
 @click.option("--translate", is_flag=True, help="Translate to English")
 def transcribe(audio_file: str, model: str, translate: bool):
     """Transcribe an audio file to text.
@@ -2872,7 +3171,7 @@ def transcribe(audio_file: str, model: str, translate: bool):
             console.print("[yellow]No speech detected in audio[/yellow]")
             return
 
-        console.print(f"\n[bold]Transcription:[/bold]")
+        console.print("\n[bold]Transcription:[/bold]")
         console.print(result.text)
         console.print(f"\n[dim]Language: {result.language}[/dim]")
         console.print(f"[dim]Duration: {result.duration_seconds:.1f}s[/dim]")
@@ -2895,17 +3194,17 @@ def voice_status():
 
     # Check STT dependencies
     console.print("[bold]Speech-to-Text (Whisper):[/bold]")
-    try:
-        from faster_whisper import WhisperModel
+    import importlib.util
+
+    if importlib.util.find_spec("faster_whisper"):
         console.print("  [green]✓ faster-whisper installed[/green]")
-    except ImportError:
+    else:
         console.print("  [red]✗ faster-whisper not installed[/red]")
         console.print("    [dim]Install with: pip install faster-whisper[/dim]")
 
-    try:
-        import pyaudio
+    if importlib.util.find_spec("pyaudio"):
         console.print("  [green]✓ pyaudio installed (microphone support)[/green]")
-    except ImportError:
+    else:
         console.print("  [yellow]⚠ pyaudio not installed (no microphone)[/yellow]")
         console.print("    [dim]Install with: pip install pyaudio[/dim]")
 
@@ -2914,10 +3213,9 @@ def voice_status():
     # Check TTS dependencies
     console.print("[bold]Text-to-Speech:[/bold]")
 
-    try:
-        import pyttsx3
+    if importlib.util.find_spec("pyttsx3"):
         console.print("  [green]✓ pyttsx3 installed[/green]")
-    except ImportError:
+    else:
         console.print("  [yellow]⚠ pyttsx3 not installed[/yellow]")
         console.print("    [dim]Install with: pip install pyttsx3[/dim]")
 
@@ -2948,7 +3246,9 @@ def voice_status():
         console.print("  [yellow]⚠ No audio player found[/yellow]")
 
     console.print()
-    console.print("[dim]Install all voice dependencies with: pip install sindri[voice][/dim]")
+    console.print(
+        "[dim]Install all voice dependencies with: pip install sindri[voice][/dim]"
+    )
 
 
 # ============================================
@@ -2958,13 +3258,43 @@ def voice_status():
 
 @cli.command("scan")
 @click.option("--path", "-p", type=click.Path(exists=True), help="Project path to scan")
-@click.option("--ecosystem", "-e", type=click.Choice(["python", "node", "rust", "go"]), help="Override ecosystem detection")
-@click.option("--severity", "-s", type=click.Choice(["low", "medium", "high", "critical"]), default="low", help="Minimum severity to report")
-@click.option("--format", "-f", "output_format", type=click.Choice(["text", "json", "sarif"]), default="text", help="Output format")
-@click.option("--include-dev/--no-dev", default=True, help="Include development dependencies")
+@click.option(
+    "--ecosystem",
+    "-e",
+    type=click.Choice(["python", "node", "rust", "go"]),
+    help="Override ecosystem detection",
+)
+@click.option(
+    "--severity",
+    "-s",
+    type=click.Choice(["low", "medium", "high", "critical"]),
+    default="low",
+    help="Minimum severity to report",
+)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["text", "json", "sarif"]),
+    default="text",
+    help="Output format",
+)
+@click.option(
+    "--include-dev/--no-dev", default=True, help="Include development dependencies"
+)
 @click.option("--outdated", is_flag=True, help="Also check for outdated packages")
-@click.option("--fix", is_flag=True, help="Attempt to fix vulnerabilities automatically")
-def scan_dependencies(path: str, ecosystem: str, severity: str, output_format: str, include_dev: bool, outdated: bool, fix: bool):
+@click.option(
+    "--fix", is_flag=True, help="Attempt to fix vulnerabilities automatically"
+)
+def scan_dependencies(
+    path: str,
+    ecosystem: str,
+    severity: str,
+    output_format: str,
+    include_dev: bool,
+    outdated: bool,
+    fix: bool,
+):
     """Scan project dependencies for security vulnerabilities.
 
     Automatically detects project type and uses the appropriate scanner:
@@ -3006,9 +3336,13 @@ def scan_dependencies(path: str, ecosystem: str, severity: str, output_format: s
             if meta.get("vulnerability_count", 0) > 0:
                 console.print()
                 if meta.get("critical", 0) > 0:
-                    console.print(f"[red bold]⚠ {meta['critical']} CRITICAL vulnerabilities found![/red bold]")
+                    console.print(
+                        f"[red bold]⚠ {meta['critical']} CRITICAL vulnerabilities found![/red bold]"
+                    )
                 if meta.get("high", 0) > 0:
-                    console.print(f"[red]{meta['high']} high severity vulnerabilities[/red]")
+                    console.print(
+                        f"[red]{meta['high']} high severity vulnerabilities[/red]"
+                    )
             else:
                 console.print("\n[green]✓ No vulnerabilities found[/green]")
         else:
@@ -3019,9 +3353,18 @@ def scan_dependencies(path: str, ecosystem: str, severity: str, output_format: s
 
 @cli.command("sbom")
 @click.option("--path", "-p", type=click.Path(exists=True), help="Project path")
-@click.option("--format", "-f", "output_format", type=click.Choice(["cyclonedx", "spdx"]), default="cyclonedx", help="SBOM format")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["cyclonedx", "spdx"]),
+    default="cyclonedx",
+    help="SBOM format",
+)
 @click.option("--output", "-o", type=click.Path(), help="Output file path")
-@click.option("--include-dev/--no-dev", default=True, help="Include development dependencies")
+@click.option(
+    "--include-dev/--no-dev", default=True, help="Include development dependencies"
+)
 def generate_sbom(path: str, output_format: str, output: str, include_dev: bool):
     """Generate Software Bill of Materials (SBOM).
 
@@ -3051,7 +3394,9 @@ def generate_sbom(path: str, output_format: str, output: str, include_dev: bool)
         if result.success:
             if output:
                 console.print(f"[green]✓ SBOM saved to {output}[/green]")
-                console.print(f"[dim]Format: {output_format}, Dependencies: {result.metadata.get('dependency_count', 0)}[/dim]")
+                console.print(
+                    f"[dim]Format: {output_format}, Dependencies: {result.metadata.get('dependency_count', 0)}[/dim]"
+                )
             else:
                 console.print(result.output)
         else:
@@ -3062,7 +3407,9 @@ def generate_sbom(path: str, output_format: str, output: str, include_dev: bool)
 
 @cli.command("outdated")
 @click.option("--path", "-p", type=click.Path(exists=True), help="Project path")
-@click.option("--include-dev/--no-dev", default=True, help="Include development dependencies")
+@click.option(
+    "--include-dev/--no-dev", default=True, help="Include development dependencies"
+)
 def check_outdated(path: str, include_dev: bool):
     """Check for outdated dependencies.
 
@@ -3089,7 +3436,9 @@ def check_outdated(path: str, include_dev: bool):
 
             meta = result.metadata
             if meta.get("outdated_count", 0) > 0:
-                console.print(f"\n[yellow]⚠ {meta['outdated_count']} packages have updates available[/yellow]")
+                console.print(
+                    f"\n[yellow]⚠ {meta['outdated_count']} packages have updates available[/yellow]"
+                )
         else:
             console.print(f"[red]✗ Check failed: {result.error}[/red]")
 
@@ -3138,8 +3487,11 @@ def security_status():
 
         # Check cargo-audit
         import subprocess
+
         try:
-            result = subprocess.run(["cargo", "audit", "--version"], capture_output=True, timeout=5)
+            result = subprocess.run(
+                ["cargo", "audit", "--version"], capture_output=True, timeout=5
+            )
             if result.returncode == 0:
                 console.print("  [green]✓ cargo-audit installed[/green]")
             else:
@@ -3162,7 +3514,9 @@ def security_status():
             console.print("  [green]✓ govulncheck installed[/green]")
         else:
             console.print("  [yellow]⚠ govulncheck not installed[/yellow]")
-            console.print("    [dim]Install with: go install golang.org/x/vuln/cmd/govulncheck@latest[/dim]")
+            console.print(
+                "    [dim]Install with: go install golang.org/x/vuln/cmd/govulncheck@latest[/dim]"
+            )
     else:
         console.print("  [dim]○ go not found (Go not installed)[/dim]")
 
@@ -3176,16 +3530,43 @@ def security_status():
 
 
 @cli.command("api-spec")
-@click.option("--path", "-p", type=click.Path(exists=True), help="Project path to scan for routes")
-@click.option("--output", "-o", type=click.Path(), help="Output file path (default: openapi.json)")
-@click.option("--format", "-f", "output_format", type=click.Choice(["json", "yaml"]), default="json", help="Output format")
+@click.option(
+    "--path", "-p", type=click.Path(exists=True), help="Project path to scan for routes"
+)
+@click.option(
+    "--output", "-o", type=click.Path(), help="Output file path (default: openapi.json)"
+)
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["json", "yaml"]),
+    default="json",
+    help="Output format",
+)
 @click.option("--title", "-t", help="API title (auto-detected if not provided)")
 @click.option("--version", "-v", "api_version", default="1.0.0", help="API version")
 @click.option("--description", "-d", help="API description")
-@click.option("--server", "-s", "servers", multiple=True, help="Server URL (can specify multiple)")
-@click.option("--framework", type=click.Choice(["flask", "fastapi", "express", "django", "gin", "echo"]), help="Override framework detection")
+@click.option(
+    "--server", "-s", "servers", multiple=True, help="Server URL (can specify multiple)"
+)
+@click.option(
+    "--framework",
+    type=click.Choice(["flask", "fastapi", "express", "django", "gin", "echo"]),
+    help="Override framework detection",
+)
 @click.option("--dry-run", is_flag=True, help="Preview spec without creating file")
-def api_spec(path: str, output: str, output_format: str, title: str, api_version: str, description: str, servers: tuple, framework: str, dry_run: bool):
+def api_spec(
+    path: str,
+    output: str,
+    output_format: str,
+    title: str,
+    api_version: str,
+    description: str,
+    servers: tuple,
+    framework: str,
+    dry_run: bool,
+):
     """Generate OpenAPI specification from route definitions.
 
     Automatically detects the web framework and extracts route information
@@ -3226,10 +3607,12 @@ def api_spec(path: str, output: str, output_format: str, title: str, api_version
         if result.success:
             meta = result.metadata
             if dry_run:
-                console.print(f"[bold]OpenAPI Spec Preview[/bold] (dry run)\n")
+                console.print("[bold]OpenAPI Spec Preview[/bold] (dry run)\n")
                 console.print(f"Framework: {meta.get('framework', 'unknown')}")
                 console.print(f"Routes: {meta.get('routes_count', 0)}")
-                console.print(f"Would write to: {meta.get('output_file', 'openapi.json')}\n")
+                console.print(
+                    f"Would write to: {meta.get('output_file', 'openapi.json')}\n"
+                )
                 # Print a truncated preview
                 output_text = result.output
                 if len(output_text) > 2000:
@@ -3238,12 +3621,18 @@ def api_spec(path: str, output: str, output_format: str, title: str, api_version
                 else:
                     console.print(output_text)
             else:
-                console.print(f"[green]✓ OpenAPI spec generated: {meta.get('output_file')}[/green]")
-                console.print(f"[dim]Framework: {meta.get('framework')}, Routes: {meta.get('routes_count')}[/dim]")
+                console.print(
+                    f"[green]✓ OpenAPI spec generated: {meta.get('output_file')}[/green]"
+                )
+                console.print(
+                    f"[dim]Framework: {meta.get('framework')}, Routes: {meta.get('routes_count')}[/dim]"
+                )
         else:
             console.print(f"[red]✗ Generation failed: {result.error}[/red]")
             if result.metadata.get("framework"):
-                console.print(f"[dim]Detected framework: {result.metadata.get('framework')}[/dim]")
+                console.print(
+                    f"[dim]Detected framework: {result.metadata.get('framework')}[/dim]"
+                )
 
     asyncio.run(do_generate())
 
@@ -3289,9 +3678,13 @@ def validate_api_spec(file_path: str):
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", "-p", default=8000, help="Port to listen on")
 @click.option("--vram-gb", default=16.0, help="Total VRAM in GB")
-@click.option("--work-dir", "-w", type=click.Path(), help="Working directory for file operations")
+@click.option(
+    "--work-dir", "-w", type=click.Path(), help="Working directory for file operations"
+)
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
-def web(host: str, port: int, vram_gb: float, work_dir: str = None, reload: bool = False):
+def web(
+    host: str, port: int, vram_gb: float, work_dir: str = None, reload: bool = False
+):
     """Start the Sindri Web API server.
 
     The Web API provides:
@@ -3306,7 +3699,7 @@ def web(host: str, port: int, vram_gb: float, work_dir: str = None, reload: bool
     """
     try:
         import uvicorn
-        from fastapi import FastAPI
+        import fastapi  # noqa: F401 - Check if fastapi is available
     except ImportError:
         console.print("[red]✗ Web dependencies not installed[/red]")
         console.print("[dim]Install with: pip install sindri[web][/dim]")
@@ -3314,13 +3707,15 @@ def web(host: str, port: int, vram_gb: float, work_dir: str = None, reload: bool
 
     from pathlib import Path
 
-    console.print(Panel(
-        f"[bold blue]Sindri Web API[/bold blue]\n\n"
-        f"Host: {host}\n"
-        f"Port: {port}\n"
-        f"VRAM: {vram_gb}GB",
-        title="🌐 Starting Server"
-    ))
+    console.print(
+        Panel(
+            f"[bold blue]Sindri Web API[/bold blue]\n\n"
+            f"Host: {host}\n"
+            f"Port: {port}\n"
+            f"VRAM: {vram_gb}GB",
+            title="🌐 Starting Server",
+        )
+    )
 
     work_path = Path(work_dir).resolve() if work_dir else None
 
@@ -3338,7 +3733,7 @@ def web(host: str, port: int, vram_gb: float, work_dir: str = None, reload: bool
             port=port,
             reload=True,
             factory=True,
-            log_level="info"
+            log_level="info",
         )
     else:
         # Production mode

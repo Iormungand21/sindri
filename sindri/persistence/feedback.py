@@ -120,7 +120,9 @@ class FeedbackStore:
         """
         await self.db.initialize()
 
-        quality_tags_json = json.dumps(feedback.quality_tags) if feedback.quality_tags else None
+        quality_tags_json = (
+            json.dumps(feedback.quality_tags) if feedback.quality_tags else None
+        )
 
         async with self.db.get_connection() as conn:
             cursor = await conn.execute(
@@ -183,7 +185,9 @@ class FeedbackStore:
                         quality_tags=quality_tags,
                         notes=row[5],
                         include_in_training=bool(row[6]),
-                        created_at=datetime.fromisoformat(row[7]) if row[7] else datetime.now(),
+                        created_at=(
+                            datetime.fromisoformat(row[7]) if row[7] else datetime.now()
+                        ),
                     )
                     feedback_list.append(feedback)
 
@@ -223,7 +227,9 @@ class FeedbackStore:
                     quality_tags=quality_tags,
                     notes=row[5],
                     include_in_training=bool(row[6]),
-                    created_at=datetime.fromisoformat(row[7]) if row[7] else datetime.now(),
+                    created_at=(
+                        datetime.fromisoformat(row[7]) if row[7] else datetime.now()
+                    ),
                 )
 
     async def update_feedback(self, feedback: SessionFeedback) -> bool:
@@ -240,7 +246,9 @@ class FeedbackStore:
 
         await self.db.initialize()
 
-        quality_tags_json = json.dumps(feedback.quality_tags) if feedback.quality_tags else None
+        quality_tags_json = (
+            json.dumps(feedback.quality_tags) if feedback.quality_tags else None
+        )
 
         async with self.db.get_connection() as conn:
             cursor = await conn.execute(
@@ -414,7 +422,9 @@ class FeedbackStore:
                     rating_dist[row[0]] = row[1]
 
             # Average rating
-            async with conn.execute("SELECT AVG(rating) FROM session_feedback") as cursor:
+            async with conn.execute(
+                "SELECT AVG(rating) FROM session_feedback"
+            ) as cursor:
                 avg_rating = (await cursor.fetchone())[0]
 
             # Training candidates (4+ rating, marked for training)

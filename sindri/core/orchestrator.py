@@ -16,7 +16,7 @@ from sindri.core.hierarchical import HierarchicalAgentLoop
 from sindri.core.loop import LoopConfig
 from sindri.memory.system import MuninnMemory
 from sindri.memory.summarizer import ConversationSummarizer
-from sindri.core.events import EventBus, Event, EventType
+from sindri.core.events import EventBus
 
 log = structlog.get_logger()
 
@@ -31,7 +31,7 @@ class Orchestrator:
         total_vram_gb: float = 16.0,
         enable_memory: bool = True,
         event_bus: Optional[EventBus] = None,
-        work_dir: Optional[Path] = None
+        work_dir: Optional[Path] = None,
     ):
         self.client = client or OllamaClient()
         self.config = config or LoopConfig()
@@ -44,9 +44,7 @@ class Orchestrator:
         self.state = SessionState()
         # Phase 6.2: Pass model_manager for pre-warming during delegation
         self.delegation = DelegationManager(
-            self.scheduler,
-            self.state,
-            model_manager=self.model_manager
+            self.scheduler, self.state, model_manager=self.model_manager
         )
         self.tools = ToolRegistry.default(work_dir=work_dir)
 
@@ -71,7 +69,7 @@ class Orchestrator:
             config=self.config,
             memory=self.memory,
             summarizer=self.summarizer,
-            event_bus=self.event_bus
+            event_bus=self.event_bus,
         )
 
         log.info("orchestrator_initialized", memory_enabled=enable_memory)
@@ -104,16 +102,14 @@ class Orchestrator:
         Returns:
             Dict with success status, task_id, result, and subtask count.
         """
-        log.info("orchestrator_started",
-                 request=user_request[:100],
-                 parallel=parallel)
+        log.info("orchestrator_started", request=user_request[:100], parallel=parallel)
 
         # Create root task assigned to Brokkr (orchestrator)
         root_task = Task(
             description=user_request,
             task_type="orchestration",
             assigned_agent="brokkr",
-            priority=0
+            priority=0,
         )
 
         # Add to scheduler
@@ -129,7 +125,7 @@ class Orchestrator:
                     "success": False,
                     "task_id": root_task.id,
                     "error": "Task cancelled by user",
-                    "output": "Task cancelled"
+                    "output": "Task cancelled",
                 }
 
             if parallel:
@@ -152,18 +148,20 @@ class Orchestrator:
                 "success": True,
                 "task_id": root_task.id,
                 "result": root_task.result,
-                "subtasks": len(root_task.subtask_ids)
+                "subtasks": len(root_task.subtask_ids),
             }
         else:
-            log.error("orchestrator_failed",
-                      task_id=root_task.id,
-                      status=root_task.status.value,
-                      error=root_task.error)
+            log.error(
+                "orchestrator_failed",
+                task_id=root_task.id,
+                status=root_task.status.value,
+                error=root_task.error,
+            )
             return {
                 "success": False,
                 "task_id": root_task.id,
                 "status": root_task.status.value,
-                "error": root_task.error
+                "error": root_task.error,
             }
 
     async def _run_parallel_batch(self) -> str:
@@ -180,7 +178,8 @@ class Orchestrator:
         if not batch:
             # No tasks ready - check if we're waiting
             waiting_count = sum(
-                1 for t in self.scheduler.tasks.values()
+                1
+                for t in self.scheduler.tasks.values()
                 if t.status == TaskStatus.WAITING
             )
 
@@ -188,47 +187,53 @@ class Orchestrator:
                 log.info("waiting_for_subtasks", count=waiting_count)
                 return "waiting"
             else:
-                log.warning("no_tasks_ready",
-                            pending=self.scheduler.get_pending_count())
+                log.warning(
+                    "no_tasks_ready", pending=self.scheduler.get_pending_count()
+                )
                 return "stuck"
 
         if len(batch) == 1:
             # Single task - run directly
             task = batch[0]
-            log.info("executing_task",
-                     task_id=task.id,
-                     agent=task.assigned_agent,
-                     description=task.description[:50])
+            log.info(
+                "executing_task",
+                task_id=task.id,
+                agent=task.assigned_agent,
+                description=task.description[:50],
+            )
             result = await self.loop.run_task(task)
-            log.info("task_result",
-                     task_id=task.id,
-                     success=result.success,
-                     iterations=result.iterations)
+            log.info(
+                "task_result",
+                task_id=task.id,
+                success=result.success,
+                iterations=result.iterations,
+            )
         else:
             # Multiple tasks - run in parallel
-            log.info("executing_parallel_batch",
-                     task_count=len(batch),
-                     tasks=[t.id for t in batch])
+            log.info(
+                "executing_parallel_batch",
+                task_count=len(batch),
+                tasks=[t.id for t in batch],
+            )
 
             # Execute all tasks concurrently
             results = await asyncio.gather(
-                *[self.loop.run_task(task) for task in batch],
-                return_exceptions=True
+                *[self.loop.run_task(task) for task in batch], return_exceptions=True
             )
 
             # Log results
             for task, result in zip(batch, results):
                 if isinstance(result, Exception):
-                    log.error("task_exception",
-                              task_id=task.id,
-                              error=str(result))
+                    log.error("task_exception", task_id=task.id, error=str(result))
                     task.status = TaskStatus.FAILED
                     task.error = str(result)
                 else:
-                    log.info("task_result",
-                             task_id=task.id,
-                             success=result.success,
-                             iterations=result.iterations)
+                    log.info(
+                        "task_result",
+                        task_id=task.id,
+                        success=result.success,
+                        iterations=result.iterations,
+                    )
 
         return "ok"
 
@@ -244,7 +249,8 @@ class Orchestrator:
 
         if next_task is None:
             waiting_count = sum(
-                1 for t in self.scheduler.tasks.values()
+                1
+                for t in self.scheduler.tasks.values()
                 if t.status == TaskStatus.WAITING
             )
 
@@ -252,20 +258,25 @@ class Orchestrator:
                 log.info("waiting_for_subtasks", count=waiting_count)
                 return "waiting"
             else:
-                log.warning("no_tasks_ready",
-                            pending=self.scheduler.get_pending_count())
+                log.warning(
+                    "no_tasks_ready", pending=self.scheduler.get_pending_count()
+                )
                 return "stuck"
 
-        log.info("executing_task",
-                 task_id=next_task.id,
-                 agent=next_task.assigned_agent,
-                 description=next_task.description[:50])
+        log.info(
+            "executing_task",
+            task_id=next_task.id,
+            agent=next_task.assigned_agent,
+            description=next_task.description[:50],
+        )
 
         result = await self.loop.run_task(next_task)
 
-        log.info("task_result",
-                 task_id=next_task.id,
-                 success=result.success,
-                 iterations=result.iterations)
+        log.info(
+            "task_result",
+            task_id=next_task.id,
+            success=result.success,
+            iterations=result.iterations,
+        )
 
         return "ok"

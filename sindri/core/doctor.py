@@ -14,7 +14,9 @@ log = structlog.get_logger()
 class HealthCheck:
     """Result of a health check."""
 
-    def __init__(self, name: str, passed: bool, message: str, details: Optional[str] = None):
+    def __init__(
+        self, name: str, passed: bool, message: str, details: Optional[str] = None
+    ):
         self.name = name
         self.passed = passed
         self.message = message
@@ -25,6 +27,7 @@ def check_ollama() -> HealthCheck:
     """Check if Ollama is running and responsive."""
     try:
         import ollama
+
         client = ollama.Client()
         models = client.list()
         model_count = len(models.get("models", []))
@@ -33,21 +36,18 @@ def check_ollama() -> HealthCheck:
             name="Ollama",
             passed=True,
             message=f"Running ({model_count} models available)",
-            details=None
+            details=None,
         )
     except ConnectionError:
         return HealthCheck(
             name="Ollama",
             passed=False,
             message="Not running or unreachable",
-            details="Start Ollama with: systemctl start ollama"
+            details="Start Ollama with: systemctl start ollama",
         )
     except Exception as e:
         return HealthCheck(
-            name="Ollama",
-            passed=False,
-            message=f"Error: {str(e)}",
-            details=None
+            name="Ollama", passed=False, message=f"Error: {str(e)}", details=None
         )
 
 
@@ -69,6 +69,7 @@ def check_required_models() -> Tuple[HealthCheck, List[str], List[str]]:
 
     try:
         import ollama
+
         client = ollama.Client()
         models_response = client.list()
 
@@ -80,8 +81,8 @@ def check_required_models() -> Tuple[HealthCheck, List[str], List[str]]:
         for model in available_raw:
             # Add both the full name and the base name (without tag)
             available_normalized.add(model)
-            if ':' in model:
-                available_normalized.add(model.split(':')[0])
+            if ":" in model:
+                available_normalized.add(model.split(":")[0])
 
         missing = required_models - available_normalized
         available_required = required_models & available_normalized
@@ -92,10 +93,10 @@ def check_required_models() -> Tuple[HealthCheck, List[str], List[str]]:
                     name="Required Models",
                     passed=True,
                     message=f"All {len(required_models)} required models available",
-                    details=None
+                    details=None,
                 ),
                 list(available_required),
-                []
+                [],
             )
         else:
             return (
@@ -103,10 +104,10 @@ def check_required_models() -> Tuple[HealthCheck, List[str], List[str]]:
                     name="Required Models",
                     passed=False,
                     message=f"{len(missing)} models missing",
-                    details=f"Missing: {', '.join(sorted(missing))}"
+                    details=f"Missing: {', '.join(sorted(missing))}",
                 ),
                 list(available_required),
-                list(missing)
+                list(missing),
             )
     except Exception as e:
         return (
@@ -114,10 +115,10 @@ def check_required_models() -> Tuple[HealthCheck, List[str], List[str]]:
                 name="Required Models",
                 passed=False,
                 message=f"Error: {str(e)}",
-                details=None
+                details=None,
             ),
             [],
-            list(required_models)
+            list(required_models),
         )
 
 
@@ -129,26 +130,26 @@ def check_gpu_vram() -> HealthCheck:
             ["rocm-smi", "--showmeminfo", "vram"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
         )
 
         if result.returncode == 0:
             # Parse rocm-smi output to get total VRAM
             # This is a simple approach - rocm-smi output varies
-            lines = result.stdout.split('\n')
+            lines = result.stdout.split("\n")
             for line in lines:
-                if 'Total VRAM' in line or 'VRAM Total' in line:
+                if "Total VRAM" in line or "VRAM Total" in line:
                     # Try to extract number
                     parts = line.split()
                     for i, part in enumerate(parts):
-                        if part.isdigit() or (part.replace('.', '').isdigit()):
+                        if part.isdigit() or (part.replace(".", "").isdigit()):
                             vram_mb = int(float(part))
                             vram_gb = vram_mb / 1024 if vram_mb > 1000 else vram_mb
                             return HealthCheck(
                                 name="GPU/VRAM",
                                 passed=True,
                                 message=f"AMD GPU detected (~{vram_gb:.1f} GB VRAM)",
-                                details="Using ROCm"
+                                details="Using ROCm",
                             )
 
             # If we got here, rocm-smi ran but we couldn't parse
@@ -156,7 +157,7 @@ def check_gpu_vram() -> HealthCheck:
                 name="GPU/VRAM",
                 passed=True,
                 message="AMD GPU detected (VRAM unknown)",
-                details="rocm-smi available"
+                details="rocm-smi available",
             )
     except FileNotFoundError:
         pass  # rocm-smi not found, try other methods
@@ -169,7 +170,7 @@ def check_gpu_vram() -> HealthCheck:
             ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=5,
         )
 
         if result.returncode == 0:
@@ -179,7 +180,7 @@ def check_gpu_vram() -> HealthCheck:
                 name="GPU/VRAM",
                 passed=True,
                 message=f"NVIDIA GPU detected ({vram_gb:.1f} GB VRAM)",
-                details="Using CUDA"
+                details="Using CUDA",
             )
     except FileNotFoundError:
         pass  # nvidia-smi not found
@@ -191,7 +192,7 @@ def check_gpu_vram() -> HealthCheck:
         name="GPU/VRAM",
         passed=False,
         message="GPU not detected",
-        details="Install rocm-smi (AMD) or nvidia-smi (NVIDIA) for GPU detection"
+        details="Install rocm-smi (AMD) or nvidia-smi (NVIDIA) for GPU detection",
     )
 
 
@@ -208,7 +209,7 @@ def check_backup() -> HealthCheck:
                 name="Backups",
                 passed=True,
                 message="No backups yet",
-                details="Backups will be created automatically before migrations"
+                details="Backups will be created automatically before migrations",
             )
 
         # Format size
@@ -221,6 +222,7 @@ def check_backup() -> HealthCheck:
         # Format age of newest backup
         if stats["newest"]:
             from datetime import datetime
+
             age = datetime.now() - stats["newest"]
             if age.days > 0:
                 age_str = f"{age.days}d ago"
@@ -235,7 +237,7 @@ def check_backup() -> HealthCheck:
             name="Backups",
             passed=True,
             message=f"{stats['count']} backups ({size_str})",
-            details=f"Latest: {age_str}"
+            details=f"Latest: {age_str}",
         )
 
     except Exception as e:
@@ -243,7 +245,7 @@ def check_backup() -> HealthCheck:
             name="Backups",
             passed=True,  # Non-critical check
             message=f"Could not check: {str(e)}",
-            details=None
+            details=None,
         )
 
 
@@ -258,7 +260,7 @@ def check_database() -> HealthCheck:
                 name="Database",
                 passed=True,
                 message="Not created yet",
-                details="Will be created on first run"
+                details="Will be created on first run",
             )
 
         # Test database connection and basic query
@@ -276,7 +278,7 @@ def check_database() -> HealthCheck:
                 name="Database",
                 passed=False,
                 message="Schema not initialized",
-                details="Database exists but tables are missing"
+                details="Database exists but tables are missing",
             )
 
         # Count sessions
@@ -292,7 +294,7 @@ def check_database() -> HealthCheck:
             name="Database",
             passed=True,
             message=f"OK ({session_count} sessions, {db_size_mb:.2f} MB)",
-            details=str(db_path)
+            details=str(db_path),
         )
 
     except sqlite3.Error as e:
@@ -300,14 +302,11 @@ def check_database() -> HealthCheck:
             name="Database",
             passed=False,
             message=f"Database error: {str(e)}",
-            details="Database may be corrupted"
+            details="Database may be corrupted",
         )
     except Exception as e:
         return HealthCheck(
-            name="Database",
-            passed=False,
-            message=f"Error: {str(e)}",
-            details=None
+            name="Database", passed=False, message=f"Error: {str(e)}", details=None
         )
 
 
@@ -318,17 +317,14 @@ def check_python_version() -> HealthCheck:
 
     if (major, minor) >= (3, 11):
         return HealthCheck(
-            name="Python Version",
-            passed=True,
-            message=f"{version_str}",
-            details=None
+            name="Python Version", passed=True, message=f"{version_str}", details=None
         )
     else:
         return HealthCheck(
             name="Python Version",
             passed=False,
             message=f"{version_str} (requires >= 3.11)",
-            details="Upgrade Python to 3.11 or higher"
+            details="Upgrade Python to 3.11 or higher",
         )
 
 
@@ -366,9 +362,9 @@ def check_dependencies() -> Tuple[HealthCheck, List[Tuple[str, str, bool]]]:
                 name="Dependencies",
                 passed=True,
                 message=f"{installed_count}/{len(deps)} packages available",
-                details=None
+                details=None,
             ),
-            results
+            results,
         )
     else:
         return (
@@ -376,9 +372,9 @@ def check_dependencies() -> Tuple[HealthCheck, List[Tuple[str, str, bool]]]:
                 name="Dependencies",
                 passed=False,
                 message=f"{len(missing_required)} required packages missing",
-                details=f"Missing: {', '.join(missing_required)}"
+                details=f"Missing: {', '.join(missing_required)}",
             ),
-            results
+            results,
         )
 
 
@@ -399,14 +395,14 @@ def check_config(config_path: Optional[str] = None) -> HealthCheck:
                 name="Configuration",
                 passed=True,
                 message="Loaded with warnings",
-                details="; ".join(warnings)
+                details="; ".join(warnings),
             )
         else:
             return HealthCheck(
                 name="Configuration",
                 passed=True,
                 message="OK",
-                details=f"Data dir: {config.data_dir}"
+                details=f"Data dir: {config.data_dir}",
             )
 
     except FileNotFoundError:
@@ -414,14 +410,11 @@ def check_config(config_path: Optional[str] = None) -> HealthCheck:
             name="Configuration",
             passed=True,
             message="Using defaults",
-            details="No config file found, using built-in defaults"
+            details="No config file found, using built-in defaults",
         )
     except Exception as e:
         return HealthCheck(
-            name="Configuration",
-            passed=False,
-            message=f"Error: {str(e)}",
-            details=None
+            name="Configuration", passed=False, message=f"Error: {str(e)}", details=None
         )
 
 
@@ -451,20 +444,18 @@ def get_all_checks(config_path: Optional[str] = None) -> Dict:
     # Calculate overall status
     all_passed = all(check.passed for check in results.values())
     critical_passed = all(
-        check.passed for name, check in results.items()
+        check.passed
+        for name, check in results.items()
         if name in ["ollama", "python", "dependencies"]
     )
 
     return {
         "checks": results,
-        "models": {
-            "available": available_models,
-            "missing": missing_models
-        },
+        "models": {"available": available_models, "missing": missing_models},
         "dependencies": dep_details,
         "overall": {
             "all_passed": all_passed,
             "critical_passed": critical_passed,
-            "ready": critical_passed  # Can use Sindri if critical checks pass
-        }
+            "ready": critical_passed,  # Can use Sindri if critical checks pass
+        },
     }

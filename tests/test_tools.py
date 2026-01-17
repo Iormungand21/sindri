@@ -3,7 +3,6 @@
 import pytest
 from pathlib import Path
 import tempfile
-import os
 
 from sindri.tools.filesystem import ReadFileTool, WriteFileTool, EditFileTool
 from sindri.tools.shell import ShellTool
@@ -49,9 +48,7 @@ async def test_edit_file():
         file_path.write_text("Hello, world!")
 
         result = await tool.execute(
-            path=str(file_path),
-            old_text="world",
-            new_text="Sindri"
+            path=str(file_path), old_text="world", new_text="Sindri"
         )
 
         assert result.success

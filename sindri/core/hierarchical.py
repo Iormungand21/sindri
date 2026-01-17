@@ -11,7 +11,7 @@ from sindri.llm.streaming import StreamingBuffer
 from sindri.tools.registry import ToolRegistry
 from sindri.tools.delegation import DelegateTool
 from sindri.persistence.state import SessionState
-from sindri.persistence.metrics import MetricsCollector, MetricsStore, SessionMetrics
+from sindri.persistence.metrics import MetricsCollector, MetricsStore
 from sindri.core.loop import LoopConfig, LoopResult
 from sindri.core.completion import CompletionDetector
 from sindri.core.context import ContextBuilder
@@ -43,7 +43,7 @@ class HierarchicalAgentLoop:
         summarizer: Optional[ConversationSummarizer] = None,
         event_bus: Optional[EventBus] = None,
         recovery: Optional[RecoveryManager] = None,
-        enable_metrics: bool = True  # Phase 5.5: Performance metrics
+        enable_metrics: bool = True,  # Phase 5.5: Performance metrics
     ):
         self.client = client
         self.tools = tools
@@ -60,7 +60,9 @@ class HierarchicalAgentLoop:
         # Phase 5.5: Performance metrics
         self.enable_metrics = enable_metrics
         self._metrics_store = MetricsStore() if enable_metrics else None
-        self._metrics_collectors: dict[str, MetricsCollector] = {}  # Per-session collectors
+        self._metrics_collectors: dict[str, MetricsCollector] = (
+            {}
+        )  # Per-session collectors
 
     async def run_task(self, task: Task) -> LoopResult:
         """Run a specific task with its assigned agent."""
@@ -70,7 +72,7 @@ class HierarchicalAgentLoop:
             return LoopResult(
                 success=False,
                 iterations=0,
-                reason=f"Unknown agent: {task.assigned_agent}"
+                reason=f"Unknown agent: {task.assigned_agent}",
             )
 
         # Ensure model is loaded (Phase 5.6: with fallback support)
@@ -81,11 +83,13 @@ class HierarchicalAgentLoop:
         # Phase 5.6: Try fallback model if primary fails and fallback is available
         active_model = agent.model
         if not loaded and agent.fallback_model:
-            log.warning("model_degradation_attempt",
-                       task_id=task.id,
-                       agent=agent.name,
-                       primary_model=agent.model,
-                       fallback_model=agent.fallback_model)
+            log.warning(
+                "model_degradation_attempt",
+                task_id=task.id,
+                agent=agent.name,
+                primary_model=agent.model,
+                fallback_model=agent.fallback_model,
+            )
 
             loaded = await self.scheduler.model_manager.ensure_loaded(
                 agent.fallback_model, agent.fallback_vram_gb or 3.0
@@ -93,54 +97,65 @@ class HierarchicalAgentLoop:
 
             if loaded:
                 active_model = agent.fallback_model
-                log.info("model_degradation_success",
-                        task_id=task.id,
-                        agent=agent.name,
-                        using_model=active_model)
+                log.info(
+                    "model_degradation_success",
+                    task_id=task.id,
+                    agent=agent.name,
+                    using_model=active_model,
+                )
 
                 # Emit degradation event for TUI
-                self.event_bus.emit(Event(
-                    type=EventType.MODEL_DEGRADED,
-                    data={
-                        "task_id": task.id,
-                        "agent": agent.name,
-                        "primary_model": agent.model,
-                        "fallback_model": agent.fallback_model,
-                        "reason": "insufficient_vram"
-                    },
-                    task_id=task.id
-                ))
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.MODEL_DEGRADED,
+                        data={
+                            "task_id": task.id,
+                            "agent": agent.name,
+                            "primary_model": agent.model,
+                            "fallback_model": agent.fallback_model,
+                            "reason": "insufficient_vram",
+                        },
+                        task_id=task.id,
+                    )
+                )
 
         if not loaded:
-            fallback_info = f" (fallback {agent.fallback_model} also failed)" if agent.fallback_model else ""
+            fallback_info = (
+                f" (fallback {agent.fallback_model} also failed)"
+                if agent.fallback_model
+                else ""
+            )
             error_reason = f"Could not load model {agent.model}{fallback_info}"
 
             # Phase 5.6: Save checkpoint on model load failure
             self._save_error_checkpoint(
                 task=task,
                 error_reason=error_reason,
-                error_context={"model": agent.model, "fallback_model": agent.fallback_model}
+                error_context={
+                    "model": agent.model,
+                    "fallback_model": agent.fallback_model,
+                },
             )
 
-            return LoopResult(
-                success=False,
-                iterations=0,
-                reason=error_reason
-            )
+            return LoopResult(success=False, iterations=0, reason=error_reason)
 
         task.status = TaskStatus.RUNNING
         task.started_at = datetime.now()
 
         # Emit task status event
-        self.event_bus.emit(Event(
-            type=EventType.TASK_STATUS_CHANGED,
-            data={"task_id": task.id, "status": TaskStatus.RUNNING}
-        ))
+        self.event_bus.emit(
+            Event(
+                type=EventType.TASK_STATUS_CHANGED,
+                data={"task_id": task.id, "status": TaskStatus.RUNNING},
+            )
+        )
 
-        log.info("task_started",
-                 task_id=task.id,
-                 agent=agent.name,
-                 description=task.description[:50])
+        log.info(
+            "task_started",
+            task_id=task.id,
+            agent=agent.name,
+            description=task.description[:50],
+        )
 
         # Add delegate tool if agent can delegate
         task_tools = ToolRegistry()
@@ -154,7 +169,9 @@ class HierarchicalAgentLoop:
                 if tool:
                     task_tools.register(tool)
 
-        result = await self._run_loop(task, agent, task_tools, active_model=active_model)
+        result = await self._run_loop(
+            task, agent, task_tools, active_model=active_model
+        )
 
         if result.success:
             task.status = TaskStatus.COMPLETE
@@ -167,10 +184,12 @@ class HierarchicalAgentLoop:
                 self.recovery.clear_checkpoint(task.id)
 
             # Emit completion event
-            self.event_bus.emit(Event(
-                type=EventType.TASK_STATUS_CHANGED,
-                data={"task_id": task.id, "status": TaskStatus.COMPLETE}
-            ))
+            self.event_bus.emit(
+                Event(
+                    type=EventType.TASK_STATUS_CHANGED,
+                    data={"task_id": task.id, "status": TaskStatus.COMPLETE},
+                )
+            )
 
             log.info("task_completed", task_id=task.id, iterations=result.iterations)
         elif task.status != TaskStatus.CANCELLED:
@@ -180,36 +199,38 @@ class HierarchicalAgentLoop:
             await self.delegation.child_failed(task)
 
             # Emit failure event
-            self.event_bus.emit(Event(
-                type=EventType.TASK_STATUS_CHANGED,
-                data={"task_id": task.id, "status": TaskStatus.FAILED}
-            ))
+            self.event_bus.emit(
+                Event(
+                    type=EventType.TASK_STATUS_CHANGED,
+                    data={"task_id": task.id, "status": TaskStatus.FAILED},
+                )
+            )
 
             # Emit error event for TUI
-            self.event_bus.emit(Event(
-                type=EventType.ERROR,
-                data={
-                    "task_id": task.id,
-                    "error": result.reason or "Task failed",
-                    "error_type": "task_failure",
-                    "agent": agent.name,
-                    "description": task.description[:100]
-                }
-            ))
+            self.event_bus.emit(
+                Event(
+                    type=EventType.ERROR,
+                    data={
+                        "task_id": task.id,
+                        "error": result.reason or "Task failed",
+                        "error_type": "task_failure",
+                        "agent": agent.name,
+                        "description": task.description[:100],
+                    },
+                )
+            )
 
-            log.error("task_failed",
-                      task_id=task.id,
-                      reason=result.reason,
-                      iterations=result.iterations)
+            log.error(
+                "task_failed",
+                task_id=task.id,
+                reason=result.reason,
+                iterations=result.iterations,
+            )
 
         return result
 
     async def _run_loop(
-        self,
-        task: Task,
-        agent,
-        task_tools: ToolRegistry,
-        active_model: str = None
+        self, task: Task, agent, task_tools: ToolRegistry, active_model: str = None
     ) -> LoopResult:
         """Execute the agent loop for a task.
 
@@ -225,12 +246,19 @@ class HierarchicalAgentLoop:
         # Resume existing session if available, otherwise create new one
         # Note: Use model_to_use for session (may be fallback model)
         if task.session_id:
-            log.info("resuming_session", task_id=task.id, session_id=task.session_id, model=model_to_use)
+            log.info(
+                "resuming_session",
+                task_id=task.id,
+                session_id=task.session_id,
+                model=model_to_use,
+            )
             session = await self.state.load_session(task.session_id)
             if not session:
                 log.warning("session_not_found", session_id=task.session_id)
                 # Fallback: create new session
-                session = await self.state.create_session(task.description, model_to_use)
+                session = await self.state.create_session(
+                    task.description, model_to_use
+                )
                 task.session_id = session.id
         else:
             # Create new session for new task
@@ -252,7 +280,7 @@ class HierarchicalAgentLoop:
             metrics_collector = MetricsCollector(
                 session_id=session.id,
                 task_description=task.description,
-                model_name=model_to_use
+                model_name=model_to_use,
             )
             self._metrics_collectors[session.id] = metrics_collector
             # Start task tracking
@@ -261,39 +289,40 @@ class HierarchicalAgentLoop:
                 description=task.description,
                 agent_name=agent.name,
                 model_name=model_to_use,
-                model_load_time=0.0  # TODO: Track actual model load time
+                model_load_time=0.0,  # TODO: Track actual model load time
             )
             log.debug("metrics_collector_initialized", session_id=session.id)
 
         recent_responses = []
         tool_call_history = []  # Phase 5.6: Track tool calls for repetition detection
-        nudge_count = 0         # Phase 5.6: Track nudges for escalation
+        nudge_count = 0  # Phase 5.6: Track nudges for escalation
         completion_detector = CompletionDetector(self.config.completion_marker)
         tool_parser = ToolCallParser()
 
         for iteration in range(agent.max_iterations):
             # Check for cancellation
             if task.cancel_requested:
-                log.info("task_cancelled_in_loop", task_id=task.id, iteration=iteration + 1)
+                log.info(
+                    "task_cancelled_in_loop", task_id=task.id, iteration=iteration + 1
+                )
                 task.status = TaskStatus.CANCELLED
                 task.error = "Task cancelled by user"
-                self.event_bus.emit(Event(
-                    type=EventType.TASK_STATUS_CHANGED,
-                    data={"task_id": task.id, "status": TaskStatus.CANCELLED}
-                ))
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.TASK_STATUS_CHANGED,
+                        data={"task_id": task.id, "status": TaskStatus.CANCELLED},
+                    )
+                )
 
                 # Phase 5.6: Save checkpoint on cancellation
                 self._save_error_checkpoint(
                     task=task,
                     error_reason="cancelled_by_user",
                     session_id=session.id if session else None,
-                    iteration=iteration + 1
+                    iteration=iteration + 1,
                 )
 
-                return LoopResult(
-                    success=False,
-                    iterations=iteration + 1
-                )
+                return LoopResult(success=False, iterations=iteration + 1)
 
             # Phase 5.6: Warn agent about remaining iterations
             iterations_remaining = agent.max_iterations - iteration
@@ -309,46 +338,52 @@ class HierarchicalAgentLoop:
                         "Please prioritize completing the task or marking blockers."
                     )
 
-                log.warning("iteration_warning",
-                           task_id=task.id,
-                           remaining=iterations_remaining)
+                log.warning(
+                    "iteration_warning", task_id=task.id, remaining=iterations_remaining
+                )
 
                 # Emit warning event for TUI
-                self.event_bus.emit(Event(
-                    type=EventType.ITERATION_WARNING,
-                    data={
-                        "task_id": task.id,
-                        "remaining": iterations_remaining,
-                        "message": warning_msg
-                    },
-                    task_id=task.id
-                ))
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.ITERATION_WARNING,
+                        data={
+                            "task_id": task.id,
+                            "remaining": iterations_remaining,
+                            "message": warning_msg,
+                        },
+                        task_id=task.id,
+                    )
+                )
 
                 # Inject warning into session so agent sees it
                 session.add_turn("system", warning_msg)
 
-            log.info("iteration_start",
-                     task_id=task.id,
-                     iteration=iteration + 1,
-                     agent=agent.name)
+            log.info(
+                "iteration_start",
+                task_id=task.id,
+                iteration=iteration + 1,
+                agent=agent.name,
+            )
 
             # Emit iteration start event
-            self.event_bus.emit(Event(
-                type=EventType.ITERATION_START,
-                data={
-                    "task_id": task.id,
-                    "iteration": iteration + 1,
-                    "agent": agent.name
-                }
-            ))
+            self.event_bus.emit(
+                Event(
+                    type=EventType.ITERATION_START,
+                    data={
+                        "task_id": task.id,
+                        "iteration": iteration + 1,
+                        "agent": agent.name,
+                    },
+                )
+            )
 
             # Phase 5.5: Start iteration timing
-            iteration_start_time = time.time()
+            time.time()
             if metrics_collector:
                 metrics_collector.start_iteration(
                     iteration_number=iteration + 1,
                     agent_name=agent.name,
-                    model_name=model_to_use
+                    model_name=model_to_use,
                 )
 
             # Build messages with memory-augmented context if available
@@ -364,7 +399,7 @@ class HierarchicalAgentLoop:
                     project_id=project_id,
                     current_task=task.description,
                     conversation=conversation,
-                    max_tokens=agent.max_context_tokens
+                    max_tokens=agent.max_context_tokens,
                 )
 
                 # Add system prompt with task info
@@ -372,7 +407,7 @@ class HierarchicalAgentLoop:
                     agent.system_prompt,
                     task.description,
                     task.context,
-                    task_tools.get_schemas()
+                    task_tools.get_schemas(),
                 )
 
                 messages = [system_msg] + memory_messages
@@ -383,7 +418,7 @@ class HierarchicalAgentLoop:
                     task.description,
                     task.context,
                     session.turns,
-                    task_tools.get_schemas()
+                    task_tools.get_schemas(),
                 )
 
             # Call LLM (Phase 5.6: use model_to_use for potential fallback)
@@ -394,13 +429,13 @@ class HierarchicalAgentLoop:
                     messages=messages,
                     tools=task_tools.get_schemas(),
                     task=task,
-                    agent=agent
+                    agent=agent,
                 )
             else:
                 response = await self.client.chat(
                     model=model_to_use,
                     messages=messages,
-                    tools=task_tools.get_schemas()
+                    tools=task_tools.get_schemas(),
                 )
                 assistant_content = response.message.content
 
@@ -409,40 +444,43 @@ class HierarchicalAgentLoop:
                 log.info("task_cancelled_after_llm", task_id=task.id)
                 task.status = TaskStatus.CANCELLED
                 task.error = "Task cancelled by user"
-                self.event_bus.emit(Event(
-                    type=EventType.TASK_STATUS_CHANGED,
-                    data={"task_id": task.id, "status": TaskStatus.CANCELLED}
-                ))
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.TASK_STATUS_CHANGED,
+                        data={"task_id": task.id, "status": TaskStatus.CANCELLED},
+                    )
+                )
 
                 # Phase 5.6: Save checkpoint on cancellation
                 self._save_error_checkpoint(
                     task=task,
                     error_reason="cancelled_after_llm",
                     session_id=session.id,
-                    iteration=iteration + 1
+                    iteration=iteration + 1,
                 )
 
-                return LoopResult(
-                    success=False,
-                    iterations=iteration + 1
-                )
+                return LoopResult(success=False, iterations=iteration + 1)
 
             # assistant_content is already set by streaming or non-streaming path
-            log.info("llm_response",
-                     task_id=task.id,
-                     content=assistant_content[:200] if assistant_content else "",
-                     has_tool_calls=response.message.tool_calls is not None)
+            log.info(
+                "llm_response",
+                task_id=task.id,
+                content=assistant_content[:200] if assistant_content else "",
+                has_tool_calls=response.message.tool_calls is not None,
+            )
 
             # Emit agent output event (only if not streaming - streaming emits tokens directly)
             if not self.config.streaming:
-                self.event_bus.emit(Event(
-                    type=EventType.AGENT_OUTPUT,
-                    data={
-                        "task_id": task.id,
-                        "agent": agent.name,
-                        "text": assistant_content
-                    }
-                ))
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.AGENT_OUTPUT,
+                        data={
+                            "task_id": task.id,
+                            "agent": agent.name,
+                            "text": assistant_content,
+                        },
+                    )
+                )
 
             # Execute tool calls FIRST (before checking completion)
             # This ensures tools are executed even if agent prematurely marks complete
@@ -450,44 +488,60 @@ class HierarchicalAgentLoop:
             calls_to_execute = []
 
             # Check for native tool calls first
-            log.info("tool_check", native_tool_calls=response.message.tool_calls,
-                     content_has_json="{" in assistant_content)
+            log.info(
+                "tool_check",
+                native_tool_calls=response.message.tool_calls,
+                content_has_json="{" in assistant_content,
+            )
             if response.message.tool_calls:
-                log.info("native_tool_calls_detected",
-                         task_id=task.id,
-                         count=len(response.message.tool_calls))
+                log.info(
+                    "native_tool_calls_detected",
+                    task_id=task.id,
+                    count=len(response.message.tool_calls),
+                )
                 calls_to_execute = response.message.tool_calls
             else:
                 # Try parsing tool calls from text
-                log.info("attempting_tool_parse", content_preview=assistant_content[:200])
+                log.info(
+                    "attempting_tool_parse", content_preview=assistant_content[:200]
+                )
                 parsed_calls = tool_parser.parse(assistant_content)
-                log.info("parse_result", parsed_count=len(parsed_calls) if parsed_calls else 0)
+                log.info(
+                    "parse_result",
+                    parsed_count=len(parsed_calls) if parsed_calls else 0,
+                )
                 if parsed_calls:
-                    log.info("parsed_tool_calls_from_text",
-                             task_id=task.id,
-                             count=len(parsed_calls))
+                    log.info(
+                        "parsed_tool_calls_from_text",
+                        task_id=task.id,
+                        count=len(parsed_calls),
+                    )
+
                     # Convert parsed calls to native format
                     class CallWrapper:
                         def __init__(self, name, arguments):
-                            self.function = type('obj', (object,), {
-                                'name': name,
-                                'arguments': arguments
-                            })()
-                    calls_to_execute = [CallWrapper(c.name, c.arguments) for c in parsed_calls]
+                            self.function = type(
+                                "obj", (object,), {"name": name, "arguments": arguments}
+                            )()
+
+                    calls_to_execute = [
+                        CallWrapper(c.name, c.arguments) for c in parsed_calls
+                    ]
 
             # Execute all calls
             for call in calls_to_execute:
-                log.info("executing_tool",
-                         task_id=task.id,
-                         tool=call.function.name,
-                         args=call.function.arguments)
+                log.info(
+                    "executing_tool",
+                    task_id=task.id,
+                    tool=call.function.name,
+                    args=call.function.arguments,
+                )
 
                 # Phase 5.5: Track tool execution timing
                 tool_start_time = time.time()
 
                 result = await task_tools.execute(
-                    call.function.name,
-                    call.function.arguments
+                    call.function.name, call.function.arguments
                 )
 
                 # Phase 5.5: Record tool execution metrics
@@ -498,13 +552,23 @@ class HierarchicalAgentLoop:
                         start_time=tool_start_time,
                         end_time=tool_end_time,
                         success=result.success,
-                        arguments=call.function.arguments if isinstance(call.function.arguments, dict) else None
+                        arguments=(
+                            call.function.arguments
+                            if isinstance(call.function.arguments, dict)
+                            else None
+                        ),
                     )
 
-                tool_results.append({
-                    "tool": call.function.name,
-                    "result": result.output if result.success else f"ERROR: {result.error}"
-                })
+                tool_results.append(
+                    {
+                        "tool": call.function.name,
+                        "result": (
+                            result.output
+                            if result.success
+                            else f"ERROR: {result.error}"
+                        ),
+                    }
+                )
 
                 # Phase 5.6: Track tool calls for stuck detection
                 args_hash = hash(str(call.function.arguments))
@@ -512,50 +576,66 @@ class HierarchicalAgentLoop:
                 if len(tool_call_history) > 10:  # Keep only recent history
                     tool_call_history.pop(0)
 
-                log.info("tool_executed",
-                         task_id=task.id,
-                         tool=call.function.name,
-                         success=result.success)
+                log.info(
+                    "tool_executed",
+                    task_id=task.id,
+                    tool=call.function.name,
+                    success=result.success,
+                )
 
                 # Emit tool called event
-                self.event_bus.emit(Event(
-                    type=EventType.TOOL_CALLED,
-                    data={
-                        "task_id": task.id,
-                        "name": call.function.name,
-                        "success": result.success,
-                        "result": result.output if result.success else result.error
-                    }
-                ))
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.TOOL_CALLED,
+                        data={
+                            "task_id": task.id,
+                            "name": call.function.name,
+                            "success": result.success,
+                            "result": result.output if result.success else result.error,
+                        },
+                    )
+                )
 
                 # Phase 7.3: Emit PLAN_PROPOSED event for propose_plan tool
                 if call.function.name == "propose_plan" and result.success:
                     plan_data = result.metadata.get("plan", {})
-                    self.event_bus.emit(Event(
-                        type=EventType.PLAN_PROPOSED,
-                        data={
-                            "task_id": task.id,
-                            "agent": agent.name,
-                            "plan": plan_data,
-                            "formatted": result.output,
-                            "step_count": result.metadata.get("step_count", 0),
-                            "agents": result.metadata.get("agents", []),
-                            "estimated_vram_gb": result.metadata.get("estimated_vram_gb", 0)
-                        },
-                        task_id=task.id
-                    ))
-                    log.info("plan_proposed",
+                    self.event_bus.emit(
+                        Event(
+                            type=EventType.PLAN_PROPOSED,
+                            data={
+                                "task_id": task.id,
+                                "agent": agent.name,
+                                "plan": plan_data,
+                                "formatted": result.output,
+                                "step_count": result.metadata.get("step_count", 0),
+                                "agents": result.metadata.get("agents", []),
+                                "estimated_vram_gb": result.metadata.get(
+                                    "estimated_vram_gb", 0
+                                ),
+                            },
                             task_id=task.id,
-                            steps=result.metadata.get("step_count", 0))
+                        )
+                    )
+                    log.info(
+                        "plan_proposed",
+                        task_id=task.id,
+                        steps=result.metadata.get("step_count", 0),
+                    )
 
                 # If delegation occurred, pause this task
                 if call.function.name == "delegate" and result.success:
-                    log.info("delegation_in_progress",
-                             task_id=task.id,
-                             pausing="waiting for child")
+                    log.info(
+                        "delegation_in_progress",
+                        task_id=task.id,
+                        pausing="waiting for child",
+                    )
 
                     # Update session with delegation result
-                    session.add_turn("assistant", assistant_content, tool_calls=response.message.tool_calls)
+                    session.add_turn(
+                        "assistant",
+                        assistant_content,
+                        tool_calls=response.message.tool_calls,
+                    )
                     if tool_results:
                         session.add_turn("tool", str(tool_results))
                     session.iterations = iteration + 1
@@ -564,18 +644,22 @@ class HierarchicalAgentLoop:
                     # RETURN from loop - parent will resume when child completes
                     # (DelegationManager sets parent status to WAITING and will
                     # set it back to PENDING + re-add to queue when child finishes)
-                    log.info("parent_paused_for_delegation",
-                            task_id=task.id,
-                            iterations=iteration + 1)
+                    log.info(
+                        "parent_paused_for_delegation",
+                        task_id=task.id,
+                        iterations=iteration + 1,
+                    )
                     return LoopResult(
                         success=None,  # Not complete yet, waiting for child
                         iterations=iteration + 1,
                         reason="delegation_waiting",
-                        final_output="Waiting for delegated child task to complete"
+                        final_output="Waiting for delegated child task to complete",
                     )
 
             # Update session
-            session.add_turn("assistant", assistant_content, tool_calls=response.message.tool_calls)
+            session.add_turn(
+                "assistant", assistant_content, tool_calls=response.message.tool_calls
+            )
             if tool_results:
                 session.add_turn("tool", str(tool_results))
 
@@ -588,16 +672,18 @@ class HierarchicalAgentLoop:
             if metrics_collector:
                 metrics_collector.end_iteration()
                 # Emit metrics update event for TUI
-                self.event_bus.emit(Event(
-                    type=EventType.METRICS_UPDATED,
-                    data={
-                        "task_id": task.id,
-                        "session_id": session.id,
-                        "iteration": iteration + 1,
-                        "duration_seconds": metrics_collector.get_session_duration()
-                    },
-                    task_id=task.id
-                ))
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.METRICS_UPDATED,
+                        data={
+                            "task_id": task.id,
+                            "session_id": session.id,
+                            "iteration": iteration + 1,
+                            "duration_seconds": metrics_collector.get_session_duration(),
+                        },
+                        task_id=task.id,
+                    )
+                )
 
             # NOW check completion (after tools executed)
             if completion_detector.is_complete(assistant_content):
@@ -615,7 +701,9 @@ class HierarchicalAgentLoop:
                                     {"role": turn.role, "content": turn.content}
                                     for turn in session.turns
                                 ]
-                                summary = await self.summarizer.summarize(task.description, conversation)
+                                summary = await self.summarizer.summarize(
+                                    task.description, conversation
+                                )
 
                                 # Store episode
                                 self.memory.store_episode(
@@ -625,8 +713,8 @@ class HierarchicalAgentLoop:
                                     metadata={
                                         "task_id": task.id,
                                         "agent": agent.name,
-                                        "iterations": iteration + 1
-                                    }
+                                        "iterations": iteration + 1,
+                                    },
                                 )
                                 log.info("episode_stored", task_id=task.id)
 
@@ -638,25 +726,29 @@ class HierarchicalAgentLoop:
                                         iterations=iteration + 1,
                                         tool_calls=tool_names,
                                         final_output=assistant_content,
-                                        session_turns=conversation
+                                        session_turns=conversation,
                                     )
                                     if pattern_id:
-                                        log.info("pattern_learned",
-                                                task_id=task.id,
-                                                pattern_id=pattern_id)
+                                        log.info(
+                                            "pattern_learned",
+                                            task_id=task.id,
+                                            pattern_id=pattern_id,
+                                        )
 
                                         # Emit pattern learned event for TUI
-                                        self.event_bus.emit(Event(
-                                            type=EventType.PATTERN_LEARNED,
-                                            data={
-                                                "task_id": task.id,
-                                                "pattern_id": pattern_id,
-                                                "agent": agent.name,
-                                                "iterations": iteration + 1,
-                                                "tools": tool_names
-                                            },
-                                            task_id=task.id
-                                        ))
+                                        self.event_bus.emit(
+                                            Event(
+                                                type=EventType.PATTERN_LEARNED,
+                                                data={
+                                                    "task_id": task.id,
+                                                    "pattern_id": pattern_id,
+                                                    "agent": agent.name,
+                                                    "iterations": iteration + 1,
+                                                    "tools": tool_names,
+                                                },
+                                                task_id=task.id,
+                                            )
+                                        )
                                 except Exception as e:
                                     log.warning("pattern_learning_failed", error=str(e))
 
@@ -671,9 +763,11 @@ class HierarchicalAgentLoop:
                                 await self._metrics_store.save_metrics(
                                     metrics_collector.get_metrics()
                                 )
-                                log.info("session_metrics_saved",
-                                        session_id=session.id,
-                                        duration=metrics_collector.get_session_duration())
+                                log.info(
+                                    "session_metrics_saved",
+                                    session_id=session.id,
+                                    duration=metrics_collector.get_session_duration(),
+                                )
                             except Exception as e:
                                 log.warning("metrics_save_failed", error=str(e))
 
@@ -681,22 +775,28 @@ class HierarchicalAgentLoop:
                             success=True,
                             iterations=iteration + 1,
                             reason="completion_marker",
-                            final_output=assistant_content
+                            final_output=assistant_content,
                         )
                     else:
                         # Completion marker found but validation failed
-                        log.warning("invalid_completion_rejected",
-                                   task_id=task.id,
-                                   reason="No evidence of work done",
-                                   message="Agent marked complete but validation failed - continuing")
-                        session.add_turn("user",
-                                       "You marked the task complete, but I don't see evidence that you performed the requested work. Please actually complete the task before marking it done.")
+                        log.warning(
+                            "invalid_completion_rejected",
+                            task_id=task.id,
+                            reason="No evidence of work done",
+                            message="Agent marked complete but validation failed - continuing",
+                        )
+                        session.add_turn(
+                            "user",
+                            "You marked the task complete, but I don't see evidence that you performed the requested work. Please actually complete the task before marking it done.",
+                        )
                 else:
                     # Tools were executed - agent marked complete prematurely
                     # Continue to next iteration to let agent see tool results
-                    log.warning("completion_marker_with_tools",
-                               task_id=task.id,
-                               message="Agent marked complete but tools were just executed - continuing")
+                    log.warning(
+                        "completion_marker_with_tools",
+                        task_id=task.id,
+                        message="Agent marked complete but tools were just executed - continuing",
+                    )
 
             # Check stuck (Phase 5.6: Enhanced detection with escalation)
             recent_responses.append(assistant_content)
@@ -706,26 +806,30 @@ class HierarchicalAgentLoop:
             is_stuck, stuck_reason = self._is_stuck(recent_responses, tool_call_history)
             if is_stuck:
                 nudge_count += 1
-                log.warning("stuck_detected",
-                           task_id=task.id,
-                           reason=stuck_reason,
-                           nudge_count=nudge_count,
-                           max_nudges=self.config.max_nudges)
+                log.warning(
+                    "stuck_detected",
+                    task_id=task.id,
+                    reason=stuck_reason,
+                    nudge_count=nudge_count,
+                    max_nudges=self.config.max_nudges,
+                )
 
                 # Check if we should escalate (fail) instead of nudging
                 if nudge_count >= self.config.max_nudges:
                     # Emit error event for TUI
-                    self.event_bus.emit(Event(
-                        type=EventType.ERROR,
-                        data={
-                            "task_id": task.id,
-                            "error_type": "agent_stuck",
-                            "reason": stuck_reason,
-                            "nudge_count": nudge_count,
-                            "suggestion": "Consider switching agent or replanning the task"
-                        },
-                        task_id=task.id
-                    ))
+                    self.event_bus.emit(
+                        Event(
+                            type=EventType.ERROR,
+                            data={
+                                "task_id": task.id,
+                                "error_type": "agent_stuck",
+                                "reason": stuck_reason,
+                                "nudge_count": nudge_count,
+                                "suggestion": "Consider switching agent or replanning the task",
+                            },
+                            task_id=task.id,
+                        )
+                    )
 
                     task.status = TaskStatus.FAILED
                     task.error = f"Agent stuck after {nudge_count} nudges (reason: {stuck_reason})"
@@ -736,7 +840,10 @@ class HierarchicalAgentLoop:
                         error_reason=f"stuck_after_nudges:{stuck_reason}",
                         session_id=session.id,
                         iteration=iteration + 1,
-                        error_context={"nudge_count": nudge_count, "stuck_reason": stuck_reason}
+                        error_context={
+                            "nudge_count": nudge_count,
+                            "stuck_reason": stuck_reason,
+                        },
                     )
 
                     # Phase 5.5: Save session metrics on stuck failure
@@ -753,7 +860,7 @@ class HierarchicalAgentLoop:
                     return LoopResult(
                         success=False,
                         iterations=iteration + 1,
-                        reason=f"stuck_after_nudges:{stuck_reason}"
+                        reason=f"stuck_after_nudges:{stuck_reason}",
                     )
 
                 # Generate context-specific nudge message
@@ -761,9 +868,11 @@ class HierarchicalAgentLoop:
                     "exact_repeat": "You're repeating the same response. Try a different approach or use a different tool.",
                     "high_similarity": "Your responses are very similar. Consider breaking down the problem differently.",
                     "repeated_tool_calls": "You're calling the same tool repeatedly with the same arguments. Check if it's working or try something else.",
-                    "clarification_loop": "You've asked for clarification multiple times. Please proceed with your best interpretation of the task."
+                    "clarification_loop": "You've asked for clarification multiple times. Please proceed with your best interpretation of the task.",
                 }
-                nudge_msg = nudge_messages.get(stuck_reason, "You seem stuck. Try a different approach.")
+                nudge_msg = nudge_messages.get(
+                    stuck_reason, "You seem stuck. Try a different approach."
+                )
                 nudge_msg += f" ({self.config.max_nudges - nudge_count} nudge(s) remaining before task fails)"
 
                 session.add_turn("user", nudge_msg)
@@ -776,7 +885,7 @@ class HierarchicalAgentLoop:
             error_reason="max_iterations_reached",
             session_id=session.id,
             iteration=agent.max_iterations,
-            error_context={"max_iterations": agent.max_iterations}
+            error_context={"max_iterations": agent.max_iterations},
         )
 
         # Phase 5.5: Save session metrics on max iterations
@@ -784,25 +893,18 @@ class HierarchicalAgentLoop:
             try:
                 metrics_collector.end_task(status="max_iterations")
                 metrics_collector.end_session(status="max_iterations")
-                await self._metrics_store.save_metrics(
-                    metrics_collector.get_metrics()
-                )
+                await self._metrics_store.save_metrics(metrics_collector.get_metrics())
             except Exception as e:
                 log.warning("metrics_save_failed", error=str(e))
 
         return LoopResult(
             success=False,
             iterations=agent.max_iterations,
-            reason="max_iterations_reached"
+            reason="max_iterations_reached",
         )
 
     async def _call_llm_streaming(
-        self,
-        model: str,
-        messages: list[dict],
-        tools: list[dict],
-        task: Task,
-        agent
+        self, model: str, messages: list[dict], tools: list[dict], task: Task, agent
     ) -> tuple:
         """Call LLM with streaming, emitting tokens to event bus.
 
@@ -821,15 +923,13 @@ class HierarchicalAgentLoop:
         streaming_buffer = StreamingBuffer()
 
         # Emit streaming start event
-        self.event_bus.emit(Event(
-            type=EventType.STREAMING_START,
-            data={
-                "task_id": task.id,
-                "agent": agent.name,
-                "model": model
-            },
-            task_id=task.id
-        ))
+        self.event_bus.emit(
+            Event(
+                type=EventType.STREAMING_START,
+                data={"task_id": task.id, "agent": agent.name, "model": model},
+                task_id=task.id,
+            )
+        )
 
         def on_token(token: str):
             """Callback for each token."""
@@ -837,38 +937,39 @@ class HierarchicalAgentLoop:
 
             # Only emit displayable tokens (not tool call JSON)
             if displayable and not is_tool:
-                self.event_bus.emit(Event(
-                    type=EventType.STREAMING_TOKEN,
-                    data={
-                        "task_id": task.id,
-                        "agent": agent.name,
-                        "token": displayable
-                    },
-                    task_id=task.id
-                ))
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.STREAMING_TOKEN,
+                        data={
+                            "task_id": task.id,
+                            "agent": agent.name,
+                            "token": displayable,
+                        },
+                        task_id=task.id,
+                    )
+                )
 
         try:
             # Use streaming chat
             streaming_response = await self.client.chat_stream(
-                model=model,
-                messages=messages,
-                tools=tools,
-                on_token=on_token
+                model=model, messages=messages, tools=tools, on_token=on_token
             )
 
             # Convert to standard Response
             response = streaming_response.to_response()
 
             # Emit streaming end event
-            self.event_bus.emit(Event(
-                type=EventType.STREAMING_END,
-                data={
-                    "task_id": task.id,
-                    "agent": agent.name,
-                    "content_length": len(streaming_response.content)
-                },
-                task_id=task.id
-            ))
+            self.event_bus.emit(
+                Event(
+                    type=EventType.STREAMING_END,
+                    data={
+                        "task_id": task.id,
+                        "agent": agent.name,
+                        "content_length": len(streaming_response.content),
+                    },
+                    task_id=task.id,
+                )
+            )
 
             # Check for tool calls detected from text (if not native)
             if not response.message.tool_calls:
@@ -877,16 +978,17 @@ class HierarchicalAgentLoop:
                     # Convert to the expected format
                     class CallWrapper:
                         def __init__(self, name, arguments):
-                            self.function = type('obj', (object,), {
-                                'name': name,
-                                'arguments': arguments
-                            })()
+                            self.function = type(
+                                "obj", (object,), {"name": name, "arguments": arguments}
+                            )()
 
                     # Note: We don't modify response.message.tool_calls as it's
                     # already handled by ToolCallParser later in the flow
-                    log.info("streaming_detected_tool_calls",
-                            task_id=task.id,
-                            count=len(detected_calls))
+                    log.info(
+                        "streaming_detected_tool_calls",
+                        task_id=task.id,
+                        count=len(detected_calls),
+                    )
 
             return response, streaming_response.content
 
@@ -894,9 +996,7 @@ class HierarchicalAgentLoop:
             log.error("streaming_error", task_id=task.id, error=str(e))
             # Fallback to non-streaming
             response = await self.client.chat(
-                model=model,
-                messages=messages,
-                tools=tools
+                model=model, messages=messages, tools=tools
             )
             return response, response.message.content
 
@@ -906,7 +1006,7 @@ class HierarchicalAgentLoop:
         task_description: str,
         task_context: dict,
         history: list,
-        tools: list[dict]
+        tools: list[dict],
     ) -> list[dict]:
         """Build messages for the LLM."""
 
@@ -922,30 +1022,28 @@ class HierarchicalAgentLoop:
 
         # Add tool descriptions
         if tools:
-            tool_descriptions = "\n".join([
-                f"- {tool['function']['name']}: {tool['function']['description']}"
-                for tool in tools
-            ])
+            tool_descriptions = "\n".join(
+                [
+                    f"- {tool['function']['name']}: {tool['function']['description']}"
+                    for tool in tools
+                ]
+            )
             full_prompt += f"\n\nAvailable tools:\n{tool_descriptions}"
 
-        messages.append({
-            "role": "system",
-            "content": full_prompt
-        })
+        messages.append({"role": "system", "content": full_prompt})
 
         # Add conversation history
         for turn in history:
-            message = {
-                "role": turn.role,
-                "content": turn.content
-            }
+            message = {"role": turn.role, "content": turn.content}
             if turn.tool_calls:
                 message["tool_calls"] = turn.tool_calls
             messages.append(message)
 
         return messages
 
-    def _is_stuck(self, responses: list[str], tool_history: list[tuple] = None) -> tuple[bool, str]:
+    def _is_stuck(
+        self, responses: list[str], tool_history: list[tuple] = None
+    ) -> tuple[bool, str]:
         """Enhanced stuck detection with multiple heuristics.
 
         Phase 5.6: Improved detection beyond exact string matching.
@@ -960,7 +1058,7 @@ class HierarchicalAgentLoop:
         if len(responses) < self.config.stuck_threshold:
             return False, ""
 
-        recent = responses[-self.config.stuck_threshold:]
+        recent = responses[-self.config.stuck_threshold :]
 
         # 1. Exact match detection (existing behavior)
         if len(set(recent)) == 1:
@@ -1041,45 +1139,68 @@ class HierarchicalAgentLoop:
         # Check 1: Were any tools executed during this session?
         tool_turns = [turn for turn in session.turns if turn.role == "tool"]
         if tool_turns:
-            log.info("completion_validation_passed",
-                    reason="tools_executed",
-                    tool_count=len(tool_turns))
+            log.info(
+                "completion_validation_passed",
+                reason="tools_executed",
+                tool_count=len(tool_turns),
+            )
             return True
 
         # Check 2: Is there substantive output in the final response?
         # (More than just the completion marker)
-        response_without_marker = final_response.replace("<sindri:complete/>", "").strip()
+        response_without_marker = final_response.replace(
+            "<sindri:complete/>", ""
+        ).strip()
         if len(response_without_marker) > 100:
-            log.info("completion_validation_passed",
-                    reason="substantive_output",
-                    output_length=len(response_without_marker))
+            log.info(
+                "completion_validation_passed",
+                reason="substantive_output",
+                output_length=len(response_without_marker),
+            )
             return True
 
         # Check 3: For action-oriented tasks, require evidence of action
         action_keywords = [
-            "create", "write", "edit", "modify", "update", "delete", "remove",
-            "implement", "build", "refactor", "review", "analyze", "fix"
+            "create",
+            "write",
+            "edit",
+            "modify",
+            "update",
+            "delete",
+            "remove",
+            "implement",
+            "build",
+            "refactor",
+            "review",
+            "analyze",
+            "fix",
         ]
         task_lower = task.description.lower()
         requires_action = any(keyword in task_lower for keyword in action_keywords)
 
         if requires_action:
-            log.warning("completion_validation_failed",
-                       reason="action_required_but_no_tools",
-                       task_preview=task.description[:100])
+            log.warning(
+                "completion_validation_failed",
+                reason="action_required_but_no_tools",
+                task_preview=task.description[:100],
+            )
             return False
 
         # Check 4: Very short sessions (< 3 turns) with no tools are suspicious
         if len(session.turns) < 3 and not tool_turns:
-            log.warning("completion_validation_failed",
-                       reason="suspiciously_short_session",
-                       turn_count=len(session.turns))
+            log.warning(
+                "completion_validation_failed",
+                reason="suspiciously_short_session",
+                turn_count=len(session.turns),
+            )
             return False
 
         # If none of the above checks failed, accept completion
-        log.info("completion_validation_passed",
-                reason="default",
-                turn_count=len(session.turns))
+        log.info(
+            "completion_validation_passed",
+            reason="default",
+            turn_count=len(session.turns),
+        )
         return True
 
     def _build_system_message(
@@ -1087,7 +1208,7 @@ class HierarchicalAgentLoop:
         system_prompt: str,
         task_description: str,
         task_context: dict,
-        tools: list[dict]
+        tools: list[dict],
     ) -> dict:
         """Build system message for memory-augmented context."""
 
@@ -1100,16 +1221,15 @@ class HierarchicalAgentLoop:
 
         # Add tool descriptions
         if tools:
-            tool_descriptions = "\n".join([
-                f"- {tool['function']['name']}: {tool['function']['description']}"
-                for tool in tools
-            ])
+            tool_descriptions = "\n".join(
+                [
+                    f"- {tool['function']['name']}: {tool['function']['description']}"
+                    for tool in tools
+                ]
+            )
             full_prompt += f"\n\nAvailable tools:\n{tool_descriptions}"
 
-        return {
-            "role": "system",
-            "content": full_prompt
-        }
+        return {"role": "system", "content": full_prompt}
 
     def _save_error_checkpoint(
         self,
@@ -1117,7 +1237,7 @@ class HierarchicalAgentLoop:
         error_reason: str,
         session_id: str = None,
         iteration: int = 0,
-        error_context: dict = None
+        error_context: dict = None,
     ):
         """Save checkpoint on error for recovery.
 
@@ -1140,23 +1260,18 @@ class HierarchicalAgentLoop:
                     "description": task.description,
                     "assigned_agent": task.assigned_agent,
                     "parent_id": task.parent_id,
-                    "context": task.context
+                    "context": task.context,
                 },
-                "error": {
-                    "reason": error_reason,
-                    "context": error_context or {}
-                },
+                "error": {"reason": error_reason, "context": error_context or {}},
                 "session_id": session_id,
                 "iterations": iteration,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now().isoformat(),
             }
 
             self.recovery.save_checkpoint(task.id, checkpoint_data)
-            log.info("error_checkpoint_saved",
-                    task_id=task.id,
-                    error_reason=error_reason)
+            log.info(
+                "error_checkpoint_saved", task_id=task.id, error_reason=error_reason
+            )
 
         except Exception as e:
-            log.warning("error_checkpoint_failed",
-                       task_id=task.id,
-                       error=str(e))
+            log.warning("error_checkpoint_failed", task_id=task.id, error=str(e))

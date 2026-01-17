@@ -16,6 +16,7 @@ log = structlog.get_logger()
 @dataclass
 class LoadedModel:
     """Represents a loaded model in VRAM with usage tracking."""
+
     name: str
     vram_gb: float
     last_used: float  # timestamp
@@ -28,6 +29,7 @@ class LoadedModel:
 @dataclass
 class CacheMetrics:
     """Cache performance metrics for monitoring."""
+
     hits: int = 0  # Model already loaded
     misses: int = 0  # Model needed loading
     evictions: int = 0  # Models evicted to make room
@@ -62,7 +64,7 @@ class ModelManager:
         self,
         total_vram_gb: float = 16.0,
         reserve_gb: float = 2.0,
-        keep_warm: Optional[list[str]] = None
+        keep_warm: Optional[list[str]] = None,
     ):
         self.total_vram = total_vram_gb
         self.reserve = reserve_gb
@@ -79,10 +81,12 @@ class ModelManager:
         self.keep_warm: set[str] = set(keep_warm or [])  # Models to never evict
         self._prewarm_tasks: dict[str, asyncio.Task] = {}  # Background pre-warming
 
-        log.info("model_manager_initialized",
-                 total_vram=total_vram_gb,
-                 available=self.available,
-                 keep_warm=list(self.keep_warm))
+        log.info(
+            "model_manager_initialized",
+            total_vram=total_vram_gb,
+            available=self.available,
+            keep_warm=list(self.keep_warm),
+        )
 
     def can_load(self, model: str, required_vram: float) -> bool:
         """Check if model can be loaded (may require eviction).
@@ -96,11 +100,13 @@ class ModelManager:
         # Can load if we have space OR can make space by evicting
         can = free_vram >= required_vram or len(self.loaded) > 0
 
-        log.debug("can_load_check",
-                  model=model,
-                  required=required_vram,
-                  free=free_vram,
-                  can_load=can)
+        log.debug(
+            "can_load_check",
+            model=model,
+            required=required_vram,
+            free=free_vram,
+            can_load=can,
+        )
 
         return can
 
@@ -127,9 +133,12 @@ class ModelManager:
             self.loaded[model].last_used = time.time()
             self.loaded[model].use_count += 1
             self.metrics.hits += 1
-            log.debug("model_cache_hit", model=model,
-                      use_count=self.loaded[model].use_count,
-                      hit_rate=f"{self.metrics.hit_rate:.1%}")
+            log.debug(
+                "model_cache_hit",
+                model=model,
+                use_count=self.loaded[model].use_count,
+                hit_rate=f"{self.metrics.hit_rate:.1%}",
+            )
             return True
 
         # Cache miss - need to load
@@ -157,29 +166,41 @@ class ModelManager:
                 while self._get_free_vram() < required_vram and self.loaded:
                     # Evict least recently used (but not locked or keep_warm models)
                     evictable = [
-                        m for m in self.loaded.values()
+                        m
+                        for m in self.loaded.values()
                         if m.name not in self.keep_warm
-                        and (m.name not in self._model_locks
-                             or not self._model_locks[m.name].locked())
+                        and (
+                            m.name not in self._model_locks
+                            or not self._model_locks[m.name].locked()
+                        )
                     ]
                     if not evictable:
-                        log.warning("no_evictable_models", model=model,
-                                    keep_warm=list(self.keep_warm))
+                        log.warning(
+                            "no_evictable_models",
+                            model=model,
+                            keep_warm=list(self.keep_warm),
+                        )
                         break
 
                     # Evict LRU (could also consider use_count for smarter eviction)
                     lru = min(evictable, key=lambda m: m.last_used)
-                    log.info("evicting_model", model=lru.name, reason="LRU",
-                             use_count=lru.use_count)
+                    log.info(
+                        "evicting_model",
+                        model=lru.name,
+                        reason="LRU",
+                        use_count=lru.use_count,
+                    )
                     await self._unload(lru.name)
                     self.metrics.evictions += 1
 
                 free_vram = self._get_free_vram()
                 if free_vram < required_vram:
-                    log.error("insufficient_vram",
-                              model=model,
-                              required=required_vram,
-                              free=free_vram)
+                    log.error(
+                        "insufficient_vram",
+                        model=model,
+                        required=required_vram,
+                        free=free_vram,
+                    )
                     return False  # Can't fit
 
                 load_time = time.time() - load_start
@@ -191,17 +212,19 @@ class ModelManager:
                     last_used=time.time(),
                     use_count=1,
                     load_time=load_time,
-                    loaded_at=time.time()
+                    loaded_at=time.time(),
                 )
 
                 self.metrics.total_load_time += load_time
 
-                log.info("model_loaded",
-                         model=model,
-                         vram_used=required_vram,
-                         load_time=f"{load_time:.2f}s",
-                         free_vram=self._get_free_vram(),
-                         cache_hit_rate=f"{self.metrics.hit_rate:.1%}")
+                log.info(
+                    "model_loaded",
+                    model=model,
+                    vram_used=required_vram,
+                    load_time=f"{load_time:.2f}s",
+                    free_vram=self._get_free_vram(),
+                    cache_hit_rate=f"{self.metrics.hit_rate:.1%}",
+                )
 
         return True
 
@@ -210,9 +233,12 @@ class ModelManager:
         # Ollama doesn't have explicit unload API, but we track it
         if model in self.loaded:
             unloaded = self.loaded.pop(model)
-            log.info("model_unloaded", model=model,
-                     was_used=unloaded.use_count,
-                     lifetime=f"{time.time() - unloaded.loaded_at:.1f}s")
+            log.info(
+                "model_unloaded",
+                model=model,
+                was_used=unloaded.use_count,
+                lifetime=f"{time.time() - unloaded.loaded_at:.1f}s",
+            )
 
     async def pre_warm(self, model: str, required_vram: float) -> None:
         """Pre-load a model in the background for anticipated use.
@@ -266,7 +292,7 @@ class ModelManager:
             "available": self.available,
             "used": used,
             "free": self.available - used,
-            "loaded_models": list(self.loaded.keys())
+            "loaded_models": list(self.loaded.keys()),
         }
 
     def get_cache_stats(self) -> dict:
@@ -285,10 +311,10 @@ class ModelManager:
                     "use_count": m.use_count,
                     "vram_gb": m.vram_gb,
                     "load_time": m.load_time,
-                    "lifetime": time.time() - m.loaded_at
+                    "lifetime": time.time() - m.loaded_at,
                 }
                 for name, m in self.loaded.items()
-            }
+            },
         }
 
     def add_keep_warm(self, model: str) -> None:

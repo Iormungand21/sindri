@@ -2,7 +2,7 @@
 
 import pytest
 import asyncio
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, patch
 
 from sindri.core.tasks import Task, TaskStatus
 from sindri.core.scheduler import TaskScheduler
@@ -15,17 +15,15 @@ class TestTaskVRAMFields:
     def test_task_has_vram_fields(self):
         """Task should have vram_required and model_name fields."""
         task = Task(description="Test task")
-        assert hasattr(task, 'vram_required')
-        assert hasattr(task, 'model_name')
+        assert hasattr(task, "vram_required")
+        assert hasattr(task, "model_name")
         assert task.vram_required == 0.0
         assert task.model_name is None
 
     def test_task_vram_fields_can_be_set(self):
         """Task VRAM fields can be set."""
         task = Task(
-            description="Test task",
-            vram_required=5.0,
-            model_name="qwen2.5-coder:7b"
+            description="Test task", vram_required=5.0, model_name="qwen2.5-coder:7b"
         )
         assert task.vram_required == 5.0
         assert task.model_name == "qwen2.5-coder:7b"
@@ -113,7 +111,7 @@ class TestSchedulerBatching:
         """get_ready_batch should respect VRAM limits."""
         # Create tasks that exceed VRAM limit when combined
         task1 = Task(id="t1", description="Task 1", assigned_agent="brokkr")  # 9GB
-        task2 = Task(id="t2", description="Task 2", assigned_agent="odin")    # 6GB
+        task2 = Task(id="t2", description="Task 2", assigned_agent="odin")  # 6GB
         # Total 15GB > 14GB available
 
         scheduler.add_task(task1)
@@ -139,7 +137,9 @@ class TestSchedulerBatching:
     def test_get_ready_batch_respects_dependencies(self, scheduler):
         """get_ready_batch should not include tasks with unmet dependencies."""
         task1 = Task(id="t1", description="Task 1", assigned_agent="huginn")
-        task2 = Task(id="t2", description="Task 2", assigned_agent="skald", depends_on=["t1"])
+        task2 = Task(
+            id="t2", description="Task 2", assigned_agent="skald", depends_on=["t1"]
+        )
 
         scheduler.add_task(task1)
         scheduler.add_task(task2)
@@ -160,8 +160,12 @@ class TestSchedulerBatching:
     def test_get_ready_batch_skips_non_pending(self, scheduler):
         """get_ready_batch should skip non-pending tasks."""
         task1 = Task(id="t1", description="Task 1", assigned_agent="huginn")
-        task2 = Task(id="t2", description="Task 2", assigned_agent="skald",
-                     status=TaskStatus.RUNNING)
+        task2 = Task(
+            id="t2",
+            description="Task 2",
+            assigned_agent="skald",
+            status=TaskStatus.RUNNING,
+        )
 
         scheduler.add_task(task1)
         scheduler.tasks[task2.id] = task2  # Add without heap push
@@ -181,8 +185,8 @@ class TestModelManagerThreadSafety:
 
     def test_manager_has_locks(self, manager):
         """ModelManager should have asyncio locks."""
-        assert hasattr(manager, '_lock')
-        assert hasattr(manager, '_model_locks')
+        assert hasattr(manager, "_lock")
+        assert hasattr(manager, "_model_locks")
 
     @pytest.mark.asyncio
     async def test_concurrent_ensure_loaded_same_model(self, manager):
@@ -193,7 +197,7 @@ class TestModelManagerThreadSafety:
         results = await asyncio.gather(
             manager.ensure_loaded(model, 5.0),
             manager.ensure_loaded(model, 5.0),
-            manager.ensure_loaded(model, 5.0)
+            manager.ensure_loaded(model, 5.0),
         )
 
         # All should succeed
@@ -206,8 +210,7 @@ class TestModelManagerThreadSafety:
     async def test_concurrent_ensure_loaded_different_models(self, manager):
         """Concurrent ensure_loaded for different models within VRAM limit."""
         results = await asyncio.gather(
-            manager.ensure_loaded("model1", 5.0),
-            manager.ensure_loaded("model2", 5.0)
+            manager.ensure_loaded("model1", 5.0), manager.ensure_loaded("model2", 5.0)
         )
 
         assert all(results)
@@ -247,7 +250,7 @@ class TestEventTimestamps:
         from sindri.core.events import Event, EventType
 
         event = Event(type=EventType.TASK_CREATED, data={})
-        assert hasattr(event, 'timestamp')
+        assert hasattr(event, "timestamp")
         assert event.timestamp > 0
 
     def test_event_has_task_id(self):
@@ -261,8 +264,8 @@ class TestEventTimestamps:
         """New parallel event types should exist."""
         from sindri.core.events import EventType
 
-        assert hasattr(EventType, 'PARALLEL_BATCH_START')
-        assert hasattr(EventType, 'PARALLEL_BATCH_END')
+        assert hasattr(EventType, "PARALLEL_BATCH_START")
+        assert hasattr(EventType, "PARALLEL_BATCH_END")
 
 
 class TestOrchestratorParallel:
@@ -272,9 +275,8 @@ class TestOrchestratorParallel:
     async def test_orchestrator_has_parallel_flag(self):
         """Orchestrator.run should accept parallel flag."""
         from sindri.core.orchestrator import Orchestrator
-        from unittest.mock import AsyncMock, patch
 
-        with patch.object(Orchestrator, '__init__', lambda self, **kwargs: None):
+        with patch.object(Orchestrator, "__init__", lambda self, **kwargs: None):
             orchestrator = Orchestrator()
             orchestrator.scheduler = Mock()
             orchestrator.scheduler.has_work.return_value = False
@@ -283,19 +285,20 @@ class TestOrchestratorParallel:
 
             # Should accept parallel parameter
             import inspect
+
             sig = inspect.signature(Orchestrator.run)
-            assert 'parallel' in sig.parameters
+            assert "parallel" in sig.parameters
 
     @pytest.mark.asyncio
     async def test_run_parallel_batch_method_exists(self):
         """Orchestrator should have _run_parallel_batch method."""
         from sindri.core.orchestrator import Orchestrator
 
-        assert hasattr(Orchestrator, '_run_parallel_batch')
+        assert hasattr(Orchestrator, "_run_parallel_batch")
 
     @pytest.mark.asyncio
     async def test_run_sequential_method_exists(self):
         """Orchestrator should have _run_sequential method."""
         from sindri.core.orchestrator import Orchestrator
 
-        assert hasattr(Orchestrator, '_run_sequential')
+        assert hasattr(Orchestrator, "_run_sequential")

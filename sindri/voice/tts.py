@@ -7,10 +7,9 @@ Supports:
 """
 
 import asyncio
-import io
+import importlib.util
 import os
 import shutil
-import subprocess
 import tempfile
 from dataclasses import dataclass
 from enum import Enum
@@ -25,9 +24,9 @@ log = structlog.get_logger()
 class TTSEngine(Enum):
     """Available TTS engines."""
 
-    PYTTSX3 = "pyttsx3"      # Cross-platform, uses system TTS
-    PIPER = "piper"          # Neural TTS with piper-tts
-    ESPEAK = "espeak"        # Fast, lightweight espeak-ng
+    PYTTSX3 = "pyttsx3"  # Cross-platform, uses system TTS
+    PIPER = "piper"  # Neural TTS with piper-tts
+    ESPEAK = "espeak"  # Fast, lightweight espeak-ng
 
 
 @dataclass
@@ -35,11 +34,11 @@ class VoiceConfig:
     """Configuration for TTS voice."""
 
     engine: TTSEngine = TTSEngine.PYTTSX3
-    voice_id: Optional[str] = None    # Engine-specific voice ID
-    rate: int = 175                    # Words per minute
-    pitch: int = 50                    # 0-100 scale
-    volume: float = 1.0                # 0.0-1.0
-    language: str = "en"               # ISO language code
+    voice_id: Optional[str] = None  # Engine-specific voice ID
+    rate: int = 175  # Words per minute
+    pitch: int = 50  # 0-100 scale
+    volume: float = 1.0  # 0.0-1.0
+    language: str = "en"  # ISO language code
 
     # Piper-specific
     piper_model: str = "en_US-lessac-medium"  # Default piper model
@@ -119,11 +118,8 @@ class TextToSpeech:
         available = []
 
         # Check pyttsx3
-        try:
-            import pyttsx3
+        if importlib.util.find_spec("pyttsx3"):
             available.append(TTSEngine.PYTTSX3)
-        except ImportError:
-            pass
 
         # Check piper
         if shutil.which("piper"):
@@ -182,12 +178,12 @@ class TextToSpeech:
             engine = pyttsx3.init()
 
             # Apply settings
-            engine.setProperty('rate', self.config.rate)
-            engine.setProperty('volume', self.config.volume)
+            engine.setProperty("rate", self.config.rate)
+            engine.setProperty("volume", self.config.volume)
 
             # Set voice if specified
             if self.config.voice_id:
-                engine.setProperty('voice', self.config.voice_id)
+                engine.setProperty("voice", self.config.voice_id)
 
             engine.say(text)
             engine.runAndWait()
@@ -219,10 +215,14 @@ class TextToSpeech:
 
         cmd = [
             espeak_cmd,
-            "-s", str(self.config.rate),
-            "-p", str(self.config.pitch),
-            "-a", str(int(self.config.volume * 200)),  # espeak uses 0-200
-            "-v", self.config.language,
+            "-s",
+            str(self.config.rate),
+            "-p",
+            str(self.config.pitch),
+            "-a",
+            str(int(self.config.volume * 200)),  # espeak uses 0-200
+            "-v",
+            self.config.language,
             text,
         ]
 
@@ -275,10 +275,10 @@ class TextToSpeech:
 
         def do_synthesize():
             engine = pyttsx3.init()
-            engine.setProperty('rate', self.config.rate)
-            engine.setProperty('volume', self.config.volume)
+            engine.setProperty("rate", self.config.rate)
+            engine.setProperty("volume", self.config.volume)
             if self.config.voice_id:
-                engine.setProperty('voice', self.config.voice_id)
+                engine.setProperty("voice", self.config.voice_id)
             engine.save_to_file(text, str(output_path))
             engine.runAndWait()
             engine.stop()
@@ -290,8 +290,10 @@ class TextToSpeech:
         """Synthesize using piper-tts."""
         cmd = [
             "piper",
-            "--model", self.config.piper_model,
-            "--output_file", str(output_path),
+            "--model",
+            self.config.piper_model,
+            "--output_file",
+            str(output_path),
         ]
 
         process = await asyncio.create_subprocess_exec(
@@ -309,11 +311,16 @@ class TextToSpeech:
 
         cmd = [
             espeak_cmd,
-            "-s", str(self.config.rate),
-            "-p", str(self.config.pitch),
-            "-a", str(int(self.config.volume * 200)),
-            "-v", self.config.language,
-            "-w", str(output_path),
+            "-s",
+            str(self.config.rate),
+            "-p",
+            str(self.config.pitch),
+            "-a",
+            str(int(self.config.volume * 200)),
+            "-v",
+            self.config.language,
+            "-w",
+            str(output_path),
             text,
         ]
 
@@ -331,10 +338,10 @@ class TextToSpeech:
 
         # Try different audio players
         players = [
-            ["aplay", audio_path],           # ALSA (Linux)
-            ["paplay", audio_path],          # PulseAudio
-            ["pw-play", audio_path],         # PipeWire
-            ["afplay", audio_path],          # macOS
+            ["aplay", audio_path],  # ALSA (Linux)
+            ["paplay", audio_path],  # PulseAudio
+            ["pw-play", audio_path],  # PipeWire
+            ["afplay", audio_path],  # macOS
             ["ffplay", "-nodisp", "-autoexit", audio_path],  # FFmpeg
         ]
 
@@ -376,7 +383,7 @@ class TextToSpeech:
 
         def get_voices():
             engine = pyttsx3.init()
-            voices = engine.getProperty('voices')
+            voices = engine.getProperty("voices")
             engine.stop()
             return [
                 {
@@ -395,7 +402,8 @@ class TextToSpeech:
         espeak_cmd = "espeak-ng" if shutil.which("espeak-ng") else "espeak"
 
         process = await asyncio.create_subprocess_exec(
-            espeak_cmd, "--voices",
+            espeak_cmd,
+            "--voices",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.DEVNULL,
         )
@@ -406,11 +414,13 @@ class TextToSpeech:
             if line.strip():
                 parts = line.split()
                 if len(parts) >= 4:
-                    voices.append({
-                        "id": parts[4] if len(parts) > 4 else parts[3],
-                        "name": parts[3],
-                        "language": parts[1],
-                    })
+                    voices.append(
+                        {
+                            "id": parts[4] if len(parts) > 4 else parts[3],
+                            "name": parts[3],
+                            "language": parts[1],
+                        }
+                    )
         return voices
 
     async def stream_speak(
@@ -434,10 +444,10 @@ class TextToSpeech:
                 # Check for sentence boundaries
                 for i, char in enumerate(buffer):
                     if char in sentence_ends:
-                        sentence = buffer[:i + 1].strip()
+                        sentence = buffer[: i + 1].strip()
                         if sentence:
                             await self.speak(sentence)
-                        buffer = buffer[i + 1:]
+                        buffer = buffer[i + 1 :]
                         break
             else:
                 # Speak immediately

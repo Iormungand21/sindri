@@ -111,7 +111,11 @@ class StyleAnalyzer:
         files = []
         for path in self.project_path.rglob("*.py"):
             parts = path.relative_to(self.project_path).parts
-            if not any(p.startswith(".") or p in {"__pycache__", "venv", ".venv", "node_modules"} for p in parts):
+            if not any(
+                p.startswith(".")
+                or p in {"__pycache__", "venv", ".venv", "node_modules"}
+                for p in parts
+            ):
                 files.append(path)
         return files[:30]  # Sample first 30 files
 
@@ -133,7 +137,7 @@ class StyleAnalyzer:
                     # Count leading whitespace
                     stripped = line.lstrip()
                     if stripped and line != stripped:
-                        indent = line[:len(line) - len(stripped)]
+                        indent = line[: len(line) - len(stripped)]
                         total_lines += 1
 
                         if "\t" in indent:
@@ -213,8 +217,12 @@ class StyleAnalyzer:
             return "unknown"
 
         snake_count = sum(1 for n in names if "_" in n and n.lower() == n)
-        camel_count = sum(1 for n in names if n[0].islower() and any(c.isupper() for c in n[1:]))
-        pascal_count = sum(1 for n in names if n[0].isupper() and any(c.islower() for c in n))
+        camel_count = sum(
+            1 for n in names if n[0].islower() and any(c.isupper() for c in n[1:])
+        )
+        pascal_count = sum(
+            1 for n in names if n[0].isupper() and any(c.islower() for c in n)
+        )
         upper_count = sum(1 for n in names if n.isupper() and len(n) > 1)
 
         counts = {
@@ -357,11 +365,23 @@ class StyleAnalyzer:
     def _find_config_files(self) -> List[str]:
         """Find all formatting/linting config files."""
         config_patterns = [
-            ".black", ".flake8", ".pylintrc", "mypy.ini", ".mypy.ini",
-            "ruff.toml", ".ruff.toml", ".isort.cfg",
-            ".prettierrc", ".prettierrc.json", ".prettierrc.js",
-            ".eslintrc", ".eslintrc.json", ".eslintrc.js",
-            ".editorconfig", "tox.ini", "pytest.ini",
+            ".black",
+            ".flake8",
+            ".pylintrc",
+            "mypy.ini",
+            ".mypy.ini",
+            "ruff.toml",
+            ".ruff.toml",
+            ".isort.cfg",
+            ".prettierrc",
+            ".prettierrc.json",
+            ".prettierrc.js",
+            ".eslintrc",
+            ".eslintrc.json",
+            ".eslintrc.js",
+            ".editorconfig",
+            "tox.ini",
+            "pytest.ini",
         ]
 
         found = []
@@ -397,8 +417,7 @@ class StyleAnalyzer:
 
         # Check for conftest.py (strong pytest indicator)
         if (self.project_path / "conftest.py").exists() or any(
-            (self.project_path / "tests" / "conftest.py").exists()
-            for _ in [1]
+            (self.project_path / "tests" / "conftest.py").exists() for _ in [1]
         ):
             pytest_indicators += 2
 

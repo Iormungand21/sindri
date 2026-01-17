@@ -16,34 +16,34 @@ def temp_dir():
 @pytest.fixture
 def mock_ollama(mocker):
     """Mock Ollama client."""
-    mock_async_client = mocker.patch('sindri.llm.client.ollama.AsyncClient')
-    mock_sync_client = mocker.patch('sindri.llm.client.ollama.Client')
+    mock_async_client = mocker.patch("sindri.llm.client.ollama.AsyncClient")
+    mock_sync_client = mocker.patch("sindri.llm.client.ollama.Client")
 
     # Configure default mock responses
-    mock_async_client.return_value.chat = AsyncMock(return_value={
-        "message": {
-            "role": "assistant",
-            "content": "Test response",
-            "tool_calls": None
-        },
-        "model": "test-model",
-        "done": True
-    })
+    mock_async_client.return_value.chat = AsyncMock(
+        return_value={
+            "message": {
+                "role": "assistant",
+                "content": "Test response",
+                "tool_calls": None,
+            },
+            "model": "test-model",
+            "done": True,
+        }
+    )
 
-    mock_sync_client.return_value.list = Mock(return_value={
-        "models": [{"name": "test-model"}]
-    })
+    mock_sync_client.return_value.list = Mock(
+        return_value={"models": [{"name": "test-model"}]}
+    )
 
-    return {
-        "async_client": mock_async_client,
-        "sync_client": mock_sync_client
-    }
+    return {"async_client": mock_async_client, "sync_client": mock_sync_client}
 
 
 @pytest.fixture
 def db(temp_dir):
     """Test database."""
     from sindri.persistence.database import Database
+
     db_path = temp_dir / "test.db"
     return Database(db_path)
 
@@ -52,6 +52,7 @@ def db(temp_dir):
 def session_state(db):
     """Test session state manager."""
     from sindri.persistence.state import SessionState
+
     return SessionState(db)
 
 
@@ -63,15 +64,13 @@ def ollama_client():
     client = Mock(spec=OllamaClient)
 
     # Default chat response
-    client.chat = AsyncMock(return_value=Response(
-        message=Message(
-            role="assistant",
-            content="Test response",
-            tool_calls=None
-        ),
-        model="test-model",
-        done=True
-    ))
+    client.chat = AsyncMock(
+        return_value=Response(
+            message=Message(role="assistant", content="Test response", tool_calls=None),
+            model="test-model",
+            done=True,
+        )
+    )
 
     return client
 
@@ -80,6 +79,7 @@ def ollama_client():
 def tool_registry():
     """Test tool registry with minimal tools."""
     from sindri.tools.registry import ToolRegistry
+
     return ToolRegistry.default()
 
 
@@ -87,6 +87,7 @@ def tool_registry():
 def recovery_manager(temp_dir):
     """Test recovery manager."""
     from sindri.core.recovery import RecoveryManager
+
     return RecoveryManager(str(temp_dir / "state"))
 
 
@@ -94,11 +95,9 @@ def recovery_manager(temp_dir):
 def config(temp_dir):
     """Test configuration."""
     from sindri.config import SindriConfig
+
     return SindriConfig(
-        data_dir=temp_dir,
-        project_dir=temp_dir,
-        total_vram_gb=16.0,
-        reserve_vram_gb=2.0
+        data_dir=temp_dir, project_dir=temp_dir, total_vram_gb=16.0, reserve_vram_gb=2.0
     )
 
 
@@ -106,6 +105,7 @@ def config(temp_dir):
 def event_bus():
     """Test event bus."""
     from sindri.core.events import EventBus
+
     return EventBus()
 
 
@@ -118,21 +118,21 @@ async def agent_loop(ollama_client, tool_registry, session_state, config):
         max_iterations=10,
         completion_marker="<sindri:complete/>",
         stuck_threshold=3,
-        checkpoint_interval=5
+        checkpoint_interval=5,
     )
 
     return AgentLoop(
         client=ollama_client,
         tools=tool_registry,
         state=session_state,
-        config=loop_config
+        config=loop_config,
     )
 
 
 @pytest.fixture
 def mock_embedder(mocker):
     """Mock embedding client."""
-    mock = mocker.patch('sindri.memory.embedder.LocalEmbedder')
+    mock = mocker.patch("sindri.memory.embedder.LocalEmbedder")
 
     # Return fixed 768-dim embedding
     mock.return_value.embed = Mock(return_value=[0.1] * 768)

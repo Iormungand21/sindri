@@ -1,16 +1,14 @@
 """Tests for session export functionality."""
 
-import json
 import pytest
 from datetime import datetime, timedelta
-from pathlib import Path
-from unittest.mock import AsyncMock, patch, MagicMock
 
 from sindri.persistence.state import Session, Turn
 from sindri.persistence.export import MarkdownExporter, generate_export_filename
 
 
 # Test fixtures
+
 
 @pytest.fixture
 def sample_session():
@@ -22,7 +20,7 @@ def sample_session():
         status="completed",
         iterations=5,
         created_at=datetime(2026, 1, 15, 10, 30, 0),
-        completed_at=datetime(2026, 1, 15, 10, 35, 30)
+        completed_at=datetime(2026, 1, 15, 10, 35, 30),
     )
     return session
 
@@ -34,28 +32,33 @@ def session_with_turns(sample_session):
         Turn(
             role="user",
             content="Create a function that says hello",
-            created_at=datetime(2026, 1, 15, 10, 30, 0)
+            created_at=datetime(2026, 1, 15, 10, 30, 0),
         ),
         Turn(
             role="assistant",
             content="I'll create a hello world function for you.",
-            tool_calls=[{
-                "function": {
-                    "name": "write_file",
-                    "arguments": {"path": "hello.py", "content": "def hello():\n    print('Hello, World!')"}
+            tool_calls=[
+                {
+                    "function": {
+                        "name": "write_file",
+                        "arguments": {
+                            "path": "hello.py",
+                            "content": "def hello():\n    print('Hello, World!')",
+                        },
+                    }
                 }
-            }],
-            created_at=datetime(2026, 1, 15, 10, 31, 0)
+            ],
+            created_at=datetime(2026, 1, 15, 10, 31, 0),
         ),
         Turn(
             role="tool",
             content="File hello.py written successfully.",
-            created_at=datetime(2026, 1, 15, 10, 31, 5)
+            created_at=datetime(2026, 1, 15, 10, 31, 5),
         ),
         Turn(
             role="assistant",
             content="I've created the hello world function. <sindri:complete/>",
-            created_at=datetime(2026, 1, 15, 10, 32, 0)
+            created_at=datetime(2026, 1, 15, 10, 32, 0),
         ),
     ]
     return sample_session
@@ -78,11 +81,12 @@ def active_session():
         status="active",
         iterations=3,
         created_at=datetime(2026, 1, 15, 11, 0, 0),
-        completed_at=None
+        completed_at=None,
     )
 
 
 # MarkdownExporter tests
+
 
 class TestMarkdownExporter:
     """Tests for MarkdownExporter class."""
@@ -192,7 +196,9 @@ class TestMarkdownExporter:
 
     def test_calculate_duration_completed(self, sample_session):
         """Test duration calculation for completed session."""
-        sample_session.completed_at = sample_session.created_at + timedelta(minutes=5, seconds=30)
+        sample_session.completed_at = sample_session.created_at + timedelta(
+            minutes=5, seconds=30
+        )
         exporter = MarkdownExporter()
 
         duration = exporter._calculate_duration(sample_session)
@@ -206,7 +212,7 @@ class TestMarkdownExporter:
             model="test",
             status="completed",
             created_at=datetime(2026, 1, 15, 10, 0, 0),
-            completed_at=datetime(2026, 1, 15, 10, 0, 45)
+            completed_at=datetime(2026, 1, 15, 10, 0, 45),
         )
         exporter = MarkdownExporter()
         duration = exporter._calculate_duration(session)
@@ -220,7 +226,7 @@ class TestMarkdownExporter:
             model="test",
             status="completed",
             created_at=datetime(2026, 1, 15, 10, 0, 0),
-            completed_at=datetime(2026, 1, 15, 11, 30, 0)
+            completed_at=datetime(2026, 1, 15, 11, 30, 0),
         )
         exporter = MarkdownExporter()
         duration = exporter._calculate_duration(session)
@@ -268,7 +274,7 @@ class TestMarkdownExporter:
             task=long_task,
             model="test",
             status="completed",
-            created_at=datetime.now()
+            created_at=datetime.now(),
         )
         exporter = MarkdownExporter()
         markdown = exporter.format_session(session)
@@ -289,9 +295,9 @@ class TestMarkdownExporter:
                 Turn(
                     role="assistant",
                     content="Line 1\nLine 2\nLine 3",
-                    created_at=datetime.now()
+                    created_at=datetime.now(),
                 )
-            ]
+            ],
         )
         exporter = MarkdownExporter()
         markdown = exporter.format_session(session)
@@ -311,9 +317,9 @@ class TestMarkdownExporter:
                     role="assistant",
                     content="",
                     tool_calls=[{"function": {"name": "test", "arguments": {}}}],
-                    created_at=datetime.now()
+                    created_at=datetime.now(),
                 )
-            ]
+            ],
         )
         exporter = MarkdownExporter()
         markdown = exporter.format_session(session)
@@ -353,14 +359,14 @@ class TestGenerateExportFilename:
             task="Task 1",
             model="test",
             status="completed",
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
         session2 = Session(
             id="bbb22222-0000-0000-0000-000000000000",
             task="Task 2",
             model="test",
             status="completed",
-            created_at=datetime(2026, 1, 16, 10, 0, 0)
+            created_at=datetime(2026, 1, 16, 10, 0, 0),
         )
 
         filename1 = generate_export_filename(session1)
@@ -384,7 +390,7 @@ class TestExportCLI:
         from sindri.cli import cli
 
         runner = CliRunner()
-        result = runner.invoke(cli, ['export', '--help'])
+        result = runner.invoke(cli, ["export", "--help"])
 
         assert result.exit_code == 0
         assert "Export a session to Markdown" in result.output
@@ -396,7 +402,7 @@ class TestExportCLI:
         from sindri.cli import cli
 
         runner = CliRunner()
-        result = runner.invoke(cli, ['export'])
+        result = runner.invoke(cli, ["export"])
 
         assert result.exit_code != 0
         assert "Missing argument" in result.output
@@ -407,7 +413,7 @@ class TestExportCLI:
         from sindri.cli import cli
 
         runner = CliRunner()
-        result = runner.invoke(cli, ['export', '--help'])
+        result = runner.invoke(cli, ["export", "--help"])
 
         assert "--no-metadata" in result.output
         assert "--no-timestamps" in result.output
@@ -460,9 +466,9 @@ class TestExportIntegration:
                 Turn(
                     role="assistant",
                     content="Here's code:\n```python\ndef foo():\n    pass\n```",
-                    created_at=datetime.now()
+                    created_at=datetime.now(),
                 )
-            ]
+            ],
         )
 
         exporter = MarkdownExporter()

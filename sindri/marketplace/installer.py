@@ -38,6 +38,7 @@ class InstallResult:
         validation: Validation result (if validation was performed)
         warnings: List of warning messages
     """
+
     success: bool
     plugin: Optional[InstalledPlugin] = None
     error: Optional[str] = None
@@ -58,6 +59,7 @@ class UninstallResult:
         name: Plugin name
         error: Error message (if failed)
     """
+
     success: bool
     name: str
     error: Optional[str] = None
@@ -204,10 +206,7 @@ class PluginInstaller:
         self.index.load()
 
         if not path.exists():
-            return InstallResult(
-                success=False,
-                error=f"Path not found: {path}"
-            )
+            return InstallResult(success=False, error=f"Path not found: {path}")
 
         try:
             # Handle directory with manifest
@@ -236,8 +235,7 @@ class PluginInstaller:
             plugin_type = "agent"
         else:
             return InstallResult(
-                success=False,
-                error=f"Unsupported file type: {path.suffix}"
+                success=False, error=f"Unsupported file type: {path.suffix}"
             )
 
         # Extract metadata
@@ -255,7 +253,7 @@ class PluginInstaller:
             existing = self.index.get(metadata.name)
             return InstallResult(
                 success=False,
-                error=f"Plugin '{metadata.name}' is already installed at {existing.installed_path}"
+                error=f"Plugin '{metadata.name}' is already installed at {existing.installed_path}",
             )
 
         # Validate if requested
@@ -327,8 +325,7 @@ class PluginInstaller:
             metadata = parse_manifest(manifest_path)
             if not metadata:
                 return InstallResult(
-                    success=False,
-                    error="Failed to parse sindri-plugin.json manifest"
+                    success=False, error="Failed to parse sindri-plugin.json manifest"
                 )
         else:
             # Look for plugin files
@@ -337,8 +334,7 @@ class PluginInstaller:
 
             if not py_files and not toml_files:
                 return InstallResult(
-                    success=False,
-                    error="No plugin files found in directory"
+                    success=False, error="No plugin files found in directory"
                 )
 
             # Install each file
@@ -360,13 +356,15 @@ class PluginInstaller:
             if not successes:
                 return InstallResult(
                     success=False,
-                    error=f"All plugin files failed: {[r.error for r in failures]}"
+                    error=f"All plugin files failed: {[r.error for r in failures]}",
                 )
 
             return InstallResult(
                 success=True,
                 plugin=successes[0].plugin if successes else None,
-                warnings=[f"Installed {len(successes)} plugins, {len(failures)} failed"],
+                warnings=[
+                    f"Installed {len(successes)} plugins, {len(failures)} failed"
+                ],
             )
 
         # Install from manifest
@@ -374,7 +372,9 @@ class PluginInstaller:
             metadata.name = name
 
         # Find entry point
-        entry_point = path / metadata.to_dict().get("entry_point", f"{metadata.name}.py")
+        entry_point = path / metadata.to_dict().get(
+            "entry_point", f"{metadata.name}.py"
+        )
         if not entry_point.exists():
             # Try common patterns
             for pattern in [f"{metadata.name}.py", "plugin.py", "main.py"]:
@@ -385,8 +385,7 @@ class PluginInstaller:
 
         if not entry_point.exists():
             return InstallResult(
-                success=False,
-                error=f"Entry point not found: {entry_point}"
+                success=False, error=f"Entry point not found: {entry_point}"
             )
 
         return await self._install_single_file(entry_point, metadata.name)
@@ -421,8 +420,7 @@ class PluginInstaller:
             )
         except (subprocess.CalledProcessError, FileNotFoundError):
             return InstallResult(
-                success=False,
-                error="Git is not installed or not in PATH"
+                success=False, error="Git is not installed or not in PATH"
             )
 
         # Clone to temp directory
@@ -444,8 +442,7 @@ class PluginInstaller:
 
                 if result.returncode != 0:
                     return InstallResult(
-                        success=False,
-                        error=f"Git clone failed: {result.stderr}"
+                        success=False, error=f"Git clone failed: {result.stderr}"
                     )
 
                 # Install from cloned directory
@@ -465,10 +462,7 @@ class PluginInstaller:
                 return install_result
 
             except Exception as e:
-                return InstallResult(
-                    success=False,
-                    error=f"Git install failed: {e}"
-                )
+                return InstallResult(success=False, error=f"Git install failed: {e}")
 
     async def install_from_url(
         self,
@@ -515,11 +509,15 @@ class PluginInstaller:
                             tf.extractall(extract_dir)
 
                     # Find plugin files
-                    install_result = await self._install_from_directory(extract_dir, name)
+                    install_result = await self._install_from_directory(
+                        extract_dir, name
+                    )
 
                 else:
                     # Single file
-                    install_result = await self._install_single_file(download_path, name)
+                    install_result = await self._install_single_file(
+                        download_path, name
+                    )
 
                 if install_result.success and install_result.plugin:
                     # Update source info
@@ -534,10 +532,7 @@ class PluginInstaller:
                 return install_result
 
             except Exception as e:
-                return InstallResult(
-                    success=False,
-                    error=f"URL install failed: {e}"
-                )
+                return InstallResult(success=False, error=f"URL install failed: {e}")
 
     async def uninstall(self, name: str) -> UninstallResult:
         """Uninstall a plugin.
@@ -553,19 +548,14 @@ class PluginInstaller:
         plugin = self.index.get(name)
         if not plugin:
             return UninstallResult(
-                success=False,
-                name=name,
-                error=f"Plugin '{name}' is not installed"
+                success=False, name=name, error=f"Plugin '{name}' is not installed"
             )
 
         try:
             # Remove the file
             if plugin.installed_path.exists():
                 plugin.installed_path.unlink()
-                log.info(
-                    "plugin_file_removed",
-                    path=str(plugin.installed_path)
-                )
+                log.info("plugin_file_removed", path=str(plugin.installed_path))
 
             # Remove from index
             self.index.remove(name)
@@ -575,9 +565,7 @@ class PluginInstaller:
 
         except Exception as e:
             return UninstallResult(
-                success=False,
-                name=name,
-                error=f"Uninstall failed: {e}"
+                success=False, name=name, error=f"Uninstall failed: {e}"
             )
 
     async def update(
@@ -669,9 +657,9 @@ class PluginInstaller:
         if not plugin:
             result = ValidationResult(valid=False)
             from sindri.plugins.validator import ValidationError
+
             result.add_error(
-                ValidationError.SYNTAX_ERROR,
-                f"Could not load plugin from {path}"
+                ValidationError.SYNTAX_ERROR, f"Could not load plugin from {path}"
             )
             return result
 

@@ -9,6 +9,7 @@ import json
 @dataclass
 class ModuleInfo:
     """Information about a module/file in the project."""
+
     path: str
     language: str
     imports: List[str] = field(default_factory=list)
@@ -23,7 +24,9 @@ class DependencyInfo:
     """Dependency analysis results."""
 
     # Import relationships
-    internal_dependencies: Dict[str, List[str]] = field(default_factory=dict)  # module -> imports
+    internal_dependencies: Dict[str, List[str]] = field(
+        default_factory=dict
+    )  # module -> imports
     external_packages: Set[str] = field(default_factory=set)  # third-party packages
 
     # Circular dependencies
@@ -31,7 +34,9 @@ class DependencyInfo:
 
     # Dependency metrics
     most_imported: List[tuple] = field(default_factory=list)  # (module, import_count)
-    orphan_modules: List[str] = field(default_factory=list)  # modules with no imports/exports
+    orphan_modules: List[str] = field(
+        default_factory=list
+    )  # modules with no imports/exports
 
     # Entry points
     entry_points: List[str] = field(default_factory=list)  # main.py, cli.py, etc.
@@ -67,7 +72,9 @@ class DependencyInfo:
             lines.append(f"\nEntry points: {', '.join(self.entry_points)}")
 
         if self.circular_dependencies:
-            lines.append(f"\nCircular dependencies found: {len(self.circular_dependencies)}")
+            lines.append(
+                f"\nCircular dependencies found: {len(self.circular_dependencies)}"
+            )
             for cycle in self.circular_dependencies[:3]:
                 lines.append(f"  - {' -> '.join(cycle)}")
 
@@ -91,8 +98,12 @@ class ArchitectureInfo:
     confidence: float = 0.0
 
     # Structure analysis
-    layer_structure: Dict[str, List[str]] = field(default_factory=dict)  # layer -> modules
-    component_groups: Dict[str, List[str]] = field(default_factory=dict)  # group -> modules
+    layer_structure: Dict[str, List[str]] = field(
+        default_factory=dict
+    )  # layer -> modules
+    component_groups: Dict[str, List[str]] = field(
+        default_factory=dict
+    )  # group -> modules
 
     # Key directories
     source_roots: List[str] = field(default_factory=list)  # src/, lib/, etc.
@@ -136,7 +147,9 @@ class ArchitectureInfo:
         """Format a human-readable summary."""
         lines = ["## Architecture Analysis"]
 
-        lines.append(f"\nDetected pattern: {self.detected_pattern} ({self.confidence:.0%} confidence)")
+        lines.append(
+            f"\nDetected pattern: {self.detected_pattern} ({self.confidence:.0%} confidence)"
+        )
         lines.append(f"Project type: {self.project_type}")
 
         if self.frameworks_detected:
@@ -161,7 +174,9 @@ class StyleInfo:
     """Style and convention analysis results."""
 
     # Coding conventions detected
-    naming_conventions: Dict[str, str] = field(default_factory=dict)  # type -> convention
+    naming_conventions: Dict[str, str] = field(
+        default_factory=dict
+    )  # type -> convention
     indentation: str = "unknown"  # spaces, tabs
     indent_size: int = 4
 
@@ -294,7 +309,11 @@ class CodebaseAnalysis:
             total_files=data.get("total_files", 0),
             total_lines=data.get("total_lines", 0),
             files_by_language=data.get("files_by_language", {}),
-            analyzed_at=datetime.fromisoformat(data["analyzed_at"]) if data.get("analyzed_at") else None,
+            analyzed_at=(
+                datetime.fromisoformat(data["analyzed_at"])
+                if data.get("analyzed_at")
+                else None
+            ),
             analysis_version=data.get("analysis_version", "1.0"),
         )
 
@@ -318,7 +337,9 @@ class CodebaseAnalysis:
 
         if self.files_by_language:
             lines.append("\nFiles by language:")
-            for lang, count in sorted(self.files_by_language.items(), key=lambda x: -x[1]):
+            for lang, count in sorted(
+                self.files_by_language.items(), key=lambda x: -x[1]
+            ):
                 lines.append(f"  - {lang}: {count}")
 
         lines.append("\n" + self.dependencies.format_summary())
@@ -332,11 +353,15 @@ class CodebaseAnalysis:
         parts = []
 
         # Architecture summary for agents
-        parts.append(f"Project: {self.primary_language} {self.architecture.project_type}")
+        parts.append(
+            f"Project: {self.primary_language} {self.architecture.project_type}"
+        )
         parts.append(f"Architecture: {self.architecture.detected_pattern}")
 
         if self.architecture.frameworks_detected:
-            parts.append(f"Frameworks: {', '.join(self.architecture.frameworks_detected)}")
+            parts.append(
+                f"Frameworks: {', '.join(self.architecture.frameworks_detected)}"
+            )
 
         if self.dependencies.entry_points:
             parts.append(f"Entry points: {', '.join(self.dependencies.entry_points)}")

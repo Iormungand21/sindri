@@ -20,6 +20,7 @@ log = structlog.get_logger()
 @dataclass
 class DelegationRequest:
     """Request to delegate work to another agent."""
+
     target_agent: str
     task_description: str
     context: dict
@@ -37,19 +38,16 @@ class DelegationManager:
         self,
         scheduler: TaskScheduler,
         state=None,
-        model_manager: Optional["ModelManager"] = None
+        model_manager: Optional["ModelManager"] = None,
     ):
         self.scheduler = scheduler
         self.state = state  # SessionState for updating parent sessions
         self.model_manager = model_manager  # For pre-warming
-        log.info("delegation_manager_initialized",
-                 prewarm_enabled=model_manager is not None)
+        log.info(
+            "delegation_manager_initialized", prewarm_enabled=model_manager is not None
+        )
 
-    async def delegate(
-        self,
-        parent_task: Task,
-        request: DelegationRequest
-    ) -> Task:
+    async def delegate(self, parent_task: Task, request: DelegationRequest) -> Task:
         """Create and schedule a child task.
 
         Phase 6.2: Triggers model pre-warming for the target agent.
@@ -67,10 +65,7 @@ class DelegationManager:
 
         # Phase 6.2: Pre-warm the target agent's model in background
         if self.model_manager:
-            await self.model_manager.pre_warm(
-                agent.model,
-                agent.estimated_vram_gb
-            )
+            await self.model_manager.pre_warm(agent.model, agent.estimated_vram_gb)
 
         child = Task(
             parent_id=parent_task.id,
@@ -83,7 +78,7 @@ class DelegationManager:
                 "delegation": request.context,
                 "constraints": request.constraints,
                 "success_criteria": request.success_criteria,
-            }
+            },
         )
 
         # Add to parent's subtasks
@@ -93,13 +88,15 @@ class DelegationManager:
         # Schedule child
         self.scheduler.add_task(child)
 
-        log.info("task_delegated",
-                 parent_id=parent_task.id,
-                 child_id=child.id,
-                 from_agent=parent_task.assigned_agent,
-                 to_agent=request.target_agent,
-                 prewarm_triggered=self.model_manager is not None,
-                 description=request.task_description[:50])
+        log.info(
+            "task_delegated",
+            parent_id=parent_task.id,
+            child_id=child.id,
+            from_agent=parent_task.assigned_agent,
+            to_agent=request.target_agent,
+            prewarm_triggered=self.model_manager is not None,
+            description=request.task_description[:50],
+        )
 
         return child
 
@@ -113,13 +110,15 @@ class DelegationManager:
         if not parent:
             return
 
-        log.info("child_completed",
-                 child_id=child.id,
-                 parent_id=parent.id,
-                 success=child.status == TaskStatus.COMPLETE)
+        log.info(
+            "child_completed",
+            child_id=child.id,
+            parent_id=parent.id,
+            success=child.status == TaskStatus.COMPLETE,
+        )
 
         # Inject child result into parent's session
-        if self.state and hasattr(parent, 'session_id'):
+        if self.state and hasattr(parent, "session_id"):
             try:
                 parent_session = await self.state.load_session(parent.session_id)
                 if parent_session:
@@ -132,13 +131,15 @@ class DelegationManager:
                     )
                     parent_session.add_turn("tool", result_text)
                     await self.state.save_session(parent_session)
-                    log.info("injected_child_result_to_parent",
-                             parent_id=parent.id,
-                             child_id=child.id)
+                    log.info(
+                        "injected_child_result_to_parent",
+                        parent_id=parent.id,
+                        child_id=child.id,
+                    )
             except Exception as e:
-                log.warning("failed_to_inject_child_result",
-                           parent_id=parent.id,
-                           error=str(e))
+                log.warning(
+                    "failed_to_inject_child_result", parent_id=parent.id, error=str(e)
+                )
 
         # Check if all children complete
         all_complete = all(
@@ -148,13 +149,16 @@ class DelegationManager:
         )
 
         if all_complete:
-            log.info("all_children_complete",
-                     parent_id=parent.id,
-                     num_children=len(parent.subtask_ids))
+            log.info(
+                "all_children_complete",
+                parent_id=parent.id,
+                num_children=len(parent.subtask_ids),
+            )
             # Resume parent
             parent.status = TaskStatus.PENDING
             # Re-add to pending queue
             import heapq
+
             heapq.heappush(self.scheduler.pending, (parent.priority, parent.id))
 
     async def child_failed(self, child: Task):
@@ -167,10 +171,9 @@ class DelegationManager:
         if not parent:
             return
 
-        log.warning("child_failed",
-                    child_id=child.id,
-                    parent_id=parent.id,
-                    error=child.error)
+        log.warning(
+            "child_failed", child_id=child.id, parent_id=parent.id, error=child.error
+        )
 
         # For now, fail the parent too
         # In future, could implement retry logic

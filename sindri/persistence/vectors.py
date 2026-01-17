@@ -30,7 +30,8 @@ class VectorStore:
         sqlite_vec.load(conn)
         conn.enable_load_extension(False)
 
-        conn.executescript(f"""
+        conn.executescript(
+            f"""
             CREATE TABLE IF NOT EXISTS embeddings (
                 id INTEGER PRIMARY KEY,
                 namespace TEXT NOT NULL,
@@ -40,7 +41,8 @@ class VectorStore:
             );
 
             CREATE INDEX IF NOT EXISTS idx_namespace ON embeddings(namespace);
-        """)
+        """
+        )
         conn.commit()
 
         return conn
@@ -50,7 +52,7 @@ class VectorStore:
         namespace: str,
         content: str,
         embedding: list[float],
-        metadata: Optional[dict] = None
+        metadata: Optional[dict] = None,
     ) -> int:
         """Insert a vector with content."""
         cursor = self.conn.execute(
@@ -62,17 +64,14 @@ class VectorStore:
                 namespace,
                 content,
                 json.dumps(metadata) if metadata else None,
-                serialize_f32(embedding)
-            )
+                serialize_f32(embedding),
+            ),
         )
         self.conn.commit()
         return cursor.lastrowid
 
     def search(
-        self,
-        namespace: str,
-        query_embedding: list[float],
-        limit: int = 10
+        self, namespace: str, query_embedding: list[float], limit: int = 10
     ) -> list[tuple[str, float, dict]]:
         """Search for similar vectors.
 
@@ -87,14 +86,14 @@ class VectorStore:
             ORDER BY distance
             LIMIT ?
             """,
-            (serialize_f32(query_embedding), namespace, limit)
+            (serialize_f32(query_embedding), namespace, limit),
         ).fetchall()
 
         return [
             (
                 row[0],
                 1 - row[2],  # Convert distance to similarity
-                json.loads(row[1]) if row[1] else {}
+                json.loads(row[1]) if row[1] else {},
             )
             for row in results
         ]
@@ -109,8 +108,7 @@ class VectorStore:
         """Count embeddings in namespace (or all if None)."""
         if namespace:
             result = self.conn.execute(
-                "SELECT COUNT(*) FROM embeddings WHERE namespace = ?",
-                (namespace,)
+                "SELECT COUNT(*) FROM embeddings WHERE namespace = ?", (namespace,)
             ).fetchone()
         else:
             result = self.conn.execute("SELECT COUNT(*) FROM embeddings").fetchone()

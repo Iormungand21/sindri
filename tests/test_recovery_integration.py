@@ -3,7 +3,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 
@@ -11,7 +11,7 @@ from sindri.core.recovery import RecoveryManager
 from sindri.core.hierarchical import HierarchicalAgentLoop
 from sindri.core.loop import LoopConfig
 from sindri.core.events import EventBus
-from sindri.core.tasks import Task, TaskStatus
+from sindri.core.tasks import Task
 
 
 class TestRecoveryManagerBasic:
@@ -25,11 +25,7 @@ class TestRecoveryManagerBasic:
     def test_save_and_load_checkpoint(self, recovery_manager):
         """Should save and load checkpoint correctly."""
         session_id = "test-session-123"
-        state = {
-            "task": "Write tests",
-            "iterations": 5,
-            "agent": "huginn"
-        }
+        state = {"task": "Write tests", "iterations": 5, "agent": "huginn"}
 
         recovery_manager.save_checkpoint(session_id, state)
 
@@ -51,9 +47,15 @@ class TestRecoveryManagerBasic:
 
     def test_list_recoverable_sessions(self, recovery_manager):
         """Should list all recoverable sessions."""
-        recovery_manager.save_checkpoint("session-1", {"task": "Task 1", "iterations": 1})
-        recovery_manager.save_checkpoint("session-2", {"task": "Task 2", "iterations": 2})
-        recovery_manager.save_checkpoint("session-3", {"task": "Task 3", "iterations": 3})
+        recovery_manager.save_checkpoint(
+            "session-1", {"task": "Task 1", "iterations": 1}
+        )
+        recovery_manager.save_checkpoint(
+            "session-2", {"task": "Task 2", "iterations": 2}
+        )
+        recovery_manager.save_checkpoint(
+            "session-3", {"task": "Task 3", "iterations": 3}
+        )
 
         sessions = recovery_manager.list_recoverable_sessions()
 
@@ -102,7 +104,7 @@ class TestHierarchicalLoopRecoveryIntegration:
             "delegation": delegation,
             "config": config,
             "event_bus": event_bus,
-            "recovery": recovery
+            "recovery": recovery,
         }
 
     @pytest.fixture
@@ -117,16 +119,11 @@ class TestHierarchicalLoopRecoveryIntegration:
     def test_save_error_checkpoint_creates_file(self, loop, mock_loop_deps):
         """Should save checkpoint data to file."""
         task = Task(
-            id="test-task-123",
-            description="Test task",
-            assigned_agent="huginn"
+            id="test-task-123", description="Test task", assigned_agent="huginn"
         )
 
         loop._save_error_checkpoint(
-            task=task,
-            error_reason="test_error",
-            session_id="session-456",
-            iteration=5
+            task=task, error_reason="test_error", session_id="session-456", iteration=5
         )
 
         recovery = mock_loop_deps["recovery"]
@@ -142,13 +139,13 @@ class TestHierarchicalLoopRecoveryIntegration:
         task = Task(
             id="test-task-789",
             description="Test task with context",
-            assigned_agent="brokkr"
+            assigned_agent="brokkr",
         )
 
         loop._save_error_checkpoint(
             task=task,
             error_reason="model_load_failed",
-            error_context={"model": "qwen2.5:14b", "vram_required": 9.0}
+            error_context={"model": "qwen2.5:14b", "vram_required": 9.0},
         )
 
         recovery = mock_loop_deps["recovery"]
@@ -164,13 +161,10 @@ class TestHierarchicalLoopRecoveryIntegration:
             description="Full task info test",
             assigned_agent="mimir",
             parent_id="parent-task-1",
-            context={"file": "test.py", "action": "review"}
+            context={"file": "test.py", "action": "review"},
         )
 
-        loop._save_error_checkpoint(
-            task=task,
-            error_reason="test_reason"
-        )
+        loop._save_error_checkpoint(task=task, error_reason="test_reason")
 
         recovery = mock_loop_deps["recovery"]
         checkpoint = recovery.load_checkpoint("test-task-full")
@@ -189,14 +183,11 @@ class TestHierarchicalLoopRecoveryIntegration:
         task = Task(
             id="test-task-no-recovery",
             description="Test without recovery",
-            assigned_agent="huginn"
+            assigned_agent="huginn",
         )
 
         # Should not raise
-        loop._save_error_checkpoint(
-            task=task,
-            error_reason="test_error"
-        )
+        loop._save_error_checkpoint(task=task, error_reason="test_error")
 
 
 class TestRecoveryOnFailurePaths:
@@ -210,12 +201,11 @@ class TestRecoveryOnFailurePaths:
         tools.get_tool = MagicMock(return_value=MagicMock())
         state = MagicMock()
         state.load_session = AsyncMock(return_value=None)
-        state.create_session = AsyncMock(return_value=MagicMock(
-            id="session-123",
-            turns=[],
-            add_turn=MagicMock(),
-            iterations=0
-        ))
+        state.create_session = AsyncMock(
+            return_value=MagicMock(
+                id="session-123", turns=[], add_turn=MagicMock(), iterations=0
+            )
+        )
 
         scheduler = MagicMock()
         scheduler.model_manager = MagicMock()
@@ -234,7 +224,7 @@ class TestRecoveryOnFailurePaths:
             "delegation": delegation,
             "config": config,
             "event_bus": event_bus,
-            "recovery": recovery
+            "recovery": recovery,
         }
 
     @pytest.mark.asyncio
@@ -245,7 +235,7 @@ class TestRecoveryOnFailurePaths:
         task = Task(
             id="task-model-fail",
             description="Test model failure",
-            assigned_agent="brokkr"
+            assigned_agent="brokkr",
         )
 
         result = await loop.run_task(task)
@@ -276,7 +266,7 @@ class TestRecoveryCleanupOnSuccess:
             delegation=MagicMock(),
             config=LoopConfig(),
             event_bus=EventBus(),
-            recovery=recovery
+            recovery=recovery,
         )
 
         return loop, recovery
@@ -309,7 +299,9 @@ class TestRecoveryCheckpointData:
         recovery_manager.save_checkpoint("session-ts", {"data": True})
 
         # Read raw checkpoint file
-        checkpoint_path = Path(recovery_manager.state_dir) / "session-ts.checkpoint.json"
+        checkpoint_path = (
+            Path(recovery_manager.state_dir) / "session-ts.checkpoint.json"
+        )
         data = json.loads(checkpoint_path.read_text())
 
         assert "timestamp" in data
@@ -321,7 +313,9 @@ class TestRecoveryCheckpointData:
         large_data = {"data": "x" * 10000}  # 10KB of data
         recovery_manager.save_checkpoint("session-atomic", large_data)
 
-        checkpoint_path = Path(recovery_manager.state_dir) / "session-atomic.checkpoint.json"
+        checkpoint_path = (
+            Path(recovery_manager.state_dir) / "session-atomic.checkpoint.json"
+        )
 
         # Verify the file exists and is valid JSON
         assert checkpoint_path.exists()

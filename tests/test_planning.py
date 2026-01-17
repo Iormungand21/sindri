@@ -9,7 +9,6 @@ Tests cover:
 """
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from sindri.tools.planning import (
     PlanStep,
@@ -24,11 +23,7 @@ class TestPlanStep:
 
     def test_plan_step_basic_creation(self):
         """Test creating a basic plan step."""
-        step = PlanStep(
-            step_number=1,
-            description="Create user model",
-            agent="huginn"
-        )
+        step = PlanStep(step_number=1, description="Create user model", agent="huginn")
         assert step.step_number == 1
         assert step.description == "Create user model"
         assert step.agent == "huginn"
@@ -44,7 +39,7 @@ class TestPlanStep:
             agent="huginn",
             estimated_iterations=10,
             dependencies=[1],
-            tool_hints=["write_file", "edit_file"]
+            tool_hints=["write_file", "edit_file"],
         )
         assert step.step_number == 2
         assert step.estimated_iterations == 10
@@ -58,7 +53,7 @@ class TestPlanStep:
             description="Test step",
             agent="mimir",
             dependencies=[2, 3],
-            tool_hints=["read_file"]
+            tool_hints=["read_file"],
         )
         result = step.to_dict()
         assert result["step_number"] == 1
@@ -75,7 +70,7 @@ class TestPlanStep:
             "agent": "skald",
             "estimated_iterations": 15,
             "dependencies": [1, 2],
-            "tool_hints": ["shell"]
+            "tool_hints": ["shell"],
         }
         step = PlanStep.from_dict(data)
         assert step.step_number == 3
@@ -101,12 +96,9 @@ class TestExecutionPlan:
         """Test creating a basic execution plan."""
         steps = [
             PlanStep(1, "Step 1", "huginn"),
-            PlanStep(2, "Step 2", "skald", dependencies=[1])
+            PlanStep(2, "Step 2", "skald", dependencies=[1]),
         ]
-        plan = ExecutionPlan(
-            task_summary="Test task",
-            steps=steps
-        )
+        plan = ExecutionPlan(task_summary="Test task", steps=steps)
         assert plan.task_summary == "Test task"
         assert len(plan.steps) == 2
         assert plan.total_estimated_vram_gb == 0.0
@@ -121,7 +113,7 @@ class TestExecutionPlan:
             steps=steps,
             total_estimated_vram_gb=10.5,
             rationale="This is the optimal approach",
-            risks=["May take longer than expected", "Requires specific model"]
+            risks=["May take longer than expected", "Requires specific model"],
         )
         assert plan.total_estimated_vram_gb == 10.5
         assert plan.rationale == "This is the optimal approach"
@@ -129,15 +121,12 @@ class TestExecutionPlan:
 
     def test_execution_plan_to_dict(self):
         """Test serializing an execution plan to dictionary."""
-        steps = [
-            PlanStep(1, "Step A", "huginn"),
-            PlanStep(2, "Step B", "mimir")
-        ]
+        steps = [PlanStep(1, "Step A", "huginn"), PlanStep(2, "Step B", "mimir")]
         plan = ExecutionPlan(
             task_summary="My task",
             steps=steps,
             rationale="Good reason",
-            risks=["Risk 1"]
+            risks=["Risk 1"],
         )
         result = plan.to_dict()
         assert result["task_summary"] == "My task"
@@ -151,11 +140,16 @@ class TestExecutionPlan:
             "task_summary": "Rebuild auth",
             "steps": [
                 {"step_number": 1, "description": "Model", "agent": "huginn"},
-                {"step_number": 2, "description": "Routes", "agent": "huginn", "dependencies": [1]}
+                {
+                    "step_number": 2,
+                    "description": "Routes",
+                    "agent": "huginn",
+                    "dependencies": [1],
+                },
             ],
             "total_estimated_vram_gb": 8.0,
             "rationale": "Standard approach",
-            "risks": ["Time intensive"]
+            "risks": ["Time intensive"],
         }
         plan = ExecutionPlan.from_dict(data)
         assert plan.task_summary == "Rebuild auth"
@@ -167,14 +161,14 @@ class TestExecutionPlan:
         """Test formatting plan for display."""
         steps = [
             PlanStep(1, "Create models", "huginn", tool_hints=["write_file"]),
-            PlanStep(2, "Add tests", "skald", dependencies=[1])
+            PlanStep(2, "Add tests", "skald", dependencies=[1]),
         ]
         plan = ExecutionPlan(
             task_summary="Auth implementation",
             steps=steps,
             total_estimated_vram_gb=10.0,
             rationale="Breaking down into logical steps",
-            risks=["Complex feature"]
+            risks=["Complex feature"],
         )
         display = plan.format_display()
 
@@ -211,8 +205,8 @@ class TestProposePlanTool:
             task_summary="Add user authentication",
             steps=[
                 {"description": "Create User model", "agent": "huginn"},
-                {"description": "Create auth routes", "agent": "huginn"}
-            ]
+                {"description": "Create auth routes", "agent": "huginn"},
+            ],
         )
 
         assert result.success
@@ -230,9 +224,17 @@ class TestProposePlanTool:
             task_summary="Build API",
             steps=[
                 {"description": "Create models", "agent": "huginn"},
-                {"description": "Create routes", "agent": "huginn", "dependencies": [1]},
-                {"description": "Write tests", "agent": "skald", "dependencies": [1, 2]}
-            ]
+                {
+                    "description": "Create routes",
+                    "agent": "huginn",
+                    "dependencies": [1],
+                },
+                {
+                    "description": "Write tests",
+                    "agent": "skald",
+                    "dependencies": [1, 2],
+                },
+            ],
         )
 
         assert result.success
@@ -248,10 +250,10 @@ class TestProposePlanTool:
             task_summary="Database migration",
             steps=[
                 {"description": "Backup database", "agent": "fenrir"},
-                {"description": "Run migration", "agent": "fenrir"}
+                {"description": "Run migration", "agent": "fenrir"},
             ],
             rationale="Backup first ensures safety",
-            risks=["Data loss if backup fails", "Downtime during migration"]
+            risks=["Data loss if backup fails", "Downtime during migration"],
         )
 
         assert result.success
@@ -267,8 +269,8 @@ class TestProposePlanTool:
             task_summary="Simple task",
             steps=[
                 {"description": "Step 1", "agent": "huginn"},
-                {"description": "Step 2", "agent": "huginn"}
-            ]
+                {"description": "Step 2", "agent": "huginn"},
+            ],
         )
 
         assert result.success
@@ -285,8 +287,8 @@ class TestProposePlanTool:
             steps=[
                 {"description": "Implement", "agent": "huginn"},
                 {"description": "Review", "agent": "mimir"},
-                {"description": "Test", "agent": "skald"}
-            ]
+                {"description": "Test", "agent": "skald"},
+            ],
         )
 
         assert result.success
@@ -301,9 +303,17 @@ class TestProposePlanTool:
         result = await tool.execute(
             task_summary="File operations",
             steps=[
-                {"description": "Read config", "agent": "huginn", "tool_hints": ["read_file"]},
-                {"description": "Write output", "agent": "huginn", "tool_hints": ["write_file", "edit_file"]}
-            ]
+                {
+                    "description": "Read config",
+                    "agent": "huginn",
+                    "tool_hints": ["read_file"],
+                },
+                {
+                    "description": "Write output",
+                    "agent": "huginn",
+                    "tool_hints": ["write_file", "edit_file"],
+                },
+            ],
         )
 
         assert result.success
@@ -316,7 +326,7 @@ class TestProposePlanTool:
         tool = ProposePlanTool()
         result = await tool.execute(
             task_summary="Test task",
-            steps=[{"description": "Do something", "agent": "ratatoskr"}]
+            steps=[{"description": "Do something", "agent": "ratatoskr"}],
         )
 
         assert result.success
@@ -352,15 +362,17 @@ class TestPlanningEvents:
         event_bus.subscribe(EventType.PLAN_PROPOSED, handler)
 
         # Emit a plan event
-        event_bus.emit(Event(
-            type=EventType.PLAN_PROPOSED,
-            data={
-                "task_id": "test-123",
-                "agent": "brokkr",
-                "plan": {"task_summary": "Test"},
-                "step_count": 2
-            }
-        ))
+        event_bus.emit(
+            Event(
+                type=EventType.PLAN_PROPOSED,
+                data={
+                    "task_id": "test-123",
+                    "agent": "brokkr",
+                    "plan": {"task_summary": "Test"},
+                    "step_count": 2,
+                },
+            )
+        )
 
         assert len(received_events) == 1
         assert received_events[0]["task_id"] == "test-123"
@@ -377,7 +389,10 @@ class TestBrokkrPromptUpdate:
         assert "propose_plan" in BROKKR_PROMPT
         assert "PLAN FIRST" in BROKKR_PROMPT
         assert "task_summary" in BROKKR_PROMPT
-        assert "EXECUTION PLAN" in BROKKR_PROMPT or "execution plan" in BROKKR_PROMPT.lower()
+        assert (
+            "EXECUTION PLAN" in BROKKR_PROMPT
+            or "execution plan" in BROKKR_PROMPT.lower()
+        )
 
     def test_brokkr_has_propose_plan_tool(self):
         """Test that Brokkr has propose_plan in tools list."""
@@ -409,8 +424,8 @@ class TestToolRegistration:
             "propose_plan",
             {
                 "task_summary": "Test via registry",
-                "steps": [{"description": "Step", "agent": "huginn"}]
-            }
+                "steps": [{"description": "Step", "agent": "huginn"}],
+            },
         )
 
         assert result.success
@@ -422,10 +437,7 @@ class TestPlanStepEdgeCases:
 
     def test_empty_steps_list(self):
         """Test creating a plan with no steps."""
-        plan = ExecutionPlan(
-            task_summary="Empty plan",
-            steps=[]
-        )
+        plan = ExecutionPlan(task_summary="Empty plan", steps=[])
         display = plan.format_display()
         assert "Empty plan" in display
         assert plan.to_dict()["steps"] == []
@@ -436,7 +448,7 @@ class TestPlanStepEdgeCases:
             step_number=5,
             description="Final step",
             agent="mimir",
-            dependencies=[1, 2, 3, 4]
+            dependencies=[1, 2, 3, 4],
         )
         step_dict = step.to_dict()
         assert len(step_dict["dependencies"]) == 4
@@ -444,11 +456,7 @@ class TestPlanStepEdgeCases:
     def test_long_description(self):
         """Test step with very long description."""
         long_desc = "A" * 500
-        step = PlanStep(
-            step_number=1,
-            description=long_desc,
-            agent="huginn"
-        )
+        step = PlanStep(step_number=1, description=long_desc, agent="huginn")
         assert step.description == long_desc
         assert len(step.to_dict()["description"]) == 500
 

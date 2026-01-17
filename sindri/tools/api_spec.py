@@ -18,6 +18,7 @@ log = structlog.get_logger()
 @dataclass
 class RouteInfo:
     """Information about a single API route."""
+
     path: str
     method: str
     handler: str
@@ -34,6 +35,7 @@ class RouteInfo:
 @dataclass
 class FrameworkInfo:
     """Detected web framework information."""
+
     framework: str  # flask, fastapi, express, django, gin, echo, actix, generic
     language: str  # python, javascript, typescript, go, rust
     version: Optional[str] = None
@@ -68,55 +70,52 @@ Examples:
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Path to project directory (default: current directory)"
+                "description": "Path to project directory (default: current directory)",
             },
             "output": {
                 "type": "string",
-                "description": "Output file path (default: openapi.json)"
+                "description": "Output file path (default: openapi.json)",
             },
             "format": {
                 "type": "string",
                 "description": "Output format: 'json' or 'yaml'",
-                "enum": ["json", "yaml"]
+                "enum": ["json", "yaml"],
             },
             "title": {
                 "type": "string",
-                "description": "API title (default: auto-detected from project)"
+                "description": "API title (default: auto-detected from project)",
             },
             "version": {
                 "type": "string",
-                "description": "API version (default: '1.0.0')"
+                "description": "API version (default: '1.0.0')",
             },
-            "description": {
-                "type": "string",
-                "description": "API description"
-            },
+            "description": {"type": "string", "description": "API description"},
             "servers": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "Server URLs (e.g., ['http://localhost:8000', 'https://api.example.com'])"
+                "description": "Server URLs (e.g., ['http://localhost:8000', 'https://api.example.com'])",
             },
             "framework": {
                 "type": "string",
                 "description": "Override framework detection: 'flask', 'fastapi', 'express', 'django', 'gin', 'echo'",
-                "enum": ["flask", "fastapi", "express", "django", "gin", "echo"]
+                "enum": ["flask", "fastapi", "express", "django", "gin", "echo"],
             },
             "include_patterns": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "File patterns to include (e.g., ['*.py', 'routes/*.js'])"
+                "description": "File patterns to include (e.g., ['*.py', 'routes/*.js'])",
             },
             "exclude_patterns": {
                 "type": "array",
                 "items": {"type": "string"},
-                "description": "File patterns to exclude (e.g., ['test_*.py', '*_test.go'])"
+                "description": "File patterns to exclude (e.g., ['test_*.py', '*_test.go'])",
             },
             "dry_run": {
                 "type": "boolean",
-                "description": "Preview spec without creating file"
-            }
+                "description": "Preview spec without creating file",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
@@ -132,7 +131,7 @@ Examples:
         include_patterns: Optional[list[str]] = None,
         exclude_patterns: Optional[list[str]] = None,
         dry_run: bool = False,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Generate an OpenAPI specification from route definitions.
 
@@ -155,14 +154,14 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Project path does not exist: {project_path}"
+                error=f"Project path does not exist: {project_path}",
             )
 
         # Detect framework
         if framework:
             fw_info = FrameworkInfo(
                 framework=framework,
-                language=self._get_language_for_framework(framework)
+                language=self._get_language_for_framework(framework),
             )
         else:
             fw_info = self._detect_framework(project_path)
@@ -172,15 +171,12 @@ Examples:
                 success=False,
                 output="",
                 error="Could not detect web framework. Use --framework to specify manually.",
-                metadata={"detected": None}
+                metadata={"detected": None},
             )
 
         # Extract routes based on framework
         routes = self._extract_routes(
-            project_path,
-            fw_info,
-            include_patterns,
-            exclude_patterns
+            project_path, fw_info, include_patterns, exclude_patterns
         )
 
         if not routes:
@@ -188,7 +184,7 @@ Examples:
                 success=False,
                 output="",
                 error=f"No routes found for {fw_info.framework} framework in {project_path}",
-                metadata={"framework": fw_info.framework}
+                metadata={"framework": fw_info.framework},
             )
 
         # Detect title from project if not provided
@@ -202,19 +198,22 @@ Examples:
             version=version,
             description=description,
             servers=servers,
-            framework_info=fw_info
+            framework_info=fw_info,
         )
 
         # Format output
         if format == "yaml":
             try:
                 import yaml
-                output_content = yaml.dump(spec, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+                output_content = yaml.dump(
+                    spec, default_flow_style=False, sort_keys=False, allow_unicode=True
+                )
             except ImportError:
                 return ToolResult(
                     success=False,
                     output="",
-                    error="PyYAML is not installed. Install with: pip install pyyaml"
+                    error="PyYAML is not installed. Install with: pip install pyyaml",
                 )
         else:
             output_content = json.dumps(spec, indent=2)
@@ -233,8 +232,8 @@ Examples:
                     "dry_run": True,
                     "framework": fw_info.framework,
                     "routes_count": len(routes),
-                    "output_file": str(output_path)
-                }
+                    "output_file": str(output_path),
+                },
             )
 
         # Write spec file
@@ -245,7 +244,7 @@ Examples:
                 "api_spec_generated",
                 framework=fw_info.framework,
                 routes=len(routes),
-                output=str(output_path)
+                output=str(output_path),
             )
             return ToolResult(
                 success=True,
@@ -254,15 +253,15 @@ Examples:
                     "framework": fw_info.framework,
                     "language": fw_info.language,
                     "routes_count": len(routes),
-                    "output_file": str(output_path)
-                }
+                    "output_file": str(output_path),
+                },
             )
         except Exception as e:
             log.error("api_spec_write_failed", error=str(e))
             return ToolResult(
                 success=False,
                 output="",
-                error=f"Failed to write OpenAPI spec: {str(e)}"
+                error=f"Failed to write OpenAPI spec: {str(e)}",
             )
 
     def _get_language_for_framework(self, framework: str) -> str:
@@ -312,7 +311,9 @@ Examples:
                     return FrameworkInfo(framework="express", language=lang)
                 if "fastify" in deps:
                     lang = "typescript" if "typescript" in deps else "javascript"
-                    return FrameworkInfo(framework="express", language=lang)  # Treat fastify similarly
+                    return FrameworkInfo(
+                        framework="express", language=lang
+                    )  # Treat fastify similarly
             except json.JSONDecodeError:
                 pass
 
@@ -343,9 +344,13 @@ Examples:
             try:
                 content = py_file.read_text()
                 if "from fastapi import" in content or "import fastapi" in content:
-                    return FrameworkInfo(framework="fastapi", language="python", entry_point=str(py_file))
+                    return FrameworkInfo(
+                        framework="fastapi", language="python", entry_point=str(py_file)
+                    )
                 if "from flask import" in content or "import flask" in content:
-                    return FrameworkInfo(framework="flask", language="python", entry_point=str(py_file))
+                    return FrameworkInfo(
+                        framework="flask", language="python", entry_point=str(py_file)
+                    )
                 if "from django" in content:
                     return FrameworkInfo(framework="django", language="python")
             except (UnicodeDecodeError, IOError):
@@ -358,7 +363,9 @@ Examples:
                 content = js_file.read_text()
                 if "require('express')" in content or "from 'express'" in content:
                     lang = "typescript" if js_file.suffix == ".ts" else "javascript"
-                    return FrameworkInfo(framework="express", language=lang, entry_point=str(js_file))
+                    return FrameworkInfo(
+                        framework="express", language=lang, entry_point=str(js_file)
+                    )
             except (UnicodeDecodeError, IOError):
                 continue
 
@@ -368,9 +375,13 @@ Examples:
             try:
                 content = go_file.read_text()
                 if '"github.com/gin-gonic/gin"' in content:
-                    return FrameworkInfo(framework="gin", language="go", entry_point=str(go_file))
+                    return FrameworkInfo(
+                        framework="gin", language="go", entry_point=str(go_file)
+                    )
                 if '"github.com/labstack/echo' in content:
-                    return FrameworkInfo(framework="echo", language="go", entry_point=str(go_file))
+                    return FrameworkInfo(
+                        framework="echo", language="go", entry_point=str(go_file)
+                    )
             except (UnicodeDecodeError, IOError):
                 continue
 
@@ -401,7 +412,7 @@ Examples:
         go_mod = path / "go.mod"
         if go_mod.exists():
             content = go_mod.read_text()
-            match = re.search(r'module\s+([^\s]+)', content)
+            match = re.search(r"module\s+([^\s]+)", content)
             if match:
                 name = match.group(1).split("/")[-1]
                 return name.replace("-", " ").replace("_", " ").title()
@@ -421,17 +432,21 @@ Examples:
         path: Path,
         fw_info: FrameworkInfo,
         include_patterns: Optional[list[str]],
-        exclude_patterns: Optional[list[str]]
+        exclude_patterns: Optional[list[str]],
     ) -> list[RouteInfo]:
         """Extract routes based on framework."""
         if fw_info.framework == "fastapi":
-            return self._extract_fastapi_routes(path, include_patterns, exclude_patterns)
+            return self._extract_fastapi_routes(
+                path, include_patterns, exclude_patterns
+            )
         elif fw_info.framework == "flask":
             return self._extract_flask_routes(path, include_patterns, exclude_patterns)
         elif fw_info.framework == "django":
             return self._extract_django_routes(path, include_patterns, exclude_patterns)
         elif fw_info.framework == "express":
-            return self._extract_express_routes(path, include_patterns, exclude_patterns)
+            return self._extract_express_routes(
+                path, include_patterns, exclude_patterns
+            )
         elif fw_info.framework == "gin":
             return self._extract_gin_routes(path, include_patterns, exclude_patterns)
         elif fw_info.framework == "echo":
@@ -444,7 +459,7 @@ Examples:
         path: Path,
         extensions: list[str],
         include_patterns: Optional[list[str]],
-        exclude_patterns: Optional[list[str]]
+        exclude_patterns: Optional[list[str]],
     ) -> list[Path]:
         """Get files matching criteria."""
         files = []
@@ -452,7 +467,15 @@ Examples:
             files.extend(path.rglob(f"*{ext}"))
 
         # Filter by patterns
-        exclude_patterns = exclude_patterns or ["test_*", "*_test*", "tests/*", "test/*", "__pycache__/*", "node_modules/*", "vendor/*"]
+        exclude_patterns = exclude_patterns or [
+            "test_*",
+            "*_test*",
+            "tests/*",
+            "test/*",
+            "__pycache__/*",
+            "node_modules/*",
+            "vendor/*",
+        ]
 
         result = []
         for f in files:
@@ -485,35 +508,36 @@ Examples:
     def _match_pattern(self, path: str, pattern: str) -> bool:
         """Simple glob-style pattern matching."""
         import fnmatch
+
         return fnmatch.fnmatch(path, pattern)
 
     def _extract_fastapi_routes(
         self,
         path: Path,
         include_patterns: Optional[list[str]],
-        exclude_patterns: Optional[list[str]]
+        exclude_patterns: Optional[list[str]],
     ) -> list[RouteInfo]:
         """Extract routes from FastAPI application."""
         routes = []
         files = self._get_files(path, [".py"], include_patterns, exclude_patterns)
 
         # FastAPI decorator patterns
-        route_pattern = re.compile(
+        re.compile(
             r'@(?:app|router)\.(get|post|put|delete|patch|options|head)\s*\(\s*["\']([^"\']+)["\']'
             r'(?:.*?(?:summary\s*=\s*["\']([^"\']+)["\'])|)'
             r'(?:.*?(?:description\s*=\s*["\']([^"\']+)["\'])|)'
-            r'(?:.*?(?:tags\s*=\s*\[([^\]]+)\])|)',
-            re.DOTALL
+            r"(?:.*?(?:tags\s*=\s*\[([^\]]+)\])|)",
+            re.DOTALL,
         )
 
         for file in files:
             try:
                 content = file.read_text()
-                for line_num, line in enumerate(content.split('\n'), 1):
+                for line_num, line in enumerate(content.split("\n"), 1):
                     # Simple single-line matching for common cases
                     match = re.search(
                         r'@(?:app|router)\.(get|post|put|delete|patch|options|head)\s*\(\s*["\']([^"\']+)["\']',
-                        line
+                        line,
                     )
                     if match:
                         method = match.group(1).upper()
@@ -525,22 +549,24 @@ Examples:
                         # Try to get function name and docstring
                         summary = None
                         handler = None
-                        remaining_lines = content.split('\n')[line_num:]
+                        remaining_lines = content.split("\n")[line_num:]
                         for next_line in remaining_lines[:5]:
-                            fn_match = re.search(r'(?:async\s+)?def\s+(\w+)', next_line)
+                            fn_match = re.search(r"(?:async\s+)?def\s+(\w+)", next_line)
                             if fn_match:
                                 handler = fn_match.group(1)
                                 break
 
-                        routes.append(RouteInfo(
-                            path=route_path,
-                            method=method,
-                            handler=handler or "handler",
-                            summary=summary,
-                            parameters=params,
-                            file=str(file.relative_to(path)),
-                            line=line_num
-                        ))
+                        routes.append(
+                            RouteInfo(
+                                path=route_path,
+                                method=method,
+                                handler=handler or "handler",
+                                summary=summary,
+                                parameters=params,
+                                file=str(file.relative_to(path)),
+                                line=line_num,
+                            )
+                        )
             except (UnicodeDecodeError, IOError):
                 continue
 
@@ -550,7 +576,7 @@ Examples:
         self,
         path: Path,
         include_patterns: Optional[list[str]],
-        exclude_patterns: Optional[list[str]]
+        exclude_patterns: Optional[list[str]],
     ) -> list[RouteInfo]:
         """Extract routes from Flask application."""
         routes = []
@@ -559,19 +585,22 @@ Examples:
         for file in files:
             try:
                 content = file.read_text()
-                for line_num, line in enumerate(content.split('\n'), 1):
+                for line_num, line in enumerate(content.split("\n"), 1):
                     # Flask @app.route or @blueprint.route
                     match = re.search(
                         r'@(?:app|[\w_]+)\.route\s*\(\s*["\']([^"\']+)["\']'
-                        r'(?:.*?methods\s*=\s*\[([^\]]+)\])?',
-                        line
+                        r"(?:.*?methods\s*=\s*\[([^\]]+)\])?",
+                        line,
                     )
                     if match:
                         route_path = match.group(1)
                         methods_str = match.group(2)
 
                         if methods_str:
-                            methods = [m.strip().strip('"\'').upper() for m in methods_str.split(',')]
+                            methods = [
+                                m.strip().strip("\"'").upper()
+                                for m in methods_str.split(",")
+                            ]
                         else:
                             methods = ["GET"]
 
@@ -579,22 +608,24 @@ Examples:
 
                         # Get function name
                         handler = None
-                        remaining_lines = content.split('\n')[line_num:]
+                        remaining_lines = content.split("\n")[line_num:]
                         for next_line in remaining_lines[:5]:
-                            fn_match = re.search(r'def\s+(\w+)', next_line)
+                            fn_match = re.search(r"def\s+(\w+)", next_line)
                             if fn_match:
                                 handler = fn_match.group(1)
                                 break
 
                         for method in methods:
-                            routes.append(RouteInfo(
-                                path=route_path,
-                                method=method,
-                                handler=handler or "handler",
-                                parameters=params,
-                                file=str(file.relative_to(path)),
-                                line=line_num
-                            ))
+                            routes.append(
+                                RouteInfo(
+                                    path=route_path,
+                                    method=method,
+                                    handler=handler or "handler",
+                                    parameters=params,
+                                    file=str(file.relative_to(path)),
+                                    line=line_num,
+                                )
+                            )
             except (UnicodeDecodeError, IOError):
                 continue
 
@@ -604,7 +635,7 @@ Examples:
         self,
         path: Path,
         include_patterns: Optional[list[str]],
-        exclude_patterns: Optional[list[str]]
+        exclude_patterns: Optional[list[str]],
     ) -> list[RouteInfo]:
         """Extract routes from Django application."""
         routes = []
@@ -616,29 +647,28 @@ Examples:
 
             try:
                 content = file.read_text()
-                for line_num, line in enumerate(content.split('\n'), 1):
+                for line_num, line in enumerate(content.split("\n"), 1):
                     # Django path() function
-                    match = re.search(
-                        r'path\s*\(\s*["\']([^"\']*)["\']',
-                        line
-                    )
+                    match = re.search(r'path\s*\(\s*["\']([^"\']*)["\']', line)
                     if match:
                         route_path = "/" + match.group(1)
                         params = self._extract_django_path_params(route_path)
 
                         # Get view name
-                        view_match = re.search(r',\s*([\w.]+)', line)
+                        view_match = re.search(r",\s*([\w.]+)", line)
                         handler = view_match.group(1) if view_match else "view"
 
                         # Django doesn't specify methods in urls.py, assume GET
-                        routes.append(RouteInfo(
-                            path=route_path,
-                            method="GET",
-                            handler=handler,
-                            parameters=params,
-                            file=str(file.relative_to(path)),
-                            line=line_num
-                        ))
+                        routes.append(
+                            RouteInfo(
+                                path=route_path,
+                                method="GET",
+                                handler=handler,
+                                parameters=params,
+                                file=str(file.relative_to(path)),
+                                line=line_num,
+                            )
+                        )
             except (UnicodeDecodeError, IOError):
                 continue
 
@@ -648,34 +678,38 @@ Examples:
         self,
         path: Path,
         include_patterns: Optional[list[str]],
-        exclude_patterns: Optional[list[str]]
+        exclude_patterns: Optional[list[str]],
     ) -> list[RouteInfo]:
         """Extract routes from Express.js application."""
         routes = []
-        files = self._get_files(path, [".js", ".ts"], include_patterns, exclude_patterns)
+        files = self._get_files(
+            path, [".js", ".ts"], include_patterns, exclude_patterns
+        )
 
         for file in files:
             try:
                 content = file.read_text()
-                for line_num, line in enumerate(content.split('\n'), 1):
+                for line_num, line in enumerate(content.split("\n"), 1):
                     # Express app.get, router.post, etc.
                     match = re.search(
                         r'(?:app|router)\.(get|post|put|delete|patch|options|head)\s*\(\s*["\']([^"\']+)["\']',
-                        line
+                        line,
                     )
                     if match:
                         method = match.group(1).upper()
                         route_path = match.group(2)
                         params = self._extract_express_path_params(route_path)
 
-                        routes.append(RouteInfo(
-                            path=route_path,
-                            method=method,
-                            handler="handler",
-                            parameters=params,
-                            file=str(file.relative_to(path)),
-                            line=line_num
-                        ))
+                        routes.append(
+                            RouteInfo(
+                                path=route_path,
+                                method=method,
+                                handler="handler",
+                                parameters=params,
+                                file=str(file.relative_to(path)),
+                                line=line_num,
+                            )
+                        )
             except (UnicodeDecodeError, IOError):
                 continue
 
@@ -685,7 +719,7 @@ Examples:
         self,
         path: Path,
         include_patterns: Optional[list[str]],
-        exclude_patterns: Optional[list[str]]
+        exclude_patterns: Optional[list[str]],
     ) -> list[RouteInfo]:
         """Extract routes from Gin (Go) application."""
         routes = []
@@ -694,26 +728,30 @@ Examples:
         for file in files:
             try:
                 content = file.read_text()
-                for line_num, line in enumerate(content.split('\n'), 1):
+                for line_num, line in enumerate(content.split("\n"), 1):
                     # Gin router.GET, group.POST, etc.
                     match = re.search(
                         r'\.(?:GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\s*\(\s*"([^"]+)"',
-                        line
+                        line,
                     )
                     if match:
-                        method_match = re.search(r'\.(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)', line)
+                        method_match = re.search(
+                            r"\.(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)", line
+                        )
                         method = method_match.group(1) if method_match else "GET"
                         route_path = match.group(1)
                         params = self._extract_gin_path_params(route_path)
 
-                        routes.append(RouteInfo(
-                            path=route_path,
-                            method=method,
-                            handler="handler",
-                            parameters=params,
-                            file=str(file.relative_to(path)),
-                            line=line_num
-                        ))
+                        routes.append(
+                            RouteInfo(
+                                path=route_path,
+                                method=method,
+                                handler="handler",
+                                parameters=params,
+                                file=str(file.relative_to(path)),
+                                line=line_num,
+                            )
+                        )
             except (UnicodeDecodeError, IOError):
                 continue
 
@@ -723,7 +761,7 @@ Examples:
         self,
         path: Path,
         include_patterns: Optional[list[str]],
-        exclude_patterns: Optional[list[str]]
+        exclude_patterns: Optional[list[str]],
     ) -> list[RouteInfo]:
         """Extract routes from Echo (Go) application."""
         routes = []
@@ -732,26 +770,30 @@ Examples:
         for file in files:
             try:
                 content = file.read_text()
-                for line_num, line in enumerate(content.split('\n'), 1):
+                for line_num, line in enumerate(content.split("\n"), 1):
                     # Echo e.GET, g.POST, etc.
                     match = re.search(
                         r'\.(?:GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\s*\(\s*"([^"]+)"',
-                        line
+                        line,
                     )
                     if match:
-                        method_match = re.search(r'\.(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)', line)
+                        method_match = re.search(
+                            r"\.(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)", line
+                        )
                         method = method_match.group(1) if method_match else "GET"
                         route_path = match.group(1)
                         params = self._extract_echo_path_params(route_path)
 
-                        routes.append(RouteInfo(
-                            path=route_path,
-                            method=method,
-                            handler="handler",
-                            parameters=params,
-                            file=str(file.relative_to(path)),
-                            line=line_num
-                        ))
+                        routes.append(
+                            RouteInfo(
+                                path=route_path,
+                                method=method,
+                                handler="handler",
+                                parameters=params,
+                                file=str(file.relative_to(path)),
+                                line=line_num,
+                            )
+                        )
             except (UnicodeDecodeError, IOError):
                 continue
 
@@ -761,52 +803,60 @@ Examples:
         """Extract path parameters from FastAPI/Flask style path ({param} or <param>)."""
         params = []
         # FastAPI style: {param} or {param:type}
-        for match in re.finditer(r'\{(\w+)(?::(\w+))?\}', path):
+        for match in re.finditer(r"\{(\w+)(?::(\w+))?\}", path):
             param_name = match.group(1)
             param_type = match.group(2) or "string"
-            params.append({
-                "name": param_name,
-                "in": "path",
-                "required": True,
-                "schema": {"type": self._convert_type(param_type)}
-            })
+            params.append(
+                {
+                    "name": param_name,
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": self._convert_type(param_type)},
+                }
+            )
         # Flask style: <param> or <type:param>
-        for match in re.finditer(r'<(?:(\w+):)?(\w+)>', path):
+        for match in re.finditer(r"<(?:(\w+):)?(\w+)>", path):
             param_type = match.group(1) or "string"
             param_name = match.group(2)
-            params.append({
-                "name": param_name,
-                "in": "path",
-                "required": True,
-                "schema": {"type": self._convert_type(param_type)}
-            })
+            params.append(
+                {
+                    "name": param_name,
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": self._convert_type(param_type)},
+                }
+            )
         return params
 
     def _extract_django_path_params(self, path: str) -> list[dict]:
         """Extract path parameters from Django style path (<type:param>)."""
         params = []
-        for match in re.finditer(r'<(?:(\w+):)?(\w+)>', path):
+        for match in re.finditer(r"<(?:(\w+):)?(\w+)>", path):
             param_type = match.group(1) or "str"
             param_name = match.group(2)
-            params.append({
-                "name": param_name,
-                "in": "path",
-                "required": True,
-                "schema": {"type": self._convert_django_type(param_type)}
-            })
+            params.append(
+                {
+                    "name": param_name,
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": self._convert_django_type(param_type)},
+                }
+            )
         return params
 
     def _extract_express_path_params(self, path: str) -> list[dict]:
         """Extract path parameters from Express style path (:param)."""
         params = []
-        for match in re.finditer(r':(\w+)', path):
+        for match in re.finditer(r":(\w+)", path):
             param_name = match.group(1)
-            params.append({
-                "name": param_name,
-                "in": "path",
-                "required": True,
-                "schema": {"type": "string"}
-            })
+            params.append(
+                {
+                    "name": param_name,
+                    "in": "path",
+                    "required": True,
+                    "schema": {"type": "string"},
+                }
+            )
         return params
 
     def _extract_gin_path_params(self, path: str) -> list[dict]:
@@ -847,9 +897,9 @@ Examples:
     def _convert_path_to_openapi(self, path: str, framework: str) -> str:
         """Convert framework-specific path to OpenAPI format."""
         # Flask/Django <param> -> {param}
-        path = re.sub(r'<(?:\w+:)?(\w+)>', r'{\1}', path)
+        path = re.sub(r"<(?:\w+:)?(\w+)>", r"{\1}", path)
         # Express/Gin/Echo :param -> {param}
-        path = re.sub(r':(\w+)', r'{\1}', path)
+        path = re.sub(r":(\w+)", r"{\1}", path)
         return path
 
     def _generate_openapi_spec(
@@ -859,7 +909,7 @@ Examples:
         version: str,
         description: Optional[str],
         servers: Optional[list[str]],
-        framework_info: FrameworkInfo
+        framework_info: FrameworkInfo,
     ) -> dict:
         """Generate OpenAPI 3.0 specification."""
         spec = {
@@ -868,7 +918,7 @@ Examples:
                 "title": title,
                 "version": version,
             },
-            "paths": {}
+            "paths": {},
         }
 
         if description:
@@ -877,24 +927,31 @@ Examples:
         if servers:
             spec["servers"] = [{"url": url} for url in servers]
         else:
-            spec["servers"] = [{"url": "http://localhost:8000", "description": "Local development server"}]
+            spec["servers"] = [
+                {
+                    "url": "http://localhost:8000",
+                    "description": "Local development server",
+                }
+            ]
 
         # Group routes by path
         paths = {}
         for route in routes:
-            openapi_path = self._convert_path_to_openapi(route.path, framework_info.framework)
+            openapi_path = self._convert_path_to_openapi(
+                route.path, framework_info.framework
+            )
 
             if openapi_path not in paths:
                 paths[openapi_path] = {}
 
             method_lower = route.method.lower()
             operation = {
-                "operationId": f"{route.handler}_{method_lower}" if route.handler else f"operation_{method_lower}",
-                "responses": {
-                    "200": {
-                        "description": "Successful response"
-                    }
-                }
+                "operationId": (
+                    f"{route.handler}_{method_lower}"
+                    if route.handler
+                    else f"operation_{method_lower}"
+                ),
+                "responses": {"200": {"description": "Successful response"}},
             }
 
             if route.summary:
@@ -909,11 +966,7 @@ Examples:
             # Add request body for POST/PUT/PATCH
             if method_lower in ["post", "put", "patch"]:
                 operation["requestBody"] = {
-                    "content": {
-                        "application/json": {
-                            "schema": {"type": "object"}
-                        }
-                    }
+                    "content": {"application/json": {"schema": {"type": "object"}}}
                 }
 
             paths[openapi_path][method_lower] = operation
@@ -929,7 +982,13 @@ Examples:
                 if len(parts) > 1:
                     tag_set.add(parts[-2])  # Parent directory
                 else:
-                    tag_set.add(parts[0].replace(".py", "").replace(".js", "").replace(".ts", "").replace(".go", ""))
+                    tag_set.add(
+                        parts[0]
+                        .replace(".py", "")
+                        .replace(".js", "")
+                        .replace(".ts", "")
+                        .replace(".go", "")
+                    )
 
         if tag_set:
             spec["tags"] = [{"name": tag} for tag in sorted(tag_set)]
@@ -962,21 +1021,18 @@ Examples:
         "properties": {
             "file_path": {
                 "type": "string",
-                "description": "Path to OpenAPI spec file to validate"
+                "description": "Path to OpenAPI spec file to validate",
             },
             "content": {
                 "type": "string",
-                "description": "OpenAPI spec content to validate directly"
-            }
+                "description": "OpenAPI spec content to validate directly",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
-        self,
-        file_path: Optional[str] = None,
-        content: Optional[str] = None,
-        **kwargs
+        self, file_path: Optional[str] = None, content: Optional[str] = None, **kwargs
     ) -> ToolResult:
         """Validate an OpenAPI specification.
 
@@ -988,7 +1044,7 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error="Either file_path or content must be provided"
+                error="Either file_path or content must be provided",
             )
 
         spec_content = content
@@ -998,9 +1054,7 @@ Examples:
             resolved = self._resolve_path(file_path)
             if not resolved.exists():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"File not found: {resolved}"
+                    success=False, output="", error=f"File not found: {resolved}"
                 )
             spec_content = resolved.read_text()
             source_name = str(resolved)
@@ -1016,6 +1070,7 @@ Examples:
             # Try YAML
             try:
                 import yaml
+
                 spec = yaml.safe_load(spec_content)
             except ImportError:
                 parse_error = "Content is not valid JSON. Install PyYAML to parse YAML: pip install pyyaml"
@@ -1023,17 +1078,13 @@ Examples:
                 parse_error = f"Invalid JSON/YAML syntax: {str(e)}"
 
         if parse_error:
-            return ToolResult(
-                success=False,
-                output="",
-                error=parse_error
-            )
+            return ToolResult(success=False, output="", error=parse_error)
 
         if not isinstance(spec, dict):
             return ToolResult(
                 success=False,
                 output="",
-                error="OpenAPI spec must be a JSON/YAML object"
+                error="OpenAPI spec must be a JSON/YAML object",
             )
 
         # Validate structure
@@ -1044,7 +1095,9 @@ Examples:
         if "openapi" not in spec:
             errors.append("Missing required field: 'openapi'")
         elif not str(spec["openapi"]).startswith("3."):
-            warnings.append(f"OpenAPI version {spec['openapi']} may not be fully supported")
+            warnings.append(
+                f"OpenAPI version {spec['openapi']} may not be fully supported"
+            )
 
         if "info" not in spec:
             errors.append("Missing required field: 'info'")
@@ -1058,7 +1111,16 @@ Examples:
             errors.append("Missing required field: 'paths'")
         elif isinstance(spec["paths"], dict):
             # Validate paths
-            valid_methods = {"get", "post", "put", "delete", "patch", "options", "head", "trace"}
+            valid_methods = {
+                "get",
+                "post",
+                "put",
+                "delete",
+                "patch",
+                "options",
+                "head",
+                "trace",
+            }
 
             for path, path_item in spec["paths"].items():
                 if not path.startswith("/"):
@@ -1069,17 +1131,25 @@ Examples:
                     continue
 
                 for method, operation in path_item.items():
-                    if method.lower() not in valid_methods and not method.startswith("x-"):
-                        errors.append(f"Invalid HTTP method '{method}' in path '{path}'")
+                    if method.lower() not in valid_methods and not method.startswith(
+                        "x-"
+                    ):
+                        errors.append(
+                            f"Invalid HTTP method '{method}' in path '{path}'"
+                        )
                         continue
 
                     if method.lower() in valid_methods:
                         if not isinstance(operation, dict):
-                            errors.append(f"Operation {method} in '{path}' must be an object")
+                            errors.append(
+                                f"Operation {method} in '{path}' must be an object"
+                            )
                             continue
 
                         if "responses" not in operation:
-                            warnings.append(f"Missing 'responses' in {method.upper()} {path}")
+                            warnings.append(
+                                f"Missing 'responses' in {method.upper()} {path}"
+                            )
 
                         # Validate parameters
                         params = operation.get("parameters", [])
@@ -1087,12 +1157,16 @@ Examples:
                             for param in params:
                                 if isinstance(param, dict):
                                     if "name" not in param:
-                                        errors.append(f"Parameter missing 'name' in {method.upper()} {path}")
+                                        errors.append(
+                                            f"Parameter missing 'name' in {method.upper()} {path}"
+                                        )
                                     if "in" not in param:
-                                        errors.append(f"Parameter missing 'in' in {method.upper()} {path}")
+                                        errors.append(
+                                            f"Parameter missing 'in' in {method.upper()} {path}"
+                                        )
 
                 # Check path parameters are defined
-                path_params = re.findall(r'\{(\w+)\}', path)
+                path_params = re.findall(r"\{(\w+)\}", path)
                 for param_name in path_params:
                     found = False
                     for method, operation in path_item.items():
@@ -1100,11 +1174,17 @@ Examples:
                             continue
                         if isinstance(operation, dict):
                             for param in operation.get("parameters", []):
-                                if isinstance(param, dict) and param.get("name") == param_name and param.get("in") == "path":
+                                if (
+                                    isinstance(param, dict)
+                                    and param.get("name") == param_name
+                                    and param.get("in") == "path"
+                                ):
                                     found = True
                                     break
                     if not found:
-                        warnings.append(f"Path parameter '{param_name}' in '{path}' not defined in parameters")
+                        warnings.append(
+                            f"Path parameter '{param_name}' in '{path}' not defined in parameters"
+                        )
 
         # Build output
         output_lines = [f"Validating: {source_name}"]
@@ -1129,9 +1209,5 @@ Examples:
         return ToolResult(
             success=len(errors) == 0,
             output="\n".join(output_lines),
-            metadata={
-                "errors": errors,
-                "warnings": warnings,
-                "source": source_name
-            }
+            metadata={"errors": errors, "warnings": warnings, "source": source_name},
         )

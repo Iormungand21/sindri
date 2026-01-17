@@ -18,27 +18,25 @@ def temp_git_repo():
     subprocess.run(["git", "init"], cwd=temp, capture_output=True)
     subprocess.run(
         ["git", "config", "user.email", "test@example.com"],
-        cwd=temp, capture_output=True
+        cwd=temp,
+        capture_output=True,
     )
     subprocess.run(
-        ["git", "config", "user.name", "Test User"],
-        cwd=temp, capture_output=True
+        ["git", "config", "user.name", "Test User"], cwd=temp, capture_output=True
     )
 
     # Create initial file and commit
     (temp / "README.md").write_text("# Test Project\n\nInitial content.")
     subprocess.run(["git", "add", "README.md"], cwd=temp, capture_output=True)
     subprocess.run(
-        ["git", "commit", "-m", "Initial commit"],
-        cwd=temp, capture_output=True
+        ["git", "commit", "-m", "Initial commit"], cwd=temp, capture_output=True
     )
 
     # Create more files
     (temp / "main.py").write_text('print("Hello")\n')
     subprocess.run(["git", "add", "main.py"], cwd=temp, capture_output=True)
     subprocess.run(
-        ["git", "commit", "-m", "Add main.py"],
-        cwd=temp, capture_output=True
+        ["git", "commit", "-m", "Add main.py"], cwd=temp, capture_output=True
     )
 
     yield temp
@@ -54,7 +52,7 @@ def temp_git_repo_with_changes(temp_git_repo):
     (temp_git_repo / "main.py").write_text('print("Hello World")\n')
 
     # Staged file
-    (temp_git_repo / "utils.py").write_text('def helper(): pass\n')
+    (temp_git_repo / "utils.py").write_text("def helper(): pass\n")
     subprocess.run(["git", "add", "utils.py"], cwd=temp_git_repo, capture_output=True)
 
     # Untracked file
@@ -76,6 +74,7 @@ def temp_non_git_dir():
 # GitStatusTool Tests
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_git_status_clean_repo(temp_git_repo):
     """Test git status on a clean repository."""
@@ -83,7 +82,9 @@ async def test_git_status_clean_repo(temp_git_repo):
     result = await tool.execute()
 
     assert result.success is True
-    assert "clean" in result.output.lower() or "nothing to commit" in result.output.lower()
+    assert (
+        "clean" in result.output.lower() or "nothing to commit" in result.output.lower()
+    )
     assert result.metadata.get("clean") is True
 
 
@@ -108,7 +109,7 @@ async def test_git_status_short_format(temp_git_repo_with_changes):
     assert result.success is True
     # Short format uses status codes like M, A, ??
     output = result.output
-    assert any(c in output for c in ['M', 'A', '??', 'modified', 'staged'])
+    assert any(c in output for c in ["M", "A", "??", "modified", "staged"])
 
 
 @pytest.mark.asyncio
@@ -143,6 +144,7 @@ async def test_git_status_with_path(temp_git_repo):
 # =============================================================================
 # GitDiffTool Tests
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_git_diff_no_changes(temp_git_repo):
@@ -244,6 +246,7 @@ async def test_git_diff_not_a_repo(temp_non_git_dir):
 # GitLogTool Tests
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_git_log_basic(temp_git_repo):
     """Test basic git log."""
@@ -340,6 +343,7 @@ async def test_git_log_nonexistent_path():
 # GitBranchTool Tests
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_git_branch_list(temp_git_repo):
     """Test listing branches."""
@@ -388,10 +392,7 @@ async def test_git_branch_not_a_repo(temp_non_git_dir):
 async def test_git_branch_with_multiple_branches(temp_git_repo):
     """Test branch listing with multiple branches."""
     # Create a new branch
-    subprocess.run(
-        ["git", "branch", "feature"],
-        cwd=temp_git_repo, capture_output=True
-    )
+    subprocess.run(["git", "branch", "feature"], cwd=temp_git_repo, capture_output=True)
 
     tool = GitBranchTool(work_dir=temp_git_repo)
     result = await tool.execute()
@@ -404,6 +405,7 @@ async def test_git_branch_with_multiple_branches(temp_git_repo):
 # =============================================================================
 # Tool Registry Integration Tests
 # =============================================================================
+
 
 @pytest.mark.asyncio
 async def test_git_tools_in_registry():
@@ -466,6 +468,7 @@ async def test_git_branch_schema():
 # Agent Integration Tests
 # =============================================================================
 
+
 def test_agents_have_git_tools():
     """Test that appropriate agents have git tools."""
     from sindri.agents.registry import AGENTS
@@ -494,29 +497,30 @@ def test_agents_have_git_tools():
 # Edge Cases and Error Handling
 # =============================================================================
 
+
 @pytest.mark.asyncio
 async def test_git_diff_branch_comparison(temp_git_repo):
     """Test git diff comparing two branches."""
     # Create a feature branch with changes
     subprocess.run(
-        ["git", "checkout", "-b", "feature"],
-        cwd=temp_git_repo, capture_output=True
+        ["git", "checkout", "-b", "feature"], cwd=temp_git_repo, capture_output=True
     )
     (temp_git_repo / "feature.py").write_text("# Feature code\n")
     subprocess.run(["git", "add", "feature.py"], cwd=temp_git_repo, capture_output=True)
     subprocess.run(
-        ["git", "commit", "-m", "Add feature"],
-        cwd=temp_git_repo, capture_output=True
+        ["git", "commit", "-m", "Add feature"], cwd=temp_git_repo, capture_output=True
     )
     subprocess.run(
         ["git", "checkout", "master"],
-        cwd=temp_git_repo, capture_output=True,
-        check=False  # May fail if default branch is main
+        cwd=temp_git_repo,
+        capture_output=True,
+        check=False,  # May fail if default branch is main
     )
     subprocess.run(
         ["git", "checkout", "main"],
-        cwd=temp_git_repo, capture_output=True,
-        check=False  # May fail if default branch is master
+        cwd=temp_git_repo,
+        capture_output=True,
+        check=False,  # May fail if default branch is master
     )
 
     tool = GitDiffTool(work_dir=temp_git_repo)

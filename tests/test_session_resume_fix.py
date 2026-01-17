@@ -2,12 +2,11 @@
 
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from datetime import datetime
 
 from sindri.core.hierarchical import HierarchicalAgentLoop
-from sindri.core.tasks import Task, TaskStatus
+from sindri.core.tasks import Task
 from sindri.core.loop import LoopConfig
-from sindri.persistence.state import Session, Turn
+from sindri.persistence.state import Session
 from sindri.agents.definitions import AgentDefinition
 
 
@@ -28,7 +27,7 @@ def mock_brokkr_agent():
         tools=[],
         max_iterations=10,
         can_delegate=True,
-        delegate_to=[]
+        delegate_to=[],
     )
     AGENTS["brokkr"] = agent
 
@@ -55,10 +54,7 @@ async def test_new_task_creates_new_session(mock_brokkr_agent):
 
     # Mock session creation
     new_session = Session(
-        id="new-session-id",
-        task="Test task",
-        model="test-model",
-        status="active"
+        id="new-session-id", task="Test task", model="test-model", status="active"
     )
     state.create_session = AsyncMock(return_value=new_session)
     state.load_session = AsyncMock(return_value=None)
@@ -76,14 +72,11 @@ async def test_new_task_creates_new_session(mock_brokkr_agent):
         state=state,
         scheduler=scheduler,
         delegation=delegation,
-        config=config
+        config=config,
     )
 
     # Create task without session_id
-    task = Task(
-        description="Test task",
-        assigned_agent="brokkr"
-    )
+    task = Task(description="Test task", assigned_agent="brokkr")
 
     # Run the loop (mock_brokkr_agent fixture already set up the agent)
     await loop.run_task(task)
@@ -112,10 +105,7 @@ async def test_task_with_session_id_resumes_session(mock_brokkr_agent):
 
     # Mock session loading
     existing_session = Session(
-        id="existing-session-id",
-        task="Test task",
-        model="test-model",
-        status="active"
+        id="existing-session-id", task="Test task", model="test-model", status="active"
     )
     # Add some conversation history
     existing_session.add_turn("user", "Original request")
@@ -138,14 +128,14 @@ async def test_task_with_session_id_resumes_session(mock_brokkr_agent):
         state=state,
         scheduler=scheduler,
         delegation=delegation,
-        config=config
+        config=config,
     )
 
     # Create task WITH session_id (resuming)
     task = Task(
         description="Test task",
         assigned_agent="brokkr",
-        session_id="existing-session-id"  # Key: task already has session_id
+        session_id="existing-session-id",  # Key: task already has session_id
     )
 
     # Run the loop (mock_brokkr_agent fixture already set up the agent)
@@ -185,10 +175,7 @@ async def test_session_load_failure_falls_back_to_create(mock_brokkr_agent):
 
     # Mock session loading to return None (session not found)
     fallback_session = Session(
-        id="fallback-session-id",
-        task="Test task",
-        model="test-model",
-        status="active"
+        id="fallback-session-id", task="Test task", model="test-model", status="active"
     )
     state.create_session = AsyncMock(return_value=fallback_session)
     state.load_session = AsyncMock(return_value=None)
@@ -206,14 +193,14 @@ async def test_session_load_failure_falls_back_to_create(mock_brokkr_agent):
         state=state,
         scheduler=scheduler,
         delegation=delegation,
-        config=config
+        config=config,
     )
 
     # Create task with session_id that doesn't exist
     task = Task(
         description="Test task",
         assigned_agent="brokkr",
-        session_id="nonexistent-session-id"
+        session_id="nonexistent-session-id",
     )
 
     # Run the loop (mock_brokkr_agent fixture already set up the agent)

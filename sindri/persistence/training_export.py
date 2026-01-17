@@ -250,7 +250,9 @@ class TrainingDataExporter:
             # Include tool calls in content if present
             if include_tool_calls and turn.tool_calls:
                 tool_str = json.dumps(
-                    self._format_tool_calls(turn.tool_calls), indent=2, ensure_ascii=False
+                    self._format_tool_calls(turn.tool_calls),
+                    indent=2,
+                    ensure_ascii=False,
                 )
                 content = f"{content}\n\nTool calls:\n{tool_str}"
 
@@ -300,7 +302,9 @@ class TrainingDataExporter:
                     content = f"{content}\n[Used tools: {', '.join(tool_names)}]"
 
             # Escape quotes and newlines
-            escaped = content.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            escaped = (
+                content.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
+            )
             f.write(f'MESSAGE {turn.role} "{escaped}"\n')
             stats.turns_exported += 1
             stats.total_tokens_estimate += len(content) // 4
@@ -422,7 +426,7 @@ SYSTEM "You are a helpful AI coding assistant fine-tuned on successful coding in
     # Read training data and append as MESSAGE directives
     if training_data_path.exists():
         with open(training_data_path, "r") as f:
-            modelfile_content += f"\n# Training conversations\n"
+            modelfile_content += "\n# Training conversations\n"
             modelfile_content += f.read()
 
     output_path.parent.mkdir(parents=True, exist_ok=True)

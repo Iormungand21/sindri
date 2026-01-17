@@ -16,7 +16,7 @@ from typing import AsyncIterator, Callable, Optional
 import structlog
 
 from sindri.voice.stt import SpeechToText, WhisperModel, TranscriptionResult
-from sindri.voice.tts import TextToSpeech, VoiceConfig, TTSEngine
+from sindri.voice.tts import TextToSpeech, VoiceConfig
 
 log = structlog.get_logger()
 
@@ -24,9 +24,9 @@ log = structlog.get_logger()
 class VoiceMode(Enum):
     """Voice interface operating modes."""
 
-    PUSH_TO_TALK = "push_to_talk"   # Manual activation
-    WAKE_WORD = "wake_word"         # Activate on wake word
-    CONTINUOUS = "continuous"        # Always listening
+    PUSH_TO_TALK = "push_to_talk"  # Manual activation
+    WAKE_WORD = "wake_word"  # Activate on wake word
+    CONTINUOUS = "continuous"  # Always listening
 
 
 @dataclass
@@ -135,6 +135,7 @@ class VoiceInterface:
 
         # Create session
         import uuid
+
         self._session = VoiceSession(
             id=str(uuid.uuid4()),
             mode=self.mode,
@@ -303,7 +304,7 @@ class VoiceInterface:
         if self.wake_word in text_lower:
             # Extract command after wake word
             idx = text_lower.find(self.wake_word)
-            command = result.text[idx + len(self.wake_word):].strip()
+            command = result.text[idx + len(self.wake_word) :].strip()
 
             if command:
                 # Wake word with command
@@ -363,9 +364,11 @@ class VoiceCommand:
         Args:
             trigger: Phrase to trigger command (case-insensitive)
         """
+
         def decorator(func: Callable[[str], str]):
             cls._handlers[trigger.lower()] = func
             return func
+
         return decorator
 
     @classmethod
@@ -378,7 +381,7 @@ class VoiceCommand:
         text_lower = text.lower()
         for trigger, handler in cls._handlers.items():
             if text_lower.startswith(trigger):
-                remaining = text[len(trigger):].strip()
+                remaining = text[len(trigger) :].strip()
                 return handler, remaining
         return None
 

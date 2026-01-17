@@ -4,8 +4,7 @@ Phase 5.5: Task History Panel implementation tests.
 """
 
 import pytest
-from datetime import datetime
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import AsyncMock, patch
 
 from sindri.tui.widgets.history import (
     TaskHistoryPanel,
@@ -413,7 +412,7 @@ class TestTaskHistoryPanelAsync:
             },
         ]
 
-        with patch('sindri.persistence.state.SessionState') as MockState:
+        with patch("sindri.persistence.state.SessionState") as MockState:
             mock_state_instance = AsyncMock()
             mock_state_instance.list_sessions = AsyncMock(return_value=mock_sessions)
             MockState.return_value = mock_state_instance
@@ -430,7 +429,7 @@ class TestTaskHistoryPanelAsync:
         """Test loading from empty database."""
         panel = TaskHistoryPanel()
 
-        with patch('sindri.persistence.state.SessionState') as MockState:
+        with patch("sindri.persistence.state.SessionState") as MockState:
             mock_state_instance = AsyncMock()
             mock_state_instance.list_sessions = AsyncMock(return_value=[])
             MockState.return_value = mock_state_instance
@@ -444,7 +443,7 @@ class TestTaskHistoryPanelAsync:
         """Test that limit parameter is passed correctly."""
         panel = TaskHistoryPanel()
 
-        with patch('sindri.persistence.state.SessionState') as MockState:
+        with patch("sindri.persistence.state.SessionState") as MockState:
             mock_state_instance = AsyncMock()
             mock_state_instance.list_sessions = AsyncMock(return_value=[])
             MockState.return_value = mock_state_instance

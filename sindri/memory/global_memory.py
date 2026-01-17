@@ -7,15 +7,13 @@ registered projects in a unified database.
 import sqlite3
 import sqlite_vec
 import struct
-import json
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 import structlog
 
 from sindri.memory.embedder import LocalEmbedder
-from sindri.memory.projects import ProjectRegistry, ProjectConfig
+from sindri.memory.projects import ProjectRegistry
 
 log = structlog.get_logger()
 
@@ -62,9 +60,20 @@ class GlobalMemoryStore:
     """
 
     SUPPORTED_EXTENSIONS = {
-        '.py', '.js', '.ts', '.jsx', '.tsx',
-        '.md', '.txt', '.yaml', '.yml', '.toml',
-        '.json', '.sh', '.bash', '.sql'
+        ".py",
+        ".js",
+        ".ts",
+        ".jsx",
+        ".tsx",
+        ".md",
+        ".txt",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".json",
+        ".sh",
+        ".bash",
+        ".sql",
     }
 
     def __init__(
@@ -72,7 +81,7 @@ class GlobalMemoryStore:
         db_path: Optional[Path] = None,
         embedder: Optional[LocalEmbedder] = None,
         registry: Optional[ProjectRegistry] = None,
-        dimension: int = 768
+        dimension: int = 768,
     ):
         """Initialize global memory store.
 
@@ -100,7 +109,8 @@ class GlobalMemoryStore:
         sqlite_vec.load(conn)
         conn.enable_load_extension(False)
 
-        conn.executescript(f"""
+        conn.executescript(
+            f"""
             CREATE TABLE IF NOT EXISTS global_embeddings (
                 id INTEGER PRIMARY KEY,
                 project_path TEXT NOT NULL,
@@ -125,15 +135,12 @@ class GlobalMemoryStore:
                 chunk_count INTEGER DEFAULT 0,
                 indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-        """)
+        """
+        )
         conn.commit()
         return conn
 
-    def index_project(
-        self,
-        project_path: str,
-        force: bool = False
-    ) -> int:
+    def index_project(self, project_path: str, force: bool = False) -> int:
         """Index a project into global memory.
 
         Args:
@@ -154,12 +161,12 @@ class GlobalMemoryStore:
         if not force:
             existing = self.conn.execute(
                 "SELECT chunk_count FROM project_index_meta WHERE project_path = ?",
-                (normalized_path,)
+                (normalized_path,),
             ).fetchone()
             if existing and existing[0] > 0:
-                log.info("project_already_indexed",
-                        path=normalized_path,
-                        chunks=existing[0])
+                log.info(
+                    "project_already_indexed", path=normalized_path, chunks=existing[0]
+                )
                 return existing[0]
 
         # Clear existing embeddings for this project
@@ -175,14 +182,24 @@ class GlobalMemoryStore:
             if file_path.suffix not in self.SUPPORTED_EXTENSIONS:
                 continue
             # Skip hidden files and directories
-            if any(p.startswith('.') for p in file_path.parts):
+            if any(p.startswith(".") for p in file_path.parts):
                 continue
             # Skip common directories
-            if any(d in file_path.parts for d in ['node_modules', '__pycache__', 'dist', 'build', 'venv', '.venv']):
+            if any(
+                d in file_path.parts
+                for d in [
+                    "node_modules",
+                    "__pycache__",
+                    "dist",
+                    "build",
+                    "venv",
+                    ".venv",
+                ]
+            ):
                 continue
 
             try:
-                content = file_path.read_text(errors='ignore')
+                content = file_path.read_text(errors="ignore")
                 if not content.strip():
                     continue
 
@@ -192,9 +209,9 @@ class GlobalMemoryStore:
                 file_count += 1
 
             except Exception as e:
-                log.warning("global_index_file_failed",
-                           path=str(file_path),
-                           error=str(e))
+                log.warning(
+                    "global_index_file_failed", path=str(file_path), error=str(e)
+                )
                 continue
 
         # Update metadata
@@ -204,36 +221,33 @@ class GlobalMemoryStore:
             (project_path, file_count, chunk_count, indexed_at)
             VALUES (?, ?, ?, CURRENT_TIMESTAMP)
             """,
-            (normalized_path, file_count, chunk_count)
+            (normalized_path, file_count, chunk_count),
         )
         self.conn.commit()
 
         # Update registry
         self.registry.set_indexed(normalized_path, True, file_count)
 
-        log.info("global_project_indexed",
-                path=normalized_path,
-                files=file_count,
-                chunks=chunk_count)
+        log.info(
+            "global_project_indexed",
+            path=normalized_path,
+            files=file_count,
+            chunks=chunk_count,
+        )
 
         return chunk_count
 
-    def _index_file(
-        self,
-        project_path: str,
-        file_path: str,
-        content: str
-    ) -> int:
+    def _index_file(self, project_path: str, file_path: str, content: str) -> int:
         """Index a single file in chunks.
 
         Returns: Number of chunks indexed
         """
-        lines = content.split('\n')
+        lines = content.split("\n")
         chunk_size = 50  # lines per chunk
         chunks_indexed = 0
 
         for i in range(0, len(lines), chunk_size):
-            chunk = '\n'.join(lines[i:i + chunk_size])
+            chunk = "\n".join(lines[i : i + chunk_size])
             if not chunk.strip():
                 continue
 
@@ -251,15 +265,14 @@ class GlobalMemoryStore:
                         chunk,
                         i + 1,
                         min(i + chunk_size, len(lines)),
-                        serialize_f32(embedding)
-                    )
+                        serialize_f32(embedding),
+                    ),
                 )
                 chunks_indexed += 1
             except Exception as e:
-                log.warning("global_chunk_failed",
-                           file=file_path,
-                           start=i+1,
-                           error=str(e))
+                log.warning(
+                    "global_chunk_failed", file=file_path, start=i + 1, error=str(e)
+                )
                 continue
 
         self.conn.commit()
@@ -268,8 +281,7 @@ class GlobalMemoryStore:
     def _clear_project(self, project_path: str):
         """Clear all embeddings for a project."""
         self.conn.execute(
-            "DELETE FROM global_embeddings WHERE project_path = ?",
-            (project_path,)
+            "DELETE FROM global_embeddings WHERE project_path = ?", (project_path,)
         )
         self.conn.commit()
         log.debug("global_project_cleared", path=project_path)
@@ -280,7 +292,7 @@ class GlobalMemoryStore:
         limit: int = 10,
         project_paths: Optional[List[str]] = None,
         tags: Optional[List[str]] = None,
-        exclude_current: Optional[str] = None
+        exclude_current: Optional[str] = None,
     ) -> List[CrossProjectResult]:
         """Search across all indexed projects.
 
@@ -347,28 +359,25 @@ class GlobalMemoryStore:
             project_name = project.name if project else Path(project_path).name
             project_tags = project.tags if project else []
 
-            results.append(CrossProjectResult(
-                content=content,
-                project_path=project_path,
-                project_name=project_name,
-                file_path=file_path,
-                start_line=start_line,
-                end_line=end_line,
-                similarity=similarity,
-                tags=project_tags,
-            ))
+            results.append(
+                CrossProjectResult(
+                    content=content,
+                    project_path=project_path,
+                    project_name=project_name,
+                    file_path=file_path,
+                    start_line=start_line,
+                    end_line=end_line,
+                    similarity=similarity,
+                    tags=project_tags,
+                )
+            )
 
-        log.debug("global_search_complete",
-                 query=query[:50],
-                 results=len(results))
+        log.debug("global_search_complete", query=query[:50], results=len(results))
 
         return results
 
     def search_by_tags(
-        self,
-        query: str,
-        tags: List[str],
-        limit: int = 10
+        self, query: str, tags: List[str], limit: int = 10
     ) -> List[CrossProjectResult]:
         """Search only in projects with specific tags.
 
@@ -399,14 +408,14 @@ class GlobalMemoryStore:
                 chunks = self.index_project(project.path, force=force)
                 results[project.path] = chunks
             except Exception as e:
-                log.error("index_all_project_failed",
-                         path=project.path,
-                         error=str(e))
+                log.error("index_all_project_failed", path=project.path, error=str(e))
                 results[project.path] = 0
 
-        log.info("index_all_complete",
-                projects=len(projects),
-                total_chunks=sum(results.values()))
+        log.info(
+            "index_all_complete",
+            projects=len(projects),
+            total_chunks=sum(results.values()),
+        )
 
         return results
 
@@ -422,12 +431,10 @@ class GlobalMemoryStore:
         normalized = str(Path(project_path).resolve())
 
         self.conn.execute(
-            "DELETE FROM global_embeddings WHERE project_path = ?",
-            (normalized,)
+            "DELETE FROM global_embeddings WHERE project_path = ?", (normalized,)
         )
         self.conn.execute(
-            "DELETE FROM project_index_meta WHERE project_path = ?",
-            (normalized,)
+            "DELETE FROM project_index_meta WHERE project_path = ?", (normalized,)
         )
         self.conn.commit()
 
@@ -444,13 +451,19 @@ class GlobalMemoryStore:
             "SELECT COUNT(*) FROM project_index_meta"
         ).fetchone()[0]
 
-        total_chunks = self.conn.execute(
-            "SELECT SUM(chunk_count) FROM project_index_meta"
-        ).fetchone()[0] or 0
+        total_chunks = (
+            self.conn.execute(
+                "SELECT SUM(chunk_count) FROM project_index_meta"
+            ).fetchone()[0]
+            or 0
+        )
 
-        total_files = self.conn.execute(
-            "SELECT SUM(file_count) FROM project_index_meta"
-        ).fetchone()[0] or 0
+        total_files = (
+            self.conn.execute(
+                "SELECT SUM(file_count) FROM project_index_meta"
+            ).fetchone()[0]
+            or 0
+        )
 
         return {
             "indexed_projects": project_count,
@@ -477,7 +490,7 @@ class GlobalMemoryStore:
             FROM project_index_meta
             WHERE project_path = ?
             """,
-            (normalized,)
+            (normalized,),
         ).fetchone()
 
         if not row:
@@ -490,9 +503,7 @@ class GlobalMemoryStore:
         }
 
     def format_search_context(
-        self,
-        results: List[CrossProjectResult],
-        max_tokens: int = 2000
+        self, results: List[CrossProjectResult], max_tokens: int = 2000
     ) -> str:
         """Format search results for agent context injection.
 

@@ -22,11 +22,27 @@ from sindri.tools.git import GitStatusTool, GitDiffTool, GitLogTool, GitBranchTo
 from sindri.tools.http import HttpRequestTool, HttpGetTool, HttpPostTool
 from sindri.tools.testing import RunTestsTool, CheckSyntaxTool
 from sindri.tools.formatting import FormatCodeTool, LintCodeTool
-from sindri.tools.refactoring import RenameSymbolTool, ExtractFunctionTool, InlineVariableTool, MoveFileTool, BatchRenameTool, SplitFileTool, MergeFilesTool
+from sindri.tools.refactoring import (
+    RenameSymbolTool,
+    ExtractFunctionTool,
+    InlineVariableTool,
+    MoveFileTool,
+    BatchRenameTool,
+    SplitFileTool,
+    MergeFilesTool,
+)
 from sindri.tools.sql import ExecuteQueryTool, DescribeSchemaTool, ExplainQueryTool
 from sindri.tools.cicd import GenerateWorkflowTool, ValidateWorkflowTool
-from sindri.tools.dependency_scanner import ScanDependenciesTool, GenerateSBOMTool, CheckOutdatedTool
-from sindri.tools.docker import GenerateDockerfileTool, GenerateDockerComposeTool, ValidateDockerfileTool
+from sindri.tools.dependency_scanner import (
+    ScanDependenciesTool,
+    GenerateSBOMTool,
+    CheckOutdatedTool,
+)
+from sindri.tools.docker import (
+    GenerateDockerfileTool,
+    GenerateDockerComposeTool,
+    ValidateDockerfileTool,
+)
 from sindri.tools.api_spec import GenerateApiSpecTool, ValidateApiSpecTool
 from sindri.core.errors import (
     ErrorCategory,
@@ -40,6 +56,7 @@ log = structlog.get_logger()
 @dataclass
 class ToolRetryConfig:
     """Configuration for tool execution retry behavior."""
+
     max_attempts: int = 3
     base_delay: float = 0.5
     max_delay: float = 5.0
@@ -52,7 +69,7 @@ class ToolRegistry:
     def __init__(
         self,
         work_dir: Optional[Path] = None,
-        retry_config: Optional[ToolRetryConfig] = None
+        retry_config: Optional[ToolRetryConfig] = None,
     ):
         """Initialize registry with optional working directory and retry config.
 
@@ -67,7 +84,11 @@ class ToolRegistry:
     def register(self, tool: Tool):
         """Register a tool."""
         self._tools[tool.name] = tool
-        log.info("tool_registered", name=tool.name, work_dir=str(self.work_dir) if self.work_dir else None)
+        log.info(
+            "tool_registered",
+            name=tool.name,
+            work_dir=str(self.work_dir) if self.work_dir else None,
+        )
 
     def get_tool(self, name: str) -> Optional[Tool]:
         """Get a tool by name."""
@@ -95,7 +116,7 @@ class ToolRegistry:
                 output="",
                 error=f"Tool not found: {name}",
                 error_category=ErrorCategory.FATAL,
-                suggestion="Check tool name spelling or available tools"
+                suggestion="Check tool name spelling or available tools",
             )
 
         # Parse arguments if they're a JSON string
@@ -109,7 +130,7 @@ class ToolRegistry:
                     output="",
                     error=f"Failed to parse tool arguments: {str(e)}",
                     error_category=ErrorCategory.FATAL,
-                    suggestion="Check JSON syntax in arguments"
+                    suggestion="Check JSON syntax in arguments",
                 )
 
         log.info("tool_execute", name=name, args=arguments)
@@ -141,8 +162,9 @@ class ToolRegistry:
                 last_result = result
                 if attempt < self.retry_config.max_attempts - 1:
                     delay = min(
-                        self.retry_config.base_delay * (self.retry_config.exponential_base ** attempt),
-                        self.retry_config.max_delay
+                        self.retry_config.base_delay
+                        * (self.retry_config.exponential_base**attempt),
+                        self.retry_config.max_delay,
                     )
                     log.warning(
                         "tool_retry",
@@ -150,7 +172,7 @@ class ToolRegistry:
                         attempt=attempt + 1,
                         max_attempts=self.retry_config.max_attempts,
                         delay=delay,
-                        error=result.error
+                        error=result.error,
                     )
                     await asyncio.sleep(delay)
 
@@ -161,21 +183,27 @@ class ToolRegistry:
 
                 if not classified.retryable:
                     # Fatal exception - return immediately
-                    log.error("tool_execution_error", name=name, error=str(e), category=classified.category.value)
+                    log.error(
+                        "tool_execution_error",
+                        name=name,
+                        error=str(e),
+                        category=classified.category.value,
+                    )
                     return ToolResult(
                         success=False,
                         output="",
                         error=f"Tool execution failed: {str(e)}",
                         error_category=classified.category,
                         suggestion=classified.suggestion,
-                        retries_attempted=attempt
+                        retries_attempted=attempt,
                     )
 
                 # Transient exception - retry if not exhausted
                 if attempt < self.retry_config.max_attempts - 1:
                     delay = min(
-                        self.retry_config.base_delay * (self.retry_config.exponential_base ** attempt),
-                        self.retry_config.max_delay
+                        self.retry_config.base_delay
+                        * (self.retry_config.exponential_base**attempt),
+                        self.retry_config.max_delay,
                     )
                     log.warning(
                         "tool_retry_exception",
@@ -183,7 +211,7 @@ class ToolRegistry:
                         attempt=attempt + 1,
                         max_attempts=self.retry_config.max_attempts,
                         delay=delay,
-                        error=str(e)
+                        error=str(e),
                     )
                     await asyncio.sleep(delay)
 
@@ -193,7 +221,7 @@ class ToolRegistry:
                 "tool_retry_exhausted",
                 tool=name,
                 attempts=self.retry_config.max_attempts,
-                error=last_result.error
+                error=last_result.error,
             )
             return last_result
         elif last_exception:
@@ -202,7 +230,7 @@ class ToolRegistry:
                 "tool_retry_exhausted",
                 tool=name,
                 attempts=self.retry_config.max_attempts,
-                error=str(last_exception)
+                error=str(last_exception),
             )
             return ToolResult(
                 success=False,
@@ -210,7 +238,7 @@ class ToolRegistry:
                 error=f"Tool execution failed after {self.retry_config.max_attempts} attempts: {str(last_exception)}",
                 error_category=classified.category,
                 suggestion=classified.suggestion,
-                retries_attempted=self.retry_config.max_attempts - 1
+                retries_attempted=self.retry_config.max_attempts - 1,
             )
         else:
             # Should never happen
@@ -219,7 +247,7 @@ class ToolRegistry:
                 output="",
                 error="Tool execution failed unexpectedly",
                 error_category=ErrorCategory.FATAL,
-                retries_attempted=self.retry_config.max_attempts - 1
+                retries_attempted=self.retry_config.max_attempts - 1,
             )
 
     @classmethod

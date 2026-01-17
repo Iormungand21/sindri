@@ -7,6 +7,7 @@ import structlog
 
 try:
     import toml
+
     HAS_TOML = True
 except ImportError:
     HAS_TOML = False
@@ -16,19 +17,21 @@ log = structlog.get_logger()
 
 class ModelConfig(BaseModel):
     """Model configuration."""
+
     name: str
     vram_gb: float = Field(gt=0, le=24, default=8.0)
 
-    @field_validator('name')
+    @field_validator("name")
     @classmethod
     def name_not_empty(cls, v):
         if not v or not v.strip():
-            raise ValueError('Model name cannot be empty')
+            raise ValueError("Model name cannot be empty")
         return v.strip()
 
 
 class MemoryConfig(BaseModel):
     """Memory system configuration."""
+
     enabled: bool = True
     episodic_limit: int = Field(gt=0, default=5)
     semantic_limit: int = Field(gt=0, default=10)
@@ -37,6 +40,7 @@ class MemoryConfig(BaseModel):
 
 class TUIConfig(BaseModel):
     """TUI configuration."""
+
     theme: str = Field(default="dark", pattern="^(dark|light)$")
     refresh_rate_ms: int = Field(gt=0, default=100)
 
@@ -49,7 +53,9 @@ class SindriConfig(BaseModel):
     # Paths
     data_dir: Path = Field(default_factory=lambda: Path.home() / ".sindri")
     db_path: Optional[Path] = None  # Computed from data_dir if None
-    work_dir: Optional[Path] = None  # Working directory for file operations (None = cwd)
+    work_dir: Optional[Path] = (
+        None  # Working directory for file operations (None = cwd)
+    )
 
     # Ollama
     ollama_host: str = "http://localhost:11434"
@@ -78,11 +84,11 @@ class SindriConfig(BaseModel):
     log_level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR)$")
     log_file: Optional[Path] = None
 
-    @field_validator('reserve_vram_gb')
+    @field_validator("reserve_vram_gb")
     @classmethod
     def reserve_less_than_total(cls, v, info):
-        if 'total_vram_gb' in info.data and v >= info.data['total_vram_gb']:
-            raise ValueError('reserve_vram_gb must be less than total_vram_gb')
+        if "total_vram_gb" in info.data and v >= info.data["total_vram_gb"]:
+            raise ValueError("reserve_vram_gb must be less than total_vram_gb")
         return v
 
     def model_post_init(self, __context):
@@ -100,7 +106,7 @@ class SindriConfig(BaseModel):
             self.work_dir = Path(self.work_dir).expanduser().resolve()
 
     @classmethod
-    def load(cls, path: Optional[str] = None) -> 'SindriConfig':
+    def load(cls, path: Optional[str] = None) -> "SindriConfig":
         """Load configuration from TOML file.
 
         Search order if path not provided:
@@ -117,7 +123,7 @@ class SindriConfig(BaseModel):
             # Search for config
             candidates = [
                 Path("sindri.toml"),
-                Path("~/.sindri/config.toml").expanduser()
+                Path("~/.sindri/config.toml").expanduser(),
             ]
             for candidate in candidates:
                 if candidate.exists():
@@ -151,9 +157,9 @@ class SindriConfig(BaseModel):
             raise RuntimeError("toml package not installed")
 
         Path(path).parent.mkdir(parents=True, exist_ok=True)
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             # Convert to dict, handling Path objects
-            data = self.model_dump(mode='json')
+            data = self.model_dump(mode="json")
             toml.dump(data, f)
         log.info("config_saved", path=path)
 

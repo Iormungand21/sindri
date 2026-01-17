@@ -2,9 +2,8 @@
 
 import pytest
 import pytest_asyncio
-import asyncio
 from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 from sindri.collaboration.sharing import (
     SessionShare,
@@ -366,6 +365,7 @@ class TestParticipant:
     def test_touch(self):
         """Test touch updates activity and status."""
         import time
+
         p = Participant(
             user_id="user1",
             display_name="Alice",

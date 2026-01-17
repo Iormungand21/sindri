@@ -1,7 +1,6 @@
 """Tests for error classification system."""
 
 import errno
-import pytest
 
 from sindri.core.errors import (
     ErrorCategory,
@@ -33,7 +32,7 @@ class TestClassifiedError:
             category=ErrorCategory.TRANSIENT,
             message="Connection refused",
             retryable=True,
-            suggestion="Check if Ollama is running"
+            suggestion="Check if Ollama is running",
         )
         assert err.category == ErrorCategory.TRANSIENT
         assert err.message == "Connection refused"
@@ -46,7 +45,7 @@ class TestClassifiedError:
             category=ErrorCategory.FATAL,
             message="File not found",
             retryable=False,
-            suggestion="Try list_directory"
+            suggestion="Try list_directory",
         )
         result = str(err)
         assert "File not found" in result
@@ -55,9 +54,7 @@ class TestClassifiedError:
     def test_str_without_suggestion(self):
         """Should format error without suggestion."""
         err = ClassifiedError(
-            category=ErrorCategory.FATAL,
-            message="Unknown error",
-            retryable=False
+            category=ErrorCategory.FATAL, message="Unknown error", retryable=False
         )
         assert str(err) == "Unknown error"
 

@@ -4,9 +4,7 @@ Phase 8.3: Tests for FastAPI-based Web API server.
 """
 
 import pytest
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
-import json
 
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
@@ -17,6 +15,7 @@ from sindri.persistence.state import Session, Turn
 
 
 # ===== Fixtures =====
+
 
 @pytest.fixture
 def app():
@@ -34,13 +33,13 @@ def client(app):
 async def async_client(app):
     """Create async test client."""
     async with AsyncClient(
-        transport=ASGITransport(app=app),
-        base_url="http://test"
+        transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         yield client
 
 
 # ===== Health Endpoint Tests =====
+
 
 class TestHealthEndpoint:
     """Tests for the /health endpoint."""
@@ -69,6 +68,7 @@ class TestHealthEndpoint:
 
 
 # ===== Agent Endpoints Tests =====
+
 
 class TestAgentEndpoints:
     """Tests for agent-related endpoints."""
@@ -105,14 +105,13 @@ class TestAgentEndpoints:
     def test_get_agent_brokkr(self, client):
         """Test getting specific agent (brokkr)."""
         # Re-import to ensure fresh registry (in case other tests modified it)
-        from sindri.agents.registry import AGENTS, get_agent
 
         response = client.get("/api/agents/brokkr")
         assert response.status_code == 200
         agent = response.json()
 
         assert agent["name"] == "brokkr"
-        assert agent["can_delegate"] == True
+        assert agent["can_delegate"]
         assert isinstance(agent["tools"], list)
         assert agent["estimated_vram_gb"] > 0
 
@@ -142,12 +141,15 @@ class TestAgentEndpoints:
 
 # ===== Session Endpoints Tests =====
 
+
 class TestSessionEndpoints:
     """Tests for session-related endpoints."""
 
     def test_list_sessions_empty(self, client):
         """Test listing sessions when empty."""
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = []
             response = client.get("/api/sessions")
             assert response.status_code == 200
@@ -156,12 +158,20 @@ class TestSessionEndpoints:
     def test_list_sessions_with_limit(self, client):
         """Test listing sessions with limit parameter."""
         mock_sessions = [
-            {"id": f"session-{i}", "task": f"Task {i}", "model": "qwen2.5:7b",
-             "status": "completed", "created_at": "2026-01-15T10:00:00", "iterations": 5}
+            {
+                "id": f"session-{i}",
+                "task": f"Task {i}",
+                "model": "qwen2.5:7b",
+                "status": "completed",
+                "created_at": "2026-01-15T10:00:00",
+                "iterations": 5,
+            }
             for i in range(30)
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = mock_sessions[:10]
             response = client.get("/api/sessions?limit=10")
             assert response.status_code == 200
@@ -171,13 +181,27 @@ class TestSessionEndpoints:
     def test_list_sessions_with_status_filter(self, client):
         """Test listing sessions with status filter."""
         mock_sessions = [
-            {"id": "s1", "task": "Task 1", "model": "qwen2.5:7b",
-             "status": "completed", "created_at": "2026-01-15T10:00:00", "iterations": 5},
-            {"id": "s2", "task": "Task 2", "model": "qwen2.5:7b",
-             "status": "failed", "created_at": "2026-01-15T11:00:00", "iterations": 10},
+            {
+                "id": "s1",
+                "task": "Task 1",
+                "model": "qwen2.5:7b",
+                "status": "completed",
+                "created_at": "2026-01-15T10:00:00",
+                "iterations": 5,
+            },
+            {
+                "id": "s2",
+                "task": "Task 2",
+                "model": "qwen2.5:7b",
+                "status": "failed",
+                "created_at": "2026-01-15T11:00:00",
+                "iterations": 10,
+            },
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = mock_sessions
             response = client.get("/api/sessions?status=completed")
             assert response.status_code == 200
@@ -195,23 +219,40 @@ class TestSessionEndpoints:
             status="completed",
             iterations=5,
             created_at=datetime(2026, 1, 15, 10, 0, 0),
-            completed_at=datetime(2026, 1, 15, 10, 5, 0)
+            completed_at=datetime(2026, 1, 15, 10, 5, 0),
         )
         mock_session.turns = [
-            Turn(role="user", content="Do something", created_at=datetime(2026, 1, 15, 10, 0, 0)),
-            Turn(role="assistant", content="Done!", created_at=datetime(2026, 1, 15, 10, 5, 0))
+            Turn(
+                role="user",
+                content="Do something",
+                created_at=datetime(2026, 1, 15, 10, 0, 0),
+            ),
+            Turn(
+                role="assistant",
+                content="Done!",
+                created_at=datetime(2026, 1, 15, 10, 5, 0),
+            ),
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 # For short ID lookup
                 mock_list.return_value = [
-                    {"id": "test-session-1234567890123456789012345678", "task": "Test task"}
+                    {
+                        "id": "test-session-1234567890123456789012345678",
+                        "task": "Test task",
+                    }
                 ]
                 mock_load.return_value = mock_session
 
                 # Use full ID to avoid short ID lookup
-                response = client.get("/api/sessions/test-session-1234567890123456789012345678")
+                response = client.get(
+                    "/api/sessions/test-session-1234567890123456789012345678"
+                )
                 assert response.status_code == 200
                 data = response.json()
 
@@ -222,8 +263,12 @@ class TestSessionEndpoints:
 
     def test_get_session_not_found(self, client):
         """Test getting non-existent session."""
-        with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
-            with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+        with patch.object(
+            client.app.state.api.state, "load_session", new_callable=AsyncMock
+        ) as mock_load:
+            with patch.object(
+                client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+            ) as mock_list:
                 mock_load.return_value = None
                 mock_list.return_value = []
 
@@ -240,11 +285,15 @@ class TestSessionEndpoints:
             model="qwen2.5:7b",
             status="completed",
             iterations=5,
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = [
                     {"id": "abcd1234-5678-9012-3456-789012345678", "task": "Test"}
                 ]
@@ -256,6 +305,7 @@ class TestSessionEndpoints:
 
 
 # ===== File Changes Endpoint Tests =====
+
 
 class TestFileChangesEndpoint:
     """Tests for the /api/sessions/{id}/file-changes endpoint."""
@@ -270,21 +320,36 @@ class TestFileChangesEndpoint:
             model="qwen2.5:7b",
             status="completed",
             iterations=5,
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
         mock_session.turns = [
-            Turn(role="user", content="Hello", created_at=datetime(2026, 1, 15, 10, 0, 0)),
-            Turn(role="assistant", content="Hi!", created_at=datetime(2026, 1, 15, 10, 1, 0))
+            Turn(
+                role="user", content="Hello", created_at=datetime(2026, 1, 15, 10, 0, 0)
+            ),
+            Turn(
+                role="assistant",
+                content="Hi!",
+                created_at=datetime(2026, 1, 15, 10, 1, 0),
+            ),
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = [
-                    {"id": "test-session-1234567890123456789012345678", "task": "Test task"}
+                    {
+                        "id": "test-session-1234567890123456789012345678",
+                        "task": "Test task",
+                    }
                 ]
                 mock_load.return_value = mock_session
 
-                response = client.get("/api/sessions/test-session-1234567890123456789012345678/file-changes")
+                response = client.get(
+                    "/api/sessions/test-session-1234567890123456789012345678/file-changes"
+                )
                 assert response.status_code == 200
                 data = response.json()
 
@@ -303,38 +368,49 @@ class TestFileChangesEndpoint:
             model="qwen2.5:7b",
             status="completed",
             iterations=3,
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
         mock_session.turns = [
             Turn(
                 role="user",
                 content="Create hello.py",
-                created_at=datetime(2026, 1, 15, 10, 0, 0)
+                created_at=datetime(2026, 1, 15, 10, 0, 0),
             ),
             Turn(
                 role="assistant",
                 content="I'll create the file",
-                tool_calls=[{
-                    "function": {
-                        "name": "write_file",
-                        "arguments": {
-                            "path": "/tmp/hello.py",
-                            "content": 'print("Hello, World!")'
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "write_file",
+                            "arguments": {
+                                "path": "/tmp/hello.py",
+                                "content": 'print("Hello, World!")',
+                            },
                         }
                     }
-                }],
-                created_at=datetime(2026, 1, 15, 10, 1, 0)
-            )
+                ],
+                created_at=datetime(2026, 1, 15, 10, 1, 0),
+            ),
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = [
-                    {"id": "test-session-write-12345678901234567890", "task": "Create a file"}
+                    {
+                        "id": "test-session-write-12345678901234567890",
+                        "task": "Create a file",
+                    }
                 ]
                 mock_load.return_value = mock_session
 
-                response = client.get("/api/sessions/test-session-write-12345678901234567890/file-changes")
+                response = client.get(
+                    "/api/sessions/test-session-write-12345678901234567890/file-changes"
+                )
                 assert response.status_code == 200
                 data = response.json()
 
@@ -358,34 +434,45 @@ class TestFileChangesEndpoint:
             model="qwen2.5:7b",
             status="completed",
             iterations=3,
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
         mock_session.turns = [
             Turn(
                 role="assistant",
                 content="I'll edit the file",
-                tool_calls=[{
-                    "function": {
-                        "name": "edit_file",
-                        "arguments": {
-                            "path": "/tmp/hello.py",
-                            "old_text": 'print("Hello")',
-                            "new_text": 'print("Hello, World!")'
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "edit_file",
+                            "arguments": {
+                                "path": "/tmp/hello.py",
+                                "old_text": 'print("Hello")',
+                                "new_text": 'print("Hello, World!")',
+                            },
                         }
                     }
-                }],
-                created_at=datetime(2026, 1, 15, 10, 1, 0)
+                ],
+                created_at=datetime(2026, 1, 15, 10, 1, 0),
             )
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = [
-                    {"id": "test-session-edit-123456789012345678901", "task": "Edit a file"}
+                    {
+                        "id": "test-session-edit-123456789012345678901",
+                        "task": "Edit a file",
+                    }
                 ]
                 mock_load.return_value = mock_session
 
-                response = client.get("/api/sessions/test-session-edit-123456789012345678901/file-changes")
+                response = client.get(
+                    "/api/sessions/test-session-edit-123456789012345678901/file-changes"
+                )
                 assert response.status_code == 200
                 data = response.json()
 
@@ -406,30 +493,41 @@ class TestFileChangesEndpoint:
             model="qwen2.5:7b",
             status="completed",
             iterations=3,
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
         mock_session.turns = [
             Turn(
                 role="assistant",
                 content="I'll read the file",
-                tool_calls=[{
-                    "function": {
-                        "name": "read_file",
-                        "arguments": {"path": "/tmp/hello.py"}
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "read_file",
+                            "arguments": {"path": "/tmp/hello.py"},
+                        }
                     }
-                }],
-                created_at=datetime(2026, 1, 15, 10, 1, 0)
+                ],
+                created_at=datetime(2026, 1, 15, 10, 1, 0),
             )
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = [
-                    {"id": "test-session-read-123456789012345678901", "task": "Read a file"}
+                    {
+                        "id": "test-session-read-123456789012345678901",
+                        "task": "Read a file",
+                    }
                 ]
                 mock_load.return_value = mock_session
 
-                response = client.get("/api/sessions/test-session-read-123456789012345678901/file-changes")
+                response = client.get(
+                    "/api/sessions/test-session-read-123456789012345678901/file-changes"
+                )
                 assert response.status_code == 200
                 data = response.json()
 
@@ -450,7 +548,7 @@ class TestFileChangesEndpoint:
             model="qwen2.5:7b",
             status="completed",
             iterations=5,
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
         mock_session.turns = [
             Turn(
@@ -460,43 +558,60 @@ class TestFileChangesEndpoint:
                     {
                         "function": {
                             "name": "write_file",
-                            "arguments": {"path": "/tmp/file1.py", "content": "# File 1"}
+                            "arguments": {
+                                "path": "/tmp/file1.py",
+                                "content": "# File 1",
+                            },
                         }
                     },
                     {
                         "function": {
                             "name": "write_file",
-                            "arguments": {"path": "/tmp/file2.py", "content": "# File 2"}
+                            "arguments": {
+                                "path": "/tmp/file2.py",
+                                "content": "# File 2",
+                            },
                         }
-                    }
+                    },
                 ],
-                created_at=datetime(2026, 1, 15, 10, 1, 0)
+                created_at=datetime(2026, 1, 15, 10, 1, 0),
             ),
             Turn(
                 role="assistant",
                 content="Editing...",
-                tool_calls=[{
-                    "function": {
-                        "name": "edit_file",
-                        "arguments": {
-                            "path": "/tmp/file1.py",
-                            "old_text": "# File 1",
-                            "new_text": "# Modified File 1"
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "edit_file",
+                            "arguments": {
+                                "path": "/tmp/file1.py",
+                                "old_text": "# File 1",
+                                "new_text": "# Modified File 1",
+                            },
                         }
                     }
-                }],
-                created_at=datetime(2026, 1, 15, 10, 2, 0)
-            )
+                ],
+                created_at=datetime(2026, 1, 15, 10, 2, 0),
+            ),
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = [
-                    {"id": "test-session-multi-12345678901234567890", "task": "Multiple"}
+                    {
+                        "id": "test-session-multi-12345678901234567890",
+                        "task": "Multiple",
+                    }
                 ]
                 mock_load.return_value = mock_session
 
-                response = client.get("/api/sessions/test-session-multi-12345678901234567890/file-changes")
+                response = client.get(
+                    "/api/sessions/test-session-multi-12345678901234567890/file-changes"
+                )
                 assert response.status_code == 200
                 data = response.json()
 
@@ -515,24 +630,33 @@ class TestFileChangesEndpoint:
             model="qwen2.5:7b",
             status="completed",
             iterations=3,
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
         mock_session.turns = [
             Turn(
                 role="assistant",
                 content="Writing...",
-                tool_calls=[{
-                    "function": {
-                        "name": "write_file",
-                        "arguments": {"path": "/tmp/test.py", "content": "big content"}
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "write_file",
+                            "arguments": {
+                                "path": "/tmp/test.py",
+                                "content": "big content",
+                            },
+                        }
                     }
-                }],
-                created_at=datetime(2026, 1, 15, 10, 1, 0)
+                ],
+                created_at=datetime(2026, 1, 15, 10, 1, 0),
             )
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = [
                     {"id": "test-session-nocontent-123456789012345", "task": "Test"}
                 ]
@@ -558,12 +682,16 @@ class TestFileChangesEndpoint:
             model="qwen2.5:7b",
             status="completed",
             iterations=2,
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
         mock_session.turns = []
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = [
                     {"id": "abcd1234-5678-9012-3456-789012345678", "task": "Test"}
                 ]
@@ -571,12 +699,19 @@ class TestFileChangesEndpoint:
 
                 response = client.get("/api/sessions/abcd1234/file-changes")
                 assert response.status_code == 200
-                assert response.json()["session_id"] == "abcd1234-5678-9012-3456-789012345678"
+                assert (
+                    response.json()["session_id"]
+                    == "abcd1234-5678-9012-3456-789012345678"
+                )
 
     def test_get_file_changes_not_found(self, client):
         """Test file changes for non-existent session."""
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = []
                 mock_load.return_value = None
 
@@ -593,31 +728,39 @@ class TestFileChangesEndpoint:
             model="qwen2.5:7b",
             status="completed",
             iterations=2,
-            created_at=datetime(2026, 1, 15, 10, 0, 0)
+            created_at=datetime(2026, 1, 15, 10, 0, 0),
         )
         mock_session.turns = [
             Turn(
                 role="assistant",
                 content="Writing...",
-                tool_calls=[{
-                    "function": {
-                        "name": "write_file",
-                        # Arguments as JSON string (some backends do this)
-                        "arguments": '{"path": "/tmp/test.py", "content": "hello"}'
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "write_file",
+                            # Arguments as JSON string (some backends do this)
+                            "arguments": '{"path": "/tmp/test.py", "content": "hello"}',
+                        }
                     }
-                }],
-                created_at=datetime(2026, 1, 15, 10, 1, 0)
+                ],
+                created_at=datetime(2026, 1, 15, 10, 1, 0),
             )
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
-            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock_list:
+            with patch.object(
+                client.app.state.api.state, "load_session", new_callable=AsyncMock
+            ) as mock_load:
                 mock_list.return_value = [
                     {"id": "test-session-jsonargs-1234567890123456", "task": "Test"}
                 ]
                 mock_load.return_value = mock_session
 
-                response = client.get("/api/sessions/test-session-jsonargs-1234567890123456/file-changes")
+                response = client.get(
+                    "/api/sessions/test-session-jsonargs-1234567890123456/file-changes"
+                )
                 assert response.status_code == 200
                 data = response.json()
 
@@ -629,30 +772,36 @@ class TestFileChangesEndpoint:
 
 # ===== Task Endpoints Tests =====
 
+
 class TestTaskEndpoints:
     """Tests for task-related endpoints."""
 
     def test_create_task_invalid_agent(self, client):
         """Test creating task with invalid agent."""
-        response = client.post("/api/tasks", json={
-            "description": "Do something",
-            "agent": "nonexistent_agent"
-        })
+        response = client.post(
+            "/api/tasks",
+            json={"description": "Do something", "agent": "nonexistent_agent"},
+        )
         assert response.status_code == 400
         assert "Unknown agent" in response.json()["detail"]
 
     def test_create_task_valid(self, client):
         """Test creating a valid task."""
-        with patch('sindri.core.orchestrator.Orchestrator') as mock_orchestrator:
+        with patch("sindri.core.orchestrator.Orchestrator") as mock_orchestrator:
             mock_instance = MagicMock()
-            mock_instance.run = AsyncMock(return_value={"success": True, "result": "Done"})
+            mock_instance.run = AsyncMock(
+                return_value={"success": True, "result": "Done"}
+            )
             mock_orchestrator.return_value = mock_instance
 
-            response = client.post("/api/tasks", json={
-                "description": "Create a hello world program",
-                "agent": "brokkr",
-                "max_iterations": 10
-            })
+            response = client.post(
+                "/api/tasks",
+                json={
+                    "description": "Create a hello world program",
+                    "agent": "brokkr",
+                    "max_iterations": 10,
+                },
+            )
 
             assert response.status_code == 200
             data = response.json()
@@ -661,14 +810,12 @@ class TestTaskEndpoints:
 
     def test_create_task_default_agent(self, client):
         """Test that default agent is brokkr."""
-        with patch('sindri.core.orchestrator.Orchestrator') as mock_orchestrator:
+        with patch("sindri.core.orchestrator.Orchestrator") as mock_orchestrator:
             mock_instance = MagicMock()
             mock_instance.run = AsyncMock(return_value={"success": True})
             mock_orchestrator.return_value = mock_instance
 
-            response = client.post("/api/tasks", json={
-                "description": "Do something"
-            })
+            response = client.post("/api/tasks", json={"description": "Do something"})
 
             assert response.status_code == 200
             # Default agent should be brokkr (no error)
@@ -687,6 +834,7 @@ class TestTaskEndpoints:
 
 # ===== Metrics Endpoints Tests =====
 
+
 class TestMetricsEndpoints:
     """Tests for metrics-related endpoints."""
 
@@ -698,7 +846,9 @@ class TestMetricsEndpoints:
             {"id": "s3", "status": "active", "iterations": 3},
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = mock_sessions
 
             response = client.get("/api/metrics")
@@ -722,7 +872,9 @@ class TestMetricsEndpoints:
             {"id": "s3", "status": "failed", "iterations": 3},
         ]
 
-        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock:
+        with patch.object(
+            client.app.state.api.state, "list_sessions", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = mock_sessions
 
             response = client.get("/api/metrics")
@@ -735,6 +887,7 @@ class TestMetricsEndpoints:
 
 
 # ===== API Model Tests =====
+
 
 class TestAPIModels:
     """Tests for Pydantic API models."""
@@ -754,11 +907,11 @@ class TestAPIModels:
             description="Custom task",
             agent="huginn",
             max_iterations=50,
-            enable_memory=False
+            enable_memory=False,
         )
         assert req.agent == "huginn"
         assert req.max_iterations == 50
-        assert req.enable_memory == False
+        assert not req.enable_memory
 
     def test_task_create_request_empty_description(self):
         """Test that empty description is rejected."""
@@ -779,13 +932,14 @@ class TestAPIModels:
             tools=["read_file"],
             can_delegate=False,
             estimated_vram_gb=5.0,
-            max_iterations=30
+            max_iterations=30,
         )
         assert agent.name == "test"
         assert agent.delegate_to == []  # Default
 
 
 # ===== SindriAPI Class Tests =====
+
 
 class TestSindriAPI:
     """Tests for SindriAPI class."""
@@ -808,6 +962,7 @@ class TestSindriAPI:
 
 
 # ===== WebSocket Tests =====
+
 
 class TestWebSocket:
     """Tests for WebSocket functionality."""
@@ -836,6 +991,7 @@ class TestWebSocket:
 
 
 # ===== Integration Tests =====
+
 
 class TestIntegration:
     """Integration tests for the Web API."""
@@ -889,6 +1045,7 @@ class TestIntegration:
 
 # ===== Error Handling Tests =====
 
+
 class TestErrorHandling:
     """Tests for API error handling."""
 
@@ -902,14 +1059,12 @@ class TestErrorHandling:
 
     def test_invalid_task_iterations(self, client):
         """Test invalid max_iterations."""
-        response = client.post("/api/tasks", json={
-            "description": "Test",
-            "max_iterations": 0
-        })
+        response = client.post(
+            "/api/tasks", json={"description": "Test", "max_iterations": 0}
+        )
         assert response.status_code == 422
 
-        response = client.post("/api/tasks", json={
-            "description": "Test",
-            "max_iterations": 200
-        })
+        response = client.post(
+            "/api/tasks", json={"description": "Test", "max_iterations": 200}
+        )
         assert response.status_code == 422

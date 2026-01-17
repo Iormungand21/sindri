@@ -1,7 +1,7 @@
 """Tests for enhanced stuck detection functionality."""
 
 import pytest
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 
 from sindri.core.loop import LoopConfig
 from sindri.core.hierarchical import HierarchicalAgentLoop
@@ -19,11 +19,7 @@ class TestEnhancedStuckDetection:
         state = MagicMock()
         scheduler = MagicMock()
         delegation = MagicMock()
-        config = LoopConfig(
-            stuck_threshold=3,
-            max_nudges=3,
-            similarity_threshold=0.8
-        )
+        config = LoopConfig(stuck_threshold=3, max_nudges=3, similarity_threshold=0.8)
         event_bus = EventBus()
 
         loop = HierarchicalAgentLoop(
@@ -33,7 +29,7 @@ class TestEnhancedStuckDetection:
             scheduler=scheduler,
             delegation=delegation,
             config=config,
-            event_bus=event_bus
+            event_bus=event_bus,
         )
         return loop
 
@@ -56,7 +52,7 @@ class TestEnhancedStuckDetection:
         responses = [
             "I'll create the file",
             "Now let me add content",
-            "The file is ready"
+            "The file is ready",
         ]
         is_stuck, reason = loop._is_stuck(responses)
         assert is_stuck is False
@@ -66,7 +62,7 @@ class TestEnhancedStuckDetection:
         responses = [
             "I will create the file with the content you requested for the project",
             "I will create the file with content you requested for project",
-            "I will create the file with the content you requested for this project"
+            "I will create the file with the content you requested for this project",
         ]
         is_stuck, reason = loop._is_stuck(responses)
         assert is_stuck is True
@@ -77,7 +73,7 @@ class TestEnhancedStuckDetection:
         responses = [
             "I'll create a Python file with hello world",
             "Let me write a test file for this function",
-            "Now I'll add documentation to the code"
+            "Now I'll add documentation to the code",
         ]
         is_stuck, reason = loop._is_stuck(responses)
         assert is_stuck is False
@@ -88,7 +84,7 @@ class TestEnhancedStuckDetection:
         tool_history = [
             ("read_file", hash("path/to/file")),
             ("read_file", hash("path/to/file")),
-            ("read_file", hash("path/to/file"))
+            ("read_file", hash("path/to/file")),
         ]
         is_stuck, reason = loop._is_stuck(responses, tool_history)
         assert is_stuck is True
@@ -100,7 +96,7 @@ class TestEnhancedStuckDetection:
         tool_history = [
             ("read_file", hash("file1")),
             ("write_file", hash("file2")),
-            ("edit_file", hash("file3"))
+            ("edit_file", hash("file3")),
         ]
         is_stuck, reason = loop._is_stuck(responses, tool_history)
         assert is_stuck is False
@@ -110,7 +106,7 @@ class TestEnhancedStuckDetection:
         responses = [
             "What would you like me to do with this file?",
             "Could you please clarify what changes you need?",
-            "I need more information to proceed. Please provide details."
+            "I need more information to proceed. Please provide details.",
         ]
         is_stuck, reason = loop._is_stuck(responses)
         assert is_stuck is True
@@ -121,7 +117,7 @@ class TestEnhancedStuckDetection:
         responses = [
             "What would you like me to do?",
             "Okay, I'll create the file now",
-            "Done! The file has been created."
+            "Done! The file has been created.",
         ]
         is_stuck, reason = loop._is_stuck(responses)
         assert is_stuck is False
@@ -142,8 +138,13 @@ class TestHighSimilarity:
         event_bus = EventBus()
 
         return HierarchicalAgentLoop(
-            client=client, tools=tools, state=state, scheduler=scheduler,
-            delegation=delegation, config=config, event_bus=event_bus
+            client=client,
+            tools=tools,
+            state=state,
+            scheduler=scheduler,
+            delegation=delegation,
+            config=config,
+            event_bus=event_bus,
         )
 
     def test_high_overlap_detected(self, loop):
@@ -151,7 +152,7 @@ class TestHighSimilarity:
         responses = [
             "creating file with python code function",
             "creating file with python code function here",
-            "creating file with python code function now"
+            "creating file with python code function now",
         ]
         assert loop._high_similarity(responses) is True
 
@@ -160,7 +161,7 @@ class TestHighSimilarity:
         responses = [
             "first I will read the file",
             "now let me write the output",
-            "finally testing the result"
+            "finally testing the result",
         ]
         assert loop._high_similarity(responses) is False
 
@@ -190,8 +191,13 @@ class TestRepeatedToolCalls:
         event_bus = EventBus()
 
         return HierarchicalAgentLoop(
-            client=client, tools=tools, state=state, scheduler=scheduler,
-            delegation=delegation, config=config, event_bus=event_bus
+            client=client,
+            tools=tools,
+            state=state,
+            scheduler=scheduler,
+            delegation=delegation,
+            config=config,
+            event_bus=event_bus,
         )
 
     def test_same_tool_same_args_detected(self, loop):
@@ -199,7 +205,7 @@ class TestRepeatedToolCalls:
         tool_history = [
             ("read_file", 12345),
             ("read_file", 12345),
-            ("read_file", 12345)
+            ("read_file", 12345),
         ]
         assert loop._repeated_tool_calls(tool_history) is True
 
@@ -208,7 +214,7 @@ class TestRepeatedToolCalls:
         tool_history = [
             ("read_file", 12345),
             ("read_file", 67890),
-            ("read_file", 11111)
+            ("read_file", 11111),
         ]
         assert loop._repeated_tool_calls(tool_history) is False
 
@@ -217,16 +223,13 @@ class TestRepeatedToolCalls:
         tool_history = [
             ("read_file", 12345),
             ("write_file", 12345),
-            ("edit_file", 12345)
+            ("edit_file", 12345),
         ]
         assert loop._repeated_tool_calls(tool_history) is False
 
     def test_short_history_not_detected(self, loop):
         """Should not flag with fewer than 3 tool calls."""
-        tool_history = [
-            ("read_file", 12345),
-            ("read_file", 12345)
-        ]
+        tool_history = [("read_file", 12345), ("read_file", 12345)]
         assert loop._repeated_tool_calls(tool_history) is False
 
 

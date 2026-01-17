@@ -6,7 +6,6 @@ Verifies that agent prompts contain:
 - Proper structure and sections
 """
 
-import pytest
 from sindri.agents.prompts import (
     BROKKR_PROMPT,
     HUGINN_PROMPT,
@@ -56,7 +55,10 @@ class TestAgentPromptsExist:
     def test_ratatoskr_prompt_exists(self):
         """Ratatoskr prompt exists for simple tasks."""
         assert len(RATATOSKR_PROMPT) > 100
-        assert "executor" in RATATOSKR_PROMPT.lower() or "swift" in RATATOSKR_PROMPT.lower()
+        assert (
+            "executor" in RATATOSKR_PROMPT.lower()
+            or "swift" in RATATOSKR_PROMPT.lower()
+        )
 
 
 class TestHuginnSpecialization:
@@ -64,7 +66,10 @@ class TestHuginnSpecialization:
 
     def test_contains_python_patterns(self):
         """Huginn prompt includes Python best practices."""
-        assert "type hints" in HUGINN_PROMPT.lower() or "type_hints" in HUGINN_PROMPT.lower()
+        assert (
+            "type hints" in HUGINN_PROMPT.lower()
+            or "type_hints" in HUGINN_PROMPT.lower()
+        )
         assert "docstring" in HUGINN_PROMPT.lower()
         assert "async" in HUGINN_PROMPT.lower()
 
@@ -144,7 +149,9 @@ class TestSkaldSpecialization:
 
     def test_contains_edge_case_guidance(self):
         """Skald prompt includes edge case testing guidance."""
-        assert "edge case" in SKALD_PROMPT.lower() or "edge cases" in SKALD_PROMPT.lower()
+        assert (
+            "edge case" in SKALD_PROMPT.lower() or "edge cases" in SKALD_PROMPT.lower()
+        )
         assert "empty" in SKALD_PROMPT.lower()
         assert "none" in SKALD_PROMPT.lower() or "null" in SKALD_PROMPT.lower()
 
@@ -164,18 +171,27 @@ class TestFenrirSpecialization:
     def test_contains_schema_design_patterns(self):
         """Fenrir prompt includes schema design guidance."""
         assert "schema" in FENRIR_PROMPT.lower()
-        assert "normalization" in FENRIR_PROMPT.lower() or "normalize" in FENRIR_PROMPT.lower()
+        assert (
+            "normalization" in FENRIR_PROMPT.lower()
+            or "normalize" in FENRIR_PROMPT.lower()
+        )
         assert "foreign key" in FENRIR_PROMPT.lower()
 
     def test_contains_query_optimization(self):
         """Fenrir prompt includes query optimization guidance."""
-        assert "optimization" in FENRIR_PROMPT.lower() or "optimize" in FENRIR_PROMPT.lower()
+        assert (
+            "optimization" in FENRIR_PROMPT.lower()
+            or "optimize" in FENRIR_PROMPT.lower()
+        )
         assert "index" in FENRIR_PROMPT.lower()
         assert "explain" in FENRIR_PROMPT.lower()
 
     def test_contains_cte_patterns(self):
         """Fenrir prompt includes CTE (Common Table Expression) patterns."""
-        assert "cte" in FENRIR_PROMPT.lower() or "common table expression" in FENRIR_PROMPT.lower()
+        assert (
+            "cte" in FENRIR_PROMPT.lower()
+            or "common table expression" in FENRIR_PROMPT.lower()
+        )
         assert "with " in FENRIR_PROMPT.lower() or "WITH " in FENRIR_PROMPT
 
     def test_contains_window_functions(self):
@@ -218,7 +234,9 @@ class TestOdinSpecialization:
         """Odin prompt includes planning verification."""
         assert "checklist" in ODIN_PROMPT.lower()
         assert "risk" in ODIN_PROMPT.lower()
-        assert "dependencies" in ODIN_PROMPT.lower() or "dependency" in ODIN_PROMPT.lower()
+        assert (
+            "dependencies" in ODIN_PROMPT.lower() or "dependency" in ODIN_PROMPT.lower()
+        )
 
     def test_contains_delegation_guidance(self):
         """Odin prompt includes delegation to specialists."""
@@ -239,10 +257,16 @@ class TestAgentRegistry:
     def test_get_agent_returns_correct_prompts(self):
         """get_agent returns agents with enhanced prompts."""
         huginn = get_agent("huginn")
-        assert "type hints" in huginn.system_prompt.lower() or "python" in huginn.system_prompt.lower()
+        assert (
+            "type hints" in huginn.system_prompt.lower()
+            or "python" in huginn.system_prompt.lower()
+        )
 
         mimir = get_agent("mimir")
-        assert "security" in mimir.system_prompt.lower() or "review" in mimir.system_prompt.lower()
+        assert (
+            "security" in mimir.system_prompt.lower()
+            or "review" in mimir.system_prompt.lower()
+        )
 
         skald = get_agent("skald")
         assert "test" in skald.system_prompt.lower()

@@ -2,9 +2,7 @@
 
 import pytest
 import tempfile
-import json
 from pathlib import Path
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from sindri.memory.projects import ProjectConfig, ProjectRegistry
@@ -32,7 +30,8 @@ def temp_project_dir():
         project_dir.mkdir()
 
         # Create sample Python files
-        (project_dir / "main.py").write_text('''"""Main module."""
+        (project_dir / "main.py").write_text(
+            '''"""Main module."""
 
 def main():
     """Entry point for the application."""
@@ -40,9 +39,11 @@ def main():
 
 if __name__ == "__main__":
     main()
-''')
+'''
+        )
 
-        (project_dir / "utils.py").write_text('''"""Utility functions."""
+        (project_dir / "utils.py").write_text(
+            '''"""Utility functions."""
 
 def format_string(s: str) -> str:
     """Format a string with proper casing."""
@@ -51,15 +52,18 @@ def format_string(s: str) -> str:
 def calculate_sum(numbers: list) -> int:
     """Calculate sum of numbers."""
     return sum(numbers)
-''')
+'''
+        )
 
         # Create subdirectory
         (project_dir / "lib").mkdir()
-        (project_dir / "lib" / "helpers.py").write_text('''"""Helper functions."""
+        (project_dir / "lib" / "helpers.py").write_text(
+            '''"""Helper functions."""
 
 def helper_function():
     return "helper"
-''')
+'''
+        )
 
         yield project_dir
 
@@ -71,7 +75,8 @@ def temp_second_project():
         project_dir = Path(tmpdir) / "second_project"
         project_dir.mkdir()
 
-        (project_dir / "api.py").write_text('''"""API module."""
+        (project_dir / "api.py").write_text(
+            '''"""API module."""
 
 def authenticate_user(username: str, password: str) -> bool:
     """Authenticate a user with credentials."""
@@ -80,7 +85,8 @@ def authenticate_user(username: str, password: str) -> bool:
 def get_user_profile(user_id: int) -> dict:
     """Get user profile by ID."""
     return {"id": user_id, "name": "User"}
-''')
+'''
+        )
 
         yield project_dir
 
@@ -116,8 +122,7 @@ class TestProjectConfig:
     def test_create_with_tags(self):
         """Test creating ProjectConfig with tags."""
         config = ProjectConfig(
-            path="/home/user/project",
-            tags=["python", "fastapi", "web"]
+            path="/home/user/project", tags=["python", "fastapi", "web"]
         )
         assert config.tags == ["python", "fastapi", "web"]
 
@@ -129,7 +134,7 @@ class TestProjectConfig:
             tags=["python"],
             enabled=True,
             indexed=True,
-            file_count=10
+            file_count=10,
         )
         data = config.to_dict()
         assert data["path"] == "/home/user/project"
@@ -147,7 +152,7 @@ class TestProjectConfig:
             "tags": ["ml", "pytorch"],
             "enabled": False,
             "indexed": True,
-            "file_count": 5
+            "file_count": 5,
         }
         config = ProjectConfig.from_dict(data)
         assert config.path == "/home/user/project"
@@ -193,18 +198,12 @@ class TestProjectRegistry:
 
     def test_add_project_with_custom_name(self, registry, temp_project_dir):
         """Test adding a project with custom name."""
-        project = registry.add_project(
-            str(temp_project_dir),
-            name="My Custom Name"
-        )
+        project = registry.add_project(str(temp_project_dir), name="My Custom Name")
         assert project.name == "My Custom Name"
 
     def test_add_project_with_tags(self, registry, temp_project_dir):
         """Test adding a project with tags."""
-        project = registry.add_project(
-            str(temp_project_dir),
-            tags=["python", "test"]
-        )
+        project = registry.add_project(str(temp_project_dir), tags=["python", "test"])
         assert "python" in project.tags
         assert "test" in project.tags
 
@@ -215,7 +214,7 @@ class TestProjectRegistry:
 
     def test_add_project_duplicate_updates(self, registry, temp_project_dir):
         """Test adding duplicate project updates existing."""
-        project1 = registry.add_project(str(temp_project_dir), tags=["first"])
+        registry.add_project(str(temp_project_dir), tags=["first"])
         project2 = registry.add_project(str(temp_project_dir), tags=["second"])
 
         assert registry.get_project_count() == 1
@@ -259,17 +258,21 @@ class TestProjectRegistry:
         assert "First" in names
         assert "Second" in names
 
-    def test_list_projects_enabled_only(self, registry, temp_project_dir, temp_second_project):
+    def test_list_projects_enabled_only(
+        self, registry, temp_project_dir, temp_second_project
+    ):
         """Test listing only enabled projects."""
         registry.add_project(str(temp_project_dir), name="Enabled")
-        project2 = registry.add_project(str(temp_second_project), name="Disabled")
+        registry.add_project(str(temp_second_project), name="Disabled")
         registry.enable_project(str(temp_second_project), enabled=False)
 
         projects = registry.list_projects(enabled_only=True)
         assert len(projects) == 1
         assert projects[0].name == "Enabled"
 
-    def test_list_projects_by_tags(self, registry, temp_project_dir, temp_second_project):
+    def test_list_projects_by_tags(
+        self, registry, temp_project_dir, temp_second_project
+    ):
         """Test listing projects filtered by tags."""
         registry.add_project(str(temp_project_dir), tags=["python", "web"])
         registry.add_project(str(temp_second_project), tags=["python", "ml"])
@@ -312,7 +315,9 @@ class TestProjectRegistry:
     def test_set_indexed(self, registry, temp_project_dir):
         """Test marking a project as indexed."""
         registry.add_project(str(temp_project_dir))
-        project = registry.set_indexed(str(temp_project_dir), indexed=True, file_count=10)
+        project = registry.set_indexed(
+            str(temp_project_dir), indexed=True, file_count=10
+        )
 
         assert project.indexed is True
         assert project.file_count == 10
@@ -374,9 +379,7 @@ class TestGlobalMemoryStore:
             db_path = Path(tmpdir) / "global_memory.db"
             registry = ProjectRegistry(config_path=temp_projects_file)
             yield GlobalMemoryStore(
-                db_path=db_path,
-                embedder=mock_embedder,
-                registry=registry
+                db_path=db_path, embedder=mock_embedder, registry=registry
             )
 
     def test_init(self, global_memory):
@@ -408,7 +411,7 @@ class TestGlobalMemoryStore:
         (temp_project_dir / ".hidden.py").write_text("secret = 'hidden'")
 
         global_memory.registry.add_project(str(temp_project_dir))
-        chunks = global_memory.index_project(str(temp_project_dir))
+        global_memory.index_project(str(temp_project_dir))
 
         # Verify hidden file wasn't indexed (check metadata)
         stats = global_memory.get_project_stats(str(temp_project_dir))
@@ -453,7 +456,9 @@ class TestGlobalMemoryStore:
         for r in results:
             assert r.project_path == str(Path(temp_project_dir).resolve())
 
-    def test_search_exclude_current(self, global_memory, temp_project_dir, temp_second_project):
+    def test_search_exclude_current(
+        self, global_memory, temp_project_dir, temp_second_project
+    ):
         """Test excluding current project from search."""
         global_memory.registry.add_project(str(temp_project_dir))
         global_memory.registry.add_project(str(temp_second_project))
@@ -463,8 +468,7 @@ class TestGlobalMemoryStore:
 
         # Exclude first project
         results = global_memory.search(
-            "function",
-            exclude_current=str(Path(temp_project_dir).resolve())
+            "function", exclude_current=str(Path(temp_project_dir).resolve())
         )
 
         # Results should only be from second project
@@ -484,7 +488,9 @@ class TestGlobalMemoryStore:
         stats_after = global_memory.get_stats()
         assert stats_after["indexed_projects"] == 0
 
-    def test_index_all_projects(self, global_memory, temp_project_dir, temp_second_project):
+    def test_index_all_projects(
+        self, global_memory, temp_project_dir, temp_second_project
+    ):
         """Test indexing all registered projects."""
         global_memory.registry.add_project(str(temp_project_dir))
         global_memory.registry.add_project(str(temp_second_project))
@@ -552,7 +558,7 @@ class TestCrossProjectResult:
             start_line=1,
             end_line=10,
             similarity=0.95,
-            tags=["python"]
+            tags=["python"],
         )
         assert result.content == "def hello(): pass"
         assert result.project_name == "Test Project"
@@ -568,7 +574,7 @@ class TestCrossProjectResult:
             start_line=1,
             end_line=5,
             similarity=0.9,
-            tags=["tag1"]
+            tags=["tag1"],
         )
         data = result.to_dict()
         assert data["content"] == "code"
@@ -587,7 +593,8 @@ class TestProjectsCLI:
 
     def test_cli_group_exists(self):
         """Test that projects CLI group is registered."""
-        from sindri.cli import cli, projects
+        from sindri.cli import projects
+
         assert projects is not None
 
     def test_projects_list_command_exists(self):
@@ -606,7 +613,7 @@ class TestProjectsCLI:
         from sindri.cli import cli
 
         runner = CliRunner()
-        with tempfile.TemporaryDirectory() as tmpdir:
+        with tempfile.TemporaryDirectory():
             # Use isolated filesystem for test
             result = runner.invoke(cli, ["projects", "stats"])
             assert result.exit_code == 0
@@ -625,14 +632,23 @@ class TestProjectsCLI:
             (project_dir / "main.py").write_text("print('hello')")
 
             # Patch the embedding to avoid Ollama dependency
-            with patch('sindri.memory.global_memory.GlobalMemoryStore.index_project', return_value=1):
-                result = runner.invoke(cli, [
-                    "projects", "add",
-                    str(project_dir),
-                    "--name", "Test",
-                    "--tags", "python,test",
-                    "--no-index"  # Skip actual indexing
-                ])
+            with patch(
+                "sindri.memory.global_memory.GlobalMemoryStore.index_project",
+                return_value=1,
+            ):
+                result = runner.invoke(
+                    cli,
+                    [
+                        "projects",
+                        "add",
+                        str(project_dir),
+                        "--name",
+                        "Test",
+                        "--tags",
+                        "python,test",
+                        "--no-index",  # Skip actual indexing
+                    ],
+                )
 
             assert result.exit_code == 0
             assert "Added project" in result.output or "Test" in result.output

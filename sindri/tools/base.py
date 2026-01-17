@@ -22,6 +22,7 @@ class ToolResult:
         suggestion: Actionable suggestion for fixing the error
         retries_attempted: Number of retry attempts made before this result
     """
+
     success: bool
     output: str
     error: Optional[str] = None
@@ -59,8 +60,8 @@ class Tool(ABC):
             "function": {
                 "name": self.name,
                 "description": self.description,
-                "parameters": self.parameters
-            }
+                "parameters": self.parameters,
+            },
         }
 
     def _resolve_path(self, path: str) -> Path:

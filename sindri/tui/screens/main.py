@@ -1,11 +1,11 @@
 """Main workspace screen."""
 
 from textual.screen import Screen
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal
 from textual.widgets import Input, Tree, RichLog
 from textual import on
 
-from sindri.core.events import EventBus, EventType, Event
+from sindri.core.events import EventBus, EventType
 from sindri.core.tasks import TaskStatus
 
 
@@ -70,7 +70,9 @@ class MainScreen(Screen):
                     for old_status, old_icon in STATUS_ICONS.items():
                         if f"[{old_icon}]" in old_label:
                             new_icon = STATUS_ICONS.get(status, "·")
-                            new_label = old_label.replace(f"[{old_icon}]", f"[{new_icon}]")
+                            new_label = old_label.replace(
+                                f"[{old_icon}]", f"[{new_icon}]"
+                            )
                             node.set_label(new_label)
                             break
             except Exception:

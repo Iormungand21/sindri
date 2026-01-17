@@ -1,9 +1,6 @@
 """Test crash recovery system."""
 
-import pytest
 import json
-from datetime import datetime
-from pathlib import Path
 
 
 def test_checkpoint_save_load(recovery_manager):
@@ -13,7 +10,7 @@ def test_checkpoint_save_load(recovery_manager):
         "task": "test task",
         "iteration": 5,
         "agent": "brokkr",
-        "messages": [{"role": "user", "content": "test"}]
+        "messages": [{"role": "user", "content": "test"}],
     }
 
     session_id = "session-123"
@@ -157,7 +154,7 @@ def test_checkpoint_directory_creation(temp_dir):
     state_dir = temp_dir / "new_state_dir"
     assert not state_dir.exists()
 
-    recovery = RecoveryManager(str(state_dir))
+    RecoveryManager(str(state_dir))
 
     # Directory should be created
     assert state_dir.exists()
@@ -173,15 +170,17 @@ def test_checkpoint_with_complex_state(recovery_manager):
         "iteration": 10,
         "messages": [
             {"role": "user", "content": "hello"},
-            {"role": "assistant", "content": "hi", "tool_calls": [
-                {"name": "read_file", "args": {"path": "/test"}}
-            ]},
+            {
+                "role": "assistant",
+                "content": "hi",
+                "tool_calls": [{"name": "read_file", "args": {"path": "/test"}}],
+            },
         ],
         "context": {
             "project_id": "test",
             "files": ["file1.py", "file2.py"],
-            "metadata": {"nested": {"data": [1, 2, 3]}}
-        }
+            "metadata": {"nested": {"data": [1, 2, 3]}},
+        },
     }
 
     recovery_manager.save_checkpoint(session_id, state)

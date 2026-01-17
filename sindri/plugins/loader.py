@@ -6,11 +6,12 @@ import sys
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from pathlib import Path
-from typing import Optional, Type, Any
+from typing import Optional, Type
 import structlog
 
 try:
     import toml
+
     HAS_TOML = True
 except ImportError:
     HAS_TOML = False
@@ -22,8 +23,9 @@ log = structlog.get_logger()
 
 class PluginType(Enum):
     """Type of plugin."""
-    TOOL = auto()       # Python tool class
-    AGENT = auto()      # TOML agent definition
+
+    TOOL = auto()  # Python tool class
+    AGENT = auto()  # TOML agent definition
 
 
 @dataclass
@@ -41,6 +43,7 @@ class PluginInfo:
         error: Error message if loading failed
         metadata: Additional metadata
     """
+
     name: str
     type: PluginType
     path: Path
@@ -72,9 +75,7 @@ class PluginLoader:
     """
 
     def __init__(
-        self,
-        plugin_dir: Optional[Path] = None,
-        agent_dir: Optional[Path] = None
+        self, plugin_dir: Optional[Path] = None, agent_dir: Optional[Path] = None
     ):
         """Initialize the plugin loader.
 
@@ -103,7 +104,9 @@ class PluginLoader:
         log.info(
             "plugins_discovered",
             tool_count=len([p for p in self._discovered if p.type == PluginType.TOOL]),
-            agent_count=len([p for p in self._discovered if p.type == PluginType.AGENT])
+            agent_count=len(
+                [p for p in self._discovered if p.type == PluginType.AGENT]
+            ),
         )
 
         return self._discovered
@@ -123,18 +126,16 @@ class PluginLoader:
                 if plugin_info:
                     self._discovered.append(plugin_info)
             except Exception as e:
-                log.warning(
-                    "plugin_load_failed",
-                    path=str(path),
-                    error=str(e)
+                log.warning("plugin_load_failed", path=str(path), error=str(e))
+                self._discovered.append(
+                    PluginInfo(
+                        name=path.stem,
+                        type=PluginType.TOOL,
+                        path=path,
+                        enabled=False,
+                        error=str(e),
+                    )
                 )
-                self._discovered.append(PluginInfo(
-                    name=path.stem,
-                    type=PluginType.TOOL,
-                    path=path,
-                    enabled=False,
-                    error=str(e)
-                ))
 
     def _load_tool_plugin(self, path: Path) -> Optional[PluginInfo]:
         """Load a Python tool plugin.
@@ -189,7 +190,12 @@ class PluginLoader:
         tool_class = None
         for name in tool_classes:
             cls = getattr(module, name, None)
-            if cls and isinstance(cls, type) and issubclass(cls, Tool) and cls is not Tool:
+            if (
+                cls
+                and isinstance(cls, type)
+                and issubclass(cls, Tool)
+                and cls is not Tool
+            ):
                 tool_class = cls
                 break
 
@@ -199,7 +205,9 @@ class PluginLoader:
 
         # Create PluginInfo
         tool_name = getattr(tool_class, "name", path.stem)
-        description = getattr(tool_class, "description", plugin_metadata.get("description", ""))
+        description = getattr(
+            tool_class, "description", plugin_metadata.get("description", "")
+        )
 
         return PluginInfo(
             name=tool_name,
@@ -210,7 +218,7 @@ class PluginLoader:
             author=plugin_metadata.get("author", ""),
             enabled=True,
             tool_class=tool_class,
-            metadata=plugin_metadata
+            metadata=plugin_metadata,
         )
 
     def _discover_agents(self) -> None:
@@ -232,18 +240,16 @@ class PluginLoader:
                 if plugin_info:
                     self._discovered.append(plugin_info)
             except Exception as e:
-                log.warning(
-                    "agent_config_load_failed",
-                    path=str(path),
-                    error=str(e)
+                log.warning("agent_config_load_failed", path=str(path), error=str(e))
+                self._discovered.append(
+                    PluginInfo(
+                        name=path.stem,
+                        type=PluginType.AGENT,
+                        path=path,
+                        enabled=False,
+                        error=str(e),
+                    )
                 )
-                self._discovered.append(PluginInfo(
-                    name=path.stem,
-                    type=PluginType.AGENT,
-                    path=path,
-                    enabled=False,
-                    error=str(e)
-                ))
 
     def _load_agent_config(self, path: Path) -> Optional[PluginInfo]:
         """Load a TOML agent configuration.
@@ -263,9 +269,9 @@ class PluginLoader:
 
         agent = config["agent"]
         required_fields = ["name", "role", "model"]
-        for field in required_fields:
-            if field not in agent:
-                raise ValueError(f"Missing required field: agent.{field}")
+        for field_name in required_fields:
+            if field_name not in agent:
+                raise ValueError(f"Missing required field: agent.{field_name}")
 
         # Get prompt content
         prompt_content = ""
@@ -311,7 +317,7 @@ class PluginLoader:
             author=metadata.get("author", ""),
             enabled=agent.get("enabled", True),
             agent_config=agent_config,
-            metadata=metadata
+            metadata=metadata,
         )
 
     def _extract_metadata(self, tree: ast.AST) -> dict:
@@ -328,9 +334,12 @@ class PluginLoader:
         metadata = {}
 
         # Get module docstring
-        if (tree.body and isinstance(tree.body[0], ast.Expr)
+        if (
+            tree.body
+            and isinstance(tree.body[0], ast.Expr)
             and isinstance(tree.body[0].value, ast.Constant)
-            and isinstance(tree.body[0].value.value, str)):
+            and isinstance(tree.body[0].value.value, str)
+        ):
             docstring = tree.body[0].value.value
             # First line is description
             lines = docstring.strip().split("\n")
@@ -342,9 +351,13 @@ class PluginLoader:
             if isinstance(node, ast.Assign):
                 for target in node.targets:
                     if isinstance(target, ast.Name):
-                        if target.id == "__version__" and isinstance(node.value, ast.Constant):
+                        if target.id == "__version__" and isinstance(
+                            node.value, ast.Constant
+                        ):
                             metadata["version"] = str(node.value.value)
-                        elif target.id == "__author__" and isinstance(node.value, ast.Constant):
+                        elif target.id == "__author__" and isinstance(
+                            node.value, ast.Constant
+                        ):
                             metadata["author"] = str(node.value.value)
 
         return metadata

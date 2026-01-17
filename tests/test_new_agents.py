@@ -9,13 +9,11 @@ Verifies that the 4 new agents are properly configured:
 Also tests Odin upgrade to deepseek-r1:14b.
 """
 
-import pytest
 from sindri.agents.prompts import (
     HEIMDALL_PROMPT,
     BALDR_PROMPT,
     IDUNN_PROMPT,
     VIDAR_PROMPT,
-    ODIN_PROMPT,
 )
 from sindri.agents.registry import AGENTS, get_agent, list_agents
 
@@ -212,7 +210,9 @@ class TestVidarAgent:
     def test_vidar_role(self):
         """Vidar has multi-language coding role."""
         agent = get_agent("vidar")
-        assert "multi-language" in agent.role.lower() or "language" in agent.role.lower()
+        assert (
+            "multi-language" in agent.role.lower() or "language" in agent.role.lower()
+        )
 
     def test_vidar_model(self):
         """Vidar uses codestral for multi-language support."""

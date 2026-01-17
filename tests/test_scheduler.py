@@ -66,7 +66,9 @@ def test_get_pending_count(scheduler):
     """Test counting pending tasks."""
     task1 = Task(description="Task 1", assigned_agent="brokkr")
     task2 = Task(description="Task 2", assigned_agent="brokkr")
-    task3 = Task(description="Task 3", assigned_agent="brokkr", status=TaskStatus.RUNNING)
+    task3 = Task(
+        description="Task 3", assigned_agent="brokkr", status=TaskStatus.RUNNING
+    )
 
     scheduler.add_task(task1)
     scheduler.add_task(task2)

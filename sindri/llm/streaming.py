@@ -6,7 +6,6 @@ Phase 6.3: Buffer accumulates tokens and detects tool calls in the stream.
 import re
 import json
 from dataclasses import dataclass, field
-from typing import Optional
 import structlog
 
 log = structlog.get_logger()
@@ -15,6 +14,7 @@ log = structlog.get_logger()
 @dataclass
 class DetectedToolCall:
     """A tool call detected from streaming content."""
+
     name: str
     arguments: dict
 
@@ -47,11 +47,11 @@ class StreamingBuffer:
 
     # Patterns that indicate start of a tool call
     TOOL_PATTERNS = [
-        r'```json\s*\{',            # Markdown JSON block
-        r'\{"name"\s*:\s*"',        # Direct JSON with name field
-        r'\{"function"\s*:\s*"',    # Function calling format
-        r'\{"tool"\s*:\s*"',        # Tool format
-        r'<tool_call>\s*\{',        # XML-style wrapper
+        r"```json\s*\{",  # Markdown JSON block
+        r'\{"name"\s*:\s*"',  # Direct JSON with name field
+        r'\{"function"\s*:\s*"',  # Function calling format
+        r'\{"tool"\s*:\s*"',  # Tool format
+        r"<tool_call>\s*\{",  # XML-style wrapper
     ]
 
     @property
@@ -73,7 +73,9 @@ class StreamingBuffer:
         # Check if we're starting a JSON block
         if not self._in_json_block:
             # Only check content after last processed position
-            search_start = max(0, self._last_processed_pos - 50)  # Small overlap for context
+            search_start = max(
+                0, self._last_processed_pos - 50
+            )  # Small overlap for context
             search_content = self.content[search_start:]
 
             # Check for tool call patterns in new content
@@ -92,9 +94,9 @@ class StreamingBuffer:
                         self._json_buffer = self.content[json_start:]
                         # Count initial depth
                         for char in self._json_buffer:
-                            if char == '{':
+                            if char == "{":
                                 self._json_depth += 1
-                            elif char == '}':
+                            elif char == "}":
                                 self._json_depth -= 1
                         # Check if already complete
                         if self._json_depth == 0 and self._json_buffer.strip():
@@ -113,9 +115,9 @@ class StreamingBuffer:
 
         # Track JSON depth to know when we've completed the object
         for char in token:
-            if char == '{':
+            if char == "{":
                 self._json_depth += 1
-            elif char == '}':
+            elif char == "}":
                 self._json_depth -= 1
                 if self._json_depth == 0:
                     # Complete JSON object - try to parse
@@ -139,7 +141,7 @@ class StreamingBuffer:
         """
         # Look for opening brace from the given position
         for i in range(from_pos, len(content)):
-            if content[i] == '{':
+            if content[i] == "{":
                 return i
         return -1
 
@@ -149,10 +151,10 @@ class StreamingBuffer:
         json_str = self._json_buffer.strip()
 
         # Remove markdown wrappers
-        json_str = re.sub(r'^```json\s*', '', json_str)
-        json_str = re.sub(r'\s*```$', '', json_str)
-        json_str = re.sub(r'^<tool_call>\s*', '', json_str)
-        json_str = re.sub(r'\s*</tool_call>$', '', json_str)
+        json_str = re.sub(r"^```json\s*", "", json_str)
+        json_str = re.sub(r"\s*```$", "", json_str)
+        json_str = re.sub(r"^<tool_call>\s*", "", json_str)
+        json_str = re.sub(r"\s*</tool_call>$", "", json_str)
 
         try:
             data = json.loads(json_str)
@@ -180,14 +182,15 @@ class StreamingBuffer:
                     except json.JSONDecodeError:
                         arguments = {"input": arguments}
 
-                self._tool_calls.append(DetectedToolCall(
-                    name=name,
-                    arguments=arguments
-                ))
+                self._tool_calls.append(
+                    DetectedToolCall(name=name, arguments=arguments)
+                )
                 log.info("tool_call_detected_from_stream", name=name)
 
         except json.JSONDecodeError as e:
-            log.debug("json_parse_failed_in_stream", error=str(e), buffer=json_str[:100])
+            log.debug(
+                "json_parse_failed_in_stream", error=str(e), buffer=json_str[:100]
+            )
 
     def get_tool_calls(self) -> list[DetectedToolCall]:
         """Get all detected tool calls."""
@@ -199,13 +202,15 @@ class StreamingBuffer:
         display = self.content
 
         # Remove markdown JSON blocks
-        display = re.sub(r'```json\s*\{[^`]*\}\s*```', '[Tool Call]', display)
+        display = re.sub(r"```json\s*\{[^`]*\}\s*```", "[Tool Call]", display)
 
         # Remove inline JSON tool calls
-        display = re.sub(r'\{"name"\s*:\s*"[^}]+\}', '[Tool Call]', display)
+        display = re.sub(r'\{"name"\s*:\s*"[^}]+\}', "[Tool Call]", display)
 
         # Remove XML-style tool calls
-        display = re.sub(r'<tool_call>\s*\{[^<]*\}\s*</tool_call>', '[Tool Call]', display)
+        display = re.sub(
+            r"<tool_call>\s*\{[^<]*\}\s*</tool_call>", "[Tool Call]", display
+        )
 
         return display.strip()
 

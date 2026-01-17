@@ -2,10 +2,8 @@
 
 import pytest
 import json
-from pathlib import Path
-from unittest.mock import patch
 
-from sindri.tools.cicd import GenerateWorkflowTool, ValidateWorkflowTool, ProjectInfo
+from sindri.tools.cicd import GenerateWorkflowTool, ValidateWorkflowTool
 
 
 class TestProjectDetection:
@@ -19,7 +17,8 @@ class TestProjectDetection:
     def test_detect_python_pyproject(self, tool, tmp_path):
         """Test Python project detection with pyproject.toml."""
         pyproject = tmp_path / "pyproject.toml"
-        pyproject.write_text("""
+        pyproject.write_text(
+            """
 [tool.poetry]
 name = "myproject"
 
@@ -28,7 +27,8 @@ line-length = 88
 
 [tool.black]
 line-length = 88
-""")
+"""
+        )
 
         info = tool._detect_project(tmp_path)
 
@@ -60,17 +60,19 @@ line-length = 88
 
     def test_detect_node_npm(self, tool, tmp_path):
         """Test Node.js project detection with npm."""
-        (tmp_path / "package.json").write_text(json.dumps({
-            "name": "myproject",
-            "devDependencies": {
-                "jest": "^29.0.0",
-                "eslint": "^8.0.0",
-                "prettier": "^3.0.0"
-            },
-            "scripts": {
-                "build": "tsc"
-            }
-        }))
+        (tmp_path / "package.json").write_text(
+            json.dumps(
+                {
+                    "name": "myproject",
+                    "devDependencies": {
+                        "jest": "^29.0.0",
+                        "eslint": "^8.0.0",
+                        "prettier": "^3.0.0",
+                    },
+                    "scripts": {"build": "tsc"},
+                }
+            )
+        )
 
         info = tool._detect_project(tmp_path)
 
@@ -105,12 +107,9 @@ line-length = 88
 
     def test_detect_node_vitest(self, tool, tmp_path):
         """Test Node.js project detection with vitest."""
-        (tmp_path / "package.json").write_text(json.dumps({
-            "name": "myproject",
-            "devDependencies": {
-                "vitest": "^1.0.0"
-            }
-        }))
+        (tmp_path / "package.json").write_text(
+            json.dumps({"name": "myproject", "devDependencies": {"vitest": "^1.0.0"}})
+        )
 
         info = tool._detect_project(tmp_path)
 
@@ -163,10 +162,7 @@ class TestGenerateWorkflowTool:
         """Test generating Python test workflow."""
         (tmp_path / "pyproject.toml").write_text("[tool.poetry]\nname = 'test'")
 
-        result = await tool.execute(
-            workflow_type="test",
-            dry_run=True
-        )
+        result = await tool.execute(workflow_type="test", dry_run=True)
 
         assert result.success
         assert "pytest" in result.output
@@ -180,9 +176,7 @@ class TestGenerateWorkflowTool:
         (tmp_path / "pyproject.toml").write_text("[project]\nname = 'test'")
 
         result = await tool.execute(
-            workflow_type="test",
-            python_versions=["3.10", "3.11", "3.12"],
-            dry_run=True
+            workflow_type="test", python_versions=["3.10", "3.11", "3.12"], dry_run=True
         )
 
         assert result.success
@@ -196,9 +190,7 @@ class TestGenerateWorkflowTool:
         (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length = 88")
 
         result = await tool.execute(
-            workflow_type="lint",
-            project_type="python",
-            dry_run=True
+            workflow_type="lint", project_type="python", dry_run=True
         )
 
         assert result.success
@@ -210,9 +202,7 @@ class TestGenerateWorkflowTool:
     async def test_generate_python_build_workflow(self, tool, tmp_path):
         """Test generating Python build workflow."""
         result = await tool.execute(
-            workflow_type="build",
-            project_type="python",
-            dry_run=True
+            workflow_type="build", project_type="python", dry_run=True
         )
 
         assert result.success
@@ -224,10 +214,7 @@ class TestGenerateWorkflowTool:
         """Test generating Python full CI workflow."""
         (tmp_path / "pyproject.toml").write_text("[project]\nname = 'test'")
 
-        result = await tool.execute(
-            workflow_type="full",
-            dry_run=True
-        )
+        result = await tool.execute(workflow_type="full", dry_run=True)
 
         assert result.success
         assert "lint:" in result.output
@@ -239,15 +226,11 @@ class TestGenerateWorkflowTool:
     @pytest.mark.asyncio
     async def test_generate_node_test_workflow(self, tool, tmp_path):
         """Test generating Node.js test workflow."""
-        (tmp_path / "package.json").write_text(json.dumps({
-            "name": "test",
-            "devDependencies": {"jest": "^29.0.0"}
-        }))
-
-        result = await tool.execute(
-            workflow_type="test",
-            dry_run=True
+        (tmp_path / "package.json").write_text(
+            json.dumps({"name": "test", "devDependencies": {"jest": "^29.0.0"}})
         )
+
+        result = await tool.execute(workflow_type="test", dry_run=True)
 
         assert result.success
         assert "npm" in result.output
@@ -260,9 +243,7 @@ class TestGenerateWorkflowTool:
         (tmp_path / "package.json").write_text(json.dumps({"name": "test"}))
 
         result = await tool.execute(
-            workflow_type="test",
-            node_versions=["18", "20", "22"],
-            dry_run=True
+            workflow_type="test", node_versions=["18", "20", "22"], dry_run=True
         )
 
         assert result.success
@@ -274,9 +255,7 @@ class TestGenerateWorkflowTool:
     async def test_generate_node_lint_workflow(self, tool, tmp_path):
         """Test generating Node.js lint workflow."""
         result = await tool.execute(
-            workflow_type="lint",
-            project_type="node",
-            dry_run=True
+            workflow_type="lint", project_type="node", dry_run=True
         )
 
         assert result.success
@@ -288,10 +267,7 @@ class TestGenerateWorkflowTool:
         """Test generating Node.js full CI workflow."""
         (tmp_path / "package.json").write_text(json.dumps({"name": "test"}))
 
-        result = await tool.execute(
-            workflow_type="full",
-            dry_run=True
-        )
+        result = await tool.execute(workflow_type="full", dry_run=True)
 
         assert result.success
         assert "lint:" in result.output
@@ -303,10 +279,7 @@ class TestGenerateWorkflowTool:
         """Test generating Rust test workflow."""
         (tmp_path / "Cargo.toml").write_text('[package]\nname = "test"')
 
-        result = await tool.execute(
-            workflow_type="test",
-            dry_run=True
-        )
+        result = await tool.execute(workflow_type="test", dry_run=True)
 
         assert result.success
         assert "cargo test" in result.output
@@ -317,9 +290,7 @@ class TestGenerateWorkflowTool:
     async def test_generate_rust_lint_workflow(self, tool, tmp_path):
         """Test generating Rust lint workflow."""
         result = await tool.execute(
-            workflow_type="lint",
-            project_type="rust",
-            dry_run=True
+            workflow_type="lint", project_type="rust", dry_run=True
         )
 
         assert result.success
@@ -331,10 +302,7 @@ class TestGenerateWorkflowTool:
         """Test generating Rust full CI workflow."""
         (tmp_path / "Cargo.toml").write_text('[package]\nname = "test"')
 
-        result = await tool.execute(
-            workflow_type="full",
-            dry_run=True
-        )
+        result = await tool.execute(workflow_type="full", dry_run=True)
 
         assert result.success
         assert "lint:" in result.output
@@ -347,10 +315,7 @@ class TestGenerateWorkflowTool:
         """Test generating Go test workflow."""
         (tmp_path / "go.mod").write_text("module test")
 
-        result = await tool.execute(
-            workflow_type="test",
-            dry_run=True
-        )
+        result = await tool.execute(workflow_type="test", dry_run=True)
 
         assert result.success
         assert "go test" in result.output
@@ -361,9 +326,7 @@ class TestGenerateWorkflowTool:
     async def test_generate_go_lint_workflow(self, tool, tmp_path):
         """Test generating Go lint workflow."""
         result = await tool.execute(
-            workflow_type="lint",
-            project_type="go",
-            dry_run=True
+            workflow_type="lint", project_type="go", dry_run=True
         )
 
         assert result.success
@@ -375,10 +338,7 @@ class TestGenerateWorkflowTool:
         """Test generating Go full CI workflow."""
         (tmp_path / "go.mod").write_text("module test")
 
-        result = await tool.execute(
-            workflow_type="full",
-            dry_run=True
-        )
+        result = await tool.execute(workflow_type="full", dry_run=True)
 
         assert result.success
         assert "lint:" in result.output
@@ -388,10 +348,7 @@ class TestGenerateWorkflowTool:
     @pytest.mark.asyncio
     async def test_generate_generic_test_workflow(self, tool, tmp_path):
         """Test generating generic test workflow."""
-        result = await tool.execute(
-            workflow_type="test",
-            dry_run=True
-        )
+        result = await tool.execute(workflow_type="test", dry_run=True)
 
         assert result.success
         assert "Add your test commands here" in result.output
@@ -400,9 +357,7 @@ class TestGenerateWorkflowTool:
     async def test_generate_docker_deploy_workflow(self, tool, tmp_path):
         """Test generating Docker deployment workflow."""
         result = await tool.execute(
-            workflow_type="deploy",
-            deploy_target="docker",
-            dry_run=True
+            workflow_type="deploy", deploy_target="docker", dry_run=True
         )
 
         assert result.success
@@ -414,9 +369,7 @@ class TestGenerateWorkflowTool:
     async def test_generate_pypi_deploy_workflow(self, tool, tmp_path):
         """Test generating PyPI deployment workflow."""
         result = await tool.execute(
-            workflow_type="deploy",
-            deploy_target="pypi",
-            dry_run=True
+            workflow_type="deploy", deploy_target="pypi", dry_run=True
         )
 
         assert result.success
@@ -429,9 +382,7 @@ class TestGenerateWorkflowTool:
         (tmp_path / "package.json").write_text(json.dumps({"name": "test"}))
 
         result = await tool.execute(
-            workflow_type="deploy",
-            deploy_target="npm",
-            dry_run=True
+            workflow_type="deploy", deploy_target="npm", dry_run=True
         )
 
         assert result.success
@@ -442,9 +393,7 @@ class TestGenerateWorkflowTool:
     async def test_generate_ghcr_deploy_workflow(self, tool, tmp_path):
         """Test generating GHCR deployment workflow."""
         result = await tool.execute(
-            workflow_type="deploy",
-            deploy_target="ghcr",
-            dry_run=True
+            workflow_type="deploy", deploy_target="ghcr", dry_run=True
         )
 
         assert result.success
@@ -455,9 +404,7 @@ class TestGenerateWorkflowTool:
     async def test_generate_heroku_deploy_workflow(self, tool, tmp_path):
         """Test generating Heroku deployment workflow."""
         result = await tool.execute(
-            workflow_type="deploy",
-            deploy_target="heroku",
-            dry_run=True
+            workflow_type="deploy", deploy_target="heroku", dry_run=True
         )
 
         assert result.success
@@ -467,10 +414,7 @@ class TestGenerateWorkflowTool:
     @pytest.mark.asyncio
     async def test_generate_release_workflow(self, tool, tmp_path):
         """Test generating release workflow."""
-        result = await tool.execute(
-            workflow_type="release",
-            dry_run=True
-        )
+        result = await tool.execute(workflow_type="release", dry_run=True)
 
         assert result.success
         assert "git-cliff" in result.output
@@ -483,7 +427,7 @@ class TestGenerateWorkflowTool:
             workflow_type="test",
             project_type="python",
             branches=["main", "develop", "release/*"],
-            dry_run=True
+            dry_run=True,
         )
 
         assert result.success
@@ -498,7 +442,7 @@ class TestGenerateWorkflowTool:
             workflow_type="test",
             project_type="python",
             include_coverage=False,
-            dry_run=True
+            dry_run=True,
         )
 
         assert result.success
@@ -511,7 +455,7 @@ class TestGenerateWorkflowTool:
             workflow_type="test",
             project_type="python",
             include_cache=False,
-            dry_run=True
+            dry_run=True,
         )
 
         assert result.success
@@ -523,10 +467,7 @@ class TestGenerateWorkflowTool:
         """Test that generate actually creates the workflow file."""
         (tmp_path / "pyproject.toml").write_text("[project]\nname = 'test'")
 
-        result = await tool.execute(
-            workflow_type="test",
-            dry_run=False
-        )
+        result = await tool.execute(workflow_type="test", dry_run=False)
 
         assert result.success
         workflow_file = tmp_path / ".github" / "workflows" / "test.yml"
@@ -538,9 +479,7 @@ class TestGenerateWorkflowTool:
     async def test_generate_creates_directory(self, tool, tmp_path):
         """Test that generate creates .github/workflows directory."""
         result = await tool.execute(
-            workflow_type="test",
-            project_type="python",
-            dry_run=False
+            workflow_type="test", project_type="python", dry_run=False
         )
 
         assert result.success
@@ -553,7 +492,7 @@ class TestGenerateWorkflowTool:
             workflow_type="test",
             project_type="python",
             output_file="ci/custom-test.yml",
-            dry_run=False
+            dry_run=False,
         )
 
         assert result.success
@@ -562,10 +501,7 @@ class TestGenerateWorkflowTool:
     @pytest.mark.asyncio
     async def test_generate_nonexistent_path(self, tool, tmp_path):
         """Test generating workflow for nonexistent path."""
-        result = await tool.execute(
-            workflow_type="test",
-            path="/nonexistent/path"
-        )
+        result = await tool.execute(workflow_type="test", path="/nonexistent/path")
 
         assert not result.success
         assert "does not exist" in result.error
@@ -892,7 +828,9 @@ class TestToolIntegration:
         assert "1/1 workflows valid" in val_result.output
 
     @pytest.mark.asyncio
-    async def test_generate_full_then_validate(self, generate_tool, validate_tool, tmp_path):
+    async def test_generate_full_then_validate(
+        self, generate_tool, validate_tool, tmp_path
+    ):
         """Test generating a full CI workflow and validating it."""
         # Create a Node.js project
         (tmp_path / "package.json").write_text(json.dumps({"name": "test"}))
@@ -916,14 +854,19 @@ class TestToolIntegration:
                 result = await generate_tool.execute(
                     workflow_type=workflow_type,
                     project_type=project_type,
-                    output_file=f".github/workflows/{project_type}-{workflow_type}.yml"
+                    output_file=f".github/workflows/{project_type}-{workflow_type}.yml",
                 )
-                assert result.success, f"Failed for {project_type}/{workflow_type}: {result.error}"
+                assert (
+                    result.success
+                ), f"Failed for {project_type}/{workflow_type}: {result.error}"
 
         # Validate all generated workflows
         val_result = await validate_tool.execute()
         assert val_result.success
-        assert f"{len(project_types) * len(workflow_types)}/{len(project_types) * len(workflow_types)} workflows valid" in val_result.output
+        assert (
+            f"{len(project_types) * len(workflow_types)}/{len(project_types) * len(workflow_types)} workflows valid"
+            in val_result.output
+        )
 
 
 class TestEdgeCases:
@@ -937,16 +880,15 @@ class TestEdgeCases:
     @pytest.mark.asyncio
     async def test_python_poetry_workflow(self, tool, tmp_path):
         """Test Python workflow uses poetry commands when detected."""
-        (tmp_path / "pyproject.toml").write_text("""
+        (tmp_path / "pyproject.toml").write_text(
+            """
 [tool.poetry]
 name = "test"
 version = "1.0.0"
-""")
-
-        result = await tool.execute(
-            workflow_type="test",
-            dry_run=True
+"""
         )
+
+        result = await tool.execute(workflow_type="test", dry_run=True)
 
         assert result.success
         assert "poetry" in result.output
@@ -958,7 +900,7 @@ version = "1.0.0"
             workflow_type="test",
             project_type="python",
             python_versions=[],  # Empty list
-            dry_run=True
+            dry_run=True,
         )
 
         # Should still work with defaults
@@ -971,7 +913,7 @@ version = "1.0.0"
             workflow_type="test",
             project_type="python",
             branches=["main", "feature/*", "release/**"],
-            dry_run=True
+            dry_run=True,
         )
 
         assert result.success
@@ -986,7 +928,7 @@ version = "1.0.0"
             workflow_type="test",
             project_type="python",
             include_coverage=True,
-            dry_run=True
+            dry_run=True,
         )
 
         # Without coverage
@@ -994,7 +936,7 @@ version = "1.0.0"
             workflow_type="test",
             project_type="python",
             include_coverage=False,
-            dry_run=True
+            dry_run=True,
         )
 
         assert result_with.success

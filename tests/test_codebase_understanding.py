@@ -10,7 +10,6 @@ from sindri.analysis.results import (
     DependencyInfo,
     ArchitectureInfo,
     StyleInfo,
-    ModuleInfo,
 )
 from sindri.analysis.dependencies import DependencyAnalyzer
 from sindri.analysis.architecture import ArchitectureDetector
@@ -19,6 +18,7 @@ from sindri.memory.codebase import CodebaseAnalyzer, CodebaseAnalysisStore
 
 
 # === Fixtures ===
+
 
 @pytest.fixture
 def temp_project():
@@ -35,7 +35,8 @@ def temp_project():
         core_dir = pkg_dir / "core"
         core_dir.mkdir()
         (core_dir / "__init__.py").write_text("")
-        (core_dir / "main.py").write_text('''"""Main module with entry point."""
+        (core_dir / "main.py").write_text(
+            '''"""Main module with entry point."""
 import asyncio
 from typing import Optional, List
 from mypackage.utils import helper
@@ -54,13 +55,15 @@ async def run(config: dict) -> Optional[str]:
 
 if __name__ == "__main__":
     asyncio.run(run({}))
-''')
+'''
+        )
 
         # Create utils module
         utils_dir = pkg_dir / "utils"
         utils_dir.mkdir()
         (utils_dir / "__init__.py").write_text("")
-        (utils_dir / "helper.py").write_text('''"""Helper utilities."""
+        (utils_dir / "helper.py").write_text(
+            '''"""Helper utilities."""
 import json
 from dataclasses import dataclass
 from typing import Any
@@ -78,13 +81,15 @@ async def process(data: dict) -> str:
 def format_output(result: Result) -> str:
     """Format result for output."""
     return f"{result.status}: {result.value}"
-''')
+'''
+        )
 
         # Create tests directory
         tests_dir = project_path / "tests"
         tests_dir.mkdir()
         (tests_dir / "__init__.py").write_text("")
-        (tests_dir / "test_main.py").write_text('''"""Tests for main module."""
+        (tests_dir / "test_main.py").write_text(
+            '''"""Tests for main module."""
 import pytest
 from mypackage.core.main import run
 
@@ -96,10 +101,12 @@ def sample_config():
 async def test_run(sample_config):
     result = await run(sample_config)
     assert result is not None
-''')
+'''
+        )
 
         # Create config files
-        (project_path / "pyproject.toml").write_text('''[project]
+        (project_path / "pyproject.toml").write_text(
+            """[project]
 name = "mypackage"
 version = "0.1.0"
 
@@ -111,7 +118,8 @@ line-length = 100
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-''')
+"""
+        )
         (project_path / "conftest.py").write_text('"""Pytest configuration."""\n')
 
         yield project_path
@@ -130,6 +138,7 @@ def temp_db():
 
 
 # === DependencyInfo Tests ===
+
 
 class TestDependencyInfo:
     """Tests for DependencyInfo dataclass."""
@@ -170,6 +179,7 @@ class TestDependencyInfo:
 
 
 # === ArchitectureInfo Tests ===
+
 
 class TestArchitectureInfo:
     """Tests for ArchitectureInfo dataclass."""
@@ -212,6 +222,7 @@ class TestArchitectureInfo:
 
 
 # === StyleInfo Tests ===
+
 
 class TestStyleInfo:
     """Tests for StyleInfo dataclass."""
@@ -258,6 +269,7 @@ class TestStyleInfo:
 
 
 # === CodebaseAnalysis Tests ===
+
 
 class TestCodebaseAnalysis:
     """Tests for CodebaseAnalysis dataclass."""
@@ -339,6 +351,7 @@ class TestCodebaseAnalysis:
 
 # === DependencyAnalyzer Tests ===
 
+
 class TestDependencyAnalyzer:
     """Tests for DependencyAnalyzer."""
 
@@ -389,6 +402,7 @@ class TestDependencyAnalyzer:
 
 # === ArchitectureDetector Tests ===
 
+
 class TestArchitectureDetector:
     """Tests for ArchitectureDetector."""
 
@@ -397,7 +411,13 @@ class TestArchitectureDetector:
         detector = ArchitectureDetector(str(temp_project))
         result = detector.analyze()
 
-        assert result.detected_pattern in ["layered", "modular", "flat", "mvc", "monolith"]
+        assert result.detected_pattern in [
+            "layered",
+            "modular",
+            "flat",
+            "mvc",
+            "monolith",
+        ]
         assert 0 <= result.confidence <= 1.0
 
     def test_analyze_finds_test_directories(self, temp_project):
@@ -422,17 +442,29 @@ class TestArchitectureDetector:
         result = detector.analyze()
 
         # Should detect pytest from test files
-        assert "pytest" in result.frameworks_detected or len(result.frameworks_detected) >= 0
+        assert (
+            "pytest" in result.frameworks_detected
+            or len(result.frameworks_detected) >= 0
+        )
 
     def test_analyze_detects_project_type(self, temp_project):
         """Test project type detection."""
         detector = ArchitectureDetector(str(temp_project))
         result = detector.analyze()
 
-        assert result.project_type in ["cli", "web_api", "web_app", "library", "microservice", "data_pipeline", "unknown"]
+        assert result.project_type in [
+            "cli",
+            "web_api",
+            "web_app",
+            "library",
+            "microservice",
+            "data_pipeline",
+            "unknown",
+        ]
 
 
 # === StyleAnalyzer Tests ===
+
 
 class TestStyleAnalyzer:
     """Tests for StyleAnalyzer."""
@@ -459,7 +491,13 @@ class TestStyleAnalyzer:
         result = analyzer.analyze()
 
         # Project uses Google-style docstrings
-        assert result.docstring_style in ["google", "numpy", "sphinx", "epytext", "unknown"]
+        assert result.docstring_style in [
+            "google",
+            "numpy",
+            "sphinx",
+            "epytext",
+            "unknown",
+        ]
 
     def test_analyze_detects_type_hints(self, temp_project):
         """Test type hint detection."""
@@ -504,6 +542,7 @@ class TestStyleAnalyzer:
 
 
 # === CodebaseAnalysisStore Tests ===
+
 
 class TestCodebaseAnalysisStore:
     """Tests for CodebaseAnalysisStore."""
@@ -574,7 +613,9 @@ class TestCodebaseAnalysisStore:
         store = CodebaseAnalysisStore(temp_db)
 
         store.store(CodebaseAnalysis(project_id="project1", primary_language="python"))
-        store.store(CodebaseAnalysis(project_id="project2", primary_language="typescript"))
+        store.store(
+            CodebaseAnalysis(project_id="project2", primary_language="typescript")
+        )
 
         projects = store.list_projects()
         assert len(projects) == 2
@@ -596,6 +637,7 @@ class TestCodebaseAnalysisStore:
 
 
 # === CodebaseAnalyzer Tests ===
+
 
 class TestCodebaseAnalyzer:
     """Tests for CodebaseAnalyzer."""
@@ -680,6 +722,7 @@ class TestCodebaseAnalyzer:
 
 # === Integration Tests ===
 
+
 class TestCodebaseUnderstandingIntegration:
     """Integration tests for codebase understanding."""
 
@@ -695,7 +738,13 @@ class TestCodebaseUnderstandingIntegration:
         assert analysis.primary_language == "python"
 
         # Check architecture detection
-        assert analysis.architecture.detected_pattern in ["layered", "modular", "flat", "mvc", "monolith"]
+        assert analysis.architecture.detected_pattern in [
+            "layered",
+            "modular",
+            "flat",
+            "mvc",
+            "monolith",
+        ]
 
         # Check style detection
         assert analysis.style.formatter == "black"

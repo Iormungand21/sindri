@@ -1,12 +1,11 @@
 """Tests for voice interface module (Phase 9.3)."""
 
 import pytest
-import pytest_asyncio
 import asyncio
 import tempfile
 import os
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from pathlib import Path
 
 from sindri.voice.stt import (
@@ -169,8 +168,8 @@ class TestSpeechToText:
         stt = SpeechToText()
 
         # Mock the import to fail
-        with patch.dict('sys.modules', {'faster_whisper': None}):
-            with patch('sindri.voice.stt.SpeechToText.load_model') as mock:
+        with patch.dict("sys.modules", {"faster_whisper": None}):
+            with patch("sindri.voice.stt.SpeechToText.load_model") as mock:
                 mock.return_value = False
                 result = await stt.load_model()
                 # Test would pass if faster-whisper not installed
@@ -196,11 +195,13 @@ class TestSpeechToText:
         stt._model = MagicMock()
         mock_result = TranscriptionResult(text="Test")
 
-        with patch.object(stt, 'transcribe_file', new_callable=AsyncMock) as mock_transcribe:
+        with patch.object(
+            stt, "transcribe_file", new_callable=AsyncMock
+        ) as mock_transcribe:
             mock_transcribe.return_value = mock_result
 
             # Create some dummy audio data
-            audio_data = b'\x00\x00' * 16000  # 1 second of silence
+            audio_data = b"\x00\x00" * 16000  # 1 second of silence
 
             result = await stt.transcribe_audio(audio_data)
 
@@ -309,9 +310,11 @@ class TestTextToSpeech:
         tts = TextToSpeech()
 
         # Mock engine detection
-        with patch.object(tts, '_detect_available_engines', new_callable=AsyncMock) as mock:
+        with patch.object(
+            tts, "_detect_available_engines", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = [TTSEngine.ESPEAK]
-            result = await tts.initialize()
+            await tts.initialize()
 
             # Should initialize even if requested engine not available
             assert mock.called
@@ -340,7 +343,9 @@ class TestTextToSpeech:
 
         try:
             # Mock subprocess
-            with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock:
+            with patch(
+                "asyncio.create_subprocess_exec", new_callable=AsyncMock
+            ) as mock:
                 mock.return_value.wait = AsyncMock(return_value=None)
                 mock.return_value.returncode = 0
 
@@ -449,6 +454,7 @@ class TestVoiceInterface:
 
     def test_voice_interface_init_custom(self):
         """Test VoiceInterface initialization with custom params."""
+
         def handler(text):
             return f"Response: {text}"
 
@@ -507,7 +513,7 @@ class TestVoiceInterface:
         """Test speak method delegates to TTS."""
         interface = VoiceInterface()
 
-        with patch.object(interface.tts, 'speak', new_callable=AsyncMock) as mock:
+        with patch.object(interface.tts, "speak", new_callable=AsyncMock) as mock:
             mock.return_value = True
             result = await interface.speak("Hello")
 
@@ -605,7 +611,7 @@ class TestVoiceIntegration:
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
             temp_path = f.name
             # Write minimal WAV header
-            f.write(b'RIFF' + b'\x00' * 36 + b'data' + b'\x00' * 4)
+            f.write(b"RIFF" + b"\x00" * 36 + b"data" + b"\x00" * 4)
 
         try:
             result = await stt.transcribe_file(temp_path)
@@ -621,9 +627,15 @@ class TestVoiceIntegration:
         interface = VoiceInterface()
 
         # Mock STT and TTS
-        with patch.object(interface.stt, 'load_model', new_callable=AsyncMock) as mock_stt:
-            with patch.object(interface.tts, 'initialize', new_callable=AsyncMock) as mock_tts:
-                with patch.object(interface.tts, 'speak', new_callable=AsyncMock) as mock_speak:
+        with patch.object(
+            interface.stt, "load_model", new_callable=AsyncMock
+        ) as mock_stt:
+            with patch.object(
+                interface.tts, "initialize", new_callable=AsyncMock
+            ) as mock_tts:
+                with patch.object(
+                    interface.tts, "speak", new_callable=AsyncMock
+                ) as mock_speak:
                     mock_stt.return_value = True
                     mock_tts.return_value = True
                     mock_speak.return_value = True
@@ -644,7 +656,9 @@ class TestVoiceIntegration:
         config = VoiceConfig(engine=TTSEngine.PIPER)  # Unlikely to be installed
         tts = TextToSpeech(config)
 
-        with patch.object(tts, '_detect_available_engines', new_callable=AsyncMock) as mock:
+        with patch.object(
+            tts, "_detect_available_engines", new_callable=AsyncMock
+        ) as mock:
             # Only espeak available
             mock.return_value = [TTSEngine.ESPEAK]
 
@@ -668,10 +682,12 @@ class TestVoiceIntegration:
         # Mock listen_once to return a turn
         mock_result = TranscriptionResult(text="test command")
 
-        with patch.object(interface.stt, 'record_and_transcribe', new_callable=AsyncMock) as mock:
+        with patch.object(
+            interface.stt, "record_and_transcribe", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = mock_result
 
-            with patch.object(interface.tts, 'speak', new_callable=AsyncMock):
+            with patch.object(interface.tts, "speak", new_callable=AsyncMock):
                 turn = await interface.listen_once()
 
                 if turn:  # May be None if STT not loaded
@@ -702,7 +718,9 @@ class TestVoiceErrorHandling:
         """Test TTS initialize with no available engines."""
         tts = TextToSpeech()
 
-        with patch.object(tts, '_detect_available_engines', new_callable=AsyncMock) as mock:
+        with patch.object(
+            tts, "_detect_available_engines", new_callable=AsyncMock
+        ) as mock:
             mock.return_value = []
 
             result = await tts.initialize()
@@ -713,7 +731,7 @@ class TestVoiceErrorHandling:
         """Test interface start with STT failure."""
         interface = VoiceInterface()
 
-        with patch.object(interface.stt, 'load_model', new_callable=AsyncMock) as mock:
+        with patch.object(interface.stt, "load_model", new_callable=AsyncMock) as mock:
             mock.return_value = False
 
             result = await interface.start()
@@ -724,8 +742,12 @@ class TestVoiceErrorHandling:
         """Test interface start with TTS failure."""
         interface = VoiceInterface()
 
-        with patch.object(interface.stt, 'load_model', new_callable=AsyncMock) as mock_stt:
-            with patch.object(interface.tts, 'initialize', new_callable=AsyncMock) as mock_tts:
+        with patch.object(
+            interface.stt, "load_model", new_callable=AsyncMock
+        ) as mock_stt:
+            with patch.object(
+                interface.tts, "initialize", new_callable=AsyncMock
+            ) as mock_tts:
                 mock_stt.return_value = True
                 mock_tts.return_value = False
 
@@ -764,7 +786,7 @@ class TestStreamTranscription:
         async def audio_generator():
             # Generate 3 seconds of "audio" (bytes)
             for _ in range(3):
-                yield b'\x00\x00' * 32000  # 2 seconds worth
+                yield b"\x00\x00" * 32000  # 2 seconds worth
                 await asyncio.sleep(0.01)
 
         results = []
@@ -790,12 +812,14 @@ class TestAudioPlayerDetection:
 
         # Create dummy audio file
         with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as f:
-            f.write(b'RIFF' + b'\x00' * 36)
+            f.write(b"RIFF" + b"\x00" * 36)
             temp_path = f.name
 
         try:
-            with patch('shutil.which') as mock_which:
-                with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock_exec:
+            with patch("shutil.which") as mock_which:
+                with patch(
+                    "asyncio.create_subprocess_exec", new_callable=AsyncMock
+                ) as mock_exec:
                     mock_which.return_value = "/usr/bin/aplay"
                     mock_exec.return_value.wait = AsyncMock(return_value=None)
                     mock_exec.return_value.returncode = 0
@@ -829,11 +853,13 @@ class TestVoiceListing:
         """Test listing espeak voices."""
         tts = TextToSpeech(VoiceConfig(engine=TTSEngine.ESPEAK))
 
-        with patch('asyncio.create_subprocess_exec', new_callable=AsyncMock) as mock:
-            mock.return_value.communicate = AsyncMock(return_value=(
-                b"Pty Language Age/Gender VoiceName\n 5  en-us  -  english-us\n",
-                b""
-            ))
+        with patch("asyncio.create_subprocess_exec", new_callable=AsyncMock) as mock:
+            mock.return_value.communicate = AsyncMock(
+                return_value=(
+                    b"Pty Language Age/Gender VoiceName\n 5  en-us  -  english-us\n",
+                    b"",
+                )
+            )
             mock.return_value.returncode = 0
 
             voices = await tts._list_espeak_voices()

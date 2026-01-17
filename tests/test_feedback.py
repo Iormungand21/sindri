@@ -6,7 +6,6 @@ Phase 9.4: Agent Fine-Tuning Infrastructure
 import json
 import pytest
 import tempfile
-from datetime import datetime
 from pathlib import Path
 
 from sindri.persistence.database import Database
@@ -54,7 +53,10 @@ async def create_sample_session(session_state) -> Session:
     """Create a sample session with turns (helper function)."""
     session = await session_state.create_session("Test coding task", "qwen2.5-coder:7b")
     session.add_turn("user", "Write a function to add two numbers")
-    session.add_turn("assistant", "Here's a function:\n```python\ndef add(a, b):\n    return a + b\n```")
+    session.add_turn(
+        "assistant",
+        "Here's a function:\n```python\ndef add(a, b):\n    return a + b\n```",
+    )
     session.add_turn("user", "Thanks!")
     session.iterations = 2
     await session_state.save_session(session)
@@ -530,16 +532,16 @@ class TestTrainingDataExporter:
             assert stats.sessions_exported == 1
 
     @pytest.mark.asyncio
-    async def test_export_with_tool_calls(
-        self, temp_db, session_state, feedback_store
-    ):
+    async def test_export_with_tool_calls(self, temp_db, session_state, feedback_store):
         """Test export includes tool calls when enabled."""
         session = await session_state.create_session("Test task", "model1")
         session.add_turn("user", "Read file")
         session.add_turn(
             "assistant",
             "Reading file",
-            tool_calls=[{"function": {"name": "read_file", "arguments": {"path": "test.py"}}}],
+            tool_calls=[
+                {"function": {"name": "read_file", "arguments": {"path": "test.py"}}}
+            ],
         )
         session.add_turn("tool", "File contents here")
         await session_state.save_session(session)
@@ -557,7 +559,7 @@ class TestTrainingDataExporter:
                 feedback_store=feedback_store,
             )
 
-            stats = await exporter.export_training_data(
+            await exporter.export_training_data(
                 output_path=output_path,
                 format=ExportFormat.JSONL,
                 include_tool_calls=True,
@@ -601,7 +603,7 @@ class TestTrainingDataExporter:
                 feedback_store=feedback_store,
             )
 
-            stats = await exporter.export_training_data(
+            await exporter.export_training_data(
                 output_path=output_path,
                 format=ExportFormat.JSONL,
                 include_tool_calls=False,

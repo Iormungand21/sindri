@@ -19,12 +19,9 @@ class ReadFileTool(Tool):
     parameters = {
         "type": "object",
         "properties": {
-            "path": {
-                "type": "string",
-                "description": "Path to the file to read"
-            }
+            "path": {"type": "string", "description": "Path to the file to read"}
         },
-        "required": ["path"]
+        "required": ["path"],
     }
 
     async def execute(self, path: str) -> ToolResult:
@@ -34,28 +31,29 @@ class ReadFileTool(Tool):
 
             if not file_path.exists():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"File not found: {path}"
+                    success=False, output="", error=f"File not found: {path}"
                 )
 
             async with aiofiles.open(file_path, "r") as f:
                 content = await f.read()
 
-            log.info("file_read", path=str(file_path), size=len(content), work_dir=str(self.work_dir) if self.work_dir else None)
+            log.info(
+                "file_read",
+                path=str(file_path),
+                size=len(content),
+                work_dir=str(self.work_dir) if self.work_dir else None,
+            )
 
             return ToolResult(
                 success=True,
                 output=content,
-                metadata={"path": str(file_path), "size": len(content)}
+                metadata={"path": str(file_path), "size": len(content)},
             )
 
         except Exception as e:
             log.error("file_read_error", path=path, error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to read file: {str(e)}"
+                success=False, output="", error=f"Failed to read file: {str(e)}"
             )
 
 
@@ -63,20 +61,19 @@ class WriteFileTool(Tool):
     """Write content to a file."""
 
     name = "write_file"
-    description = "Write content to a file at the given path, creating it if it doesn't exist"
+    description = (
+        "Write content to a file at the given path, creating it if it doesn't exist"
+    )
     parameters = {
         "type": "object",
         "properties": {
-            "path": {
-                "type": "string",
-                "description": "Path to the file to write"
-            },
+            "path": {"type": "string", "description": "Path to the file to write"},
             "content": {
                 "type": "string",
-                "description": "Content to write to the file"
-            }
+                "description": "Content to write to the file",
+            },
         },
-        "required": ["path", "content"]
+        "required": ["path", "content"],
     }
 
     async def execute(self, path: str, content: str) -> ToolResult:
@@ -90,20 +87,23 @@ class WriteFileTool(Tool):
             async with aiofiles.open(file_path, "w") as f:
                 await f.write(content)
 
-            log.info("file_written", path=str(file_path), size=len(content), work_dir=str(self.work_dir) if self.work_dir else None)
+            log.info(
+                "file_written",
+                path=str(file_path),
+                size=len(content),
+                work_dir=str(self.work_dir) if self.work_dir else None,
+            )
 
             return ToolResult(
                 success=True,
                 output=f"Successfully wrote {len(content)} bytes to {path}",
-                metadata={"path": str(file_path), "size": len(content)}
+                metadata={"path": str(file_path), "size": len(content)},
             )
 
         except Exception as e:
             log.error("file_write_error", path=path, error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to write file: {str(e)}"
+                success=False, output="", error=f"Failed to write file: {str(e)}"
             )
 
 
@@ -115,20 +115,14 @@ class EditFileTool(Tool):
     parameters = {
         "type": "object",
         "properties": {
-            "path": {
-                "type": "string",
-                "description": "Path to the file to edit"
-            },
+            "path": {"type": "string", "description": "Path to the file to edit"},
             "old_text": {
                 "type": "string",
-                "description": "Text to search for and replace"
+                "description": "Text to search for and replace",
             },
-            "new_text": {
-                "type": "string",
-                "description": "Text to replace with"
-            }
+            "new_text": {"type": "string", "description": "Text to replace with"},
         },
-        "required": ["path", "old_text", "new_text"]
+        "required": ["path", "old_text", "new_text"],
     }
 
     async def execute(self, path: str, old_text: str, new_text: str) -> ToolResult:
@@ -138,9 +132,7 @@ class EditFileTool(Tool):
 
             if not file_path.exists():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"File not found: {path}"
+                    success=False, output="", error=f"File not found: {path}"
                 )
 
             # Read current content
@@ -149,9 +141,7 @@ class EditFileTool(Tool):
 
             if old_text not in content:
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Text to replace not found in file"
+                    success=False, output="", error="Text to replace not found in file"
                 )
 
             # Replace and write back
@@ -160,20 +150,22 @@ class EditFileTool(Tool):
             async with aiofiles.open(file_path, "w") as f:
                 await f.write(new_content)
 
-            log.info("file_edited", path=str(file_path), work_dir=str(self.work_dir) if self.work_dir else None)
+            log.info(
+                "file_edited",
+                path=str(file_path),
+                work_dir=str(self.work_dir) if self.work_dir else None,
+            )
 
             return ToolResult(
                 success=True,
                 output=f"Successfully edited {path}",
-                metadata={"path": str(file_path)}
+                metadata={"path": str(file_path)},
             )
 
         except Exception as e:
             log.error("file_edit_error", path=path, error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to edit file: {str(e)}"
+                success=False, output="", error=f"Failed to edit file: {str(e)}"
             )
 
 
@@ -187,22 +179,22 @@ class ListDirectoryTool(Tool):
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Directory path to list (default: current directory)"
+                "description": "Directory path to list (default: current directory)",
             },
             "recursive": {
                 "type": "boolean",
-                "description": "List recursively (default: false)"
+                "description": "List recursively (default: false)",
             },
             "pattern": {
                 "type": "string",
-                "description": "Glob pattern filter (e.g., '*.py', '*.{js,ts}')"
+                "description": "Glob pattern filter (e.g., '*.py', '*.{js,ts}')",
             },
             "ignore_hidden": {
                 "type": "boolean",
-                "description": "Skip hidden files/directories (default: true)"
-            }
+                "description": "Skip hidden files/directories (default: true)",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
@@ -210,7 +202,7 @@ class ListDirectoryTool(Tool):
         path: str = ".",
         recursive: bool = False,
         pattern: str = None,
-        ignore_hidden: bool = True
+        ignore_hidden: bool = True,
     ) -> ToolResult:
         """List directory contents."""
         try:
@@ -218,16 +210,12 @@ class ListDirectoryTool(Tool):
 
             if not dir_path.exists():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Directory not found: {path}"
+                    success=False, output="", error=f"Directory not found: {path}"
                 )
 
             if not dir_path.is_dir():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Path is not a directory: {path}"
+                    success=False, output="", error=f"Path is not a directory: {path}"
                 )
 
             # Collect entries
@@ -236,7 +224,10 @@ class ListDirectoryTool(Tool):
             if recursive:
                 # Recursively walk the directory
                 for item in dir_path.rglob("*"):
-                    if ignore_hidden and any(part.startswith('.') for part in item.relative_to(dir_path).parts):
+                    if ignore_hidden and any(
+                        part.startswith(".")
+                        for part in item.relative_to(dir_path).parts
+                    ):
                         continue
                     if pattern and not fnmatch.fnmatch(item.name, pattern):
                         continue
@@ -244,7 +235,7 @@ class ListDirectoryTool(Tool):
             else:
                 # Just list immediate children
                 for item in dir_path.iterdir():
-                    if ignore_hidden and item.name.startswith('.'):
+                    if ignore_hidden and item.name.startswith("."):
                         continue
                     if pattern and not fnmatch.fnmatch(item.name, pattern):
                         continue
@@ -280,7 +271,7 @@ class ListDirectoryTool(Tool):
                 path=str(dir_path),
                 count=len(entries),
                 recursive=recursive,
-                work_dir=str(self.work_dir) if self.work_dir else None
+                work_dir=str(self.work_dir) if self.work_dir else None,
             )
 
             return ToolResult(
@@ -289,16 +280,14 @@ class ListDirectoryTool(Tool):
                 metadata={
                     "path": str(dir_path),
                     "count": len(entries),
-                    "recursive": recursive
-                }
+                    "recursive": recursive,
+                },
             )
 
         except Exception as e:
             log.error("directory_list_error", path=path, error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to list directory: {str(e)}"
+                success=False, output="", error=f"Failed to list directory: {str(e)}"
             )
 
 
@@ -312,25 +301,22 @@ class ReadTreeTool(Tool):
         "properties": {
             "path": {
                 "type": "string",
-                "description": "Root directory path (default: current directory)"
+                "description": "Root directory path (default: current directory)",
             },
             "max_depth": {
                 "type": "integer",
-                "description": "Maximum depth to traverse (default: 3)"
+                "description": "Maximum depth to traverse (default: 3)",
             },
             "ignore_hidden": {
                 "type": "boolean",
-                "description": "Skip hidden files/directories (default: true)"
-            }
+                "description": "Skip hidden files/directories (default: true)",
+            },
         },
-        "required": []
+        "required": [],
     }
 
     async def execute(
-        self,
-        path: str = ".",
-        max_depth: int = 3,
-        ignore_hidden: bool = True
+        self, path: str = ".", max_depth: int = 3, ignore_hidden: bool = True
     ) -> ToolResult:
         """Show directory tree."""
         try:
@@ -338,16 +324,12 @@ class ReadTreeTool(Tool):
 
             if not root_path.exists():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Directory not found: {path}"
+                    success=False, output="", error=f"Directory not found: {path}"
                 )
 
             if not root_path.is_dir():
                 return ToolResult(
-                    success=False,
-                    output="",
-                    error=f"Path is not a directory: {path}"
+                    success=False, output="", error=f"Path is not a directory: {path}"
                 )
 
             # Build tree structure
@@ -365,7 +347,7 @@ class ReadTreeTool(Tool):
                     # Get and sort entries
                     entries = list(dir_path.iterdir())
                     if ignore_hidden:
-                        entries = [e for e in entries if not e.name.startswith('.')]
+                        entries = [e for e in entries if not e.name.startswith(".")]
 
                     # Sort: directories first, then files, alphabetically
                     entries.sort(key=lambda p: (not p.is_dir(), p.name.lower()))
@@ -388,7 +370,9 @@ class ReadTreeTool(Tool):
                                 size_str = f"{size / 1024:.1f}KB"
                             else:
                                 size_str = f"{size / (1024 * 1024):.1f}MB"
-                            lines.append(f"{prefix}{connector}📄 {entry.name} ({size_str})")
+                            lines.append(
+                                f"{prefix}{connector}📄 {entry.name} ({size_str})"
+                            )
 
                 except PermissionError:
                     lines.append(f"{prefix}└── [Permission Denied]")
@@ -409,7 +393,7 @@ class ReadTreeTool(Tool):
                 dirs=total_dirs,
                 files=total_files,
                 depth=max_depth,
-                work_dir=str(self.work_dir) if self.work_dir else None
+                work_dir=str(self.work_dir) if self.work_dir else None,
             )
 
             return ToolResult(
@@ -419,14 +403,12 @@ class ReadTreeTool(Tool):
                     "path": str(root_path),
                     "directories": total_dirs,
                     "files": total_files,
-                    "max_depth": max_depth
-                }
+                    "max_depth": max_depth,
+                },
             )
 
         except Exception as e:
             log.error("tree_read_error", path=path, error=str(e))
             return ToolResult(
-                success=False,
-                output="",
-                error=f"Failed to read tree: {str(e)}"
+                success=False, output="", error=f"Failed to read tree: {str(e)}"
             )

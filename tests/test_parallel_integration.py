@@ -7,9 +7,9 @@ without requiring actual LLM responses (which are slow).
 import pytest
 import asyncio
 import time
-from unittest.mock import Mock, AsyncMock, patch
+from unittest.mock import Mock, patch
 
-from sindri.core.tasks import Task, TaskStatus
+from sindri.core.tasks import Task
 from sindri.core.scheduler import TaskScheduler
 from sindri.core.orchestrator import Orchestrator
 from sindri.llm.manager import ModelManager
@@ -83,8 +83,9 @@ class TestParallelBatchFormation:
     def test_dependency_prevents_batching(self, scheduler):
         """Tasks with dependencies shouldn't batch together."""
         task1 = Task(id="t1", description="First", assigned_agent="huginn")
-        task2 = Task(id="t2", description="Second", assigned_agent="skald",
-                     depends_on=["t1"])
+        task2 = Task(
+            id="t2", description="Second", assigned_agent="skald", depends_on=["t1"]
+        )
 
         scheduler.add_task(task1)
         scheduler.add_task(task2)
@@ -128,11 +129,7 @@ class TestParallelExecutionTiming:
             start = time.time()
             await asyncio.sleep(delay)
             end = time.time()
-            execution_times.append({
-                "task_id": task_id,
-                "start": start,
-                "end": end
-            })
+            execution_times.append({"task_id": task_id, "start": start, "end": end})
             return LoopResult(success=True, iterations=1, reason="test")
 
         # Run 3 tasks in parallel
@@ -140,7 +137,7 @@ class TestParallelExecutionTiming:
         results = await asyncio.gather(
             mock_task_runner("task1", 0.1),
             mock_task_runner("task2", 0.1),
-            mock_task_runner("task3", 0.1)
+            mock_task_runner("task3", 0.1),
         )
         total_time = time.time() - start_time
 
@@ -149,7 +146,9 @@ class TestParallelExecutionTiming:
 
         # Total time should be ~0.1s (parallel), not ~0.3s (sequential)
         # Allow some overhead
-        assert total_time < 0.25, f"Tasks took {total_time}s, expected ~0.1s for parallel"
+        assert (
+            total_time < 0.25
+        ), f"Tasks took {total_time}s, expected ~0.1s for parallel"
 
         # All tasks should have overlapping execution windows
         starts = [e["start"] for e in execution_times]
@@ -165,7 +164,7 @@ class TestOrchestratorParallelMode:
     @pytest.mark.asyncio
     async def test_orchestrator_run_accepts_parallel_flag(self):
         """Orchestrator.run() should accept parallel parameter."""
-        with patch('sindri.core.orchestrator.OllamaClient'):
+        with patch("sindri.core.orchestrator.OllamaClient"):
             orchestrator = Orchestrator(enable_memory=False)
 
             # Mock scheduler to return no work immediately
@@ -178,7 +177,7 @@ class TestOrchestratorParallelMode:
     @pytest.mark.asyncio
     async def test_orchestrator_run_parallel_false(self):
         """Orchestrator should work with parallel=False (legacy mode)."""
-        with patch('sindri.core.orchestrator.OllamaClient'):
+        with patch("sindri.core.orchestrator.OllamaClient"):
             orchestrator = Orchestrator(enable_memory=False)
 
             orchestrator.scheduler.has_work = Mock(return_value=False)

@@ -20,7 +20,9 @@ class Pattern:
 
     # When to use this pattern
     context: str = ""  # What kind of task this applies to
-    trigger_keywords: List[str] = field(default_factory=list)  # Keywords that suggest this pattern
+    trigger_keywords: List[str] = field(
+        default_factory=list
+    )  # Keywords that suggest this pattern
 
     # What the pattern contains
     approach: str = ""  # The approach/strategy used
@@ -102,7 +104,8 @@ class PatternStore:
     def _init_db(self) -> sqlite3.Connection:
         """Initialize database schema."""
         conn = sqlite3.connect(self.db_path)
-        conn.executescript("""
+        conn.executescript(
+            """
             CREATE TABLE IF NOT EXISTS patterns (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
@@ -125,7 +128,8 @@ class PatternStore:
             CREATE INDEX IF NOT EXISTS idx_patterns_agent ON patterns(agent);
             CREATE INDEX IF NOT EXISTS idx_patterns_project ON patterns(project_id);
             CREATE INDEX IF NOT EXISTS idx_patterns_context ON patterns(context);
-        """)
+        """
+        )
         conn.commit()
         return conn
 
@@ -171,7 +175,7 @@ class PatternStore:
                 pattern.success_count,
                 pattern.avg_iterations,
                 pattern.min_iterations,
-            )
+            ),
         )
         self.conn.commit()
         pattern_id = cursor.lastrowid
@@ -183,9 +187,8 @@ class PatternStore:
         # Merge success metrics
         total_successes = existing.success_count + 1
         new_avg = (
-            (existing.avg_iterations * existing.success_count + new.avg_iterations)
-            / total_successes
-        )
+            existing.avg_iterations * existing.success_count + new.avg_iterations
+        ) / total_successes
         new_min = min(existing.min_iterations or 999, new.min_iterations or 999)
         if new_min == 999:
             new_min = 0
@@ -208,13 +211,15 @@ class PatternStore:
                 new.example_task if new.example_task else None,
                 new.example_output if new.example_output else None,
                 existing.id,
-            )
+            ),
         )
         self.conn.commit()
-        log.info("pattern_updated",
-                pattern_id=existing.id,
-                name=existing.name,
-                success_count=total_successes)
+        log.info(
+            "pattern_updated",
+            pattern_id=existing.id,
+            name=existing.name,
+            success_count=total_successes,
+        )
         return existing.id
 
     def find_by_name_and_context(self, name: str, context: str) -> Optional[Pattern]:
@@ -228,7 +233,7 @@ class PatternStore:
             FROM patterns
             WHERE name = ? AND context = ?
             """,
-            (name, context)
+            (name, context),
         ).fetchone()
 
         return self._row_to_pattern(row) if row else None
@@ -238,7 +243,7 @@ class PatternStore:
         task_description: str,
         context: Optional[str] = None,
         project_id: Optional[str] = None,
-        limit: int = 5
+        limit: int = 5,
     ) -> List[Pattern]:
         """Find patterns relevant to a task.
 
@@ -273,7 +278,7 @@ class PatternStore:
 
         # Score by task relevance
         scored = []
-        task_words = set(task_description.lower().split())
+        set(task_description.lower().split())
 
         for pattern in patterns:
             score = pattern.matches_task(task_description)
@@ -303,7 +308,7 @@ class PatternStore:
             FROM patterns
             WHERE id = ?
             """,
-            (pattern_id,)
+            (pattern_id,),
         ).fetchone()
 
         return self._row_to_pattern(row) if row else None
@@ -320,7 +325,7 @@ class PatternStore:
             ORDER BY success_count DESC, last_used DESC NULLS LAST
             LIMIT ?
             """,
-            (limit,)
+            (limit,),
         ).fetchall()
 
         return [self._row_to_pattern(row) for row in rows]
@@ -333,10 +338,7 @@ class PatternStore:
 
     def delete(self, pattern_id: int) -> bool:
         """Delete a pattern by ID."""
-        cursor = self.conn.execute(
-            "DELETE FROM patterns WHERE id = ?",
-            (pattern_id,)
-        )
+        cursor = self.conn.execute("DELETE FROM patterns WHERE id = ?", (pattern_id,))
         self.conn.commit()
         deleted = cursor.rowcount > 0
         if deleted:

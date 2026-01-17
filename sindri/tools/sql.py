@@ -1,11 +1,9 @@
 """SQL tools for Fenrir agent."""
 
 import asyncio
-import json
 import re
 import sqlite3
-from pathlib import Path
-from typing import Optional, Any
+from typing import Optional
 import structlog
 
 from sindri.tools.base import Tool, ToolResult
@@ -52,7 +50,7 @@ def _format_table(headers: list[str], rows: list[tuple]) -> str:
             else:
                 s = str(val)
             if len(s) > w:
-                s = s[:w-3] + "..."
+                s = s[: w - 3] + "..."
             row_parts.append(s.ljust(w))
         lines.append(" | ".join(row_parts))
 
@@ -82,31 +80,28 @@ Results are limited to prevent memory issues."""
         "properties": {
             "database": {
                 "type": "string",
-                "description": "Path to SQLite database file"
+                "description": "Path to SQLite database file",
             },
-            "query": {
-                "type": "string",
-                "description": "SQL query to execute"
-            },
+            "query": {"type": "string", "description": "SQL query to execute"},
             "params": {
                 "type": "array",
                 "items": {"type": ["string", "number", "boolean", "null"]},
-                "description": "Query parameters for prepared statements (optional)"
+                "description": "Query parameters for prepared statements (optional)",
             },
             "allow_write": {
                 "type": "boolean",
-                "description": "Allow write operations (INSERT, UPDATE, DELETE). Default: false"
+                "description": "Allow write operations (INSERT, UPDATE, DELETE). Default: false",
             },
             "max_rows": {
                 "type": "integer",
-                "description": "Maximum rows to return (default: 100, max: 1000)"
+                "description": "Maximum rows to return (default: 100, max: 1000)",
             },
             "timeout": {
                 "type": "number",
-                "description": "Query timeout in seconds (default: 30)"
-            }
+                "description": "Query timeout in seconds (default: 30)",
+            },
         },
-        "required": ["database", "query"]
+        "required": ["database", "query"],
     }
 
     # Default limits
@@ -142,7 +137,7 @@ Results are limited to prevent memory issues."""
         allow_write: bool = False,
         max_rows: int = DEFAULT_MAX_ROWS,
         timeout: float = DEFAULT_TIMEOUT,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Execute SQL query.
 
@@ -167,7 +162,7 @@ Results are limited to prevent memory issues."""
                 success=False,
                 output="",
                 error=f"Database not found: {db_path}",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
 
         # Check write permission
@@ -176,7 +171,7 @@ Results are limited to prevent memory issues."""
                 success=False,
                 output="",
                 error="Write operations not allowed. Set allow_write=true to enable INSERT/UPDATE/DELETE/etc.",
-                metadata={"query_type": "write", "database": str(db_path)}
+                metadata={"query_type": "write", "database": str(db_path)},
             )
 
         # Cap max_rows
@@ -187,7 +182,7 @@ Results are limited to prevent memory issues."""
             database=str(db_path),
             query=query[:100],
             is_write=is_write,
-            max_rows=max_rows
+            max_rows=max_rows,
         )
 
         def _execute_in_thread():
@@ -218,7 +213,11 @@ Results are limited to prevent memory issues."""
                     if has_more:
                         rows = rows[:max_rows]
 
-                    headers = [desc[0] for desc in cursor.description] if cursor.description else []
+                    headers = (
+                        [desc[0] for desc in cursor.description]
+                        if cursor.description
+                        else []
+                    )
                     return {
                         "type": "select",
                         "headers": headers,
@@ -234,12 +233,14 @@ Results are limited to prevent memory issues."""
             loop = asyncio.get_event_loop()
             result = await asyncio.wait_for(
                 loop.run_in_executor(None, _execute_in_thread),
-                timeout=timeout + 5  # Give extra buffer for connection
+                timeout=timeout + 5,  # Give extra buffer for connection
             )
 
             # Format output
             if result["type"] == "write":
-                output = f"Write operation successful.\nRows affected: {result['rowcount']}"
+                output = (
+                    f"Write operation successful.\nRows affected: {result['rowcount']}"
+                )
                 if result["lastrowid"]:
                     output += f"\nLast inserted ID: {result['lastrowid']}"
                 metadata = {
@@ -259,25 +260,21 @@ Results are limited to prevent memory issues."""
                     "has_more": result["has_more"],
                 }
 
-            return ToolResult(
-                success=True,
-                output=output,
-                metadata=metadata
-            )
+            return ToolResult(success=True, output=output, metadata=metadata)
 
         except asyncio.TimeoutError:
             return ToolResult(
                 success=False,
                 output="",
                 error=f"Query timed out after {timeout} seconds",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
         except sqlite3.Error as e:
             return ToolResult(
                 success=False,
                 output="",
                 error=f"SQLite error: {str(e)}",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
         except Exception as e:
             log.error("sql_execute_error", error=str(e), database=str(db_path))
@@ -285,7 +282,7 @@ Results are limited to prevent memory issues."""
                 success=False,
                 output="",
                 error=f"Query execution failed: {str(e)}",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
 
 
@@ -310,22 +307,22 @@ Returns table names, column definitions, types, and constraints."""
         "properties": {
             "database": {
                 "type": "string",
-                "description": "Path to SQLite database file"
+                "description": "Path to SQLite database file",
             },
             "table": {
                 "type": "string",
-                "description": "Specific table to describe (optional, defaults to all tables)"
+                "description": "Specific table to describe (optional, defaults to all tables)",
             },
             "include_indexes": {
                 "type": "boolean",
-                "description": "Include index information (default: false)"
+                "description": "Include index information (default: false)",
             },
             "include_sql": {
                 "type": "boolean",
-                "description": "Include CREATE statements (default: false)"
-            }
+                "description": "Include CREATE statements (default: false)",
+            },
         },
-        "required": ["database"]
+        "required": ["database"],
     }
 
     async def execute(
@@ -334,7 +331,7 @@ Returns table names, column definitions, types, and constraints."""
         table: Optional[str] = None,
         include_indexes: bool = False,
         include_sql: bool = False,
-        **kwargs
+        **kwargs,
     ) -> ToolResult:
         """Get schema information.
 
@@ -354,7 +351,7 @@ Returns table names, column definitions, types, and constraints."""
                 success=False,
                 output="",
                 error=f"Database not found: {db_path}",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
 
         log.info("sql_describe_schema", database=str(db_path), table=table)
@@ -399,11 +396,13 @@ Returns table names, column definitions, types, and constraints."""
                     if fks:
                         table_info["foreign_keys"] = []
                         for fk in fks:
-                            table_info["foreign_keys"].append({
-                                "column": fk[3],
-                                "references_table": fk[2],
-                                "references_column": fk[4],
-                            })
+                            table_info["foreign_keys"].append(
+                                {
+                                    "column": fk[3],
+                                    "references_table": fk[2],
+                                    "references_column": fk[4],
+                                }
+                            )
 
                     # Get indexes if requested
                     if include_indexes:
@@ -415,17 +414,19 @@ Returns table names, column definitions, types, and constraints."""
                                 idx_name = idx[1]
                                 cursor.execute(f"PRAGMA index_info('{idx_name}')")
                                 idx_cols = cursor.fetchall()
-                                table_info["indexes"].append({
-                                    "name": idx_name,
-                                    "unique": bool(idx[2]),
-                                    "columns": [col[2] for col in idx_cols],
-                                })
+                                table_info["indexes"].append(
+                                    {
+                                        "name": idx_name,
+                                        "unique": bool(idx[2]),
+                                        "columns": [col[2] for col in idx_cols],
+                                    }
+                                )
 
                     # Get CREATE statement if requested
                     if include_sql:
                         cursor.execute(
                             "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
-                            (table_name,)
+                            (table_name,),
                         )
                         row = cursor.fetchone()
                         if row:
@@ -453,13 +454,17 @@ Returns table names, column definitions, types, and constraints."""
                     nullable = "NULL" if col["nullable"] else "NOT NULL"
                     default = f" DEFAULT {col['default']}" if col["default"] else ""
                     pk = " [PK]" if col["name"] in info.get("primary_key", []) else ""
-                    lines.append(f"  - {col['name']}: {col['type']} {nullable}{default}{pk}")
+                    lines.append(
+                        f"  - {col['name']}: {col['type']} {nullable}{default}{pk}"
+                    )
 
                 # Foreign keys
                 if info.get("foreign_keys"):
                     lines.append("\nForeign Keys:")
                     for fk in info["foreign_keys"]:
-                        lines.append(f"  - {fk['column']} -> {fk['references_table']}.{fk['references_column']}")
+                        lines.append(
+                            f"  - {fk['column']} -> {fk['references_table']}.{fk['references_column']}"
+                        )
 
                 # Indexes
                 if info.get("indexes"):
@@ -486,7 +491,7 @@ Returns table names, column definitions, types, and constraints."""
                     "database": str(db_path),
                     "table_count": len(schema["tables"]),
                     "tables": list(schema["tables"].keys()),
-                }
+                },
             )
 
         except sqlite3.Error as e:
@@ -494,7 +499,7 @@ Returns table names, column definitions, types, and constraints."""
                 success=False,
                 output="",
                 error=f"SQLite error: {str(e)}",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
         except Exception as e:
             log.error("sql_schema_error", error=str(e), database=str(db_path))
@@ -502,7 +507,7 @@ Returns table names, column definitions, types, and constraints."""
                 success=False,
                 output="",
                 error=f"Failed to get schema: {str(e)}",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
 
 
@@ -528,26 +533,19 @@ Useful for optimizing slow queries."""
         "properties": {
             "database": {
                 "type": "string",
-                "description": "Path to SQLite database file"
+                "description": "Path to SQLite database file",
             },
-            "query": {
-                "type": "string",
-                "description": "SQL query to analyze"
-            },
+            "query": {"type": "string", "description": "SQL query to analyze"},
             "detailed": {
                 "type": "boolean",
-                "description": "Include detailed byte-code output (default: false)"
-            }
+                "description": "Include detailed byte-code output (default: false)",
+            },
         },
-        "required": ["database", "query"]
+        "required": ["database", "query"],
     }
 
     async def execute(
-        self,
-        database: str,
-        query: str,
-        detailed: bool = False,
-        **kwargs
+        self, database: str, query: str, detailed: bool = False, **kwargs
     ) -> ToolResult:
         """Explain query execution plan.
 
@@ -566,7 +564,7 @@ Useful for optimizing slow queries."""
                 success=False,
                 output="",
                 error=f"Database not found: {db_path}",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
 
         log.info("sql_explain_query", database=str(db_path), query=query[:100])
@@ -582,12 +580,14 @@ Useful for optimizing slow queries."""
                 cursor.execute(f"EXPLAIN QUERY PLAN {query}")
                 plan_rows = cursor.fetchall()
                 for row in plan_rows:
-                    result["plan"].append({
-                        "id": row[0],
-                        "parent": row[1],
-                        "notused": row[2],
-                        "detail": row[3],
-                    })
+                    result["plan"].append(
+                        {
+                            "id": row[0],
+                            "parent": row[1],
+                            "notused": row[2],
+                            "detail": row[3],
+                        }
+                    )
 
                 # Get detailed bytecode if requested
                 if detailed:
@@ -623,15 +623,23 @@ Useful for optimizing slow queries."""
             hints = []
 
             if "SCAN" in plan_text and "INDEX" not in plan_text:
-                hints.append("- Full table scan detected. Consider adding an index on filtered columns.")
+                hints.append(
+                    "- Full table scan detected. Consider adding an index on filtered columns."
+                )
             if "SEARCH" in plan_text and "INDEX" in plan_text:
                 hints.append("- Using index for search (efficient).")
             if "COVERING INDEX" in plan_text:
-                hints.append("- Using covering index (very efficient - no table lookup needed).")
+                hints.append(
+                    "- Using covering index (very efficient - no table lookup needed)."
+                )
             if "TEMP B-TREE" in plan_text:
-                hints.append("- Creating temporary B-tree for sorting/grouping. Consider adding index if query is slow.")
+                hints.append(
+                    "- Creating temporary B-tree for sorting/grouping. Consider adding index if query is slow."
+                )
             if "CORRELATED SCALAR SUBQUERY" in plan_text:
-                hints.append("- Correlated subquery detected. Consider rewriting as JOIN for better performance.")
+                hints.append(
+                    "- Correlated subquery detected. Consider rewriting as JOIN for better performance."
+                )
             if not hints:
                 hints.append("- Query plan looks reasonable.")
 
@@ -655,7 +663,7 @@ Useful for optimizing slow queries."""
                     "plan_steps": len(explain_result["plan"]),
                     "uses_index": "INDEX" in plan_text,
                     "has_table_scan": "SCAN" in plan_text and "INDEX" not in plan_text,
-                }
+                },
             )
 
         except sqlite3.Error as e:
@@ -663,7 +671,7 @@ Useful for optimizing slow queries."""
                 success=False,
                 output="",
                 error=f"SQLite error: {str(e)}",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
         except Exception as e:
             log.error("sql_explain_error", error=str(e), database=str(db_path))
@@ -671,5 +679,5 @@ Useful for optimizing slow queries."""
                 success=False,
                 output="",
                 error=f"Failed to explain query: {str(e)}",
-                metadata={"database": str(db_path)}
+                metadata={"database": str(db_path)},
             )
