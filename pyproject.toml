@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "ruff", "mypy", "httpx"]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "ruff", "mypy", "httpx"]
 tui = ["textual>=0.89.0"]
 web = ["fastapi>=0.109.0", "uvicorn[standard]>=0.27.0"]
 voice = ["faster-whisper>=1.0.0", "pyttsx3>=2.90", "pyaudio>=0.2.14"]
