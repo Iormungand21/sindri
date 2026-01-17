@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Voice Interface
-**Test Status:** 1391 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (AST-Based Refactoring, Dependency Scanner)
+**Current State:** Production Ready with Dependency Scanner
+**Test Status:** 1449 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (AST-Based Refactoring, Docker Generator)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 1391 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1449 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -31,6 +31,42 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Dependency Scanner (2026-01-17)
+
+Added security vulnerability scanning for project dependencies:
+
+**Supported Ecosystems:**
+- Python: pip-audit (or safety as fallback)
+- Node.js: npm audit
+- Rust: cargo audit
+- Go: govulncheck
+
+**Scanning Features:**
+- `sindri scan` - Scan for vulnerabilities
+- `sindri scan --severity high` - Filter by minimum severity
+- `sindri scan --format json` - Output as JSON
+- `sindri scan --format sarif` - Output as SARIF (GitHub Security)
+- `sindri scan --fix` - Attempt automatic fixes
+- `sindri scan --outdated` - Also check for outdated packages
+
+**SBOM Generation:**
+- `sindri sbom` - Generate Software Bill of Materials
+- `sindri sbom --format cyclonedx` - CycloneDX format (default)
+- `sindri sbom --format spdx` - SPDX format
+- `sindri sbom --output sbom.json` - Save to file
+
+**Additional Commands:**
+- `sindri outdated` - Check for outdated packages only
+- `sindri security-status` - Check scanner availability
+
+**Tools Added:**
+- `scan_dependencies` - Vulnerability scanning tool
+- `generate_sbom` - SBOM generation tool
+- `check_outdated` - Outdated package detection tool
+
+**Files:** `sindri/tools/dependency_scanner.py`
+**Tests:** 58 new tests in test_dependency_scanner.py
 
 ### Voice Interface (2026-01-17)
 
@@ -157,7 +193,7 @@ GitHub Actions workflow generation and validation:
 | Idunn | Documentation | llama3.1:8b |
 | Vidar | Multi-lang Coder | codestral:22b |
 
-### Tools (32 total)
+### Tools (35 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Search:** search_code, find_symbol
@@ -168,6 +204,7 @@ GitHub Actions workflow generation and validation:
 **Refactoring:** rename_symbol, extract_function, inline_variable, move_file, batch_rename, split_file, merge_files
 **SQL:** execute_query, describe_schema, explain_query
 **CI/CD:** generate_workflow, validate_workflow
+**Security:** scan_dependencies, generate_sbom, check_outdated
 **Core:** shell, delegate
 
 ### Key Features
@@ -239,6 +276,13 @@ sindri voice                   # Start voice mode
 sindri say "Hello"             # Speak text
 sindri transcribe audio.wav    # Transcribe audio
 sindri voice-status            # Check dependencies
+
+# Security Scanning
+sindri scan                    # Scan for vulnerabilities
+sindri scan --severity high    # Filter by severity
+sindri sbom                    # Generate SBOM
+sindri outdated                # Check outdated packages
+sindri security-status         # Check scanner availability
 
 # Plugins
 sindri plugins list            # List plugins

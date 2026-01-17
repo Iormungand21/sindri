@@ -2951,6 +2951,225 @@ def voice_status():
     console.print("[dim]Install all voice dependencies with: pip install sindri[voice][/dim]")
 
 
+# ============================================
+# Phase 9.4: Security Scanning Commands
+# ============================================
+
+
+@cli.command("scan")
+@click.option("--path", "-p", type=click.Path(exists=True), help="Project path to scan")
+@click.option("--ecosystem", "-e", type=click.Choice(["python", "node", "rust", "go"]), help="Override ecosystem detection")
+@click.option("--severity", "-s", type=click.Choice(["low", "medium", "high", "critical"]), default="low", help="Minimum severity to report")
+@click.option("--format", "-f", "output_format", type=click.Choice(["text", "json", "sarif"]), default="text", help="Output format")
+@click.option("--include-dev/--no-dev", default=True, help="Include development dependencies")
+@click.option("--outdated", is_flag=True, help="Also check for outdated packages")
+@click.option("--fix", is_flag=True, help="Attempt to fix vulnerabilities automatically")
+def scan_dependencies(path: str, ecosystem: str, severity: str, output_format: str, include_dev: bool, outdated: bool, fix: bool):
+    """Scan project dependencies for security vulnerabilities.
+
+    Automatically detects project type and uses the appropriate scanner:
+    - Python: pip-audit (or safety)
+    - Node.js: npm audit
+    - Rust: cargo audit
+    - Go: govulncheck
+
+    Example:
+        sindri scan
+
+        sindri scan --path /project --severity high
+
+        sindri scan --format json --outdated
+
+        sindri scan --fix
+    """
+    from sindri.tools.dependency_scanner import ScanDependenciesTool
+    from pathlib import Path as P
+
+    async def do_scan():
+        tool = ScanDependenciesTool(work_dir=P(path).resolve() if path else None)
+
+        result = await tool.execute(
+            path=path or ".",
+            ecosystem=ecosystem,
+            min_severity=severity,
+            format=output_format,
+            include_dev=include_dev,
+            check_outdated=outdated,
+            fix=fix,
+        )
+
+        if result.success:
+            console.print(result.output)
+
+            # Show summary
+            meta = result.metadata
+            if meta.get("vulnerability_count", 0) > 0:
+                console.print()
+                if meta.get("critical", 0) > 0:
+                    console.print(f"[red bold]⚠ {meta['critical']} CRITICAL vulnerabilities found![/red bold]")
+                if meta.get("high", 0) > 0:
+                    console.print(f"[red]{meta['high']} high severity vulnerabilities[/red]")
+            else:
+                console.print("\n[green]✓ No vulnerabilities found[/green]")
+        else:
+            console.print(f"[red]✗ Scan failed: {result.error}[/red]")
+
+    asyncio.run(do_scan())
+
+
+@cli.command("sbom")
+@click.option("--path", "-p", type=click.Path(exists=True), help="Project path")
+@click.option("--format", "-f", "output_format", type=click.Choice(["cyclonedx", "spdx"]), default="cyclonedx", help="SBOM format")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--include-dev/--no-dev", default=True, help="Include development dependencies")
+def generate_sbom(path: str, output_format: str, output: str, include_dev: bool):
+    """Generate Software Bill of Materials (SBOM).
+
+    Creates a comprehensive list of all project dependencies in
+    CycloneDX or SPDX format.
+
+    Example:
+        sindri sbom
+
+        sindri sbom --format spdx --output sbom.json
+
+        sindri sbom --no-dev
+    """
+    from sindri.tools.dependency_scanner import GenerateSBOMTool
+    from pathlib import Path as P
+
+    async def do_sbom():
+        tool = GenerateSBOMTool(work_dir=P(path).resolve() if path else None)
+
+        result = await tool.execute(
+            path=path or ".",
+            format=output_format,
+            output=output,
+            include_dev=include_dev,
+        )
+
+        if result.success:
+            if output:
+                console.print(f"[green]✓ SBOM saved to {output}[/green]")
+                console.print(f"[dim]Format: {output_format}, Dependencies: {result.metadata.get('dependency_count', 0)}[/dim]")
+            else:
+                console.print(result.output)
+        else:
+            console.print(f"[red]✗ SBOM generation failed: {result.error}[/red]")
+
+    asyncio.run(do_sbom())
+
+
+@cli.command("outdated")
+@click.option("--path", "-p", type=click.Path(exists=True), help="Project path")
+@click.option("--include-dev/--no-dev", default=True, help="Include development dependencies")
+def check_outdated(path: str, include_dev: bool):
+    """Check for outdated dependencies.
+
+    Lists all packages that have newer versions available.
+
+    Example:
+        sindri outdated
+
+        sindri outdated --path /project --no-dev
+    """
+    from sindri.tools.dependency_scanner import CheckOutdatedTool
+    from pathlib import Path as P
+
+    async def do_check():
+        tool = CheckOutdatedTool(work_dir=P(path).resolve() if path else None)
+
+        result = await tool.execute(
+            path=path or ".",
+            include_dev=include_dev,
+        )
+
+        if result.success:
+            console.print(result.output)
+
+            meta = result.metadata
+            if meta.get("outdated_count", 0) > 0:
+                console.print(f"\n[yellow]⚠ {meta['outdated_count']} packages have updates available[/yellow]")
+        else:
+            console.print(f"[red]✗ Check failed: {result.error}[/red]")
+
+    asyncio.run(do_check())
+
+
+@cli.command("security-status")
+def security_status():
+    """Check security scanning tool availability.
+
+    Shows which vulnerability scanners are available on the system.
+    """
+    import shutil
+
+    console.print("[bold]🔒 Security Scanner Status[/bold]\n")
+
+    # Python scanners
+    console.print("[bold]Python:[/bold]")
+    if shutil.which("pip-audit"):
+        console.print("  [green]✓ pip-audit installed (recommended)[/green]")
+    else:
+        console.print("  [yellow]⚠ pip-audit not installed[/yellow]")
+        console.print("    [dim]Install with: pip install pip-audit[/dim]")
+
+    if shutil.which("safety"):
+        console.print("  [green]✓ safety installed (alternative)[/green]")
+    else:
+        console.print("  [dim]○ safety not installed (optional)[/dim]")
+
+    console.print()
+
+    # Node.js scanners
+    console.print("[bold]Node.js:[/bold]")
+    if shutil.which("npm"):
+        console.print("  [green]✓ npm available (npm audit)[/green]")
+    else:
+        console.print("  [red]✗ npm not found[/red]")
+        console.print("    [dim]Install Node.js to enable npm audit[/dim]")
+
+    console.print()
+
+    # Rust scanners
+    console.print("[bold]Rust:[/bold]")
+    if shutil.which("cargo"):
+        console.print("  [green]✓ cargo available[/green]")
+
+        # Check cargo-audit
+        import subprocess
+        try:
+            result = subprocess.run(["cargo", "audit", "--version"], capture_output=True, timeout=5)
+            if result.returncode == 0:
+                console.print("  [green]✓ cargo-audit installed[/green]")
+            else:
+                console.print("  [yellow]⚠ cargo-audit not installed[/yellow]")
+                console.print("    [dim]Install with: cargo install cargo-audit[/dim]")
+        except Exception:
+            console.print("  [yellow]⚠ cargo-audit not installed[/yellow]")
+            console.print("    [dim]Install with: cargo install cargo-audit[/dim]")
+    else:
+        console.print("  [dim]○ cargo not found (Rust not installed)[/dim]")
+
+    console.print()
+
+    # Go scanners
+    console.print("[bold]Go:[/bold]")
+    if shutil.which("go"):
+        console.print("  [green]✓ go available[/green]")
+
+        if shutil.which("govulncheck"):
+            console.print("  [green]✓ govulncheck installed[/green]")
+        else:
+            console.print("  [yellow]⚠ govulncheck not installed[/yellow]")
+            console.print("    [dim]Install with: go install golang.org/x/vuln/cmd/govulncheck@latest[/dim]")
+    else:
+        console.print("  [dim]○ go not found (Go not installed)[/dim]")
+
+    console.print()
+    console.print("[dim]Use 'sindri scan' to scan for vulnerabilities[/dim]")
+
+
 @cli.command()
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", "-p", default=8000, help="Port to listen on")
