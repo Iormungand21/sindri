@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **BatchRenameTool COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay + MoveFileTool + BatchRenameTool. **100% production ready.** 1064/1064 backend tests + 104 frontend tests passing (100%).
+**Current Status:** ✅ **SplitFileTool COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay + MoveFileTool + BatchRenameTool + SplitFileTool. **100% production ready.** 1092/1092 backend tests + 104 frontend tests passing (100%).
 
 ---
 
@@ -11,10 +11,10 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-16)
-- ✅ BatchRenameTool COMPLETE - Pattern-based batch file renaming with import updates
-- ✅ 1064/1064 backend tests + 104 frontend tests passing (100%)
+- ✅ SplitFileTool COMPLETE - Split large files into multiple smaller files with import updates
+- ✅ 1092/1092 backend tests + 104 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, Timeline View, Session Replay, MoveFileTool, **BatchRenameTool**
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, Timeline View, Session Replay, MoveFileTool, BatchRenameTool, **SplitFileTool**
 
 ### Try It Out
 ```bash
@@ -56,9 +56,10 @@ cd sindri/web/static && npm run build  # Build frontend
 - ~~**Session Replay:** Step-by-step replay of past sessions with tool call visualization~~ ✅ **COMPLETED!**
 - ~~**MoveFileTool:** Move/rename files with automatic import updates~~ ✅ **COMPLETED!**
 - ~~**BatchRenameTool:** Pattern-based batch file renaming with glob/regex~~ ✅ **COMPLETED!**
-- **Next:** CI/CD Integration, Remote Collaboration, SplitFileTool, MergeFilesTool
+- ~~**SplitFileTool:** Split large files into multiple smaller files~~ ✅ **COMPLETED!**
+- **Next:** CI/CD Integration, Remote Collaboration, MergeFilesTool
 
-**All core Web UI enhancements + MoveFileTool complete! 🎉**
+**All core multi-file refactoring patterns complete! 🎉**
 
 **Web UI Development:**
 ```bash

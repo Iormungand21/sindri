@@ -1749,3 +1749,690 @@ Examples:
                 i += 1
 
         return f"^{result}$"
+
+
+class SplitFileTool(Tool):
+    """Split a large file into multiple smaller files.
+
+    Supports splitting by:
+    - Classes: Each class goes to its own file
+    - Functions: Each top-level function goes to its own file
+    - Markers: Split at comment markers (e.g., # --- split: filename.py ---)
+    - Lines: Split at specified line numbers
+
+    Automatically updates imports across the codebase for the split files.
+    """
+
+    name = "split_file"
+    description = """Split a large file into multiple smaller files based on a splitting strategy.
+
+Splitting strategies:
+- classes: Each class becomes its own file (class Foo -> foo.py)
+- functions: Each top-level function becomes its own file
+- markers: Split at comment markers like "# --- split: filename.py ---"
+- lines: Split at specified line numbers into parts
+
+Examples:
+- split_file(file="src/models.py", strategy="classes") - Split each class to separate files
+- split_file(file="src/utils.py", strategy="functions", output_dir="src/utils/") - Split functions to a package
+- split_file(file="src/big.py", strategy="markers") - Split at marker comments
+- split_file(file="src/data.py", strategy="lines", lines=[50, 100, 150]) - Split at specific lines
+- split_file(file="src/all.py", strategy="classes", dry_run=true) - Preview split without applying"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "file": {
+                "type": "string",
+                "description": "Path to the file to split"
+            },
+            "strategy": {
+                "type": "string",
+                "enum": ["classes", "functions", "markers", "lines"],
+                "description": "Strategy for splitting: classes, functions, markers, or lines"
+            },
+            "output_dir": {
+                "type": "string",
+                "description": "Directory for split files (default: same directory as source file)"
+            },
+            "lines": {
+                "type": "array",
+                "items": {"type": "integer"},
+                "description": "Line numbers to split at (for 'lines' strategy)"
+            },
+            "marker": {
+                "type": "string",
+                "description": "Custom marker pattern (for 'markers' strategy, default: '# --- split: {filename} ---')"
+            },
+            "create_init": {
+                "type": "boolean",
+                "description": "Create __init__.py for Python packages (default: true)"
+            },
+            "update_imports": {
+                "type": "boolean",
+                "description": "Update imports in other files (default: true)"
+            },
+            "keep_original": {
+                "type": "boolean",
+                "description": "Keep original file with re-exports (default: true for backward compat)"
+            },
+            "dry_run": {
+                "type": "boolean",
+                "description": "Preview changes without applying them (default: false)"
+            }
+        },
+        "required": ["file", "strategy"]
+    }
+
+    # Directories to skip during import search
+    SKIP_DIRS = {
+        'node_modules', '__pycache__', '.git', '.svn', '.hg',
+        'dist', 'build', 'target', 'venv', '.venv', 'env',
+        '.tox', '.nox', '.pytest_cache', '.mypy_cache',
+        'coverage', '.coverage', 'htmlcov', '.eggs'
+    }
+
+    async def execute(
+        self,
+        file: str,
+        strategy: str,
+        output_dir: Optional[str] = None,
+        lines: Optional[list[int]] = None,
+        marker: Optional[str] = None,
+        create_init: bool = True,
+        update_imports: bool = True,
+        keep_original: bool = True,
+        dry_run: bool = False,
+        **kwargs
+    ) -> ToolResult:
+        """Execute file split operation."""
+        # Validate inputs
+        if strategy not in ["classes", "functions", "markers", "lines"]:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Invalid strategy: {strategy}. Must be one of: classes, functions, markers, lines"
+            )
+
+        if strategy == "lines" and (not lines or len(lines) == 0):
+            return ToolResult(
+                success=False,
+                output="",
+                error="Lines strategy requires 'lines' parameter with at least one line number"
+            )
+
+        # Resolve source file path
+        source_path = self._resolve_path(file)
+        if not source_path.exists():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"File not found: {file}"
+            )
+        if not source_path.is_file():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Not a file: {file}"
+            )
+
+        # Resolve output directory
+        if output_dir:
+            output_path = self._resolve_path(output_dir)
+        else:
+            output_path = source_path.parent
+
+        # Determine file language
+        ext = source_path.suffix.lower()
+        if ext == '.py':
+            lang = 'python'
+        elif ext in ['.ts', '.tsx', '.js', '.jsx', '.mjs']:
+            lang = 'javascript'
+        else:
+            lang = 'generic'
+
+        try:
+            # Read source file
+            async with aiofiles.open(source_path, 'r', encoding='utf-8') as f:
+                content = await f.read()
+
+            # Split the file based on strategy
+            if strategy == "classes":
+                splits = self._split_by_classes(content, source_path, lang)
+            elif strategy == "functions":
+                splits = self._split_by_functions(content, source_path, lang)
+            elif strategy == "markers":
+                splits = self._split_by_markers(content, marker or "# --- split: {filename} ---")
+            else:  # lines
+                splits = self._split_by_lines(content, lines or [], source_path)
+
+            if not splits:
+                return ToolResult(
+                    success=True,
+                    output=f"No {strategy} found to split in {file}",
+                    metadata={"files_created": 0, "strategy": strategy}
+                )
+
+            if len(splits) == 1:
+                return ToolResult(
+                    success=True,
+                    output=f"Only one {strategy[:-1] if strategy.endswith('s') else strategy} found. Nothing to split.",
+                    metadata={"files_created": 0, "strategy": strategy}
+                )
+
+            # Build results
+            results = {
+                "source_file": str(source_path),
+                "strategy": strategy,
+                "files_created": [],
+                "init_created": False,
+                "imports_updated": 0,
+                "files_with_import_updates": 0,
+                "dry_run": dry_run
+            }
+            output_lines = []
+
+            # Create output files
+            if not dry_run:
+                output_path.mkdir(parents=True, exist_ok=True)
+
+            for split in splits:
+                dest_file = output_path / split["filename"]
+                results["files_created"].append({
+                    "file": str(dest_file),
+                    "name": split.get("name", split["filename"]),
+                    "lines": split.get("lines", 0)
+                })
+
+                if dry_run:
+                    preview_content = split["content"][:200] + "..." if len(split["content"]) > 200 else split["content"]
+                    output_lines.append(f"  Would create: {dest_file}")
+                    output_lines.append(f"    Content preview ({split.get('lines', 'N/A')} lines):")
+                    for line in preview_content.split('\n')[:5]:
+                        output_lines.append(f"      {line}")
+                    if split["content"].count('\n') > 5:
+                        output_lines.append("      ...")
+                else:
+                    async with aiofiles.open(dest_file, 'w', encoding='utf-8') as f:
+                        await f.write(split["content"])
+                    output_lines.append(f"  Created: {dest_file}")
+
+            # Create __init__.py for Python packages
+            if lang == 'python' and create_init and output_path != source_path.parent:
+                init_content = self._generate_init_content(splits, source_path.stem)
+                init_file = output_path / "__init__.py"
+
+                if dry_run:
+                    output_lines.append(f"  Would create: {init_file}")
+                else:
+                    async with aiofiles.open(init_file, 'w', encoding='utf-8') as f:
+                        await f.write(init_content)
+                    output_lines.append(f"  Created: {init_file}")
+                    results["init_created"] = True
+
+            # Update imports in other files
+            if update_imports and not dry_run:
+                import_results = await self._update_imports_for_split(
+                    source_path, splits, output_path, self._resolve_path(".")
+                )
+                results["imports_updated"] = import_results["count"]
+                results["files_with_import_updates"] = len(import_results["files"])
+
+                if import_results["count"] > 0:
+                    output_lines.append(f"  Updated {import_results['count']} import(s) in {len(import_results['files'])} file(s)")
+
+            # Keep original file with re-exports for backward compatibility
+            if keep_original and not dry_run and lang == 'python':
+                reexport_content = self._generate_reexport_content(splits, output_path, source_path)
+                async with aiofiles.open(source_path, 'w', encoding='utf-8') as f:
+                    await f.write(reexport_content)
+                output_lines.append(f"  Updated original file with re-exports for backward compatibility")
+
+            # Build summary
+            action = "Would split" if dry_run else "Split"
+            summary = f"{action} {file} into {len(splits)} files using '{strategy}' strategy"
+            output_lines.insert(0, summary)
+            output_lines.insert(1, "")
+
+            log.info(
+                "file_split",
+                source=str(source_path),
+                strategy=strategy,
+                files_created=len(splits),
+                imports_updated=results["imports_updated"],
+                dry_run=dry_run,
+                work_dir=str(self.work_dir) if self.work_dir else None
+            )
+
+            return ToolResult(
+                success=True,
+                output="\n".join(output_lines),
+                metadata=results
+            )
+
+        except Exception as e:
+            log.error("split_file_error", error=str(e))
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Failed to split file: {str(e)}"
+            )
+
+    def _split_by_classes(self, content: str, source_path: Path, lang: str) -> list[dict]:
+        """Split content by class definitions."""
+        splits = []
+
+        if lang == 'python':
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                # Fall back to regex if AST parsing fails
+                return self._split_by_classes_regex(content, source_path, lang)
+
+            lines = content.splitlines(keepends=True)
+
+            # Collect imports at the top
+            imports = []
+            first_non_import_line = 0
+
+            for node in ast.iter_child_nodes(tree):
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    start = node.lineno - 1
+                    end = node.end_lineno or node.lineno
+                    imports.append(''.join(lines[start:end]))
+                    first_non_import_line = max(first_non_import_line, end)
+                elif not isinstance(node, ast.Expr) or not isinstance(node.value, ast.Constant):
+                    # Not a docstring or import
+                    break
+
+            import_block = ''.join(imports)
+
+            # Find all class definitions
+            for node in ast.iter_child_nodes(tree):
+                if isinstance(node, ast.ClassDef):
+                    # Get the class source code
+                    start = node.lineno - 1
+                    end = node.end_lineno or node.lineno
+                    class_content = ''.join(lines[start:end])
+
+                    # Generate filename
+                    filename = self._to_snake_case(node.name) + '.py'
+
+                    # Build complete file content
+                    full_content = import_block
+                    if import_block and not import_block.endswith('\n\n'):
+                        full_content += '\n\n' if import_block.endswith('\n') else '\n\n\n'
+                    full_content += class_content
+
+                    splits.append({
+                        "filename": filename,
+                        "name": node.name,
+                        "content": full_content,
+                        "lines": end - start
+                    })
+
+        elif lang == 'javascript':
+            # Use regex for JS/TS classes
+            return self._split_by_classes_regex(content, source_path, lang)
+
+        return splits
+
+    def _split_by_classes_regex(self, content: str, source_path: Path, lang: str) -> list[dict]:
+        """Split content by class definitions using regex (fallback)."""
+        splits = []
+
+        if lang == 'python':
+            # Match Python class definitions
+            pattern = r'^class\s+(\w+).*?(?=^class\s|\Z)'
+            import_pattern = r'^(?:from\s+.+\s+import\s+.+|import\s+.+)$'
+        else:
+            # Match JS/TS class definitions
+            pattern = r'^(?:export\s+)?class\s+(\w+).*?(?=^(?:export\s+)?class\s|\Z)'
+            import_pattern = r'^(?:import\s+.+|export\s+\{.+\}\s+from)'
+
+        # Extract imports
+        import_lines = []
+        for match in re.finditer(import_pattern, content, re.MULTILINE):
+            import_lines.append(match.group(0))
+        import_block = '\n'.join(import_lines)
+
+        # Find classes
+        for match in re.finditer(pattern, content, re.MULTILINE | re.DOTALL):
+            class_name = match.group(1)
+            class_content = match.group(0).strip()
+
+            filename = self._to_snake_case(class_name)
+            if lang == 'python':
+                filename += '.py'
+            else:
+                filename += '.ts' if source_path.suffix == '.ts' else '.js'
+
+            full_content = import_block + '\n\n' + class_content if import_block else class_content
+
+            splits.append({
+                "filename": filename,
+                "name": class_name,
+                "content": full_content,
+                "lines": class_content.count('\n') + 1
+            })
+
+        return splits
+
+    def _split_by_functions(self, content: str, source_path: Path, lang: str) -> list[dict]:
+        """Split content by top-level function definitions."""
+        splits = []
+
+        if lang == 'python':
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                return self._split_by_functions_regex(content, source_path, lang)
+
+            lines = content.splitlines(keepends=True)
+
+            # Collect imports
+            imports = []
+            for node in ast.iter_child_nodes(tree):
+                if isinstance(node, (ast.Import, ast.ImportFrom)):
+                    start = node.lineno - 1
+                    end = node.end_lineno or node.lineno
+                    imports.append(''.join(lines[start:end]))
+
+            import_block = ''.join(imports)
+
+            # Find all top-level function definitions
+            for node in ast.iter_child_nodes(tree):
+                if isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
+                    start = node.lineno - 1
+                    end = node.end_lineno or node.lineno
+
+                    # Include decorators
+                    if node.decorator_list:
+                        start = node.decorator_list[0].lineno - 1
+
+                    func_content = ''.join(lines[start:end])
+                    filename = node.name + '.py'
+
+                    full_content = import_block
+                    if import_block and not import_block.endswith('\n\n'):
+                        full_content += '\n\n' if import_block.endswith('\n') else '\n\n\n'
+                    full_content += func_content
+
+                    splits.append({
+                        "filename": filename,
+                        "name": node.name,
+                        "content": full_content,
+                        "lines": end - start
+                    })
+
+        elif lang == 'javascript':
+            return self._split_by_functions_regex(content, source_path, lang)
+
+        return splits
+
+    def _split_by_functions_regex(self, content: str, source_path: Path, lang: str) -> list[dict]:
+        """Split content by function definitions using regex (fallback)."""
+        splits = []
+
+        if lang == 'python':
+            pattern = r'^(?:@\w+.*?\n)*^(?:async\s+)?def\s+(\w+)\s*\([^)]*\).*?(?=^(?:@\w+.*?\n)*^(?:async\s+)?def\s|\Z)'
+            import_pattern = r'^(?:from\s+.+\s+import\s+.+|import\s+.+)$'
+        else:
+            pattern = r'^(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\([^)]*\).*?(?=^(?:export\s+)?(?:async\s+)?function\s|\Z)'
+            import_pattern = r'^(?:import\s+.+|export\s+\{.+\}\s+from)'
+
+        import_lines = []
+        for match in re.finditer(import_pattern, content, re.MULTILINE):
+            import_lines.append(match.group(0))
+        import_block = '\n'.join(import_lines)
+
+        for match in re.finditer(pattern, content, re.MULTILINE | re.DOTALL):
+            func_name = match.group(1)
+            func_content = match.group(0).strip()
+
+            filename = func_name
+            if lang == 'python':
+                filename += '.py'
+            else:
+                filename += '.ts' if source_path.suffix == '.ts' else '.js'
+
+            full_content = import_block + '\n\n' + func_content if import_block else func_content
+
+            splits.append({
+                "filename": filename,
+                "name": func_name,
+                "content": full_content,
+                "lines": func_content.count('\n') + 1
+            })
+
+        return splits
+
+    def _split_by_markers(self, content: str, marker_pattern: str) -> list[dict]:
+        """Split content at marker comments.
+
+        Marker format: # --- split: filename.py ---
+        or custom pattern with {filename} placeholder.
+        """
+        splits = []
+
+        # Build regex from marker pattern
+        escaped_pattern = re.escape(marker_pattern)
+        regex_pattern = escaped_pattern.replace(r'\{filename\}', r'([^\s]+)')
+        pattern = re.compile(regex_pattern, re.MULTILINE)
+
+        # Find all markers
+        markers = list(pattern.finditer(content))
+
+        if not markers:
+            return splits
+
+        lines = content.splitlines(keepends=True)
+
+        # Process each section
+        for i, match in enumerate(markers):
+            filename = match.group(1) if match.groups() else f"part_{i+1}.py"
+
+            # Find line number of marker
+            marker_pos = match.start()
+            marker_line = content[:marker_pos].count('\n')
+
+            # Find end of section (next marker or EOF)
+            if i + 1 < len(markers):
+                end_pos = markers[i + 1].start()
+                end_line = content[:end_pos].count('\n')
+            else:
+                end_line = len(lines)
+
+            # Extract content (skip the marker line itself)
+            section_lines = lines[marker_line + 1:end_line]
+            section_content = ''.join(section_lines).strip()
+
+            if section_content:
+                splits.append({
+                    "filename": filename,
+                    "name": Path(filename).stem,
+                    "content": section_content + '\n',
+                    "lines": len(section_lines)
+                })
+
+        return splits
+
+    def _split_by_lines(self, content: str, split_lines: list[int], source_path: Path) -> list[dict]:
+        """Split content at specified line numbers."""
+        splits = []
+        lines = content.splitlines(keepends=True)
+        total_lines = len(lines)
+
+        # Sort line numbers and add start/end
+        split_points = sorted(set([0] + split_lines + [total_lines]))
+
+        ext = source_path.suffix
+
+        for i in range(len(split_points) - 1):
+            start = split_points[i]
+            end = split_points[i + 1]
+
+            if start >= total_lines:
+                continue
+
+            section_content = ''.join(lines[start:end]).strip()
+
+            if section_content:
+                filename = f"{source_path.stem}_part{i + 1}{ext}"
+
+                splits.append({
+                    "filename": filename,
+                    "name": f"part_{i + 1}",
+                    "content": section_content + '\n',
+                    "lines": end - start
+                })
+
+        return splits
+
+    def _to_snake_case(self, name: str) -> str:
+        """Convert CamelCase to snake_case."""
+        # Insert underscore before uppercase letters
+        result = re.sub(r'(?<!^)(?=[A-Z])', '_', name)
+        return result.lower()
+
+    def _generate_init_content(self, splits: list[dict], original_name: str) -> str:
+        """Generate __init__.py content that re-exports split items."""
+        lines = [
+            f'"""Package created by splitting {original_name}."""',
+            ''
+        ]
+
+        # Import each split file's main item
+        for split in splits:
+            module_name = Path(split["filename"]).stem
+            item_name = split.get("name", module_name)
+            lines.append(f"from .{module_name} import {item_name}")
+
+        lines.append('')
+
+        # Generate __all__
+        all_items = [split.get("name", Path(split["filename"]).stem) for split in splits]
+        lines.append(f"__all__ = {all_items!r}")
+        lines.append('')
+
+        return '\n'.join(lines)
+
+    def _generate_reexport_content(self, splits: list[dict], output_dir: Path, source_path: Path) -> str:
+        """Generate content for original file with re-exports."""
+        lines = [
+            f'"""Re-exports from split modules for backward compatibility."""',
+            ''
+        ]
+
+        # Calculate relative import path
+        try:
+            rel_path = output_dir.relative_to(source_path.parent)
+            package_path = '.'.join(rel_path.parts)
+        except ValueError:
+            package_path = output_dir.name
+
+        # Re-export each item
+        for split in splits:
+            module_name = Path(split["filename"]).stem
+            item_name = split.get("name", module_name)
+            lines.append(f"from {package_path}.{module_name} import {item_name}")
+
+        lines.append('')
+
+        # Generate __all__
+        all_items = [split.get("name", Path(split["filename"]).stem) for split in splits]
+        lines.append(f"__all__ = {all_items!r}")
+        lines.append('')
+
+        return '\n'.join(lines)
+
+    async def _update_imports_for_split(
+        self,
+        source_path: Path,
+        splits: list[dict],
+        output_dir: Path,
+        search_root: Path
+    ) -> dict:
+        """Update imports in other files after splitting."""
+        results = {"files": [], "count": 0}
+
+        # Calculate old module path
+        try:
+            old_module = '.'.join(source_path.relative_to(search_root).with_suffix('').parts)
+        except ValueError:
+            old_module = source_path.stem
+
+        # Find all Python files
+        for file_path in search_root.rglob("*.py"):
+            if any(part in self.SKIP_DIRS for part in file_path.parts):
+                continue
+
+            if file_path.resolve() == source_path.resolve():
+                continue
+
+            count = await self._update_imports_in_file(
+                file_path, old_module, splits, output_dir, search_root
+            )
+
+            if count > 0:
+                results["files"].append(str(file_path))
+                results["count"] += count
+
+        return results
+
+    async def _update_imports_in_file(
+        self,
+        file_path: Path,
+        old_module: str,
+        splits: list[dict],
+        output_dir: Path,
+        search_root: Path
+    ) -> int:
+        """Update imports in a single file for split items."""
+        try:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = await f.read()
+        except Exception:
+            return 0
+
+        original_content = content
+        update_count = 0
+
+        # Calculate new package path
+        try:
+            new_package = '.'.join(output_dir.relative_to(search_root).parts)
+        except ValueError:
+            new_package = output_dir.name
+
+        # For each split item, update imports
+        for split in splits:
+            item_name = split.get("name", Path(split["filename"]).stem)
+            module_name = Path(split["filename"]).stem
+
+            # Pattern: from old_module import ItemName
+            pattern = re.compile(
+                rf'^(\s*from\s+){re.escape(old_module)}(\s+import\s+.*\b){re.escape(item_name)}(\b.*?)$',
+                re.MULTILINE
+            )
+
+            def replace_import(match):
+                # Check if this import contains the item
+                import_line = match.group(0)
+                if item_name not in import_line:
+                    return import_line
+
+                # Replace with new import
+                prefix = match.group(1)
+                return f"{prefix}{new_package}.{module_name} import {item_name}"
+
+            new_content, n = pattern.subn(replace_import, content)
+            if n > 0:
+                content = new_content
+                update_count += n
+
+        # Write changes if any
+        if update_count > 0 and content != original_content:
+            async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+                await f.write(content)
+
+        return update_count

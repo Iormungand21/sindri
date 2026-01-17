@@ -1,17 +1,17 @@
 # Sindri Project Status Report
-**Date:** 2026-01-16 (BatchRenameTool Feature)
-**Session:** Batch File Refactoring - BatchRenameTool Implementation
+**Date:** 2026-01-16 (SplitFileTool Feature)
+**Session:** Multi-File Refactoring - SplitFileTool Implementation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - BatchRenameTool Complete! 🎉
-**Just Completed:** BatchRenameTool for pattern-based batch file renaming ✓ (2026-01-16)
-**Test Status:** 1064/1064 backend tests + 104 frontend tests, **all passing (100%)** 🎉
-**Production Readiness:** 100% - Full batch file refactoring with pattern matching!
-**Next Priority:** 🎯 **Phase 9 Features** (CI/CD Integration, Remote Collaboration, SplitFileTool, MergeFilesTool)
+**Current State:** ✅ **PRODUCTION READY (100%)** - SplitFileTool Complete! 🎉
+**Just Completed:** SplitFileTool for splitting large files into multiple smaller files ✓ (2026-01-16)
+**Test Status:** 1092/1092 backend tests + 104 frontend tests, **all passing (100%)** 🎉
+**Production Readiness:** 100% - Complete multi-file refactoring suite!
+**Next Priority:** 🎯 **Phase 9 Features** (CI/CD Integration, Remote Collaboration, MergeFilesTool)
 
 ---
 
@@ -21,7 +21,55 @@
 
 ### What Was Just Completed ✅
 
-**BatchRenameTool (2026-01-16):**
+**SplitFileTool (2026-01-16):**
+
+Added comprehensive SplitFileTool for splitting large files into multiple smaller files:
+
+**Backend:**
+- New `SplitFileTool` class in `sindri/tools/refactoring.py`
+- Four splitting strategies: classes, functions, markers, lines
+- AST-based parsing for Python (accurate class/function detection)
+- Regex fallback for JavaScript/TypeScript
+- Automatic import updates across codebase
+- `__init__.py` generation for Python packages
+- Re-export generation for backward compatibility
+- Dry run mode for previewing changes
+
+**Splitting Strategies:**
+- `strategy="classes"` - Split each class to its own file (class Foo -> foo.py)
+- `strategy="functions"` - Split each top-level function to its own file
+- `strategy="markers"` - Split at comment markers like `# --- split: filename.py ---`
+- `strategy="lines"` - Split at specified line numbers
+
+**Features:**
+- `split_file(file="models.py", strategy="classes")` - Split each class to separate files
+- `split_file(file="utils.py", strategy="functions", output_dir="utils/")` - Split functions to a package
+- `split_file(file="big.py", strategy="markers")` - Split at marker comments
+- `split_file(file="data.py", strategy="lines", lines=[50, 100, 150])` - Split at specific lines
+- `split_file(..., create_init=true)` - Generate __init__.py with re-exports
+- `split_file(..., keep_original=true)` - Update original file with re-exports
+- `split_file(..., dry_run=true)` - Preview changes
+
+**Agent Integration:**
+- Added to **Brokkr** (orchestrator) tool list
+- Added to **Huginn** (coder) tool list
+- Total tools: 29 implemented
+
+**New Tests:**
+- 28 tests in `tests/test_split_file.py`
+- Test categories: Classes split, Functions split, Markers split, Lines split, Dry run, Init generation, Re-export generation, Error handling, Edge cases, Integration
+
+**Files Created:**
+- `tests/test_split_file.py` (~500 lines) - Comprehensive test coverage
+
+**Files Modified:**
+- `sindri/tools/refactoring.py` (+700 lines) - SplitFileTool implementation
+- `sindri/tools/registry.py` (+2 lines) - Tool registration
+- `sindri/agents/registry.py` (+2 lines) - Agent tool lists
+
+---
+
+**Previous: BatchRenameTool (2026-01-16):**
 
 Added comprehensive BatchRenameTool for renaming multiple files using patterns:
 
