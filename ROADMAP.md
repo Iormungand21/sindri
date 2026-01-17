@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 35 tools, 1449 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 11 agents, 38 tools, 1513 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 1449 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1513 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -74,7 +74,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - Voice Interface: Whisper STT, multi-engine TTS, wake word
 - Dependency Scanner: pip-audit, npm audit, cargo audit, govulncheck, SBOM
 
-**Total:** 1449 backend tests + 104 frontend tests (100% passing)
+**Total:** 1513 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -93,7 +93,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 |---------|-------------|--------|
 | AST-Based Refactoring | Tree-sitter for precise multi-language refactoring | Idea |
 | Dependency Scanner | OWASP/npm audit vulnerability detection | **Complete** |
-| Docker Generator | Auto-generate Dockerfile/docker-compose | Idea |
+| Docker Generator | Auto-generate Dockerfile/docker-compose | **Complete** |
 | API Spec Generator | OpenAPI from route definitions | Idea |
 | Coverage Visualization | Code coverage in Web UI | Idea |
 
@@ -154,6 +154,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Docker Generator (Dockerfile, docker-compose, validation) | +64 |
 | 2026-01-17 | Dependency Scanner (pip-audit, npm audit, cargo audit, SBOM) | +58 |
 | 2026-01-17 | Voice Interface (Whisper STT, multi-engine TTS) | +56 |
 | 2026-01-17 | Plugin Marketplace (install, search, update, uninstall) | +51 |

@@ -26,6 +26,7 @@ from sindri.tools.refactoring import RenameSymbolTool, ExtractFunctionTool, Inli
 from sindri.tools.sql import ExecuteQueryTool, DescribeSchemaTool, ExplainQueryTool
 from sindri.tools.cicd import GenerateWorkflowTool, ValidateWorkflowTool
 from sindri.tools.dependency_scanner import ScanDependenciesTool, GenerateSBOMTool, CheckOutdatedTool
+from sindri.tools.docker import GenerateDockerfileTool, GenerateDockerComposeTool, ValidateDockerfileTool
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -266,4 +267,7 @@ class ToolRegistry:
         registry.register(ScanDependenciesTool(work_dir=work_dir))
         registry.register(GenerateSBOMTool(work_dir=work_dir))
         registry.register(CheckOutdatedTool(work_dir=work_dir))
+        registry.register(GenerateDockerfileTool(work_dir=work_dir))
+        registry.register(GenerateDockerComposeTool(work_dir=work_dir))
+        registry.register(ValidateDockerfileTool(work_dir=work_dir))
         return registry

@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Dependency Scanner
-**Test Status:** 1449 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (AST-Based Refactoring, Docker Generator)
+**Current State:** Production Ready with Docker Generator
+**Test Status:** 1513 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (AST-Based Refactoring, API Spec Generator)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 1449 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1513 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -31,6 +31,33 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Docker Generator (2026-01-17)
+
+Added automatic Dockerfile and docker-compose.yml generation for projects:
+
+**Dockerfile Generation:**
+- `generate_dockerfile` tool - Auto-detect project type and generate optimized Dockerfile
+- Supports Python (pip/poetry), Node.js (npm/yarn/pnpm), Rust, and Go projects
+- Multi-stage builds for compiled languages (Rust, Go)
+- Alpine-based images option for smaller sizes
+- Automatic framework detection (Flask, FastAPI, Django, Next.js, Express)
+
+**Docker Compose Generation:**
+- `generate_docker_compose` tool - Generate docker-compose.yml with services
+- Supports services: postgres, mysql, mongodb, redis, rabbitmq, kafka, elasticsearch, nginx
+- Automatic environment variable configuration
+- Production-ready configurations with restart policies
+- Persistent volume mounting for data services
+
+**Dockerfile Validation:**
+- `validate_dockerfile` tool - Check for common issues and best practices
+- Validates FROM instruction, WORKDIR, USER, EXPOSE, HEALTHCHECK
+- Detects :latest tag usage, missing cleanup commands
+- Suggests pip --no-cache-dir, COPY vs ADD best practices
+
+**Files:** `sindri/tools/docker.py`
+**Tests:** 64 new tests in test_docker.py
 
 ### Dependency Scanner (2026-01-17)
 
@@ -193,7 +220,7 @@ GitHub Actions workflow generation and validation:
 | Idunn | Documentation | llama3.1:8b |
 | Vidar | Multi-lang Coder | codestral:22b |
 
-### Tools (35 total)
+### Tools (38 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Search:** search_code, find_symbol
@@ -205,6 +232,7 @@ GitHub Actions workflow generation and validation:
 **SQL:** execute_query, describe_schema, explain_query
 **CI/CD:** generate_workflow, validate_workflow
 **Security:** scan_dependencies, generate_sbom, check_outdated
+**Docker:** generate_dockerfile, generate_docker_compose, validate_dockerfile
 **Core:** shell, delegate
 
 ### Key Features
