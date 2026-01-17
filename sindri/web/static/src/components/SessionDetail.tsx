@@ -7,9 +7,10 @@ import { useParams, Link } from 'react-router-dom'
 import { useSession, useFileChanges } from '../hooks/useApi'
 import { CodeDiffViewer } from './CodeDiffViewer'
 import { TimelineView } from './TimelineView'
+import { SessionReplay } from './SessionReplay'
 import type { Turn } from '../types/api'
 
-type TabId = 'conversation' | 'files' | 'timeline'
+type TabId = 'conversation' | 'files' | 'timeline' | 'replay'
 
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -142,6 +143,16 @@ export function SessionDetail() {
           >
             📊 Timeline
           </button>
+          <button
+            onClick={() => setActiveTab('replay')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'replay'
+                ? 'border-forge-500 text-forge-400'
+                : 'border-transparent text-sindri-400 hover:text-sindri-200'
+            }`}
+          >
+            ▶️ Replay
+          </button>
         </div>
       </div>
 
@@ -184,6 +195,19 @@ export function SessionDetail() {
           <TimelineView
             turns={session.turns ?? []}
             fileChanges={fileChanges?.file_changes ?? null}
+            sessionStart={new Date(session.created_at)}
+            sessionEnd={session.completed_at ? new Date(session.completed_at) : null}
+          />
+        </div>
+      )}
+
+      {activeTab === 'replay' && (
+        <div className="card p-4">
+          <h2 className="text-lg font-semibold text-sindri-100 mb-4">
+            Session Replay
+          </h2>
+          <SessionReplay
+            turns={session.turns ?? []}
             sessionStart={new Date(session.created_at)}
             sessionEnd={session.completed_at ? new Date(session.completed_at) : null}
           />
