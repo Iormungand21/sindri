@@ -1,17 +1,17 @@
 # Sindri Project Status Report
-**Date:** 2026-01-17 (CI/CD Integration)
-**Session:** Phase 9.3 - CI/CD Integration Tools
+**Date:** 2026-01-17 (Agent Fine-Tuning)
+**Session:** Phase 9.4 - Agent Fine-Tuning Infrastructure
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - CI/CD Integration Complete! 🎉
-**Just Completed:** GenerateWorkflowTool + ValidateWorkflowTool for GitHub Actions ✓ (2026-01-17)
-**Test Status:** 1183/1183 backend tests + 104 frontend tests, **all passing (100%)** 🎉
-**Production Readiness:** 100% - Full CI/CD workflow generation for Python, Node.js, Rust, Go!
-**Next Priority:** 🎯 **Phase 9 Features** (Remote Collaboration, Agent Fine-Tuning)
+**Current State:** ✅ **PRODUCTION READY (100%)** - Agent Fine-Tuning Infrastructure Complete! 🎉
+**Just Completed:** Feedback Collection + Training Data Export for LLM fine-tuning ✓ (2026-01-17)
+**Test Status:** 1219/1219 backend tests + 104 frontend tests, **all passing (100%)** 🎉
+**Production Readiness:** 100% - Complete fine-tuning pipeline with JSONL/ChatML/Ollama export!
+**Next Priority:** 🎯 **Phase 9 Features** (Remote Collaboration, Voice Interface)
 
 ---
 
@@ -21,7 +21,55 @@
 
 ### What Was Just Completed ✅
 
-**CI/CD Integration Tools (2026-01-17):**
+**Agent Fine-Tuning Infrastructure (2026-01-17):**
+
+Added comprehensive feedback collection and training data export system for fine-tuning local LLMs:
+
+**Backend:**
+- New `SessionFeedback` dataclass in `sindri/persistence/feedback.py`
+- New `FeedbackStore` class for feedback persistence
+- New `TrainingDataExporter` class in `sindri/persistence/training_export.py`
+- Database schema v3 with `session_feedback` table
+- Quality tags for categorizing feedback (correct, efficient, hallucinated, etc.)
+- Support for session-level and turn-level feedback
+
+**Export Formats:**
+- JSONL: OpenAI-style fine-tuning format
+- ChatML: Chat Markup Language format
+- Ollama: Modelfile MESSAGE directives
+
+**CLI Commands:**
+- `sindri feedback <session_id> <rating>` - Rate a session (1-5 stars)
+- `sindri feedback-stats` - View feedback statistics
+- `sindri feedback-list` - List rated sessions
+- `sindri export-training <output>` - Export training data
+
+**Features:**
+- `sindri feedback abc12345 5 -n "Perfect solution"` - Add 5-star feedback
+- `sindri feedback abc12345 4 -t correct -t efficient` - Add with quality tags
+- `sindri feedback abc12345 2 --turn 3 -t wrong_tool` - Rate specific turn
+- `sindri export-training training.jsonl` - Export JSONL format
+- `sindri export-training data.chatml -f chatml` - Export ChatML format
+- `sindri export-training ollama.txt -f ollama` - Export Ollama format
+- `sindri export-training data.jsonl --min-rating 5` - Only 5-star sessions
+- `sindri export-training huginn.jsonl --agent qwen2.5-coder` - Filter by agent
+
+**New Tests:**
+- 36 tests in `tests/test_feedback.py`
+- Test categories: SessionFeedback (7), QualityTag (3), FeedbackStore (14), TrainingDataExporter (7), ExportStats (2), GenerateModelfile (1), Integration (2)
+
+**Files Created:**
+- `sindri/persistence/feedback.py` (~400 lines) - Feedback dataclass and store
+- `sindri/persistence/training_export.py` (~350 lines) - Training data export
+- `tests/test_feedback.py` (~500 lines) - Comprehensive test coverage
+
+**Files Modified:**
+- `sindri/persistence/database.py` (+30 lines) - Schema v3 with feedback table
+- `sindri/cli.py` (+300 lines) - Four new CLI commands
+
+---
+
+**Previous: CI/CD Integration Tools (2026-01-17):**
 
 Added comprehensive CI/CD integration with GitHub Actions workflow generation and validation:
 

@@ -10,7 +10,8 @@ log = structlog.get_logger()
 
 # Current schema version for migration tracking
 # Version 2: Added session_metrics table for performance tracking
-SCHEMA_VERSION = 2
+# Version 3: Added session_feedback table for feedback collection and fine-tuning
+SCHEMA_VERSION = 3
 
 
 class Database:
@@ -119,6 +120,31 @@ class Database:
                     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (session_id) REFERENCES sessions(id)
                 )
+            """)
+
+            # Phase 9.4: Session feedback for fine-tuning
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS session_feedback (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    turn_index INTEGER,
+                    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+                    quality_tags TEXT,
+                    notes TEXT,
+                    include_in_training INTEGER DEFAULT 1,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """)
+
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_feedback_session
+                ON session_feedback(session_id)
+            """)
+
+            await db.execute("""
+                CREATE INDEX IF NOT EXISTS idx_feedback_rating
+                ON session_feedback(rating)
             """)
 
             # Update schema version

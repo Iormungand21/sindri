@@ -1419,6 +1419,309 @@ def projects_stats():
 
 
 @cli.command()
+@click.argument("session_id")
+@click.argument("rating", type=click.IntRange(1, 5))
+@click.option("--notes", "-n", help="Optional notes about the session")
+@click.option("--tag", "-t", multiple=True, help="Quality tags (can repeat)")
+@click.option("--turn", type=int, help="Rate specific turn index instead of whole session")
+@click.option("--exclude-training", is_flag=True, help="Exclude from training data export")
+def feedback(session_id: str, rating: int, notes: str = None, tag: tuple = None, turn: int = None, exclude_training: bool = False):
+    """Add feedback rating to a session (1-5 stars).
+
+    SESSION_ID can be the full UUID or first 8 characters.
+    RATING is 1-5 (1=poor, 5=excellent).
+
+    Quality tags: correct, efficient, well_explained, followed_instructions,
+    good_tool_use, creative, incorrect, inefficient, poor_explanation,
+    ignored_instructions, wrong_tool, verbose, hallucinated, partial, needed_guidance
+
+    Examples:
+
+        sindri feedback abc12345 5 -n "Perfect solution"
+
+        sindri feedback abc12345 4 -t correct -t efficient
+
+        sindri feedback abc12345 2 --turn 3 -t wrong_tool
+    """
+    from sindri.persistence.feedback import SessionFeedback, FeedbackStore
+
+    async def do_feedback():
+        state = SessionState()
+        feedback_store = FeedbackStore()
+
+        # Resolve short session ID
+        full_session_id = session_id
+        if len(session_id) < 36:
+            all_sessions = await state.list_sessions(limit=100)
+            matching = [s for s in all_sessions if s["id"].startswith(session_id)]
+
+            if not matching:
+                console.print(f"[red]✗ No session found starting with {session_id}[/]")
+                console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
+                return False
+            elif len(matching) > 1:
+                console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
+                for m in matching:
+                    console.print(f"  • {m['id'][:8]} - {m['task'][:50]}")
+                console.print("[dim]Use more characters to be specific[/dim]")
+                return False
+
+            full_session_id = matching[0]["id"]
+
+        # Verify session exists
+        session = await state.load_session(full_session_id)
+        if not session:
+            console.print(f"[red]✗ Session {full_session_id} not found[/]")
+            return False
+
+        # Validate turn index if provided
+        if turn is not None:
+            if turn < 0 or turn >= len(session.turns):
+                console.print(f"[red]✗ Invalid turn index {turn}. Session has {len(session.turns)} turns (0-{len(session.turns)-1})[/]")
+                return False
+
+        # Create feedback
+        fb = SessionFeedback(
+            session_id=full_session_id,
+            rating=rating,
+            turn_index=turn,
+            quality_tags=list(tag) if tag else [],
+            notes=notes,
+            include_in_training=not exclude_training,
+        )
+
+        await feedback_store.add_feedback(fb)
+
+        # Display confirmation
+        stars = "⭐" * rating + "☆" * (5 - rating)
+        console.print(f"[green]✓ Feedback added for session {full_session_id[:8]}[/]")
+        console.print(f"  Rating: {stars} ({rating}/5)")
+        if turn is not None:
+            console.print(f"  Turn: {turn}")
+        if tag:
+            console.print(f"  Tags: {', '.join(tag)}")
+        if notes:
+            console.print(f"  Notes: {notes[:50]}...")
+        if exclude_training:
+            console.print(f"  [dim]Excluded from training export[/dim]")
+
+        return True
+
+    asyncio.run(do_feedback())
+
+
+@cli.command("feedback-stats")
+def feedback_stats():
+    """Show feedback statistics and training data readiness.
+
+    Displays aggregate statistics about collected feedback including:
+    - Total feedback entries
+    - Sessions with feedback
+    - Rating distribution
+    - Training data candidates (4+ star sessions)
+    - Most common quality tags
+    """
+    from sindri.persistence.feedback import FeedbackStore
+
+    async def show_stats():
+        store = FeedbackStore()
+        stats = await store.get_feedback_stats()
+
+        if stats["total_feedback"] == 0:
+            console.print("[yellow]No feedback collected yet[/]")
+            console.print("[dim]Use 'sindri feedback <session_id> <rating>' to add feedback[/dim]")
+            return
+
+        console.print("[bold]📊 Feedback Statistics[/bold]\n")
+
+        console.print(f"  Total feedback entries: {stats['total_feedback']}")
+        console.print(f"  Sessions with feedback: {stats['sessions_with_feedback']}")
+        console.print(f"  Average rating: {stats['average_rating']:.1f}/5")
+        console.print(f"  Training candidates (4+ stars): [green]{stats['training_candidates']}[/green]")
+
+        # Rating distribution
+        if stats["rating_distribution"]:
+            console.print("\n[bold]Rating Distribution:[/bold]")
+            for rating in range(5, 0, -1):
+                count = stats["rating_distribution"].get(rating, 0)
+                bar = "█" * count + "░" * (10 - min(count, 10))
+                stars = "⭐" * rating + "☆" * (5 - rating)
+                console.print(f"  {stars} [{bar}] {count}")
+
+        # Top quality tags
+        if stats["top_quality_tags"]:
+            console.print("\n[bold]Top Quality Tags:[/bold]")
+            for tag, count in list(stats["top_quality_tags"].items())[:5]:
+                console.print(f"  • {tag}: {count}")
+
+        console.print("\n[dim]Export training data: sindri export-training output.jsonl[/dim]")
+
+    asyncio.run(show_stats())
+
+
+@cli.command("export-training")
+@click.argument("output", type=click.Path())
+@click.option("--format", "-f", type=click.Choice(["jsonl", "chatml", "ollama"]), default="jsonl", help="Export format")
+@click.option("--min-rating", "-r", default=4, type=click.IntRange(1, 5), help="Minimum rating to include")
+@click.option("--max-sessions", "-m", default=1000, type=int, help="Maximum sessions to export")
+@click.option("--no-system-prompt", is_flag=True, help="Exclude system prompts")
+@click.option("--no-tools", is_flag=True, help="Exclude tool calls and results")
+@click.option("--agent", "-a", help="Export only sessions for specific agent/model")
+def export_training(output: str, format: str, min_rating: int, max_sessions: int, no_system_prompt: bool, no_tools: bool, agent: str = None):
+    """Export high-quality sessions for LLM fine-tuning.
+
+    Exports sessions rated 4+ stars in formats suitable for fine-tuning:
+    - jsonl: OpenAI fine-tuning format
+    - chatml: Chat Markup Language format
+    - ollama: Ollama Modelfile MESSAGE format
+
+    Examples:
+
+        sindri export-training training.jsonl
+
+        sindri export-training data.jsonl --min-rating 5
+
+        sindri export-training ollama.txt -f ollama
+
+        sindri export-training huginn.jsonl --agent qwen2.5-coder
+    """
+    from pathlib import Path
+    from sindri.persistence.training_export import TrainingDataExporter, ExportFormat
+
+    async def do_export():
+        exporter = TrainingDataExporter()
+        output_path = Path(output)
+
+        # Map format string to enum
+        format_map = {
+            "jsonl": ExportFormat.JSONL,
+            "chatml": ExportFormat.CHATML,
+            "ollama": ExportFormat.OLLAMA,
+        }
+        export_format = format_map[format]
+
+        console.print(f"[bold]📦 Exporting Training Data[/bold]\n")
+        console.print(f"  Format: {format}")
+        console.print(f"  Min rating: {min_rating}+ stars")
+        console.print(f"  Max sessions: {max_sessions}")
+        if agent:
+            console.print(f"  Agent filter: {agent}")
+
+        # Export
+        if agent:
+            stats = await exporter.export_for_specific_agent(
+                output_path=output_path,
+                agent_name=agent,
+                format=export_format,
+                min_rating=min_rating,
+                max_sessions=max_sessions,
+            )
+        else:
+            stats = await exporter.export_training_data(
+                output_path=output_path,
+                format=export_format,
+                min_rating=min_rating,
+                include_system_prompt=not no_system_prompt,
+                include_tool_calls=not no_tools,
+                max_sessions=max_sessions,
+            )
+
+        if stats.sessions_exported == 0:
+            console.print("\n[yellow]⚠ No sessions exported[/]")
+            console.print("[dim]Add feedback with 'sindri feedback <session_id> <rating>'[/dim]")
+            console.print(f"[dim]Need sessions rated {min_rating}+ stars marked for training[/dim]")
+            return
+
+        console.print(f"\n[green]✓ Export complete![/green]")
+        console.print(f"  Sessions: {stats.sessions_exported}")
+        console.print(f"  Conversations: {stats.conversations_exported}")
+        console.print(f"  Turns: {stats.turns_exported}")
+        console.print(f"  Estimated tokens: ~{stats.total_tokens_estimate:,}")
+        console.print(f"  Output: {output_path}")
+
+        if format == "ollama":
+            console.print(f"\n[dim]To create model: ollama create sindri-custom -f {output_path}[/dim]")
+        else:
+            console.print(f"\n[dim]Use this file for fine-tuning your preferred model[/dim]")
+
+    asyncio.run(do_export())
+
+
+@cli.command("feedback-list")
+@click.option("--min-rating", "-r", default=1, type=click.IntRange(1, 5), help="Minimum rating filter")
+@click.option("--max-rating", "-R", default=5, type=click.IntRange(1, 5), help="Maximum rating filter")
+@click.option("--training-only", is_flag=True, help="Only show sessions marked for training")
+@click.option("--limit", "-l", default=20, type=int, help="Maximum sessions to show")
+def feedback_list(min_rating: int, max_rating: int, training_only: bool, limit: int):
+    """List sessions with feedback.
+
+    Shows sessions that have been rated, sorted by average rating.
+
+    Examples:
+
+        sindri feedback-list
+
+        sindri feedback-list --min-rating 4
+
+        sindri feedback-list --training-only
+    """
+    from rich.table import Table
+    from sindri.persistence.feedback import FeedbackStore
+
+    async def list_feedback():
+        store = FeedbackStore()
+
+        sessions = await store.list_rated_sessions(
+            min_rating=min_rating,
+            max_rating=max_rating,
+            include_in_training_only=training_only,
+            limit=limit,
+        )
+
+        if not sessions:
+            console.print("[yellow]No rated sessions found[/]")
+            if training_only:
+                console.print("[dim]Try without --training-only flag[/dim]")
+            return
+
+        table = Table(title="Rated Sessions")
+        table.add_column("Session")
+        table.add_column("Task")
+        table.add_column("Rating", justify="center")
+        table.add_column("Count", justify="right")
+        table.add_column("Tags")
+
+        for s in sessions:
+            rating = s["avg_rating"]
+            stars = "⭐" * int(rating) + ("½" if rating % 1 >= 0.5 else "")
+
+            # Color based on rating
+            if rating >= 4:
+                rating_color = "green"
+            elif rating >= 3:
+                rating_color = "yellow"
+            else:
+                rating_color = "red"
+
+            tags_str = ", ".join(s["quality_tags"][:3]) if s["quality_tags"] else ""
+            if len(s["quality_tags"]) > 3:
+                tags_str += f" +{len(s['quality_tags'])-3}"
+
+            table.add_row(
+                s["id"][:8],
+                s["task"][:35] + "..." if len(s["task"]) > 35 else s["task"],
+                f"[{rating_color}]{stars}[/{rating_color}]",
+                str(s["feedback_count"]),
+                tags_str[:20],
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Use 'sindri feedback <session_id> <rating>' to add more feedback[/dim]")
+
+    asyncio.run(list_feedback())
+
+
+@cli.command()
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", "-p", default=8000, help="Port to listen on")
 @click.option("--vram-gb", default=16.0, help="Total VRAM in GB")

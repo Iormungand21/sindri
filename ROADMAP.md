@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **CI/CD Integration COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay + MoveFileTool + BatchRenameTool + SplitFileTool + MergeFilesTool + **CI/CD Tools**. **100% production ready.** 1183/1183 backend tests + 104 frontend tests passing (100%).
+**Current Status:** ✅ **Agent Fine-Tuning COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay + MoveFileTool + BatchRenameTool + SplitFileTool + MergeFilesTool + CI/CD Tools + **Feedback & Training Export**. **100% production ready.** 1219/1219 backend tests + 104 frontend tests passing (100%).
 
 ---
 
@@ -11,10 +11,10 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-17)
-- ✅ CI/CD Integration COMPLETE - Generate and validate GitHub Actions workflows
-- ✅ 1183/1183 backend tests + 104 frontend tests passing (100%)
+- ✅ Agent Fine-Tuning COMPLETE - Feedback collection and training data export
+- ✅ 1219/1219 backend tests + 104 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, Timeline View, Session Replay, MoveFileTool, BatchRenameTool, SplitFileTool, MergeFilesTool, **CI/CD Integration**
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, Timeline View, Session Replay, MoveFileTool, BatchRenameTool, SplitFileTool, MergeFilesTool, CI/CD Integration, **Agent Fine-Tuning**
 
 ### Try It Out
 ```bash
@@ -59,9 +59,10 @@ cd sindri/web/static && npm run build  # Build frontend
 - ~~**SplitFileTool:** Split large files into multiple smaller files~~ ✅ **COMPLETED!**
 - ~~**MergeFilesTool:** Merge multiple files into one with import handling~~ ✅ **COMPLETED!**
 - ~~**CI/CD Integration:** GitHub Actions workflow generation and validation~~ ✅ **COMPLETED!**
-- **Next:** Remote Collaboration, Agent Fine-Tuning, Voice Interface
+- ~~**Agent Fine-Tuning:** Feedback collection and training data export~~ ✅ **COMPLETED!**
+- **Next:** Remote Collaboration, Voice Interface
 
-**Complete multi-file refactoring suite with split AND merge! 🎉**
+**Complete fine-tuning pipeline with feedback collection and JSONL/ChatML/Ollama export! 🎉**
 
 **Web UI Development:**
 ```bash
@@ -1202,10 +1203,58 @@ sindri run "Create a Docker deployment workflow"
 - 63 new tests added (all passing)
 - Total: 1183/1183 backend tests + 104 frontend tests (100%)
 
-### 9.4 Agent Fine-Tuning
-- Collect successful interactions
-- Fine-tune models on your coding style
-- Personal AI pair programmer
+### ✅ 9.4 Agent Fine-Tuning (COMPLETED 2026-01-17)
+
+**Status:** ✅ Implemented and tested with 36 new tests
+
+#### Implementation Summary:
+
+**Feedback Collection** (`sindri/persistence/feedback.py`):
+- ✅ `SessionFeedback` dataclass with 1-5 star ratings
+- ✅ `FeedbackStore` for persistence with SQLite
+- ✅ Quality tags: correct, efficient, hallucinated, etc.
+- ✅ Session-level and turn-level feedback support
+- ✅ Statistics and training candidate queries
+
+**Training Data Export** (`sindri/persistence/training_export.py`):
+- ✅ JSONL format (OpenAI fine-tuning compatible)
+- ✅ ChatML format with special tokens
+- ✅ Ollama Modelfile MESSAGE format
+- ✅ System prompt inclusion option
+- ✅ Tool call inclusion option
+- ✅ Filter by minimum rating
+
+**CLI Commands:**
+- `sindri feedback <session_id> <rating>` - Rate session 1-5 stars
+- `sindri feedback-stats` - View feedback statistics
+- `sindri feedback-list` - List rated sessions
+- `sindri export-training <output>` - Export training data
+
+**Example Usage:**
+```bash
+# Rate a session
+sindri feedback abc12345 5 -n "Perfect solution" -t correct -t efficient
+
+# View statistics
+sindri feedback-stats
+
+# Export for fine-tuning
+sindri export-training training.jsonl --min-rating 4
+sindri export-training model.txt -f ollama
+```
+
+**Files Created:**
+- `sindri/persistence/feedback.py` (~400 lines)
+- `sindri/persistence/training_export.py` (~350 lines)
+- `tests/test_feedback.py` (~500 lines)
+
+**Files Modified:**
+- `sindri/persistence/database.py` - Schema v3
+- `sindri/cli.py` - Four new commands
+
+**Test Results:**
+- 36 new tests added (all passing)
+- Total: 1219/1219 backend tests + 104 frontend tests (100%)
 
 ### 9.5 Voice Interface
 - Voice commands to TUI
@@ -1240,6 +1289,7 @@ sindri run "Create a Docker deployment workflow"
 | ~~Formatting tools~~ | High | Medium | ✅ Complete | 8.3 | Done 2026-01-15 |
 | ~~Web UI Frontend~~ | High | High | ✅ Complete | 8.3 | Done 2026-01-15 |
 | ~~Multi-Project Memory~~ | Medium | Medium | ✅ Complete | 8.4 | Done 2026-01-16 |
+| ~~Agent Fine-Tuning~~ | High | Medium | ✅ Complete | 9.4 | Done 2026-01-17 |
 
 ---
 
