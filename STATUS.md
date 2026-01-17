@@ -11,13 +11,13 @@
 **Just Completed:** Phase 9 Agent Expansion - 4 new agents + Odin upgrade ✓ (2026-01-16)
 **Test Status:** 995/995 backend tests + 37 frontend tests, **all passing (100%)** 🎉
 **Production Readiness:** 100% - 11 specialized agents with larger model support!
-**Next Priority:** 🎯 **Pull new models** (qwen3:14b, codestral:22b) then **Web UI Enhancements**
+**Next Priority:** 🎯 **Web UI Enhancements** (Code Diff Viewer, Timeline View, Session Replay)
 
 ---
 
-## 🎯 NEXT SESSION: Pull Models & Web UI Enhancements
+## 🎯 NEXT SESSION: Web UI Enhancements
 
-**Goal:** Pull required models for new agents, then continue UI improvements.
+**Goal:** Continue improving Sindri with advanced visualizations and UX improvements.
 
 ### What Was Just Completed ✅
 
@@ -40,16 +40,13 @@ Added 4 new specialized agents with larger model support (up to 14GB VRAM):
 - Now can delegate to 9 agents (was 5)
 - Added heimdall, baldr, idunn, vidar to delegation targets
 
-**Models to Pull:**
-```bash
-# Required for new agents (run these to activate Heimdall and Vidar):
-ollama pull qwen3:14b              # ~9GB download - For Heimdall (security)
-ollama pull codestral:22b-v0.1-q4_K_M  # ~13GB download - For Vidar (multi-lang)
+**All Models Installed:** ✅
+- `qwen3:14b` (9.3GB) - For Heimdall (security) ✅
+- `codestral:22b-v0.1-q4_K_M` (13GB) - For Vidar (multi-lang) ✅
+- `deepseek-r1:14b` (9GB) - For Baldr + upgraded Odin ✅
+- `llama3.1:8b` (4.9GB) - Shared by Idunn + Mimir ✅
 
-# Already pulled (reused):
-# deepseek-r1:14b - Already pulled! Used by Baldr + upgraded Odin
-# llama3.1:8b - Already pulled! Shared by Idunn + Mimir
-```
+**All 11 agents are now fully operational!**
 
 **New Tests:** 53 tests for new agents in `tests/test_new_agents.py`
 
