@@ -5,10 +5,12 @@ Provides tools for common code refactoring operations:
 - ExtractFunctionTool: Extract code into a new function
 - InlineVariableTool: Inline variable values into usages
 - MoveFileTool: Move/rename files and update imports across codebase
+- BatchRenameTool: Rename multiple files using patterns
 """
 
 import ast
 import asyncio
+import fnmatch
 import re
 import shutil
 from pathlib import Path
@@ -1349,3 +1351,401 @@ Examples:
         if content != original_content:
             async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
                 await f.write(content)
+
+
+class BatchRenameTool(Tool):
+    """Rename multiple files using pattern matching.
+
+    Allows batch renaming of files matching a glob pattern, transforming
+    names according to a specified output pattern. Optionally updates
+    imports across the codebase for each renamed file.
+    """
+
+    name = "batch_rename"
+    description = """Rename multiple files matching a pattern. Transforms filenames according to
+an output pattern with placeholders.
+
+Placeholders in output pattern:
+- {name}: Full original filename without extension
+- {stem}: Original filename stem (without extension)
+- {ext}: Original file extension (with dot)
+- {parent}: Parent directory name
+- {1}, {2}, ...: Regex capture groups (when using regex pattern)
+
+Examples:
+- batch_rename(pattern="test_*.py", output="{stem}_test.py") - Rename test_foo.py to foo_test.py
+- batch_rename(pattern="*.test.ts", output="{stem}.spec.ts") - Rename foo.test.ts to foo.spec.ts
+- batch_rename(pattern="old_*.py", output="new_{1}.py", regex=true) - Replace prefix
+- batch_rename(pattern="*.py", output="lib/{stem}.py", path="src/") - Move to lib/ subdirectory
+- batch_rename(pattern="*.js", output="{stem}.ts", dry_run=true) - Preview converting JS to TS"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "pattern": {
+                "type": "string",
+                "description": "Glob pattern to match files (e.g., 'test_*.py', '*.test.ts'). Use regex=true for regex patterns."
+            },
+            "output": {
+                "type": "string",
+                "description": "Output pattern with placeholders: {name}, {stem}, {ext}, {parent}, {1}, {2}... for capture groups"
+            },
+            "path": {
+                "type": "string",
+                "description": "Directory to search in (default: current directory)"
+            },
+            "regex": {
+                "type": "boolean",
+                "description": "Treat pattern as regex instead of glob (default: false)"
+            },
+            "recursive": {
+                "type": "boolean",
+                "description": "Search subdirectories recursively (default: true)"
+            },
+            "update_imports": {
+                "type": "boolean",
+                "description": "Update imports in other files after renaming (default: true)"
+            },
+            "dry_run": {
+                "type": "boolean",
+                "description": "Preview changes without applying them (default: false)"
+            },
+            "max_files": {
+                "type": "integer",
+                "description": "Maximum number of files to rename (safety limit, default: 100)"
+            }
+        },
+        "required": ["pattern", "output"]
+    }
+
+    # Directories to skip during search
+    SKIP_DIRS = {
+        'node_modules', '__pycache__', '.git', '.svn', '.hg',
+        'dist', 'build', 'target', 'venv', '.venv', 'env',
+        '.tox', '.nox', '.pytest_cache', '.mypy_cache',
+        'coverage', '.coverage', 'htmlcov', '.eggs'
+    }
+
+    async def execute(
+        self,
+        pattern: str,
+        output: str,
+        path: Optional[str] = None,
+        regex: bool = False,
+        recursive: bool = True,
+        update_imports: bool = True,
+        dry_run: bool = False,
+        max_files: int = 100,
+        **kwargs
+    ) -> ToolResult:
+        """Execute batch rename operation."""
+        # Validate inputs
+        if not pattern or not pattern.strip():
+            return ToolResult(
+                success=False,
+                output="",
+                error="Pattern cannot be empty"
+            )
+        if not output or not output.strip():
+            return ToolResult(
+                success=False,
+                output="",
+                error="Output pattern cannot be empty"
+            )
+        if max_files < 1:
+            return ToolResult(
+                success=False,
+                output="",
+                error="max_files must be at least 1"
+            )
+
+        # Resolve search path
+        search_path = self._resolve_path(path or ".")
+        if not search_path.exists():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Path does not exist: {path}"
+            )
+        if not search_path.is_dir():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Path is not a directory: {path}"
+            )
+
+        try:
+            # Find matching files
+            if regex:
+                try:
+                    regex_pattern = re.compile(pattern)
+                except re.error as e:
+                    return ToolResult(
+                        success=False,
+                        output="",
+                        error=f"Invalid regex pattern: {e}"
+                    )
+                matched_files = self._find_files_regex(search_path, regex_pattern, recursive)
+            else:
+                matched_files = self._find_files_glob(search_path, pattern, recursive)
+
+            if not matched_files:
+                return ToolResult(
+                    success=True,
+                    output=f"No files matching pattern '{pattern}' found in {search_path}",
+                    metadata={"files_renamed": 0, "pattern": pattern}
+                )
+
+            # Apply max_files limit
+            if len(matched_files) > max_files:
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error=f"Found {len(matched_files)} matching files, exceeds max_files limit of {max_files}. "
+                          f"Increase max_files or use a more specific pattern."
+                )
+
+            # Calculate new names for all files
+            rename_plan = []
+            seen_destinations = set()
+            conflicts = []
+
+            for file_path in matched_files:
+                try:
+                    if regex:
+                        new_name = self._apply_regex_output(file_path, regex_pattern, output)
+                    else:
+                        new_name = self._apply_glob_output(file_path, pattern, output)
+
+                    # Resolve new path relative to file's parent
+                    if '/' in new_name or '\\' in new_name:
+                        # Output contains directory - resolve relative to search path
+                        new_path = search_path / new_name
+                    else:
+                        # Simple rename - keep in same directory
+                        new_path = file_path.parent / new_name
+
+                    # Check for conflicts
+                    if new_path.resolve() in seen_destinations:
+                        conflicts.append(f"Multiple files would be renamed to: {new_path}")
+                    elif new_path.exists() and new_path.resolve() != file_path.resolve():
+                        conflicts.append(f"Destination already exists: {new_path}")
+                    else:
+                        seen_destinations.add(new_path.resolve())
+                        rename_plan.append({
+                            "source": file_path,
+                            "destination": new_path,
+                            "source_rel": str(file_path.relative_to(search_path)) if file_path.is_relative_to(search_path) else str(file_path),
+                            "dest_rel": str(new_path.relative_to(search_path)) if new_path.is_relative_to(search_path) else str(new_path)
+                        })
+                except Exception as e:
+                    conflicts.append(f"Error processing {file_path}: {e}")
+
+            if conflicts:
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error="Conflicts detected:\n" + "\n".join(conflicts[:10]) +
+                          (f"\n... and {len(conflicts) - 10} more" if len(conflicts) > 10 else "")
+                )
+
+            # Execute renames
+            results = {
+                "files_renamed": 0,
+                "imports_updated": 0,
+                "files_with_import_updates": 0,
+                "renames": [],
+                "dry_run": dry_run
+            }
+            output_lines = []
+
+            # Use MoveFileTool for actual moves to get import updates
+            move_tool = MoveFileTool(work_dir=self.work_dir)
+
+            for plan in rename_plan:
+                source = plan["source"]
+                destination = plan["destination"]
+
+                if update_imports:
+                    # Use MoveFileTool for import updates
+                    move_result = await move_tool.execute(
+                        source=str(source),
+                        destination=str(destination),
+                        update_imports=True,
+                        search_path=str(search_path),
+                        dry_run=dry_run,
+                        create_dirs=True
+                    )
+
+                    if move_result.success:
+                        results["files_renamed"] += 1
+                        if move_result.metadata:
+                            results["imports_updated"] += move_result.metadata.get("imports_updated", 0)
+                            if move_result.metadata.get("files_updated"):
+                                results["files_with_import_updates"] += len(move_result.metadata["files_updated"])
+                        results["renames"].append({
+                            "source": plan["source_rel"],
+                            "destination": plan["dest_rel"],
+                            "imports_updated": move_result.metadata.get("imports_updated", 0) if move_result.metadata else 0
+                        })
+                        output_lines.append(f"  {plan['source_rel']} → {plan['dest_rel']}")
+                    else:
+                        # Report error but continue with other files
+                        output_lines.append(f"  ✗ {plan['source_rel']}: {move_result.error}")
+                else:
+                    # Simple move without import updates
+                    if not dry_run:
+                        destination.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(source), str(destination))
+
+                    results["files_renamed"] += 1
+                    results["renames"].append({
+                        "source": plan["source_rel"],
+                        "destination": plan["dest_rel"],
+                        "imports_updated": 0
+                    })
+                    output_lines.append(f"  {plan['source_rel']} → {plan['dest_rel']}")
+
+            # Build summary
+            action = "Would rename" if dry_run else "Renamed"
+            summary_lines = [
+                f"{action} {results['files_renamed']} file(s) matching '{pattern}'",
+            ]
+            if update_imports and results["imports_updated"] > 0:
+                summary_lines.append(
+                    f"Updated {results['imports_updated']} import(s) in {results['files_with_import_updates']} file(s)"
+                )
+            summary_lines.append("")
+            summary_lines.extend(output_lines)
+
+            log.info(
+                "batch_rename_complete",
+                pattern=pattern,
+                files_renamed=results["files_renamed"],
+                imports_updated=results["imports_updated"],
+                dry_run=dry_run,
+                work_dir=str(self.work_dir) if self.work_dir else None
+            )
+
+            return ToolResult(
+                success=True,
+                output="\n".join(summary_lines),
+                metadata=results
+            )
+
+        except Exception as e:
+            log.error("batch_rename_error", error=str(e))
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Batch rename failed: {str(e)}"
+            )
+
+    def _find_files_glob(self, search_path: Path, pattern: str, recursive: bool) -> list[Path]:
+        """Find files matching a glob pattern."""
+        files = []
+
+        if recursive:
+            # Use rglob for recursive search
+            for file_path in search_path.rglob(pattern):
+                if file_path.is_file() and not any(part in self.SKIP_DIRS for part in file_path.parts):
+                    files.append(file_path)
+        else:
+            # Use glob for non-recursive search
+            for file_path in search_path.glob(pattern):
+                if file_path.is_file():
+                    files.append(file_path)
+
+        return sorted(files)
+
+    def _find_files_regex(self, search_path: Path, regex_pattern: re.Pattern, recursive: bool) -> list[Path]:
+        """Find files matching a regex pattern (on filename only)."""
+        files = []
+
+        def process_dir(dir_path: Path):
+            for item in dir_path.iterdir():
+                if item.is_file():
+                    if regex_pattern.search(item.name):
+                        files.append(item)
+                elif item.is_dir() and recursive:
+                    if item.name not in self.SKIP_DIRS:
+                        process_dir(item)
+
+        process_dir(search_path)
+        return sorted(files)
+
+    def _apply_glob_output(self, file_path: Path, pattern: str, output: str) -> str:
+        """Apply output pattern to a file matched by glob pattern."""
+        # Extract placeholders
+        result = output
+
+        # {name} - full filename without extension
+        result = result.replace("{name}", file_path.stem)
+        # {stem} - same as {name}
+        result = result.replace("{stem}", file_path.stem)
+        # {ext} - extension with dot
+        result = result.replace("{ext}", file_path.suffix)
+        # {parent} - parent directory name
+        result = result.replace("{parent}", file_path.parent.name)
+
+        # Try to extract capture groups from glob pattern
+        # Convert glob to regex for capturing
+        glob_regex = self._glob_to_regex(pattern)
+        match = re.match(glob_regex, file_path.name)
+        if match:
+            for i, group in enumerate(match.groups(), 1):
+                if group is not None:
+                    result = result.replace(f"{{{i}}}", group)
+
+        return result
+
+    def _apply_regex_output(self, file_path: Path, regex_pattern: re.Pattern, output: str) -> str:
+        """Apply output pattern to a file matched by regex pattern."""
+        result = output
+
+        # Standard placeholders
+        result = result.replace("{name}", file_path.stem)
+        result = result.replace("{stem}", file_path.stem)
+        result = result.replace("{ext}", file_path.suffix)
+        result = result.replace("{parent}", file_path.parent.name)
+
+        # Extract capture groups from regex match
+        match = regex_pattern.search(file_path.name)
+        if match:
+            for i, group in enumerate(match.groups(), 1):
+                if group is not None:
+                    result = result.replace(f"{{{i}}}", group)
+
+        return result
+
+    def _glob_to_regex(self, pattern: str) -> str:
+        """Convert a glob pattern to a regex pattern with capture groups.
+
+        * becomes (.*) to capture the wildcard content
+        ? becomes (.) to capture single character
+        """
+        # Escape special regex chars except * and ?
+        result = ""
+        i = 0
+        while i < len(pattern):
+            char = pattern[i]
+            if char == '*':
+                if i + 1 < len(pattern) and pattern[i + 1] == '*':
+                    # ** matches any path
+                    result += "(.*)"
+                    i += 2
+                else:
+                    # * matches any chars except /
+                    result += "([^/]*)"
+                    i += 1
+            elif char == '?':
+                result += "(.)"
+                i += 1
+            elif char in '.^$+{}[]|()\\':
+                result += '\\' + char
+                i += 1
+            else:
+                result += char
+                i += 1
+
+        return f"^{result}$"

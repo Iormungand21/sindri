@@ -1,17 +1,17 @@
 # Sindri Project Status Report
-**Date:** 2026-01-16 (MoveFileTool Feature)
-**Session:** Multi-file Refactoring - MoveFileTool Implementation
+**Date:** 2026-01-16 (BatchRenameTool Feature)
+**Session:** Batch File Refactoring - BatchRenameTool Implementation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - MoveFileTool Complete! 🎉
-**Just Completed:** MoveFileTool with import updates ✓ (2026-01-16)
-**Test Status:** 1032/1032 backend tests + 104 frontend tests, **all passing (100%)** 🎉
-**Production Readiness:** 100% - Full multi-file refactoring capability with automatic import updates!
-**Next Priority:** 🎯 **Phase 9 Features** (CI/CD Integration, Remote Collaboration, etc.)
+**Current State:** ✅ **PRODUCTION READY (100%)** - BatchRenameTool Complete! 🎉
+**Just Completed:** BatchRenameTool for pattern-based batch file renaming ✓ (2026-01-16)
+**Test Status:** 1064/1064 backend tests + 104 frontend tests, **all passing (100%)** 🎉
+**Production Readiness:** 100% - Full batch file refactoring with pattern matching!
+**Next Priority:** 🎯 **Phase 9 Features** (CI/CD Integration, Remote Collaboration, SplitFileTool, MergeFilesTool)
 
 ---
 
@@ -21,7 +21,49 @@
 
 ### What Was Just Completed ✅
 
-**MoveFileTool (2026-01-16):**
+**BatchRenameTool (2026-01-16):**
+
+Added comprehensive BatchRenameTool for renaming multiple files using patterns:
+
+**Backend:**
+- New `BatchRenameTool` class in `sindri/tools/refactoring.py`
+- Glob pattern matching (e.g., `test_*.py`, `*.test.ts`)
+- Regex pattern matching with capture groups
+- Output pattern placeholders: `{stem}`, `{name}`, `{ext}`, `{parent}`, `{1}`, `{2}`...
+- Dry run mode for previewing changes before applying
+- Automatic import updates via integration with MoveFileTool
+- Safety limit (max_files) to prevent accidental mass renames
+- Skip standard ignore directories (node_modules, __pycache__, .git, etc.)
+- Conflict detection (duplicate destinations, existing files)
+
+**Features:**
+- `batch_rename(pattern="test_*.py", output="{1}_test.py")` - Rename test_foo.py to foo_test.py
+- `batch_rename(pattern="*.test.ts", output="{stem}.spec.ts")` - Rename .test.ts to .spec.ts
+- `batch_rename(pattern="old_(.+)\\.py", output="new_{1}.py", regex=true)` - Regex replacement
+- `batch_rename(..., dry_run=true)` - Preview changes
+- `batch_rename(..., update_imports=true)` - Update imports across codebase
+- `batch_rename(..., recursive=true)` - Search subdirectories
+
+**Agent Integration:**
+- Added to **Brokkr** (orchestrator) tool list
+- Added to **Huginn** (coder) tool list
+- Total tools: 28 implemented
+
+**New Tests:**
+- 32 tests in `tests/test_batch_rename.py`
+- Test categories: Glob patterns, Regex patterns, Output placeholders, Dry run, Import updates, Error handling, Edge cases, Integration
+
+**Files Created:**
+- `tests/test_batch_rename.py` (~450 lines) - Comprehensive test coverage
+
+**Files Modified:**
+- `sindri/tools/refactoring.py` (+400 lines) - BatchRenameTool implementation
+- `sindri/tools/registry.py` (+2 lines) - Tool registration
+- `sindri/agents/registry.py` (+2 lines) - Agent tool lists
+
+---
+
+**Previous: MoveFileTool (2026-01-16):**
 
 Added comprehensive MoveFileTool for moving/renaming files with automatic import updates:
 
