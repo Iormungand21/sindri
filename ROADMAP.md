@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Phase 9 Agent Expansion COMPLETE!** (v0.1.0) - 11 specialized agents fully operational with all models installed. **100% production ready.** 995/995 backend tests + 37 frontend tests passing (100%). Ready for Web UI Enhancements.
+**Current Status:** ✅ **Code Diff Viewer COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer. **100% production ready.** 1004/1004 backend tests + 53 frontend tests passing (100%). Ready for more Web UI Enhancements.
 
 ---
 
@@ -11,10 +11,10 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-16)
-- ✅ Phase 9 Agent Expansion COMPLETE - 11 specialized agents (was 7)
-- ✅ 995/995 backend tests + 37 frontend tests passing (100%)
+- ✅ Code Diff Viewer COMPLETE - Web UI file change visualization
+- ✅ 1004/1004 backend tests + 53 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, **4 new specialized agents (Heimdall, Baldr, Idunn, Vidar)**
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, **Code Diff Viewer**
 
 ### Try It Out
 ```bash
@@ -51,7 +51,7 @@ cd sindri/web/static && npm run build  # Build frontend
 3. **This file** - See roadmap sections below
 
 ### 🎯 Recommended Next: Web UI Enhancements
-- **Code Diff Viewer:** Before/after for file edits with syntax highlighting
+- ~~**Code Diff Viewer:** Before/after for file edits with syntax highlighting~~ ✅ **COMPLETED!**
 - **Timeline View:** Horizontal timeline showing parallel execution, filter by agent/status
 - **Session Replay:** Step-by-step replay of past sessions with tool call visualization
 - **Effort:** 1-2 days per enhancement
@@ -75,7 +75,7 @@ curl http://localhost:8000/api/agents | jq
 4. ✅ Real-time updates via WebSocket
 
 **Features to Build:**
-1. Code diff viewer for file changes
+1. ~~Code diff viewer for file changes~~ ✅ **COMPLETED!**
 2. Timeline view for task execution
 3. Session replay functionality
 
@@ -120,7 +120,7 @@ curl http://localhost:8000/api/agents | jq
 - New agents fully operational: **Heimdall** (security), **Baldr** (debugging), **Idunn** (docs), **Vidar** (multi-lang) ✅
 
 **Next priorities:**
-- Web UI Enhancements: Code Diff Viewer, Timeline View, Session Replay
+- Web UI Enhancements: ~~Code Diff Viewer~~ ✅, Timeline View, Session Replay
 - Tools: Multi-file refactoring patterns (advanced)
 
 ---
@@ -1060,10 +1060,13 @@ Ratatoskr
 - Click node → see conversation
 - Real-time VRAM usage
 
-**Code Diff Viewer**
-- Before/after for file edits
-- Syntax highlighting
-- Accept/reject changes
+**Code Diff Viewer** ✅ **COMPLETED (2026-01-16)**
+- ✅ Before/after for file edits
+- ✅ Syntax highlighting with line-by-line diff
+- Accept/reject changes (future enhancement)
+- New endpoint: `GET /api/sessions/{id}/file-changes`
+- New component: `CodeDiffViewer.tsx`
+- 9 backend tests + 16 frontend tests
 
 **Timeline View**
 - Horizontal timeline of all tasks
@@ -1359,8 +1362,8 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-16 (Stale Session Cleanup Complete)
-**Next Review:** When starting Web UI Enhancements (Code Diff Viewer, Timeline View)
+**Last Updated:** 2026-01-16 (Code Diff Viewer Complete)
+**Next Review:** When starting Timeline View or Session Replay
 **Maintained By:** Project maintainers and contributors
 
 ---

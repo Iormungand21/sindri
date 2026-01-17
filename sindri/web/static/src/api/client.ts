@@ -10,6 +10,7 @@ import type {
   TaskResponse,
   TaskStatus,
   Metrics,
+  FileChanges,
 } from '../types/api'
 
 const API_BASE = '/api'
@@ -80,6 +81,17 @@ export async function getSessions(options?: {
 
 export async function getSession(id: string): Promise<SessionDetail> {
   return fetchApi<SessionDetail>(`/sessions/${encodeURIComponent(id)}`)
+}
+
+export async function getFileChanges(
+  sessionId: string,
+  includeContent = true
+): Promise<FileChanges> {
+  const params = new URLSearchParams()
+  params.set('include_content', String(includeContent))
+  return fetchApi<FileChanges>(
+    `/sessions/${encodeURIComponent(sessionId)}/file-changes?${params.toString()}`
+  )
 }
 
 // Task endpoints

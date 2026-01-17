@@ -255,6 +255,378 @@ class TestSessionEndpoints:
                 assert response.json()["id"] == "abcd1234-5678-9012-3456-789012345678"
 
 
+# ===== File Changes Endpoint Tests =====
+
+class TestFileChangesEndpoint:
+    """Tests for the /api/sessions/{id}/file-changes endpoint."""
+
+    def test_get_file_changes_empty_session(self, client):
+        """Test file changes for session with no file operations."""
+        from datetime import datetime
+
+        mock_session = Session(
+            id="test-session-1234567890123456789012345678",
+            task="Test task with no files",
+            model="qwen2.5:7b",
+            status="completed",
+            iterations=5,
+            created_at=datetime(2026, 1, 15, 10, 0, 0)
+        )
+        mock_session.turns = [
+            Turn(role="user", content="Hello", created_at=datetime(2026, 1, 15, 10, 0, 0)),
+            Turn(role="assistant", content="Hi!", created_at=datetime(2026, 1, 15, 10, 1, 0))
+        ]
+
+        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+                mock_list.return_value = [
+                    {"id": "test-session-1234567890123456789012345678", "task": "Test task"}
+                ]
+                mock_load.return_value = mock_session
+
+                response = client.get("/api/sessions/test-session-1234567890123456789012345678/file-changes")
+                assert response.status_code == 200
+                data = response.json()
+
+                assert data["session_id"] == "test-session-1234567890123456789012345678"
+                assert data["total_changes"] == 0
+                assert data["file_changes"] == []
+                assert data["files_modified"] == []
+
+    def test_get_file_changes_with_write(self, client):
+        """Test file changes for session with write_file operation."""
+        from datetime import datetime
+
+        mock_session = Session(
+            id="test-session-write-12345678901234567890",
+            task="Create a file",
+            model="qwen2.5:7b",
+            status="completed",
+            iterations=3,
+            created_at=datetime(2026, 1, 15, 10, 0, 0)
+        )
+        mock_session.turns = [
+            Turn(
+                role="user",
+                content="Create hello.py",
+                created_at=datetime(2026, 1, 15, 10, 0, 0)
+            ),
+            Turn(
+                role="assistant",
+                content="I'll create the file",
+                tool_calls=[{
+                    "function": {
+                        "name": "write_file",
+                        "arguments": {
+                            "path": "/tmp/hello.py",
+                            "content": 'print("Hello, World!")'
+                        }
+                    }
+                }],
+                created_at=datetime(2026, 1, 15, 10, 1, 0)
+            )
+        ]
+
+        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+                mock_list.return_value = [
+                    {"id": "test-session-write-12345678901234567890", "task": "Create a file"}
+                ]
+                mock_load.return_value = mock_session
+
+                response = client.get("/api/sessions/test-session-write-12345678901234567890/file-changes")
+                assert response.status_code == 200
+                data = response.json()
+
+                assert data["total_changes"] == 1
+                assert len(data["file_changes"]) == 1
+                assert data["files_modified"] == ["/tmp/hello.py"]
+
+                change = data["file_changes"][0]
+                assert change["file_path"] == "/tmp/hello.py"
+                assert change["operation"] == "write"
+                assert change["new_content"] == 'print("Hello, World!")'
+                assert change["content_size"] == 22
+
+    def test_get_file_changes_with_edit(self, client):
+        """Test file changes for session with edit_file operation."""
+        from datetime import datetime
+
+        mock_session = Session(
+            id="test-session-edit-123456789012345678901",
+            task="Edit a file",
+            model="qwen2.5:7b",
+            status="completed",
+            iterations=3,
+            created_at=datetime(2026, 1, 15, 10, 0, 0)
+        )
+        mock_session.turns = [
+            Turn(
+                role="assistant",
+                content="I'll edit the file",
+                tool_calls=[{
+                    "function": {
+                        "name": "edit_file",
+                        "arguments": {
+                            "path": "/tmp/hello.py",
+                            "old_text": 'print("Hello")',
+                            "new_text": 'print("Hello, World!")'
+                        }
+                    }
+                }],
+                created_at=datetime(2026, 1, 15, 10, 1, 0)
+            )
+        ]
+
+        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+                mock_list.return_value = [
+                    {"id": "test-session-edit-123456789012345678901", "task": "Edit a file"}
+                ]
+                mock_load.return_value = mock_session
+
+                response = client.get("/api/sessions/test-session-edit-123456789012345678901/file-changes")
+                assert response.status_code == 200
+                data = response.json()
+
+                assert data["total_changes"] == 1
+                change = data["file_changes"][0]
+                assert change["file_path"] == "/tmp/hello.py"
+                assert change["operation"] == "edit"
+                assert change["old_text"] == 'print("Hello")'
+                assert change["new_text"] == 'print("Hello, World!")'
+
+    def test_get_file_changes_with_read(self, client):
+        """Test file changes includes read operations."""
+        from datetime import datetime
+
+        mock_session = Session(
+            id="test-session-read-123456789012345678901",
+            task="Read a file",
+            model="qwen2.5:7b",
+            status="completed",
+            iterations=3,
+            created_at=datetime(2026, 1, 15, 10, 0, 0)
+        )
+        mock_session.turns = [
+            Turn(
+                role="assistant",
+                content="I'll read the file",
+                tool_calls=[{
+                    "function": {
+                        "name": "read_file",
+                        "arguments": {"path": "/tmp/hello.py"}
+                    }
+                }],
+                created_at=datetime(2026, 1, 15, 10, 1, 0)
+            )
+        ]
+
+        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+                mock_list.return_value = [
+                    {"id": "test-session-read-123456789012345678901", "task": "Read a file"}
+                ]
+                mock_load.return_value = mock_session
+
+                response = client.get("/api/sessions/test-session-read-123456789012345678901/file-changes")
+                assert response.status_code == 200
+                data = response.json()
+
+                assert data["total_changes"] == 1
+                change = data["file_changes"][0]
+                assert change["file_path"] == "/tmp/hello.py"
+                assert change["operation"] == "read"
+                # Read operations don't modify files
+                assert "/tmp/hello.py" not in data["files_modified"]
+
+    def test_get_file_changes_multiple_operations(self, client):
+        """Test file changes with multiple file operations."""
+        from datetime import datetime
+
+        mock_session = Session(
+            id="test-session-multi-12345678901234567890",
+            task="Multiple file ops",
+            model="qwen2.5:7b",
+            status="completed",
+            iterations=5,
+            created_at=datetime(2026, 1, 15, 10, 0, 0)
+        )
+        mock_session.turns = [
+            Turn(
+                role="assistant",
+                content="Working...",
+                tool_calls=[
+                    {
+                        "function": {
+                            "name": "write_file",
+                            "arguments": {"path": "/tmp/file1.py", "content": "# File 1"}
+                        }
+                    },
+                    {
+                        "function": {
+                            "name": "write_file",
+                            "arguments": {"path": "/tmp/file2.py", "content": "# File 2"}
+                        }
+                    }
+                ],
+                created_at=datetime(2026, 1, 15, 10, 1, 0)
+            ),
+            Turn(
+                role="assistant",
+                content="Editing...",
+                tool_calls=[{
+                    "function": {
+                        "name": "edit_file",
+                        "arguments": {
+                            "path": "/tmp/file1.py",
+                            "old_text": "# File 1",
+                            "new_text": "# Modified File 1"
+                        }
+                    }
+                }],
+                created_at=datetime(2026, 1, 15, 10, 2, 0)
+            )
+        ]
+
+        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+                mock_list.return_value = [
+                    {"id": "test-session-multi-12345678901234567890", "task": "Multiple"}
+                ]
+                mock_load.return_value = mock_session
+
+                response = client.get("/api/sessions/test-session-multi-12345678901234567890/file-changes")
+                assert response.status_code == 200
+                data = response.json()
+
+                assert data["total_changes"] == 3
+                assert len(data["files_modified"]) == 2
+                assert "/tmp/file1.py" in data["files_modified"]
+                assert "/tmp/file2.py" in data["files_modified"]
+
+    def test_get_file_changes_exclude_content(self, client):
+        """Test file changes with include_content=false."""
+        from datetime import datetime
+
+        mock_session = Session(
+            id="test-session-nocontent-123456789012345",
+            task="Test no content",
+            model="qwen2.5:7b",
+            status="completed",
+            iterations=3,
+            created_at=datetime(2026, 1, 15, 10, 0, 0)
+        )
+        mock_session.turns = [
+            Turn(
+                role="assistant",
+                content="Writing...",
+                tool_calls=[{
+                    "function": {
+                        "name": "write_file",
+                        "arguments": {"path": "/tmp/test.py", "content": "big content"}
+                    }
+                }],
+                created_at=datetime(2026, 1, 15, 10, 1, 0)
+            )
+        ]
+
+        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+                mock_list.return_value = [
+                    {"id": "test-session-nocontent-123456789012345", "task": "Test"}
+                ]
+                mock_load.return_value = mock_session
+
+                response = client.get(
+                    "/api/sessions/test-session-nocontent-123456789012345/file-changes?include_content=false"
+                )
+                assert response.status_code == 200
+                data = response.json()
+
+                change = data["file_changes"][0]
+                assert change["new_content"] is None  # Content excluded
+                assert change["content_size"] == 11  # Size still tracked
+
+    def test_get_file_changes_short_id(self, client):
+        """Test file changes with short session ID."""
+        from datetime import datetime
+
+        mock_session = Session(
+            id="abcd1234-5678-9012-3456-789012345678",
+            task="Test short ID",
+            model="qwen2.5:7b",
+            status="completed",
+            iterations=2,
+            created_at=datetime(2026, 1, 15, 10, 0, 0)
+        )
+        mock_session.turns = []
+
+        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+                mock_list.return_value = [
+                    {"id": "abcd1234-5678-9012-3456-789012345678", "task": "Test"}
+                ]
+                mock_load.return_value = mock_session
+
+                response = client.get("/api/sessions/abcd1234/file-changes")
+                assert response.status_code == 200
+                assert response.json()["session_id"] == "abcd1234-5678-9012-3456-789012345678"
+
+    def test_get_file_changes_not_found(self, client):
+        """Test file changes for non-existent session."""
+        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+                mock_list.return_value = []
+                mock_load.return_value = None
+
+                response = client.get("/api/sessions/nonexistent/file-changes")
+                assert response.status_code == 404
+
+    def test_get_file_changes_json_string_arguments(self, client):
+        """Test file changes when tool_call arguments are JSON strings."""
+        from datetime import datetime
+
+        mock_session = Session(
+            id="test-session-jsonargs-1234567890123456",
+            task="JSON args test",
+            model="qwen2.5:7b",
+            status="completed",
+            iterations=2,
+            created_at=datetime(2026, 1, 15, 10, 0, 0)
+        )
+        mock_session.turns = [
+            Turn(
+                role="assistant",
+                content="Writing...",
+                tool_calls=[{
+                    "function": {
+                        "name": "write_file",
+                        # Arguments as JSON string (some backends do this)
+                        "arguments": '{"path": "/tmp/test.py", "content": "hello"}'
+                    }
+                }],
+                created_at=datetime(2026, 1, 15, 10, 1, 0)
+            )
+        ]
+
+        with patch.object(client.app.state.api.state, 'list_sessions', new_callable=AsyncMock) as mock_list:
+            with patch.object(client.app.state.api.state, 'load_session', new_callable=AsyncMock) as mock_load:
+                mock_list.return_value = [
+                    {"id": "test-session-jsonargs-1234567890123456", "task": "Test"}
+                ]
+                mock_load.return_value = mock_session
+
+                response = client.get("/api/sessions/test-session-jsonargs-1234567890123456/file-changes")
+                assert response.status_code == 200
+                data = response.json()
+
+                assert data["total_changes"] == 1
+                change = data["file_changes"][0]
+                assert change["file_path"] == "/tmp/test.py"
+                assert change["new_content"] == "hello"
+
+
 # ===== Task Endpoints Tests =====
 
 class TestTaskEndpoints:

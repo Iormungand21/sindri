@@ -13,6 +13,7 @@ export const queryKeys = {
   sessions: (options?: { status?: string; limit?: number }) =>
     ['sessions', options] as const,
   session: (id: string) => ['sessions', id] as const,
+  fileChanges: (id: string) => ['sessions', id, 'file-changes'] as const,
   taskStatus: (id: string) => ['tasks', id] as const,
   metrics: ['metrics'] as const,
   health: ['health'] as const,
@@ -50,6 +51,15 @@ export function useSession(id: string) {
     queryKey: queryKeys.session(id),
     queryFn: () => api.getSession(id),
     enabled: !!id,
+  })
+}
+
+export function useFileChanges(sessionId: string) {
+  return useQuery({
+    queryKey: queryKeys.fileChanges(sessionId),
+    queryFn: () => api.getFileChanges(sessionId),
+    enabled: !!sessionId,
+    staleTime: 1000 * 60 * 5, // 5 minutes - file changes don't change
   })
 }
 

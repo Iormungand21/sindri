@@ -80,6 +80,27 @@ export interface WebSocketEvent {
   timestamp: string
 }
 
+// File change types for diff viewer
+export interface FileChange {
+  file_path: string
+  operation: 'read' | 'write' | 'edit'
+  turn_index: number
+  timestamp: string
+  success: boolean
+  new_content?: string
+  content_size?: number
+  old_text?: string
+  new_text?: string
+  read_content?: string
+}
+
+export interface FileChanges {
+  session_id: string
+  file_changes: FileChange[]
+  files_modified: string[]
+  total_changes: number
+}
+
 // Event types from the EventBus
 export type EventType =
   | 'TASK_START'

@@ -2,13 +2,23 @@
  * SessionDetail - View details of a specific session
  */
 
+import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useSession } from '../hooks/useApi'
+import { useSession, useFileChanges } from '../hooks/useApi'
+import { CodeDiffViewer } from './CodeDiffViewer'
 import type { Turn } from '../types/api'
+
+type TabId = 'conversation' | 'files'
 
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>()
   const { data: session, isLoading, error } = useSession(id ?? '')
+  const {
+    data: fileChanges,
+    isLoading: fileChangesLoading,
+    error: fileChangesError,
+  } = useFileChanges(id ?? '')
+  const [activeTab, setActiveTab] = useState<TabId>('conversation')
 
   if (isLoading) {
     return (
@@ -98,21 +108,60 @@ export function SessionDetail() {
         </div>
       </div>
 
-      {/* Conversation */}
-      <div className="card p-4">
-        <h2 className="text-lg font-semibold text-sindri-100 mb-4">
-          Conversation ({session.turns?.length ?? 0} turns)
-        </h2>
-        <div className="space-y-4">
-          {session.turns?.length === 0 ? (
-            <p className="text-sindri-500 text-center py-4">No turns yet</p>
-          ) : (
-            session.turns?.map((turn, index) => (
-              <TurnDisplay key={index} turn={turn} />
-            ))
-          )}
+      {/* Tabs */}
+      <div className="border-b border-sindri-700">
+        <div className="flex gap-4">
+          <button
+            onClick={() => setActiveTab('conversation')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'conversation'
+                ? 'border-forge-500 text-forge-400'
+                : 'border-transparent text-sindri-400 hover:text-sindri-200'
+            }`}
+          >
+            💬 Conversation ({session.turns?.length ?? 0})
+          </button>
+          <button
+            onClick={() => setActiveTab('files')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'files'
+                ? 'border-forge-500 text-forge-400'
+                : 'border-transparent text-sindri-400 hover:text-sindri-200'
+            }`}
+          >
+            📁 File Changes ({fileChanges?.total_changes ?? 0})
+          </button>
         </div>
       </div>
+
+      {/* Tab Content */}
+      {activeTab === 'conversation' ? (
+        <div className="card p-4">
+          <h2 className="text-lg font-semibold text-sindri-100 mb-4">
+            Conversation ({session.turns?.length ?? 0} turns)
+          </h2>
+          <div className="space-y-4">
+            {session.turns?.length === 0 ? (
+              <p className="text-sindri-500 text-center py-4">No turns yet</p>
+            ) : (
+              session.turns?.map((turn, index) => (
+                <TurnDisplay key={index} turn={turn} />
+              ))
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="card p-4">
+          <h2 className="text-lg font-semibold text-sindri-100 mb-4">
+            File Changes
+          </h2>
+          <CodeDiffViewer
+            fileChanges={fileChanges ?? null}
+            isLoading={fileChangesLoading}
+            error={fileChangesError}
+          />
+        </div>
+      )}
     </div>
   )
 }

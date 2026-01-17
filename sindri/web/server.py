@@ -108,6 +108,31 @@ class HealthResponse(BaseModel):
     timestamp: str
 
 
+class FileChangeResponse(BaseModel):
+    """Individual file change from a session."""
+    file_path: str
+    operation: str  # 'read', 'write', 'edit'
+    turn_index: int
+    timestamp: str
+    success: bool
+    # For write operations
+    new_content: Optional[str] = None
+    content_size: Optional[int] = None
+    # For edit operations
+    old_text: Optional[str] = None
+    new_text: Optional[str] = None
+    # For read operations (used as "before" context)
+    read_content: Optional[str] = None
+
+
+class FileChangesResponse(BaseModel):
+    """All file changes from a session."""
+    session_id: str
+    file_changes: list[FileChangeResponse]
+    files_modified: list[str]
+    total_changes: int
+
+
 class WebSocketMessage(BaseModel):
     """WebSocket message format."""
     type: str
@@ -369,6 +394,114 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
                 }
                 for turn in session.turns
             ]
+        )
+
+    @app.get("/api/sessions/{session_id}/file-changes", response_model=FileChangesResponse, tags=["Sessions"])
+    async def get_session_file_changes(
+        session_id: str,
+        include_content: bool = Query(default=True, description="Include file content in response")
+    ):
+        """Get all file changes from a session for diff visualization.
+
+        Extracts file operations (read, write, edit) from session turns and
+        returns structured data for rendering diffs.
+        """
+        # Handle short session IDs
+        full_id = session_id
+        if len(session_id) < 36:
+            sessions = await api.state.list_sessions(limit=100)
+            matching = [s for s in sessions if s["id"].startswith(session_id)]
+            if not matching:
+                raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+            if len(matching) > 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Ambiguous session ID '{session_id}', matches: {[m['id'][:8] for m in matching]}"
+                )
+            full_id = matching[0]["id"]
+
+        session = await api.state.load_session(full_id)
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+
+        # Extract file changes from turns
+        file_changes: list[FileChangeResponse] = []
+        files_modified: set[str] = set()
+
+        for turn_index, turn in enumerate(session.turns):
+            if not turn.tool_calls:
+                continue
+
+            for tool_call in turn.tool_calls:
+                # Handle both dict and object formats
+                if isinstance(tool_call, dict):
+                    func = tool_call.get("function", {})
+                    tool_name = func.get("name", "")
+                    args = func.get("arguments", {})
+                else:
+                    # Object format
+                    func = getattr(tool_call, "function", None)
+                    tool_name = getattr(func, "name", "") if func else ""
+                    args = getattr(func, "arguments", {}) if func else {}
+
+                # Parse arguments if string (JSON)
+                if isinstance(args, str):
+                    try:
+                        args = json.loads(args)
+                    except json.JSONDecodeError:
+                        args = {}
+
+                # Process file operations
+                if tool_name == "read_file":
+                    file_path = args.get("path", "")
+                    if file_path:
+                        # For reads, we store content for context (before state)
+                        # Content will be in tool result, but we capture the path
+                        file_changes.append(FileChangeResponse(
+                            file_path=file_path,
+                            operation="read",
+                            turn_index=turn_index,
+                            timestamp=turn.created_at.isoformat(),
+                            success=True,  # Assume success if in tool_calls
+                            read_content=None  # Would need tool result parsing
+                        ))
+
+                elif tool_name == "write_file":
+                    file_path = args.get("path", "")
+                    content = args.get("content", "") if include_content else None
+                    if file_path:
+                        files_modified.add(file_path)
+                        file_changes.append(FileChangeResponse(
+                            file_path=file_path,
+                            operation="write",
+                            turn_index=turn_index,
+                            timestamp=turn.created_at.isoformat(),
+                            success=True,
+                            new_content=content,
+                            content_size=len(args.get("content", ""))
+                        ))
+
+                elif tool_name == "edit_file":
+                    file_path = args.get("path", "")
+                    old_text = args.get("old_text", "") if include_content else None
+                    new_text = args.get("new_text", "") if include_content else None
+                    if file_path:
+                        files_modified.add(file_path)
+                        file_changes.append(FileChangeResponse(
+                            file_path=file_path,
+                            operation="edit",
+                            turn_index=turn_index,
+                            timestamp=turn.created_at.isoformat(),
+                            success=True,
+                            old_text=old_text,
+                            new_text=new_text
+                        ))
+
+        return FileChangesResponse(
+            session_id=full_id,
+            file_changes=file_changes,
+            files_modified=sorted(files_modified),
+            total_changes=len(file_changes)
         )
 
     # ===== Task Endpoints =====
