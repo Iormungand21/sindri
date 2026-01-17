@@ -1721,6 +1721,494 @@ def feedback_list(min_rating: int, max_rating: int, training_only: bool, limit: 
     asyncio.run(list_feedback())
 
 
+# ============================================
+# Phase 9.2: Remote Collaboration Commands
+# ============================================
+
+
+@cli.command()
+@click.argument("session_id")
+@click.option("--permission", "-p", type=click.Choice(["read", "comment", "write"]), default="read", help="Permission level")
+@click.option("--expires", "-e", type=float, help="Hours until link expires")
+@click.option("--max-uses", "-m", type=int, help="Maximum number of uses")
+@click.option("--user", "-u", help="Your username (optional)")
+def share(session_id: str, permission: str, expires: float = None, max_uses: int = None, user: str = None):
+    """Create a share link for a session.
+
+    SESSION_ID can be the full UUID or first 8 characters.
+
+    Permission levels:
+    - read: View session only
+    - comment: View + add comments
+    - write: View + comment + continue session (future)
+
+    Examples:
+
+        sindri share abc12345
+
+        sindri share abc12345 -p comment -e 24
+
+        sindri share abc12345 --max-uses 5 --user alice
+    """
+    from sindri.collaboration import ShareStore, SharePermission
+
+    async def do_share():
+        state = SessionState()
+        share_store = ShareStore()
+
+        # Resolve short session ID
+        full_session_id = session_id
+        if len(session_id) < 36:
+            all_sessions = await state.list_sessions(limit=100)
+            matching = [s for s in all_sessions if s["id"].startswith(session_id)]
+
+            if not matching:
+                console.print(f"[red]✗ No session found starting with {session_id}[/]")
+                console.print("[dim]Use 'sindri sessions' to list available sessions[/dim]")
+                return False
+            elif len(matching) > 1:
+                console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
+                for m in matching:
+                    console.print(f"  • {m['id'][:8]} - {m['task'][:50]}")
+                console.print("[dim]Use more characters to be specific[/dim]")
+                return False
+
+            full_session_id = matching[0]["id"]
+
+        # Verify session exists
+        session = await state.load_session(full_session_id)
+        if not session:
+            console.print(f"[red]✗ Session {full_session_id} not found[/]")
+            return False
+
+        # Map permission string to enum
+        perm_map = {
+            "read": SharePermission.READ,
+            "comment": SharePermission.COMMENT,
+            "write": SharePermission.WRITE,
+        }
+
+        # Create share
+        share_obj = await share_store.create_share(
+            session_id=full_session_id,
+            permission=perm_map[permission],
+            created_by=user,
+            expires_in_hours=expires,
+            max_uses=max_uses,
+        )
+
+        # Display share link
+        share_url = share_obj.get_share_url()
+        console.print(f"[green]✓ Share link created![/green]\n")
+        console.print(f"[bold cyan]{share_url}[/bold cyan]\n")
+        console.print(f"  Session: {full_session_id[:8]} - {session.task[:40]}...")
+        console.print(f"  Permission: {permission}")
+        if expires:
+            console.print(f"  Expires: in {expires} hours")
+        if max_uses:
+            console.print(f"  Max uses: {max_uses}")
+
+        console.print("\n[dim]Share this link to give others access to the session[/dim]")
+        return True
+
+    asyncio.run(do_share())
+
+
+@cli.command("share-list")
+@click.argument("session_id")
+def share_list(session_id: str):
+    """List all share links for a session.
+
+    SESSION_ID can be the full UUID or first 8 characters.
+
+    Example:
+
+        sindri share-list abc12345
+    """
+    from rich.table import Table
+    from sindri.collaboration import ShareStore
+
+    async def list_shares():
+        state = SessionState()
+        share_store = ShareStore()
+
+        # Resolve short session ID
+        full_session_id = session_id
+        if len(session_id) < 36:
+            all_sessions = await state.list_sessions(limit=100)
+            matching = [s for s in all_sessions if s["id"].startswith(session_id)]
+
+            if not matching:
+                console.print(f"[red]✗ No session found starting with {session_id}[/]")
+                return
+            elif len(matching) > 1:
+                console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
+                for m in matching:
+                    console.print(f"  • {m['id'][:8]} - {m['task'][:50]}")
+                return
+
+            full_session_id = matching[0]["id"]
+
+        shares = await share_store.get_shares_for_session(full_session_id)
+
+        if not shares:
+            console.print(f"[yellow]No shares found for session {full_session_id[:8]}[/]")
+            console.print("[dim]Create one with: sindri share <session_id>[/dim]")
+            return
+
+        table = Table(title=f"Share Links for {full_session_id[:8]}")
+        table.add_column("ID", width=6)
+        table.add_column("Token", width=12)
+        table.add_column("Permission", width=10)
+        table.add_column("Status", width=10)
+        table.add_column("Uses", justify="right", width=8)
+        table.add_column("Created", width=16)
+
+        for s in shares:
+            # Status
+            if not s.is_active:
+                status = "[red]revoked[/red]"
+            elif s.is_expired:
+                status = "[yellow]expired[/yellow]"
+            elif s.is_exhausted:
+                status = "[yellow]exhausted[/yellow]"
+            else:
+                status = "[green]active[/green]"
+
+            # Uses
+            uses_str = str(s.use_count)
+            if s.max_uses:
+                uses_str += f"/{s.max_uses}"
+
+            table.add_row(
+                str(s.id),
+                s.share_token[:10] + "...",
+                s.permission.value,
+                status,
+                uses_str,
+                s.created_at.strftime("%Y-%m-%d %H:%M"),
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Revoke a share: sindri share-revoke <id>[/dim]")
+
+    asyncio.run(list_shares())
+
+
+@cli.command("share-revoke")
+@click.argument("share_id", type=int)
+def share_revoke(share_id: int):
+    """Revoke a share link.
+
+    SHARE_ID is the numeric ID from 'sindri share-list'.
+
+    Example:
+
+        sindri share-revoke 5
+    """
+    from sindri.collaboration import ShareStore
+
+    async def revoke():
+        share_store = ShareStore()
+
+        success = await share_store.revoke_share(share_id)
+
+        if success:
+            console.print(f"[green]✓ Share {share_id} revoked[/green]")
+            console.print("[dim]The link will no longer grant access[/dim]")
+        else:
+            console.print(f"[red]✗ Share {share_id} not found[/]")
+
+    asyncio.run(revoke())
+
+
+@cli.command()
+@click.argument("session_id")
+@click.argument("content")
+@click.option("--turn", "-t", type=int, help="Turn index to attach comment to")
+@click.option("--line", "-l", type=int, help="Line number within turn")
+@click.option("--type", "-T", "comment_type", type=click.Choice(["comment", "suggestion", "question", "issue", "praise", "note"]), default="comment", help="Comment type")
+@click.option("--author", "-a", default="cli", help="Author name")
+def comment(session_id: str, content: str, turn: int = None, line: int = None, comment_type: str = "comment", author: str = "cli"):
+    """Add a review comment to a session.
+
+    SESSION_ID can be the full UUID or first 8 characters.
+    CONTENT is the comment text (supports markdown).
+
+    Examples:
+
+        sindri comment abc12345 "Great use of type hints!"
+
+        sindri comment abc12345 "Consider using a list comprehension" -t 3 -T suggestion
+
+        sindri comment abc12345 "Why this approach?" -t 5 -l 42 -T question
+    """
+    from sindri.collaboration import CommentStore, SessionComment, CommentType
+
+    async def add_comment():
+        state = SessionState()
+        comment_store = CommentStore()
+
+        # Resolve short session ID
+        full_session_id = session_id
+        if len(session_id) < 36:
+            all_sessions = await state.list_sessions(limit=100)
+            matching = [s for s in all_sessions if s["id"].startswith(session_id)]
+
+            if not matching:
+                console.print(f"[red]✗ No session found starting with {session_id}[/]")
+                return False
+            elif len(matching) > 1:
+                console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
+                for m in matching:
+                    console.print(f"  • {m['id'][:8]} - {m['task'][:50]}")
+                return False
+
+            full_session_id = matching[0]["id"]
+
+        # Verify session exists
+        session = await state.load_session(full_session_id)
+        if not session:
+            console.print(f"[red]✗ Session {full_session_id} not found[/]")
+            return False
+
+        # Validate turn index if provided
+        if turn is not None and (turn < 0 or turn >= len(session.turns)):
+            console.print(f"[red]✗ Invalid turn {turn}. Session has {len(session.turns)} turns (0-{len(session.turns)-1})[/]")
+            return False
+
+        # Map type string to enum
+        type_map = {
+            "comment": CommentType.COMMENT,
+            "suggestion": CommentType.SUGGESTION,
+            "question": CommentType.QUESTION,
+            "issue": CommentType.ISSUE,
+            "praise": CommentType.PRAISE,
+            "note": CommentType.NOTE,
+        }
+
+        # Create comment
+        c = SessionComment(
+            session_id=full_session_id,
+            author=author,
+            content=content,
+            turn_index=turn,
+            line_number=line,
+            comment_type=type_map[comment_type],
+        )
+
+        saved = await comment_store.add_comment(c)
+
+        # Type icons
+        type_icons = {
+            "comment": "💬",
+            "suggestion": "💡",
+            "question": "❓",
+            "issue": "🐛",
+            "praise": "👍",
+            "note": "📝",
+        }
+
+        console.print(f"[green]✓ Comment added![/green]")
+        console.print(f"  {type_icons.get(comment_type, '💬')} [{comment_type}] by {author}")
+        if turn is not None:
+            loc = f"Turn {turn}"
+            if line is not None:
+                loc += f", Line {line}"
+            console.print(f"  📍 {loc}")
+        console.print(f"  {content[:60]}{'...' if len(content) > 60 else ''}")
+
+        return True
+
+    asyncio.run(add_comment())
+
+
+@cli.command("comment-list")
+@click.argument("session_id")
+@click.option("--include-resolved", "-r", is_flag=True, help="Include resolved comments")
+@click.option("--turn", "-t", type=int, help="Filter by turn index")
+def comment_list(session_id: str, include_resolved: bool = False, turn: int = None):
+    """List comments on a session.
+
+    SESSION_ID can be the full UUID or first 8 characters.
+
+    Examples:
+
+        sindri comment-list abc12345
+
+        sindri comment-list abc12345 --include-resolved
+
+        sindri comment-list abc12345 -t 5
+    """
+    from rich.table import Table
+    from sindri.collaboration import CommentStore
+
+    async def list_comments():
+        state = SessionState()
+        comment_store = CommentStore()
+
+        # Resolve short session ID
+        full_session_id = session_id
+        if len(session_id) < 36:
+            all_sessions = await state.list_sessions(limit=100)
+            matching = [s for s in all_sessions if s["id"].startswith(session_id)]
+
+            if not matching:
+                console.print(f"[red]✗ No session found starting with {session_id}[/]")
+                return
+            elif len(matching) > 1:
+                console.print(f"[yellow]⚠ Multiple sessions match {session_id}:[/]")
+                for m in matching:
+                    console.print(f"  • {m['id'][:8]} - {m['task'][:50]}")
+                return
+
+            full_session_id = matching[0]["id"]
+
+        if turn is not None:
+            comments = await comment_store.get_comments_for_turn(full_session_id, turn)
+        else:
+            comments = await comment_store.get_comments_for_session(full_session_id, include_resolved=include_resolved)
+
+        if not comments:
+            console.print(f"[yellow]No comments found for session {full_session_id[:8]}[/]")
+            console.print("[dim]Add one with: sindri comment <session_id> \"comment text\"[/dim]")
+            return
+
+        # Type icons
+        type_icons = {
+            "comment": "💬",
+            "suggestion": "💡",
+            "question": "❓",
+            "issue": "🐛",
+            "praise": "👍",
+            "note": "📝",
+        }
+
+        table = Table(title=f"Comments on {full_session_id[:8]}")
+        table.add_column("ID", width=5)
+        table.add_column("Type", width=4)
+        table.add_column("Author", width=12)
+        table.add_column("Location", width=12)
+        table.add_column("Content", width=40)
+        table.add_column("Status", width=10)
+
+        for c in comments:
+            icon = type_icons.get(c.comment_type.value, "💬")
+
+            # Location
+            if c.turn_index is not None:
+                loc = f"Turn {c.turn_index}"
+                if c.line_number is not None:
+                    loc += f":{c.line_number}"
+            else:
+                loc = "Session"
+
+            # Status color
+            if c.status.value == "open":
+                status = "[yellow]open[/yellow]"
+            elif c.status.value == "resolved":
+                status = "[green]resolved[/green]"
+            else:
+                status = f"[dim]{c.status.value}[/dim]"
+
+            # Content preview
+            content_preview = c.content[:37] + "..." if len(c.content) > 40 else c.content
+            content_preview = content_preview.replace("\n", " ")
+
+            table.add_row(
+                str(c.id),
+                icon,
+                c.author[:12],
+                loc,
+                content_preview,
+                status,
+            )
+
+        console.print(table)
+
+        # Summary
+        open_count = sum(1 for c in comments if c.status.value == "open")
+        console.print(f"\n[dim]Total: {len(comments)} | Open: {open_count}[/dim]")
+
+    asyncio.run(list_comments())
+
+
+@cli.command("comment-resolve")
+@click.argument("comment_id", type=int)
+def comment_resolve(comment_id: int):
+    """Resolve a comment.
+
+    COMMENT_ID is the numeric ID from 'sindri comment-list'.
+
+    Example:
+
+        sindri comment-resolve 5
+    """
+    from sindri.collaboration import CommentStore
+
+    async def resolve():
+        comment_store = CommentStore()
+
+        success = await comment_store.resolve_comment(comment_id)
+
+        if success:
+            console.print(f"[green]✓ Comment {comment_id} resolved[/green]")
+        else:
+            console.print(f"[red]✗ Comment {comment_id} not found[/]")
+
+    asyncio.run(resolve())
+
+
+@cli.command("collab-stats")
+def collab_stats():
+    """Show collaboration statistics.
+
+    Displays statistics about session sharing, comments, and activity.
+    """
+    from sindri.collaboration import ShareStore, CommentStore
+
+    async def show_stats():
+        share_store = ShareStore()
+        comment_store = CommentStore()
+
+        share_stats = await share_store.get_share_stats()
+        comment_stats = await comment_store.get_comment_stats()
+
+        console.print("[bold]🤝 Collaboration Statistics[/bold]\n")
+
+        # Sharing stats
+        console.print("[bold]📤 Session Sharing:[/bold]")
+        console.print(f"  Total shares: {share_stats['total_shares']}")
+        console.print(f"  Active shares: {share_stats['active_shares']}")
+        console.print(f"  Sessions shared: {share_stats['sessions_shared']}")
+        console.print(f"  Total link uses: {share_stats['total_uses']}")
+
+        if share_stats["permission_breakdown"]:
+            console.print("  Permissions:")
+            for perm, count in share_stats["permission_breakdown"].items():
+                console.print(f"    • {perm}: {count}")
+
+        console.print()
+
+        # Comment stats
+        console.print("[bold]💬 Review Comments:[/bold]")
+        console.print(f"  Total comments: {comment_stats['total_comments']}")
+        console.print(f"  Sessions with comments: {comment_stats['sessions_commented']}")
+        console.print(f"  Unique authors: {comment_stats['unique_authors']}")
+
+        if comment_stats["status_breakdown"]:
+            console.print("  Status:")
+            for status, count in comment_stats["status_breakdown"].items():
+                console.print(f"    • {status}: {count}")
+
+        if comment_stats["type_breakdown"]:
+            console.print("  Types:")
+            for ctype, count in comment_stats["type_breakdown"].items():
+                console.print(f"    • {ctype}: {count}")
+
+    asyncio.run(show_stats())
+
+
 @cli.command()
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", "-p", default=8000, help="Port to listen on")

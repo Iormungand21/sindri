@@ -140,6 +140,88 @@ class WebSocketMessage(BaseModel):
     timestamp: float
 
 
+# Collaboration models
+class ShareCreateRequest(BaseModel):
+    """Request to create a session share."""
+    permission: str = Field(default="read", description="Permission level: read, comment, write")
+    expires_in_hours: Optional[float] = Field(default=None, description="Hours until expiration")
+    max_uses: Optional[int] = Field(default=None, description="Maximum number of uses")
+    created_by: Optional[str] = Field(default=None, description="Creator identifier")
+
+
+class ShareResponse(BaseModel):
+    """Session share response."""
+    id: int
+    session_id: str
+    share_token: str
+    share_url: str
+    permission: str
+    expires_at: Optional[str] = None
+    max_uses: Optional[int] = None
+    use_count: int
+    is_active: bool
+    is_valid: bool
+    created_at: str
+
+
+class CommentCreateRequest(BaseModel):
+    """Request to create a comment."""
+    author: str = Field(..., min_length=1, description="Comment author")
+    content: str = Field(..., min_length=1, description="Comment text (markdown supported)")
+    turn_index: Optional[int] = Field(default=None, description="Turn to attach comment to")
+    line_number: Optional[int] = Field(default=None, description="Line within turn")
+    comment_type: str = Field(default="comment", description="Type: comment, suggestion, question, issue, praise, note")
+    parent_id: Optional[int] = Field(default=None, description="Parent comment ID for replies")
+
+
+class CommentResponse(BaseModel):
+    """Comment response."""
+    id: int
+    session_id: str
+    author: str
+    content: str
+    turn_index: Optional[int] = None
+    line_number: Optional[int] = None
+    comment_type: str
+    status: str
+    parent_id: Optional[int] = None
+    is_reply: bool
+    is_resolved: bool
+    created_at: str
+    updated_at: str
+
+
+class CommentUpdateRequest(BaseModel):
+    """Request to update a comment."""
+    content: Optional[str] = Field(default=None, description="New content")
+    status: Optional[str] = Field(default=None, description="New status: open, resolved, wontfix, outdated")
+
+
+class ParticipantResponse(BaseModel):
+    """Participant in a collaborative session."""
+    user_id: str
+    display_name: str
+    session_id: str
+    status: str
+    cursor_turn: Optional[int] = None
+    cursor_line: Optional[int] = None
+    color: Optional[str] = None
+    joined_at: str
+    is_idle: bool
+
+
+class JoinSessionRequest(BaseModel):
+    """Request to join a session for collaboration."""
+    user_id: str = Field(..., min_length=1, description="Unique user identifier")
+    display_name: str = Field(..., min_length=1, description="Display name")
+
+
+class CursorUpdateRequest(BaseModel):
+    """Request to update cursor position."""
+    turn_index: Optional[int] = Field(default=None, description="Turn being viewed")
+    line_number: Optional[int] = Field(default=None, description="Line within turn")
+
+
 class SindriAPI:
     """Sindri API application state."""
 
@@ -152,10 +234,32 @@ class SindriAPI:
         self.active_tasks: dict[str, dict] = {}
         self.websocket_connections: list[WebSocket] = []
 
+        # Collaboration components
+        self.share_store: Optional["ShareStore"] = None
+        self.comment_store: Optional["CommentStore"] = None
+        self.presence_manager: Optional["PresenceManager"] = None
+
     async def initialize(self):
         """Initialize API components."""
         await self.state.db.initialize()
         self.model_manager = ModelManager(total_vram_gb=self.vram_gb)
+
+        # Initialize collaboration components
+        from sindri.collaboration.sharing import ShareStore
+        from sindri.collaboration.comments import CommentStore
+        from sindri.collaboration.presence import PresenceManager
+
+        self.share_store = ShareStore(self.state.db)
+        self.comment_store = CommentStore(self.state.db)
+        self.presence_manager = PresenceManager()
+
+        # Start presence cleanup task
+        self.presence_manager.start_cleanup_task()
+
+        # Register presence callbacks for WebSocket broadcast
+        self.presence_manager.on_join(self._broadcast_presence_join)
+        self.presence_manager.on_leave(self._broadcast_presence_leave)
+        self.presence_manager.on_update(self._broadcast_presence_update)
 
         # Clean up stale sessions on startup
         # Any "active" sessions from before server start are clearly not running
@@ -167,7 +271,7 @@ class SindriAPI:
         for event_type in EventType:
             self.event_bus.subscribe(event_type, self._broadcast_event_sync)
 
-        log.info("sindri_api_initialized", vram_gb=self.vram_gb)
+        log.info("sindri_api_initialized", vram_gb=self.vram_gb, collaboration_enabled=True)
 
     def _broadcast_event_sync(self, data: Any):
         """Synchronous wrapper for event broadcast (called from EventBus)."""
@@ -198,8 +302,33 @@ class SindriAPI:
         for ws in disconnected:
             self.websocket_connections.remove(ws)
 
+    async def _broadcast_presence_join(self, participant: Any):
+        """Broadcast participant join event."""
+        await self._broadcast_event({
+            "event_type": "presence_join",
+            "participant": participant.to_dict(),
+        })
+
+    async def _broadcast_presence_leave(self, participant: Any):
+        """Broadcast participant leave event."""
+        await self._broadcast_event({
+            "event_type": "presence_leave",
+            "participant": participant.to_dict(),
+        })
+
+    async def _broadcast_presence_update(self, participant: Any):
+        """Broadcast participant update event."""
+        await self._broadcast_event({
+            "event_type": "presence_update",
+            "participant": participant.to_dict(),
+        })
+
     async def shutdown(self):
         """Clean shutdown of API components."""
+        # Stop presence manager cleanup task
+        if self.presence_manager:
+            self.presence_manager.stop_cleanup_task()
+
         # Close WebSocket connections
         for ws in self.websocket_connections:
             try:
@@ -655,6 +784,351 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             raise HTTPException(status_code=404, detail=f"Metrics not found for session '{session_id}'")
 
         return metrics.to_dict()
+
+    # ===== Collaboration Endpoints =====
+
+    @app.post("/api/sessions/{session_id}/share", response_model=ShareResponse, tags=["Collaboration"])
+    async def create_share(session_id: str, request: ShareCreateRequest):
+        """Create a share link for a session.
+
+        Allows sharing a session with others via a unique link.
+        Permissions: read (view only), comment (view + add comments), write (full access).
+        """
+        from sindri.collaboration.sharing import SharePermission
+
+        # Verify session exists
+        full_id = await _resolve_session_id(api, session_id)
+
+        # Create share
+        try:
+            permission = SharePermission(request.permission)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid permission: {request.permission}")
+
+        share = await api.share_store.create_share(
+            session_id=full_id,
+            permission=permission,
+            created_by=request.created_by,
+            expires_in_hours=request.expires_in_hours,
+            max_uses=request.max_uses,
+        )
+
+        return ShareResponse(
+            id=share.id,
+            session_id=share.session_id,
+            share_token=share.share_token,
+            share_url=share.get_share_url(),
+            permission=share.permission.value,
+            expires_at=share.expires_at.isoformat() if share.expires_at else None,
+            max_uses=share.max_uses,
+            use_count=share.use_count,
+            is_active=share.is_active,
+            is_valid=share.is_valid,
+            created_at=share.created_at.isoformat(),
+        )
+
+    @app.get("/api/sessions/{session_id}/shares", response_model=list[ShareResponse], tags=["Collaboration"])
+    async def list_shares(session_id: str):
+        """List all share links for a session."""
+        full_id = await _resolve_session_id(api, session_id)
+
+        shares = await api.share_store.get_shares_for_session(full_id)
+
+        return [
+            ShareResponse(
+                id=s.id,
+                session_id=s.session_id,
+                share_token=s.share_token,
+                share_url=s.get_share_url(),
+                permission=s.permission.value,
+                expires_at=s.expires_at.isoformat() if s.expires_at else None,
+                max_uses=s.max_uses,
+                use_count=s.use_count,
+                is_active=s.is_active,
+                is_valid=s.is_valid,
+                created_at=s.created_at.isoformat(),
+            )
+            for s in shares
+        ]
+
+    @app.get("/api/share/{share_token}", tags=["Collaboration"])
+    async def get_shared_session(share_token: str):
+        """Access a shared session via share token.
+
+        Returns session details if the share is valid.
+        """
+        share = await api.share_store.validate_and_use_share(share_token)
+        if not share:
+            raise HTTPException(status_code=404, detail="Share link not found or expired")
+
+        # Load the session
+        session = await api.state.load_session(share.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Shared session not found")
+
+        return {
+            "share": share.to_dict(),
+            "session": {
+                "id": session.id,
+                "task": session.task,
+                "model": session.model,
+                "status": session.status,
+                "created_at": session.created_at.isoformat(),
+                "completed_at": session.completed_at.isoformat() if session.completed_at else None,
+                "iterations": session.iterations,
+                "turns": [
+                    {
+                        "role": t.role,
+                        "content": t.content,
+                        "tool_calls": t.tool_calls,
+                        "created_at": t.created_at.isoformat(),
+                    }
+                    for t in session.turns
+                ],
+            },
+        }
+
+    @app.delete("/api/shares/{share_id}", tags=["Collaboration"])
+    async def revoke_share(share_id: int):
+        """Revoke a share link."""
+        success = await api.share_store.revoke_share(share_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Share not found")
+        return {"message": "Share revoked", "share_id": share_id}
+
+    # ===== Comments Endpoints =====
+
+    @app.post("/api/sessions/{session_id}/comments", response_model=CommentResponse, tags=["Collaboration"])
+    async def create_comment(session_id: str, request: CommentCreateRequest):
+        """Add a review comment to a session."""
+        from sindri.collaboration.comments import SessionComment, CommentType
+
+        full_id = await _resolve_session_id(api, session_id)
+
+        try:
+            comment_type = CommentType(request.comment_type)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Invalid comment type: {request.comment_type}")
+
+        comment = SessionComment(
+            session_id=full_id,
+            author=request.author,
+            content=request.content,
+            turn_index=request.turn_index,
+            line_number=request.line_number,
+            comment_type=comment_type,
+            parent_id=request.parent_id,
+        )
+
+        comment = await api.comment_store.add_comment(comment)
+
+        # Broadcast comment event
+        await api._broadcast_event({
+            "event_type": "comment_added",
+            "comment": comment.to_dict(),
+        })
+
+        return CommentResponse(
+            id=comment.id,
+            session_id=comment.session_id,
+            author=comment.author,
+            content=comment.content,
+            turn_index=comment.turn_index,
+            line_number=comment.line_number,
+            comment_type=comment.comment_type.value,
+            status=comment.status.value,
+            parent_id=comment.parent_id,
+            is_reply=comment.is_reply,
+            is_resolved=comment.is_resolved,
+            created_at=comment.created_at.isoformat(),
+            updated_at=comment.updated_at.isoformat(),
+        )
+
+    @app.get("/api/sessions/{session_id}/comments", response_model=list[CommentResponse], tags=["Collaboration"])
+    async def list_comments(
+        session_id: str,
+        include_resolved: bool = Query(default=True, description="Include resolved comments"),
+    ):
+        """List all comments for a session."""
+        full_id = await _resolve_session_id(api, session_id)
+
+        comments = await api.comment_store.get_comments_for_session(full_id, include_resolved)
+
+        return [
+            CommentResponse(
+                id=c.id,
+                session_id=c.session_id,
+                author=c.author,
+                content=c.content,
+                turn_index=c.turn_index,
+                line_number=c.line_number,
+                comment_type=c.comment_type.value,
+                status=c.status.value,
+                parent_id=c.parent_id,
+                is_reply=c.is_reply,
+                is_resolved=c.is_resolved,
+                created_at=c.created_at.isoformat(),
+                updated_at=c.updated_at.isoformat(),
+            )
+            for c in comments
+        ]
+
+    @app.put("/api/comments/{comment_id}", response_model=CommentResponse, tags=["Collaboration"])
+    async def update_comment(comment_id: int, request: CommentUpdateRequest):
+        """Update a comment's content or status."""
+        from sindri.collaboration.comments import CommentStatus
+
+        status = None
+        if request.status:
+            try:
+                status = CommentStatus(request.status)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid status: {request.status}")
+
+        success = await api.comment_store.update_comment(
+            comment_id, content=request.content, status=status
+        )
+
+        if not success:
+            raise HTTPException(status_code=404, detail="Comment not found")
+
+        comment = await api.comment_store.get_comment(comment_id)
+
+        # Broadcast update
+        await api._broadcast_event({
+            "event_type": "comment_updated",
+            "comment": comment.to_dict(),
+        })
+
+        return CommentResponse(
+            id=comment.id,
+            session_id=comment.session_id,
+            author=comment.author,
+            content=comment.content,
+            turn_index=comment.turn_index,
+            line_number=comment.line_number,
+            comment_type=comment.comment_type.value,
+            status=comment.status.value,
+            parent_id=comment.parent_id,
+            is_reply=comment.is_reply,
+            is_resolved=comment.is_resolved,
+            created_at=comment.created_at.isoformat(),
+            updated_at=comment.updated_at.isoformat(),
+        )
+
+    @app.delete("/api/comments/{comment_id}", tags=["Collaboration"])
+    async def delete_comment(comment_id: int):
+        """Delete a comment and its replies."""
+        success = await api.comment_store.delete_comment(comment_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Comment not found")
+
+        # Broadcast deletion
+        await api._broadcast_event({
+            "event_type": "comment_deleted",
+            "comment_id": comment_id,
+        })
+
+        return {"message": "Comment deleted", "comment_id": comment_id}
+
+    # ===== Presence Endpoints =====
+
+    @app.post("/api/sessions/{session_id}/join", response_model=ParticipantResponse, tags=["Collaboration"])
+    async def join_session(session_id: str, request: JoinSessionRequest):
+        """Join a session for real-time collaboration."""
+        full_id = await _resolve_session_id(api, session_id)
+
+        participant = await api.presence_manager.join_session(
+            session_id=full_id,
+            user_id=request.user_id,
+            display_name=request.display_name,
+        )
+
+        return ParticipantResponse(
+            user_id=participant.user_id,
+            display_name=participant.display_name,
+            session_id=participant.session_id,
+            status=participant.status.value,
+            cursor_turn=participant.cursor_turn,
+            cursor_line=participant.cursor_line,
+            color=participant.color,
+            joined_at=participant.joined_at.isoformat(),
+            is_idle=participant.is_idle,
+        )
+
+    @app.post("/api/sessions/{session_id}/leave", tags=["Collaboration"])
+    async def leave_session(session_id: str, user_id: str = Query(..., description="User ID")):
+        """Leave a collaborative session."""
+        participant = await api.presence_manager.leave_session(user_id)
+        if not participant:
+            raise HTTPException(status_code=404, detail="User not in session")
+
+        return {"message": "Left session", "session_id": session_id}
+
+    @app.get("/api/sessions/{session_id}/participants", response_model=list[ParticipantResponse], tags=["Collaboration"])
+    async def list_participants(session_id: str):
+        """List all participants in a session."""
+        full_id = await _resolve_session_id(api, session_id)
+
+        participants = api.presence_manager.get_session_participants(full_id)
+
+        return [
+            ParticipantResponse(
+                user_id=p.user_id,
+                display_name=p.display_name,
+                session_id=p.session_id,
+                status=p.status.value,
+                cursor_turn=p.cursor_turn,
+                cursor_line=p.cursor_line,
+                color=p.color,
+                joined_at=p.joined_at.isoformat(),
+                is_idle=p.is_idle,
+            )
+            for p in participants
+        ]
+
+    @app.put("/api/users/{user_id}/cursor", tags=["Collaboration"])
+    async def update_cursor(user_id: str, request: CursorUpdateRequest):
+        """Update a participant's cursor position."""
+        participant = await api.presence_manager.update_cursor(
+            user_id=user_id,
+            turn_index=request.turn_index,
+            line_number=request.line_number,
+        )
+
+        if not participant:
+            raise HTTPException(status_code=404, detail="User not in any session")
+
+        return {"message": "Cursor updated"}
+
+    @app.get("/api/collaboration/stats", tags=["Collaboration"])
+    async def get_collaboration_stats():
+        """Get collaboration statistics."""
+        share_stats = await api.share_store.get_share_stats()
+        comment_stats = await api.comment_store.get_comment_stats()
+        presence_stats = api.presence_manager.get_stats()
+
+        return {
+            "shares": share_stats,
+            "comments": comment_stats,
+            "presence": presence_stats,
+        }
+
+    # Helper function for session ID resolution
+    async def _resolve_session_id(api_instance: SindriAPI, session_id: str) -> str:
+        """Resolve a potentially short session ID to full ID."""
+        if len(session_id) >= 36:
+            return session_id
+
+        sessions = await api_instance.state.list_sessions(limit=100)
+        matching = [s for s in sessions if s["id"].startswith(session_id)]
+
+        if not matching:
+            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found")
+        if len(matching) > 1:
+            raise HTTPException(status_code=400, detail=f"Ambiguous session ID '{session_id}'")
+
+        return matching[0]["id"]
 
     # ===== WebSocket Endpoint =====
 
