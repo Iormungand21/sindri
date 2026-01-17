@@ -44,6 +44,12 @@ from sindri.tools.docker import (
     ValidateDockerfileTool,
 )
 from sindri.tools.api_spec import GenerateApiSpecTool, ValidateApiSpecTool
+from sindri.tools.ast_refactoring import (
+    ASTParserTool,
+    FindReferencesTool,
+    ASTSymbolInfoTool,
+    ASTRefactorRenameTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -301,4 +307,9 @@ class ToolRegistry:
         registry.register(ValidateDockerfileTool(work_dir=work_dir))
         registry.register(GenerateApiSpecTool(work_dir=work_dir))
         registry.register(ValidateApiSpecTool(work_dir=work_dir))
+        # AST-based refactoring tools (requires tree-sitter)
+        registry.register(ASTParserTool(work_dir=work_dir))
+        registry.register(FindReferencesTool(work_dir=work_dir))
+        registry.register(ASTSymbolInfoTool(work_dir=work_dir))
+        registry.register(ASTRefactorRenameTool(work_dir=work_dir))
         return registry

@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with API Spec Generator
-**Test Status:** 1575 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (AST-Based Refactoring, Coverage Visualization)
+**Current State:** Production Ready with AST-Based Refactoring
+**Test Status:** 1630 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (Coverage Visualization, Team Mode)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 1575 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1630 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -31,6 +31,56 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### AST-Based Refactoring with Tree-sitter (2026-01-17)
+
+Added precise multi-language code analysis and refactoring using tree-sitter parsers:
+
+**Supported Languages:**
+- Python (.py, .pyi)
+- JavaScript (.js, .jsx)
+- TypeScript (.ts, .tsx)
+- Rust (.rs)
+- Go (.go)
+
+**New Tools:**
+- `parse_ast` - Parse source code into AST structure with node types, names, and positions
+- `find_references` - Find all references to a symbol across files using AST (more accurate than grep)
+- `symbol_info` - Get detailed info about a symbol (type, scope, docstring, parameters)
+- `ast_rename` - Precise symbol renaming using AST (only renames code references, not strings/comments)
+
+**Key Features:**
+- More accurate than regex-based refactoring
+- Extracts docstrings, function parameters, return types
+- Skips excluded directories (node_modules, __pycache__, .git, etc.)
+- Supports dry-run mode for previewing changes
+- Full AST JSON output for code analysis
+
+**Installation:**
+```bash
+pip install -e ".[ast]"  # Install tree-sitter dependencies
+```
+
+**Usage Examples:**
+```python
+# Parse a file's AST
+parse_ast(file_path="src/main.py")
+
+# Find all references to a function
+find_references(symbol_name="calculate_total", path="src/")
+
+# Get detailed info about a symbol
+symbol_info(file_path="utils.py", symbol_name="helper_func")
+
+# Rename a symbol precisely
+ast_rename(old_name="old_func", new_name="new_func", dry_run=True)
+```
+
+**Files:** `sindri/tools/ast_refactoring.py`
+**Tests:** 55 new tests in test_ast_refactoring.py
+**Dependencies:** tree-sitter, tree-sitter-python, tree-sitter-javascript, tree-sitter-typescript, tree-sitter-rust, tree-sitter-go
+
+---
 
 ### CI/CD Fix - Linting, Formatting, and Dependencies (2026-01-17)
 
@@ -294,9 +344,10 @@ GitHub Actions workflow generation and validation:
 | Idunn | Documentation | llama3.1:8b |
 | Vidar | Multi-lang Coder | codestral:22b |
 
-### Tools (40 total)
+### Tools (44 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
+**AST:** parse_ast, find_references, symbol_info, ast_rename
 **Search:** search_code, find_symbol
 **Git:** git_status, git_diff, git_log, git_branch
 **HTTP:** http_request, http_get, http_post

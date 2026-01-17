@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 1513 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1630 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -74,7 +74,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - Voice Interface: Whisper STT, multi-engine TTS, wake word
 - Dependency Scanner: pip-audit, npm audit, cargo audit, govulncheck, SBOM
 
-**Total:** 1575 backend tests + 104 frontend tests (100% passing)
+**Total:** 1630 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -91,7 +91,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| AST-Based Refactoring | Tree-sitter for precise multi-language refactoring | Idea |
+| AST-Based Refactoring | Tree-sitter for precise multi-language refactoring | **Complete** |
 | Dependency Scanner | OWASP/npm audit vulnerability detection | **Complete** |
 | Docker Generator | Auto-generate Dockerfile/docker-compose | **Complete** |
 | API Spec Generator | OpenAPI from route definitions | **Complete** |
@@ -154,6 +154,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | AST-Based Refactoring (tree-sitter, Python/JS/TS/Rust/Go) | +55 |
 | 2026-01-17 | API Spec Generator (OpenAPI 3.0 from Flask/FastAPI/Express/Django/Gin/Echo) | +62 |
 | 2026-01-17 | Docker Generator (Dockerfile, docker-compose, validation) | +64 |
 | 2026-01-17 | Dependency Scanner (pip-audit, npm audit, cargo audit, SBOM) | +58 |
