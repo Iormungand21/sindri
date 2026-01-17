@@ -50,6 +50,11 @@ from sindri.tools.ast_refactoring import (
     ASTSymbolInfoTool,
     ASTRefactorRenameTool,
 )
+from sindri.tools.iac import (
+    GenerateTerraformTool,
+    GeneratePulumiTool,
+    ValidateTerraformTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -312,4 +317,8 @@ class ToolRegistry:
         registry.register(FindReferencesTool(work_dir=work_dir))
         registry.register(ASTSymbolInfoTool(work_dir=work_dir))
         registry.register(ASTRefactorRenameTool(work_dir=work_dir))
+        # Infrastructure as Code tools
+        registry.register(GenerateTerraformTool(work_dir=work_dir))
+        registry.register(GeneratePulumiTool(work_dir=work_dir))
+        registry.register(ValidateTerraformTool(work_dir=work_dir))
         return registry

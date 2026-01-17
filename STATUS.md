@@ -6,9 +6,9 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Coverage Visualization
-**Test Status:** 1670 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (Team Mode, IDE Plugins)
+**Current State:** Production Ready with Infrastructure as Code Generation
+**Test Status:** 1743 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (Team Mode, IDE Plugins, Fine-Tuning Pipeline)
 
 ### Try It Out
 ```bash
@@ -31,6 +31,52 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Infrastructure as Code Generation (2026-01-17)
+
+Added Terraform and Pulumi generation for multi-cloud infrastructure:
+
+**Supported Cloud Providers:**
+- AWS (ECS, Lambda, EKS, EC2, RDS, ElastiCache, SQS, S3, CloudFront, ALB)
+- GCP (Cloud Run, Cloud SQL, Memorystore, Cloud Storage)
+- Azure (Container Apps, PostgreSQL Flexible Server, Redis Cache, Storage)
+
+**Terraform Generation (`sindri terraform`):**
+- Auto-detects project type (Python, Node.js, Rust, Go)
+- Detects infrastructure needs from dependencies (database, cache)
+- Multiple compute types: container, vm, serverless, kubernetes
+- Environment-aware (dev uses FARGATE_SPOT, prod uses FARGATE)
+- Generates complete configurations: main.tf, variables.tf, outputs.tf, providers.tf
+- VPC module integration for AWS
+- Multi-stage resource configuration
+
+**Pulumi Generation (`sindri pulumi`):**
+- Python and TypeScript language support
+- AWS and GCP provider support
+- Generates Pulumi.yaml, requirements.txt/package.json
+- Infrastructure-as-code with type safety
+
+**Terraform Validation (`sindri validate-terraform`):**
+- Syntax validation (brace matching)
+- Sensitive variable detection (password, secret, token, key)
+- Required providers suggestions
+- Variable description recommendations
+
+**CLI Commands:**
+- `sindri terraform` - Generate Terraform for AWS/GCP/Azure
+- `sindri terraform --provider gcp --database postgres --cache redis`
+- `sindri terraform --compute serverless --dry-run`
+- `sindri pulumi` - Generate Pulumi Python code
+- `sindri pulumi --language typescript --provider aws`
+- `sindri validate-terraform` - Validate Terraform files
+
+**Files:**
+- `sindri/tools/iac.py` - GenerateTerraformTool, GeneratePulumiTool, ValidateTerraformTool
+- `tests/test_iac.py` - 73 comprehensive tests
+
+**Tests:** 73 new tests (total: 1743 backend tests)
+
+---
 
 ### Coverage Visualization (2026-01-17)
 
@@ -388,7 +434,7 @@ GitHub Actions workflow generation and validation:
 | Idunn | Documentation | llama3.1:8b |
 | Vidar | Multi-lang Coder | codestral:22b |
 
-### Tools (45 total)
+### Tools (48 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **AST:** parse_ast, find_references, symbol_info, ast_rename
@@ -403,6 +449,7 @@ GitHub Actions workflow generation and validation:
 **Security:** scan_dependencies, generate_sbom, check_outdated
 **Docker:** generate_dockerfile, generate_docker_compose, validate_dockerfile
 **API Spec:** generate_api_spec, validate_api_spec
+**Infrastructure as Code:** generate_terraform, generate_pulumi, validate_terraform
 **Core:** shell, delegate
 
 ### Key Features
@@ -487,6 +534,17 @@ sindri api-spec                # Generate OpenAPI spec
 sindri api-spec --format yaml  # Output as YAML
 sindri api-spec --dry-run      # Preview without writing
 sindri validate-api-spec spec.json  # Validate spec
+
+# Infrastructure as Code
+sindri terraform               # Generate Terraform (AWS default)
+sindri terraform --provider gcp  # Generate for GCP
+sindri terraform --provider azure  # Generate for Azure
+sindri terraform --database postgres --cache redis  # Add services
+sindri terraform --compute serverless  # Lambda/Functions
+sindri terraform --compute kubernetes  # EKS/GKE/AKS
+sindri pulumi                  # Generate Pulumi Python
+sindri pulumi --language typescript  # Generate TypeScript
+sindri validate-terraform      # Validate Terraform files
 
 # Plugins
 sindri plugins list            # List plugins

@@ -3741,5 +3741,216 @@ def web(
         uvicorn.run(app, host=host, port=port, log_level="info")
 
 
+# ============================================
+# Infrastructure as Code Generation Commands
+# ============================================
+
+
+@cli.command("terraform")
+@click.option(
+    "--path", "-p", type=click.Path(exists=True), help="Project path (default: current)"
+)
+@click.option(
+    "--output", "-o", type=click.Path(), help="Output directory (default: terraform/)"
+)
+@click.option(
+    "--provider",
+    type=click.Choice(["aws", "gcp", "azure"]),
+    default="aws",
+    help="Cloud provider",
+)
+@click.option("--region", "-r", help="Cloud region (auto-detected from provider)")
+@click.option(
+    "--environment",
+    "-e",
+    type=click.Choice(["dev", "staging", "prod"]),
+    default="dev",
+    help="Environment",
+)
+@click.option(
+    "--compute",
+    type=click.Choice(["container", "vm", "serverless", "kubernetes"]),
+    default="container",
+    help="Compute type",
+)
+@click.option("--database", "-d", help="Database type: postgres, mysql, mongodb, dynamodb")
+@click.option("--cache", "-c", help="Cache type: redis, memcached")
+@click.option("--queue", "-q", help="Queue type: sqs, pubsub, servicebus, rabbitmq")
+@click.option("--storage", is_flag=True, help="Include object storage (S3/GCS/Blob)")
+@click.option("--cdn", is_flag=True, help="Include CDN (CloudFront/Cloud CDN)")
+@click.option("--load-balancer", is_flag=True, help="Include load balancer")
+@click.option("--project-name", help="Project name (default: directory name)")
+@click.option("--dry-run", is_flag=True, help="Preview without creating files")
+def terraform(
+    path: str,
+    output: str,
+    provider: str,
+    region: str,
+    environment: str,
+    compute: str,
+    database: str,
+    cache: str,
+    queue: str,
+    storage: bool,
+    cdn: bool,
+    load_balancer: bool,
+    project_name: str,
+    dry_run: bool,
+):
+    """Generate Terraform configuration for cloud infrastructure.
+
+    Automatically detects project type and generates appropriate Terraform HCL
+    with support for AWS, GCP, and Azure.
+
+    Examples:
+        sindri terraform
+
+        sindri terraform --provider gcp --region us-central1
+
+        sindri terraform --provider aws --database postgres --cache redis
+
+        sindri terraform --compute serverless --dry-run
+
+        sindri terraform --provider azure --environment prod --load-balancer
+    """
+    from sindri.tools.iac import GenerateTerraformTool
+    from pathlib import Path
+
+    async def execute():
+        work_path = Path(path).resolve() if path else Path.cwd()
+        tool = GenerateTerraformTool(work_dir=work_path)
+
+        result = await tool.execute(
+            path=str(work_path),
+            output_dir=output,
+            provider=provider,
+            region=region,
+            environment=environment,
+            compute_type=compute,
+            database=database,
+            cache=cache,
+            queue=queue,
+            storage=storage,
+            cdn=cdn,
+            load_balancer=load_balancer,
+            project_name=project_name,
+            dry_run=dry_run,
+        )
+
+        if result.success:
+            console.print(f"[green]✓[/green] {result.output}")
+        else:
+            console.print(f"[red]✗[/red] {result.error}")
+
+    asyncio.run(execute())
+
+
+@cli.command("pulumi")
+@click.option(
+    "--path", "-p", type=click.Path(exists=True), help="Project path (default: current)"
+)
+@click.option(
+    "--output", "-o", type=click.Path(), help="Output directory (default: infra/)"
+)
+@click.option(
+    "--language",
+    "-l",
+    type=click.Choice(["python", "typescript"]),
+    default="python",
+    help="Pulumi language",
+)
+@click.option(
+    "--provider",
+    type=click.Choice(["aws", "gcp", "azure"]),
+    default="aws",
+    help="Cloud provider",
+)
+@click.option("--project-name", help="Project name (default: directory name)")
+@click.option("--dry-run", is_flag=True, help="Preview without creating files")
+def pulumi(
+    path: str,
+    output: str,
+    language: str,
+    provider: str,
+    project_name: str,
+    dry_run: bool,
+):
+    """Generate Pulumi infrastructure code.
+
+    Creates Pulumi Python or TypeScript code for cloud infrastructure.
+
+    Examples:
+        sindri pulumi
+
+        sindri pulumi --language typescript --provider aws
+
+        sindri pulumi --provider gcp --dry-run
+
+        sindri pulumi --project-name my-infra --output infrastructure/
+    """
+    from sindri.tools.iac import GeneratePulumiTool
+    from pathlib import Path
+
+    async def execute():
+        work_path = Path(path).resolve() if path else Path.cwd()
+        tool = GeneratePulumiTool(work_dir=work_path)
+
+        result = await tool.execute(
+            path=str(work_path),
+            output_dir=output,
+            language=language,
+            provider=provider,
+            project_name=project_name,
+            dry_run=dry_run,
+        )
+
+        if result.success:
+            console.print(f"[green]✓[/green] {result.output}")
+        else:
+            console.print(f"[red]✗[/red] {result.error}")
+
+    asyncio.run(execute())
+
+
+@cli.command("validate-terraform")
+@click.option(
+    "--path",
+    "-p",
+    type=click.Path(exists=True),
+    help="Terraform directory (default: current)",
+)
+@click.option("--check-formatting", is_flag=True, help="Also check terraform fmt")
+def validate_terraform(path: str, check_formatting: bool):
+    """Validate Terraform configuration files.
+
+    Checks for syntax errors, missing required fields, and best practices.
+
+    Examples:
+        sindri validate-terraform
+
+        sindri validate-terraform --path terraform/
+
+        sindri validate-terraform --check-formatting
+    """
+    from sindri.tools.iac import ValidateTerraformTool
+    from pathlib import Path
+
+    async def execute():
+        work_path = Path(path).resolve() if path else Path.cwd()
+        tool = ValidateTerraformTool(work_dir=work_path)
+
+        result = await tool.execute(
+            path=str(work_path),
+            check_formatting=check_formatting,
+        )
+
+        if result.success:
+            console.print(f"[green]✓[/green] {result.output}")
+        else:
+            console.print(f"[red]✗[/red] {result.output}")
+
+    asyncio.run(execute())
+
+
 if __name__ == "__main__":
     cli()

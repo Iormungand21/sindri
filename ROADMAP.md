@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 45 tools, 1670 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 11 agents, 48 tools, 1743 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -101,10 +101,10 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 
 | Feature | Description | Status |
 |---------|-------------|--------|
+| Infrastructure as Code | Terraform/Pulumi generation for AWS/GCP/Azure | **Complete** |
 | Team Mode | Multi-user sessions, permissions | Idea |
 | IDE Plugins | Neovim, JetBrains support | Idea |
 | Fine-Tuning Pipeline | Streamlined feedback → training → deployment | Idea |
-| Infrastructure as Code | Terraform/Pulumi generation | Idea |
 
 ---
 
@@ -154,6 +154,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Infrastructure as Code (Terraform AWS/GCP/Azure, Pulumi Python/TS) | +73 |
 | 2026-01-17 | Coverage Visualization (Cobertura XML, LCOV, JSON; Web UI) | +40 |
 | 2026-01-17 | AST-Based Refactoring (tree-sitter, Python/JS/TS/Rust/Go) | +55 |
 | 2026-01-17 | API Spec Generator (OpenAPI 3.0 from Flask/FastAPI/Express/Django/Gin/Echo) | +62 |
