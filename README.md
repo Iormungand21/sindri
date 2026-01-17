@@ -4,17 +4,21 @@
 
 Forge code with local LLMs via Ollama, using a hierarchical multi-agent system inspired by Norse mythology. Like the legendary dwarf smith who forged Mjolnir, Sindri crafts your code through iterative refinement.
 
-> **⚠️ Status:** Active development - Core functionality working (hierarchical delegation, TUI, persistence). Some features are planned or partially implemented. See [STATUS.md](STATUS.md) for detailed implementation status.
+> **Status:** Production Ready (v0.1.0) - 11 agents, 32 tools, 1284 tests passing. See [STATUS.md](STATUS.md) for details.
 
 ## Features
 
-- 🏛️ **Hierarchical Multi-Agent System** - Specialized agents delegate tasks to experts
-- 🧠 **Three-Tier Memory System** - Working, episodic, and semantic memory with codebase indexing
+- 🏛️ **Hierarchical Multi-Agent System** - 11 specialized agents delegate tasks to experts
+- 🧠 **Five-Tier Memory System** - Working, episodic, semantic, pattern, and analysis memory
 - 🎨 **Rich Terminal UI** - Monitor agent activity, task trees, and VRAM usage in real-time
+- 🌐 **Web UI** - React dashboard with agent graph, session replay, and code diff viewer
+- ⚡ **Parallel Execution** - Independent tasks run concurrently with VRAM-aware batching
 - 💾 **Crash Recovery** - Automatic checkpointing and session restoration
-- 🔄 **Automatic Retry** - Exponential backoff for transient failures
-- 📊 **VRAM Management** - Intelligent model loading with LRU eviction for AMD/NVIDIA GPUs
+- 🔄 **Error Recovery** - Classification, retry, stuck detection, and model fallback
+- 📊 **VRAM Management** - Intelligent model loading with LRU eviction and pre-warming
 - 🗄️ **Vector Search** - Semantic codebase search with sqlite-vec and local embeddings
+- 🔌 **Plugin System** - Custom tools and agents without modifying Sindri
+- 🤝 **Collaboration** - Session sharing, comments, and real-time presence
 
 ## Installation
 
@@ -22,7 +26,7 @@ Forge code with local LLMs via Ollama, using a hierarchical multi-agent system i
 
 - Python 3.11+
 - [Ollama](https://ollama.ai) installed and running
-- 8GB+ VRAM recommended (works with less for smaller models)
+- 16GB VRAM recommended (works with 8GB+ using smaller models)
 
 ### Install Sindri
 
@@ -31,25 +35,30 @@ Forge code with local LLMs via Ollama, using a hierarchical multi-agent system i
 git clone https://github.com/Iormungand21/sindri.git
 cd sindri
 
-# Install with dev dependencies
-pip install -e ".[dev,tui]"
+# Install with all dependencies
+pip install -e ".[dev,tui,web]"
 
 # Verify installation
 sindri --version
-sindri doctor
+sindri doctor --verbose
 ```
 
-### Pull Recommended Models
+### Pull Required Models
 
 ```bash
-# Core models (total ~23GB)
+# Core models
 ollama pull qwen2.5-coder:14b       # Orchestrator (Brokkr)
-ollama pull deepseek-coder-v2:16b   # Coder (Huginn)
-ollama pull qwen2.5-coder:7b        # Reviewer (Mimir)
+ollama pull qwen2.5-coder:7b        # Coder (Huginn), Tester (Skald)
 ollama pull qwen2.5-coder:3b        # Executor (Ratatoskr)
+ollama pull llama3.1:8b             # Reviewer (Mimir), Docs (Idunn)
 
 # Memory system
 ollama pull nomic-embed-text        # Embeddings
+
+# Optional specialized models
+ollama pull deepseek-r1:14b         # Planner (Odin), Debugger (Baldr)
+ollama pull sqlcoder:7b             # SQL Expert (Fenrir)
+ollama pull codestral:22b           # Multi-language (Vidar)
 ```
 
 ## Quick Start
@@ -57,59 +66,60 @@ ollama pull nomic-embed-text        # Embeddings
 ### Basic Usage
 
 ```bash
-# Simple task
+# Simple task with single agent
 sindri run "Create a hello.py file that prints hello world"
 
-# With specific model
-sindri run "Write a binary search function" --model qwen2.5-coder:14b
-
-# Hierarchical orchestration (uses all agents)
+# Multi-agent orchestration (recommended for complex tasks)
 sindri orchestrate "Build a REST API for a todo list with tests"
 
-# Organize outputs in a specific directory
-sindri run "Generate utility functions" --work-dir ./output
+# Specify work directory for outputs
 sindri orchestrate "Create a blog API" --work-dir ./my_project
 ```
 
-### Interactive TUI
+### Interactive Interfaces
 
 ```bash
-# Launch TUI
+# Terminal UI
 sindri tui
 
-# TUI with initial task
-sindri tui "Refactor the authentication module"
-
-# TUI with work directory for outputs
-sindri tui --work-dir ./my_project
+# Web UI (React dashboard)
+sindri web --port 8000
+# Visit http://localhost:8000
 ```
 
-### Crash Recovery
+### Session Management
 
 ```bash
-# List recoverable sessions
-sindri recover
+# List past sessions
+sindri sessions
 
-# Recover specific session
-sindri recover --session-id abc123
+# Resume interrupted session
+sindri resume <session_id>
 
-# Resume execution
-sindri resume abc123
+# Export session to markdown
+sindri export <session_id>
+
+# View performance metrics
+sindri metrics
 ```
 
 ## Agent Hierarchy
 
-Sindri uses a Norse mythology-themed agent hierarchy:
+Sindri uses 11 Norse mythology-themed specialized agents:
 
-| Agent | Role | Model | Delegates To |
-|-------|------|-------|--------------|
-| **Brokkr** | Master Orchestrator | qwen2.5:14b | All agents |
-| **Huginn** | Code Implementation | deepseek-coder:16b | Ratatoskr |
-| **Mimir** | Code Review | qwen2.5:7b | - |
-| **Ratatoskr** | Fast Executor | qwen2.5:3b | - |
-| **Skald** | Test Writer | llama3.1:8b | - |
-| **Fenrir** | SQL Specialist | qwen2.5-coder:7b | - |
-| **Odin** | Deep Reasoning | deepseek-r1:8b | - |
+| Agent | Role | Model | VRAM |
+|-------|------|-------|------|
+| **Brokkr** | Master Orchestrator | qwen2.5-coder:14b | ~9GB |
+| **Huginn** | Code Implementation | qwen2.5-coder:7b | ~5GB |
+| **Mimir** | Code Review | llama3.1:8b | ~5GB |
+| **Ratatoskr** | Fast Executor | qwen2.5-coder:3b | ~2GB |
+| **Skald** | Test Writer | qwen2.5-coder:7b | ~5GB |
+| **Fenrir** | SQL Specialist | sqlcoder:7b | ~5GB |
+| **Odin** | Strategic Planner | deepseek-r1:14b | ~9GB |
+| **Heimdall** | Security Auditor | qwen3:14b | ~10GB |
+| **Baldr** | Debugger | deepseek-r1:14b | ~9GB |
+| **Idunn** | Documentation | llama3.1:8b | ~5GB |
+| **Vidar** | Multi-language | codestral:22b | ~14GB |
 
 ### Delegation Flow
 
@@ -120,35 +130,80 @@ User Task
 │  Brokkr   │ ─ Plans and delegates
 └─────┬─────┘
       │
-      ├──→ Huginn ──→ Writes implementation ──→ Delegates to Ratatoskr for file ops
+      ├──→ Huginn ──→ Writes implementation ──→ Delegates to Ratatoskr
       │
       ├──→ Mimir ───→ Reviews code quality
       │
-      ├──→ Skald ───→ Generates tests
+      ├──→ Skald ───→ Generates tests ──→ Delegates to Ratatoskr
       │
-      └──→ Fenrir ──→ Handles SQL/database tasks
+      ├──→ Fenrir ──→ Handles SQL/database tasks
+      │
+      ├──→ Heimdall ─→ Security audit
+      │
+      └──→ Idunn ───→ Documentation
 ```
+
+## Tools (32 total)
+
+**Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
+**Search:** search_code, find_symbol
+**Git:** git_status, git_diff, git_log, git_branch
+**HTTP:** http_request, http_get, http_post
+**Testing:** run_tests, check_syntax
+**Formatting:** format_code, lint_code
+**Refactoring:** rename_symbol, extract_function, inline_variable, move_file, batch_rename, split_file, merge_files
+**SQL:** execute_query, describe_schema, explain_query
+**CI/CD:** generate_workflow, validate_workflow
+**Core:** shell, delegate, propose_plan
 
 ## Memory System (Muninn)
 
-Sindri uses a three-tier memory architecture:
+Five-tier memory architecture for intelligent context:
 
-1. **Working Memory (60%)** - Recent conversation and immediate context
-2. **Episodic Memory (20%)** - Summaries of past tasks and sessions
-3. **Semantic Memory (20%)** - Codebase embeddings for relevant file retrieval
-
-### How Memory Works
+| Tier | Budget | Purpose |
+|------|--------|---------|
+| **Working** | 50% | Recent conversation, current task, tool results |
+| **Episodic** | 18% | Past task summaries, what worked/didn't |
+| **Semantic** | 18% | Codebase embeddings, relevant code chunks |
+| **Pattern** | 5% | Learned successful tool sequences |
+| **Analysis** | 9% | Codebase architecture, dependencies, style |
 
 ```bash
-# First run on a project - indexes codebase
+# Memory is enabled by default
 sindri orchestrate "Add user authentication"
-# → Indexes project files, creates embeddings
 
-# Subsequent runs use memory
-sindri orchestrate "Add password reset"
-# → Retrieves relevant auth files from semantic memory
-# → Recalls past auth implementation from episodic memory
+# Disable memory if needed
+sindri orchestrate "Simple task" --no-memory
 ```
+
+## CLI Reference
+
+| Command | Description |
+|---------|-------------|
+| `sindri run <task>` | Execute task with single agent |
+| `sindri orchestrate <task>` | Execute with hierarchical agents |
+| `sindri tui [task]` | Launch terminal UI |
+| `sindri web` | Launch web UI server |
+| `sindri agents` | List all agents |
+| `sindri sessions` | Show past sessions |
+| `sindri resume <id>` | Resume a session |
+| `sindri export <id>` | Export session to markdown |
+| `sindri metrics` | View performance metrics |
+| `sindri doctor` | System health check |
+| `sindri plugins list` | List installed plugins |
+| `sindri projects add <path>` | Register project for cross-project search |
+| `sindri share <session>` | Share session with others |
+| `sindri feedback <session> <rating>` | Rate session for fine-tuning |
+
+### Options
+
+| Option | Description |
+|--------|-------------|
+| `--model, -m` | Specify Ollama model |
+| `--max-iter` | Maximum iterations (default: 50) |
+| `--vram-gb` | Total VRAM available (default: 16.0) |
+| `--work-dir` | Output directory for generated files |
+| `--no-memory` | Disable memory system |
 
 ## Configuration
 
@@ -171,170 +226,30 @@ theme = "dark"
 refresh_rate_ms = 100
 ```
 
-See [CONFIGURATION.md](docs/CONFIGURATION.md) for full options.
+See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full options.
 
 ## Documentation
 
-### 📚 For Users
-
-**Getting Started:**
-- **[Quick Start](docs/QUICKSTART.md)** - Get running in 5 minutes
-- **[Agents Guide](docs/AGENTS.md)** - Understanding agents and when to use them
-- **[Configuration](docs/CONFIGURATION.md)** - Complete configuration reference
-- **[Troubleshooting](docs/TROUBLESHOOTING.md)** - Common issues and solutions
-
-**Task Guides:**
-- **[Code Generation](docs/guides/code-generation.md)** - Generate clean, production code
-- **[Testing](docs/guides/testing.md)** - Create comprehensive test suites
-- **[More guides](docs/guides/)** - Additional task-specific guides
-
-### 🔧 For Developers
-
-**Core Documentation:**
-- **[Architecture](ARCHITECTURE.md)** - System design and technical patterns
-- **[Roadmap](ROADMAP.md)** - Feature roadmap and development plan
-- **[Status](STATUS.md)** - Current implementation status
-- **[Contributing](CONTRIBUTING.md)** - How to contribute
-- **[API Reference](docs/API.md)** - Python API for programmatic use
-
-**Navigation:**
-- **[Documentation Guide](NAVIGATION.md)** - Find what you need quickly
-
-### 🤖 For AI Assistants
-
-- **[Claude Context](CLAUDE.md)** - Project context for Claude Code
-
-## CLI Reference
-
-### Commands
-
-| Command | Description | Status |
-|---------|-------------|--------|
-| `sindri run <task>` | Execute task with single agent | ✅ Working |
-| `sindri tui [task]` | Launch interactive terminal UI | ✅ Working |
-| `sindri orchestrate <task>` | Execute with hierarchical agents | 🚧 Planned |
-| `sindri agents` | List all available agents | 🚧 Planned |
-| `sindri sessions` | Show recent sessions | 🚧 Planned |
-| `sindri recover` | List/recover interrupted sessions | 🚧 Planned |
-| `sindri resume <id>` | Resume a session | 🚧 Planned |
-| `sindri doctor` | Verify installation and config | 🚧 Planned |
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--model, -m` | Specify Ollama model |
-| `--max-iter` | Maximum iterations (default: 50) |
-| `--vram-gb` | Total VRAM available (default: 16.0) |
-| `--no-memory` | Disable memory system |
-
-## Examples
-
-### Code Generation
-
-```bash
-# Generate a module
-sindri run "Create a user authentication module with JWT"
-
-# With orchestration (better for complex tasks)
-sindri orchestrate "Create a REST API with FastAPI for a blog"
-```
-
-### Refactoring
-
-```bash
-sindri orchestrate "Refactor database.py to use async SQLAlchemy"
-```
-
-### Testing
-
-```bash
-sindri run "Write pytest tests for the auth module" --model llama3.1:8b
-```
-
-### SQL Tasks
-
-```bash
-sindri run "Create a migration to add user_roles table"
-```
-
-## Architecture
-
-```
-sindri/
-├── cli.py              # Click CLI
-├── config.py           # Configuration with validation
-├── core/
-│   ├── loop.py         # Ralph-style iteration loop
-│   ├── scheduler.py    # Priority queue with dependencies
-│   ├── delegation.py   # Parent→child task management
-│   ├── recovery.py     # Crash recovery
-│   ├── retry.py        # Retry logic with backoff
-│   └── events.py       # Event bus for TUI
-├── agents/
-│   ├── definitions.py  # AgentDefinition dataclass
-│   ├── registry.py     # All agent configs
-│   └── prompts.py      # System prompts
-├── llm/
-│   ├── client.py       # Async Ollama wrapper
-│   ├── manager.py      # VRAM-aware model loading
-│   └── tool_parser.py  # Text-based tool call parsing
-├── tools/
-│   ├── filesystem.py   # File operations
-│   └── shell.py        # Shell execution
-├── memory/
-│   ├── system.py       # MuninnMemory orchestrator
-│   ├── episodic.py     # Session history
-│   ├── semantic.py     # Codebase embeddings
-│   └── embedder.py     # Local embedding client
-├── persistence/
-│   ├── database.py     # SQLite setup
-│   ├── vectors.py      # sqlite-vec integration
-│   └── state.py        # Session state
-└── tui/
-    ├── app.py          # Textual application
-    └── widgets/        # Custom widgets
-```
-
-## How It Works
-
-### The Ralph Loop
-
-Sindri's core is based on the "Ralph loop" pattern:
-
-```python
-for iteration in range(max_iterations):
-    response = await llm.chat(messages)
-
-    if "<sindri:complete/>" in response:
-        return Success
-
-    tool_results = await execute_tools(response)
-    messages.append(response, tool_results)
-```
-
-### Delegation as Nested Loops
-
-When an agent delegates, it spawns a child loop:
-
-```python
-if tool_call.name == "delegate":
-    child_task = create_child(target_agent, task_description)
-    child_result = await run_child_loop(child_task)
-    return child_result  # Parent resumes with child's result
-```
+| Document | Purpose |
+|----------|---------|
+| [ONBOARDING.md](ONBOARDING.md) | Quick start for new contributors |
+| [STATUS.md](STATUS.md) | Current state and recent changes |
+| [ROADMAP.md](ROADMAP.md) | Future plans and priorities |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Technical design and patterns |
+| [docs/QUICKSTART.md](docs/QUICKSTART.md) | User quick start guide |
+| [docs/AGENTS.md](docs/AGENTS.md) | Agent capabilities and usage |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common issues and solutions |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
 
 ## Development
 
 ```bash
 # Install dev dependencies
-pip install -e ".[dev,tui]"
+pip install -e ".[dev,tui,web]"
 
-# Run tests
+# Run tests (1284 backend + 104 frontend)
 pytest tests/ -v
-
-# Run tests with coverage
-pytest --cov=sindri --cov-report=term-missing
+cd sindri/web/static && npm test -- --run
 
 # Type checking
 mypy sindri/
@@ -345,27 +260,26 @@ ruff check sindri/
 
 ## Troubleshooting
 
-See [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for common issues.
-
-### Quick Fixes
-
 **Ollama not responding:**
 ```bash
-systemctl status ollama  # Check if running
+systemctl --user start ollama
 ollama list              # Verify models
+sindri doctor            # Full health check
 ```
 
 **Out of VRAM:**
 ```bash
-# Use smaller models or reduce reserve
+# Reduce VRAM allocation
 sindri orchestrate "task" --vram-gb 12.0
 ```
 
 **Recover from crash:**
 ```bash
-sindri recover           # List checkpoints
+sindri sessions          # List sessions
 sindri resume <id>       # Continue execution
 ```
+
+See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for more solutions.
 
 ## Contributing
 
@@ -377,9 +291,9 @@ MIT License - see [LICENSE](LICENSE)
 
 ## Acknowledgments
 
-- Inspired by Ralph Loop pattern from [Ralph](https://github.com/anthropics/ralph)
+- Inspired by Ralph Loop pattern
 - Norse mythology for agent naming
-- Built with [Ollama](https://ollama.ai), [Textual](https://textual.textualize.io), and [sqlite-vec](https://github.com/asg017/sqlite-vec)
+- Built with [Ollama](https://ollama.ai), [Textual](https://textual.textualize.io), [FastAPI](https://fastapi.tiangolo.com), [React](https://react.dev), and [sqlite-vec](https://github.com/asg017/sqlite-vec)
 
 ---
 
