@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 32 tools, 1284 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 11 agents, 32 tools, 1335 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -69,8 +69,9 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - CI/CD Integration: workflow generation and validation
 - Agent Fine-Tuning: feedback collection and training export
 - Remote Collaboration: session sharing, comments, presence
+- Plugin Marketplace: install from git/URL/local, search, update
 
-**Total:** 1284 backend tests + 104 frontend tests (100% passing)
+**Total:** 1335 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -81,7 +82,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 | Feature | Description | Status |
 |---------|-------------|--------|
 | Voice Interface | Speech-to-text commands, TTS responses | Planned |
-| Plugin Marketplace | Share and discover community plugins | Planned |
+| Plugin Marketplace | Share and discover community plugins | **Complete** |
 | VS Code Extension | IDE integration with inline commands | Planned |
 
 ### Medium Priority
@@ -151,6 +152,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Plugin Marketplace (install, search, update, uninstall) | +51 |
 | 2026-01-17 | Remote Collaboration (sharing, comments, presence) | +65 |
 | 2026-01-17 | Agent Fine-Tuning (feedback, training export) | +36 |
 | 2026-01-17 | CI/CD Integration (workflow generation/validation) | +63 |

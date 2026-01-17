@@ -6,9 +6,9 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Remote Collaboration
-**Test Status:** 1284 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (Voice Interface, Plugin Marketplace)
+**Current State:** Production Ready with Plugin Marketplace
+**Test Status:** 1335 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (Voice Interface, VS Code Extension)
 
 ### Try It Out
 ```bash
@@ -30,6 +30,34 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Plugin Marketplace (2026-01-17)
+
+Added plugin marketplace for discovering, installing, and managing plugins from various sources:
+
+**Installation Sources:**
+- Local file paths: `sindri marketplace install /path/to/plugin.py`
+- GitHub shorthand: `sindri marketplace install user/repo`
+- Git repositories: `sindri marketplace install https://github.com/user/repo.git --ref v1.0.0`
+- Direct URLs: `sindri marketplace install https://example.com/plugin.py`
+
+**Marketplace Commands:**
+- `sindri marketplace search <query>` - Search plugins by name, description, tags
+- `sindri marketplace install <source>` - Install from various sources
+- `sindri marketplace uninstall <name>` - Remove installed plugin
+- `sindri marketplace update [name]` - Update plugins to latest version
+- `sindri marketplace info <name>` - Show detailed plugin information
+- `sindri marketplace pin <name>` - Pin plugin to prevent auto-updates
+- `sindri marketplace enable <name>` - Enable/disable plugins
+- `sindri marketplace stats` - Show marketplace statistics
+- `sindri marketplace categories` - List available plugin categories
+
+**Plugin Categories:**
+- Tools: filesystem, git, http, database, testing, formatting, refactoring, analysis, security, devops, documentation
+- Agents: coder, reviewer, planner, specialist
+
+**Files:** `sindri/marketplace/` module (metadata.py, index.py, installer.py, search.py)
+**Tests:** 51 new tests in test_marketplace.py
 
 ### Remote Collaboration (2026-01-17)
 
@@ -162,6 +190,13 @@ sindri tui                     # Start TUI
 # Collaboration
 sindri share <session>         # Share session
 sindri comment <session> "msg" # Add comment
+
+# Marketplace
+sindri marketplace search <q>  # Search plugins
+sindri marketplace install <s> # Install plugin
+sindri marketplace uninstall x # Uninstall plugin
+sindri marketplace update      # Update plugins
+sindri marketplace info <name> # Plugin details
 
 # Fine-tuning
 sindri feedback <session> 5    # Rate session

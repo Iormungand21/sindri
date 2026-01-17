@@ -1092,6 +1092,403 @@ def plugins_dirs():
 
 
 # ============================================
+# Plugin Marketplace Commands
+# ============================================
+
+
+@cli.group()
+def marketplace():
+    """Plugin marketplace for discovering and installing plugins."""
+    pass
+
+
+@marketplace.command("search")
+@click.argument("query", required=False, default="")
+@click.option("--type", "-t", "plugin_type", type=click.Choice(["tool", "agent"]), help="Filter by type")
+@click.option("--category", "-c", help="Filter by category")
+@click.option("--tags", help="Filter by tags (comma-separated)")
+@click.option("--installed", "-i", is_flag=True, help="Only show installed plugins")
+def marketplace_search(
+    query: str = "",
+    plugin_type: str = None,
+    category: str = None,
+    tags: str = None,
+    installed: bool = False
+):
+    """Search for plugins by name, description, or tags.
+
+    Examples:
+        sindri marketplace search git
+        sindri marketplace search --type tool
+        sindri marketplace search --category security
+        sindri marketplace search --tags "ai,code"
+    """
+    from rich.table import Table
+    from sindri.marketplace import PluginSearcher, PluginCategory
+
+    searcher = PluginSearcher()
+
+    # Parse category
+    cat = None
+    if category:
+        try:
+            cat = PluginCategory(category.lower())
+        except ValueError:
+            console.print(f"[red]Invalid category: {category}[/red]")
+            console.print(f"[dim]Valid categories: {', '.join(c.value for c in PluginCategory)}[/dim]")
+            return
+
+    # Handle tag-based search
+    if tags:
+        tag_list = [t.strip() for t in tags.split(",")]
+        results = searcher.search_by_tags(tag_list, installed_only=installed)
+    elif query:
+        results = searcher.search(query, plugin_type=plugin_type, category=cat, installed_only=installed)
+    elif plugin_type:
+        results = searcher.search_by_type(plugin_type, installed_only=installed)
+    elif cat:
+        results = searcher.search_by_category(cat, installed_only=installed)
+    else:
+        results = searcher.list_all(installed_only=installed)
+
+    if not results:
+        console.print("[yellow]No plugins found matching your criteria.[/yellow]")
+        return
+
+    table = Table(title=f"🔍 Plugin Search Results ({len(results)})", show_header=True, header_style="bold cyan")
+    table.add_column("Name", style="cyan", width=20)
+    table.add_column("Type", width=8)
+    table.add_column("Version", width=10)
+    table.add_column("Category", width=15)
+    table.add_column("Status", width=12)
+    table.add_column("Description", width=35)
+
+    for r in results:
+        status = "[green]installed[/green]" if r.installed else "[dim]available[/dim]"
+        plugin_type_str = "🔧 tool" if r.plugin_type == "tool" else "🤖 agent"
+        desc = r.description[:32] + "..." if len(r.description) > 35 else r.description
+
+        table.add_row(
+            r.name,
+            plugin_type_str,
+            r.version,
+            r.category,
+            status,
+            desc
+        )
+
+    console.print(table)
+
+
+@marketplace.command("install")
+@click.argument("source")
+@click.option("--name", "-n", help="Override plugin name")
+@click.option("--ref", "-r", help="Git branch/tag/commit (for git sources)")
+@click.option("--no-validate", is_flag=True, help="Skip validation")
+@click.option("--strict", is_flag=True, help="Treat validation warnings as errors")
+def marketplace_install(
+    source: str,
+    name: str = None,
+    ref: str = None,
+    no_validate: bool = False,
+    strict: bool = False
+):
+    """Install a plugin from a source.
+
+    SOURCE can be:
+    - Local path: /path/to/plugin.py
+    - GitHub shorthand: user/repo
+    - Git URL: https://github.com/user/repo.git
+    - Direct URL: https://example.com/plugin.py
+
+    Examples:
+        sindri marketplace install /path/to/my_tool.py
+        sindri marketplace install user/sindri-plugin-example
+        sindri marketplace install https://github.com/user/repo.git --ref v1.0.0
+    """
+    import asyncio
+    from sindri.marketplace import PluginInstaller
+
+    installer = PluginInstaller(
+        validate=not no_validate,
+        strict=strict,
+    )
+
+    console.print(f"[bold]Installing plugin from: {source}[/bold]\n")
+
+    result = asyncio.run(installer.install(source, name=name, ref=ref))
+
+    if result.success:
+        plugin = result.plugin
+        console.print(f"[green]✓ Successfully installed: {plugin.metadata.name} v{plugin.metadata.version}[/green]")
+        console.print(f"  [dim]Type: {plugin.metadata.plugin_type}[/dim]")
+        console.print(f"  [dim]Path: {plugin.installed_path}[/dim]")
+
+        if result.warnings:
+            console.print("\n[yellow]Warnings:[/yellow]")
+            for warning in result.warnings:
+                console.print(f"  ⚠ {warning}")
+    else:
+        console.print(f"[red]✗ Installation failed: {result.error}[/red]")
+
+        if result.validation and result.validation.errors:
+            console.print("\n[bold red]Validation errors:[/bold red]")
+            for _, msg in result.validation.errors:
+                console.print(f"  ✗ {msg}")
+
+
+@marketplace.command("uninstall")
+@click.argument("name")
+@click.option("--force", "-f", is_flag=True, help="Force uninstall without confirmation")
+def marketplace_uninstall(name: str, force: bool = False):
+    """Uninstall an installed plugin.
+
+    Example:
+        sindri marketplace uninstall my_tool
+    """
+    import asyncio
+    from sindri.marketplace import PluginInstaller, MarketplaceIndex
+
+    index = MarketplaceIndex()
+    index.load()
+
+    plugin = index.get(name)
+    if not plugin:
+        console.print(f"[red]Plugin '{name}' is not installed.[/red]")
+        return
+
+    if not force:
+        console.print(f"[bold]Uninstalling plugin: {name}[/bold]")
+        console.print(f"  Version: {plugin.metadata.version}")
+        console.print(f"  Type: {plugin.metadata.plugin_type}")
+        console.print(f"  Path: {plugin.installed_path}")
+        console.print()
+
+        if not click.confirm("Are you sure you want to uninstall this plugin?"):
+            console.print("[yellow]Cancelled.[/yellow]")
+            return
+
+    installer = PluginInstaller(index=index)
+    result = asyncio.run(installer.uninstall(name))
+
+    if result.success:
+        console.print(f"[green]✓ Successfully uninstalled: {name}[/green]")
+    else:
+        console.print(f"[red]✗ Uninstall failed: {result.error}[/red]")
+
+
+@marketplace.command("update")
+@click.argument("name", required=False)
+@click.option("--all", "-a", "update_all", is_flag=True, help="Update all plugins")
+def marketplace_update(name: str = None, update_all: bool = False):
+    """Update installed plugins to latest versions.
+
+    Examples:
+        sindri marketplace update my_tool
+        sindri marketplace update --all
+    """
+    import asyncio
+    from sindri.marketplace import PluginInstaller, MarketplaceIndex
+
+    if not name and not update_all:
+        console.print("[red]Specify a plugin name or use --all to update all plugins.[/red]")
+        return
+
+    index = MarketplaceIndex()
+    index.load()
+
+    if name:
+        plugin = index.get(name)
+        if not plugin:
+            console.print(f"[red]Plugin '{name}' is not installed.[/red]")
+            return
+        if plugin.pinned:
+            console.print(f"[yellow]Plugin '{name}' is pinned. Use 'sindri marketplace pin --unpin {name}' first.[/yellow]")
+            return
+
+    installer = PluginInstaller(index=index)
+    console.print("[bold]Updating plugins...[/bold]\n")
+
+    results = asyncio.run(installer.update(name))
+
+    if not results:
+        console.print("[yellow]No plugins to update.[/yellow]")
+        return
+
+    successes = [r for r in results if r.success]
+    failures = [r for r in results if not r.success]
+
+    for r in successes:
+        console.print(f"[green]✓ Updated: {r.plugin.metadata.name} → v{r.plugin.metadata.version}[/green]")
+
+    for r in failures:
+        console.print(f"[red]✗ Failed: {r.error}[/red]")
+
+    console.print(f"\n[dim]Updated: {len(successes)}, Failed: {len(failures)}[/dim]")
+
+
+@marketplace.command("info")
+@click.argument("name")
+def marketplace_info(name: str):
+    """Show detailed information about a plugin.
+
+    Example:
+        sindri marketplace info my_tool
+    """
+    from sindri.marketplace import PluginSearcher
+
+    searcher = PluginSearcher()
+    result = searcher.get_info(name)
+
+    if not result:
+        console.print(f"[red]Plugin '{name}' not found.[/red]")
+        return
+
+    console.print(f"[bold cyan]Plugin: {result.name}[/bold cyan]\n")
+
+    console.print(f"  [bold]Version:[/bold]     {result.version}")
+    console.print(f"  [bold]Type:[/bold]        {'🔧 Tool' if result.plugin_type == 'tool' else '🤖 Agent'}")
+    console.print(f"  [bold]Category:[/bold]    {result.category}")
+    console.print(f"  [bold]Status:[/bold]      {'[green]Installed[/green]' if result.installed else '[dim]Not installed[/dim]'}")
+
+    if result.description:
+        console.print(f"\n  [bold]Description:[/bold]\n  {result.description}")
+
+    if result.tags:
+        console.print(f"\n  [bold]Tags:[/bold]        {', '.join(result.tags)}")
+
+    if result.installed_path:
+        console.print(f"\n  [bold]Path:[/bold]        {result.installed_path}")
+
+    if result.source:
+        console.print(f"  [bold]Source:[/bold]      {result.source}")
+
+
+@marketplace.command("pin")
+@click.argument("name")
+@click.option("--unpin", is_flag=True, help="Unpin the plugin (allow updates)")
+def marketplace_pin(name: str, unpin: bool = False):
+    """Pin a plugin to prevent automatic updates.
+
+    Example:
+        sindri marketplace pin my_tool
+        sindri marketplace pin --unpin my_tool
+    """
+    from sindri.marketplace import MarketplaceIndex
+
+    index = MarketplaceIndex()
+    index.load()
+
+    plugin = index.get(name)
+    if not plugin:
+        console.print(f"[red]Plugin '{name}' is not installed.[/red]")
+        return
+
+    if unpin:
+        index.set_pinned(name, False)
+        index.save()
+        console.print(f"[green]✓ Unpinned: {name}[/green]")
+        console.print("[dim]This plugin will be included in 'marketplace update --all'[/dim]")
+    else:
+        index.set_pinned(name, True)
+        index.save()
+        console.print(f"[green]✓ Pinned: {name}[/green]")
+        console.print("[dim]This plugin will not be updated by 'marketplace update --all'[/dim]")
+
+
+@marketplace.command("enable")
+@click.argument("name")
+@click.option("--disable", is_flag=True, help="Disable the plugin")
+def marketplace_enable(name: str, disable: bool = False):
+    """Enable or disable an installed plugin.
+
+    Example:
+        sindri marketplace enable my_tool
+        sindri marketplace enable --disable my_tool
+    """
+    from sindri.marketplace import MarketplaceIndex
+
+    index = MarketplaceIndex()
+    index.load()
+
+    plugin = index.get(name)
+    if not plugin:
+        console.print(f"[red]Plugin '{name}' is not installed.[/red]")
+        return
+
+    if disable:
+        index.set_enabled(name, False)
+        index.save()
+        console.print(f"[yellow]✓ Disabled: {name}[/yellow]")
+        console.print("[dim]The plugin will not be loaded on next start[/dim]")
+    else:
+        index.set_enabled(name, True)
+        index.save()
+        console.print(f"[green]✓ Enabled: {name}[/green]")
+        console.print("[dim]The plugin will be loaded on next start[/dim]")
+
+
+@marketplace.command("stats")
+def marketplace_stats():
+    """Show marketplace statistics."""
+    from rich.table import Table
+    from sindri.marketplace import MarketplaceIndex
+
+    index = MarketplaceIndex()
+    index.load()
+
+    stats = index.get_stats()
+
+    if stats["total"] == 0:
+        console.print("[yellow]No plugins installed from marketplace.[/yellow]")
+        console.print("[dim]Install plugins with: sindri marketplace install <source>[/dim]")
+        return
+
+    console.print("[bold]📊 Marketplace Statistics[/bold]\n")
+
+    # Overview
+    console.print(f"  [bold]Total plugins:[/bold]  {stats['total']}")
+    console.print(f"  [bold]Enabled:[/bold]        {stats['enabled']}")
+    console.print(f"  [bold]Pinned:[/bold]         {stats['pinned']}")
+
+    # By type
+    console.print("\n[bold]By Type:[/bold]")
+    for ptype, count in stats["by_type"].items():
+        icon = "🔧" if ptype == "tool" else "🤖"
+        console.print(f"  {icon} {ptype}: {count}")
+
+    # By category
+    if stats["by_category"]:
+        console.print("\n[bold]By Category:[/bold]")
+        for cat, count in sorted(stats["by_category"].items(), key=lambda x: -x[1]):
+            console.print(f"  {cat}: {count}")
+
+    # By source
+    if stats["by_source"]:
+        console.print("\n[bold]By Source:[/bold]")
+        for src, count in stats["by_source"].items():
+            console.print(f"  {src}: {count}")
+
+
+@marketplace.command("categories")
+def marketplace_categories():
+    """List available plugin categories."""
+    from rich.table import Table
+    from sindri.marketplace.search import get_categories
+
+    categories = get_categories()
+
+    table = Table(title="📂 Plugin Categories", show_header=True, header_style="bold cyan")
+    table.add_column("Category", style="cyan", width=15)
+    table.add_column("Description", width=45)
+
+    for value, description in categories:
+        table.add_row(value, description)
+
+    console.print(table)
+
+
+# ============================================
 # Phase 8.4: Multi-Project Memory Commands
 # ============================================
 
