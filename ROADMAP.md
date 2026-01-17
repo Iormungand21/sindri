@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **SplitFileTool COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay + MoveFileTool + BatchRenameTool + SplitFileTool. **100% production ready.** 1092/1092 backend tests + 104 frontend tests passing (100%).
+**Current Status:** ✅ **MergeFilesTool COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay + MoveFileTool + BatchRenameTool + SplitFileTool + MergeFilesTool. **100% production ready.** 1120/1120 backend tests + 104 frontend tests passing (100%).
 
 ---
 
@@ -11,10 +11,10 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-16)
-- ✅ SplitFileTool COMPLETE - Split large files into multiple smaller files with import updates
-- ✅ 1092/1092 backend tests + 104 frontend tests passing (100%)
+- ✅ MergeFilesTool COMPLETE - Merge multiple files into one with import handling
+- ✅ 1120/1120 backend tests + 104 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, Timeline View, Session Replay, MoveFileTool, BatchRenameTool, **SplitFileTool**
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, Timeline View, Session Replay, MoveFileTool, BatchRenameTool, SplitFileTool, **MergeFilesTool**
 
 ### Try It Out
 ```bash
@@ -57,9 +57,10 @@ cd sindri/web/static && npm run build  # Build frontend
 - ~~**MoveFileTool:** Move/rename files with automatic import updates~~ ✅ **COMPLETED!**
 - ~~**BatchRenameTool:** Pattern-based batch file renaming with glob/regex~~ ✅ **COMPLETED!**
 - ~~**SplitFileTool:** Split large files into multiple smaller files~~ ✅ **COMPLETED!**
-- **Next:** CI/CD Integration, Remote Collaboration, MergeFilesTool
+- ~~**MergeFilesTool:** Merge multiple files into one with import handling~~ ✅ **COMPLETED!**
+- **Next:** CI/CD Integration, Remote Collaboration
 
-**All core multi-file refactoring patterns complete! 🎉**
+**Complete multi-file refactoring suite with split AND merge! 🎉**
 
 **Web UI Development:**
 ```bash

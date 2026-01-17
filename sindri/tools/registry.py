@@ -22,7 +22,7 @@ from sindri.tools.git import GitStatusTool, GitDiffTool, GitLogTool, GitBranchTo
 from sindri.tools.http import HttpRequestTool, HttpGetTool, HttpPostTool
 from sindri.tools.testing import RunTestsTool, CheckSyntaxTool
 from sindri.tools.formatting import FormatCodeTool, LintCodeTool
-from sindri.tools.refactoring import RenameSymbolTool, ExtractFunctionTool, InlineVariableTool, MoveFileTool, BatchRenameTool, SplitFileTool
+from sindri.tools.refactoring import RenameSymbolTool, ExtractFunctionTool, InlineVariableTool, MoveFileTool, BatchRenameTool, SplitFileTool, MergeFilesTool
 from sindri.tools.sql import ExecuteQueryTool, DescribeSchemaTool, ExplainQueryTool
 from sindri.core.errors import (
     ErrorCategory,
@@ -255,6 +255,7 @@ class ToolRegistry:
         registry.register(MoveFileTool(work_dir=work_dir))
         registry.register(BatchRenameTool(work_dir=work_dir))
         registry.register(SplitFileTool(work_dir=work_dir))
+        registry.register(MergeFilesTool(work_dir=work_dir))
         registry.register(ExecuteQueryTool(work_dir=work_dir))
         registry.register(DescribeSchemaTool(work_dir=work_dir))
         registry.register(ExplainQueryTool(work_dir=work_dir))

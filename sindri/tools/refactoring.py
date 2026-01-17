@@ -2436,3 +2436,619 @@ Examples:
                 await f.write(content)
 
         return update_count
+
+
+class MergeFilesTool(Tool):
+    """Merge multiple files into a single file.
+
+    The inverse of SplitFileTool - combines multiple source files into
+    a single destination file with intelligent import handling.
+    """
+
+    name = "merge_files"
+    description = """Merge multiple files into a single file.
+
+Combines multiple source files into one destination file, intelligently handling:
+- Import deduplication and organization
+- Content ordering (alphabetical, preserve order, or by dependency)
+- Automatic import updates in other files that reference the merged files
+
+Examples:
+- merge_files(files=["user.py", "order.py", "product.py"], destination="models.py")
+- merge_files(pattern="src/utils/*.py", destination="src/utils.py") - Merge all utils
+- merge_files(files=["a.py", "b.py"], destination="combined.py", delete_sources=true)
+- merge_files(pattern="*.py", destination="all.py", dry_run=true) - Preview merge
+- merge_files(files=["foo.ts", "bar.ts"], destination="index.ts") - Merge TypeScript"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "files": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of files to merge (mutually exclusive with 'pattern')"
+            },
+            "pattern": {
+                "type": "string",
+                "description": "Glob pattern to match files to merge (e.g., 'src/models/*.py')"
+            },
+            "destination": {
+                "type": "string",
+                "description": "Path to the merged output file"
+            },
+            "sort_order": {
+                "type": "string",
+                "enum": ["preserve", "alpha", "dependency"],
+                "description": "How to order content: preserve (input order), alpha (alphabetical), dependency (imports first)"
+            },
+            "delete_sources": {
+                "type": "boolean",
+                "description": "Delete source files after merging (default: false)"
+            },
+            "update_imports": {
+                "type": "boolean",
+                "description": "Update imports in other files (default: true)"
+            },
+            "add_section_comments": {
+                "type": "boolean",
+                "description": "Add comments marking sections from each source file (default: true)"
+            },
+            "dry_run": {
+                "type": "boolean",
+                "description": "Preview changes without applying them (default: false)"
+            }
+        },
+        "required": ["destination"]
+    }
+
+    # Directories to skip during search
+    SKIP_DIRS = {
+        'node_modules', '__pycache__', '.git', '.svn', '.hg',
+        'dist', 'build', 'target', 'venv', '.venv', 'env',
+        '.tox', '.nox', '.pytest_cache', '.mypy_cache',
+        'coverage', '.coverage', 'htmlcov', '.eggs'
+    }
+
+    async def execute(
+        self,
+        destination: str,
+        files: Optional[list[str]] = None,
+        pattern: Optional[str] = None,
+        sort_order: str = "preserve",
+        delete_sources: bool = False,
+        update_imports: bool = True,
+        add_section_comments: bool = True,
+        dry_run: bool = False,
+        **kwargs
+    ) -> ToolResult:
+        """Execute file merge operation."""
+        # Validate inputs
+        if not files and not pattern:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Either 'files' or 'pattern' must be specified"
+            )
+
+        if files and pattern:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Cannot specify both 'files' and 'pattern'. Use one or the other."
+            )
+
+        if sort_order not in ["preserve", "alpha", "dependency"]:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Invalid sort_order: {sort_order}. Must be: preserve, alpha, or dependency"
+            )
+
+        # Resolve destination path
+        dest_path = self._resolve_path(destination)
+
+        # Collect source files
+        if files:
+            source_files = [self._resolve_path(f) for f in files]
+        else:
+            # Use glob pattern
+            search_dir = self._resolve_path(".")
+            source_files = list(search_dir.glob(pattern))
+            source_files = [f for f in source_files if f.is_file()]
+            source_files = [f for f in source_files if not any(part in self.SKIP_DIRS for part in f.parts)]
+
+        # Validate source files
+        missing_files = [f for f in source_files if not f.exists()]
+        if missing_files:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Source files not found: {', '.join(str(f) for f in missing_files)}"
+            )
+
+        if len(source_files) == 0:
+            return ToolResult(
+                success=True,
+                output=f"No files found matching pattern: {pattern}" if pattern else "No files specified",
+                metadata={"files_merged": 0}
+            )
+
+        if len(source_files) == 1:
+            return ToolResult(
+                success=True,
+                output="Only one file to merge. Nothing to do.",
+                metadata={"files_merged": 0}
+            )
+
+        # Check if destination would overwrite a source
+        if dest_path.resolve() in [f.resolve() for f in source_files] and not delete_sources:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Destination file {destination} is in the source list. Use delete_sources=true to overwrite."
+            )
+
+        # Determine file language
+        ext = dest_path.suffix.lower()
+        if ext == '.py':
+            lang = 'python'
+        elif ext in ['.ts', '.tsx', '.js', '.jsx', '.mjs']:
+            lang = 'javascript'
+        else:
+            lang = 'generic'
+
+        try:
+            # Read and parse all source files
+            file_contents = []
+            for source_file in source_files:
+                async with aiofiles.open(source_file, 'r', encoding='utf-8') as f:
+                    content = await f.read()
+                file_contents.append({
+                    "path": source_file,
+                    "content": content,
+                    "name": source_file.stem
+                })
+
+            # Sort files based on sort_order
+            if sort_order == "alpha":
+                file_contents.sort(key=lambda x: x["name"].lower())
+            elif sort_order == "dependency":
+                file_contents = self._sort_by_dependency(file_contents, lang)
+            # "preserve" keeps original order
+
+            # Merge the files
+            merged_content, items_exported = self._merge_files(
+                file_contents, lang, add_section_comments
+            )
+
+            # Build results
+            results = {
+                "destination": str(dest_path),
+                "files_merged": len(source_files),
+                "source_files": [str(f) for f in source_files],
+                "items_exported": items_exported,
+                "imports_updated": 0,
+                "files_with_import_updates": 0,
+                "sources_deleted": False,
+                "dry_run": dry_run
+            }
+            output_lines = []
+
+            if dry_run:
+                output_lines.append(f"Would merge {len(source_files)} files into {destination}")
+                output_lines.append("")
+                output_lines.append("Source files:")
+                for fc in file_contents:
+                    output_lines.append(f"  - {fc['path']}")
+                output_lines.append("")
+                output_lines.append(f"Merged content preview ({len(merged_content)} chars, {merged_content.count(chr(10))+1} lines):")
+                preview = merged_content[:500] + "..." if len(merged_content) > 500 else merged_content
+                for line in preview.split('\n')[:15]:
+                    output_lines.append(f"  {line}")
+                if merged_content.count('\n') > 15:
+                    output_lines.append("  ...")
+            else:
+                # Write merged file
+                dest_path.parent.mkdir(parents=True, exist_ok=True)
+                async with aiofiles.open(dest_path, 'w', encoding='utf-8') as f:
+                    await f.write(merged_content)
+
+                output_lines.append(f"Merged {len(source_files)} files into {destination}")
+
+                # Update imports in other files
+                if update_imports:
+                    import_results = await self._update_imports_for_merge(
+                        source_files, dest_path, items_exported, self._resolve_path(".")
+                    )
+                    results["imports_updated"] = import_results["count"]
+                    results["files_with_import_updates"] = len(import_results["files"])
+
+                    if import_results["count"] > 0:
+                        output_lines.append(f"Updated {import_results['count']} import(s) in {len(import_results['files'])} file(s)")
+
+                # Delete source files if requested
+                if delete_sources:
+                    for source_file in source_files:
+                        if source_file.resolve() != dest_path.resolve():
+                            source_file.unlink()
+                    results["sources_deleted"] = True
+                    output_lines.append(f"Deleted {len(source_files)} source files")
+
+                output_lines.append("")
+                output_lines.append("Merged files:")
+                for fc in file_contents:
+                    output_lines.append(f"  - {fc['path']}")
+
+            log.info(
+                "files_merged",
+                destination=str(dest_path),
+                files_merged=len(source_files),
+                imports_updated=results["imports_updated"],
+                dry_run=dry_run,
+                work_dir=str(self.work_dir) if self.work_dir else None
+            )
+
+            return ToolResult(
+                success=True,
+                output="\n".join(output_lines),
+                metadata=results
+            )
+
+        except Exception as e:
+            log.error("merge_files_error", error=str(e))
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Failed to merge files: {str(e)}"
+            )
+
+    def _merge_files(
+        self,
+        file_contents: list[dict],
+        lang: str,
+        add_section_comments: bool
+    ) -> Tuple[str, list[str]]:
+        """Merge multiple files into one.
+
+        Returns:
+            Tuple of (merged_content, list_of_exported_items)
+        """
+        if lang == 'python':
+            return self._merge_python_files(file_contents, add_section_comments)
+        elif lang == 'javascript':
+            return self._merge_js_files(file_contents, add_section_comments)
+        else:
+            return self._merge_generic_files(file_contents, add_section_comments)
+
+    def _merge_python_files(
+        self,
+        file_contents: list[dict],
+        add_section_comments: bool
+    ) -> Tuple[str, list[str]]:
+        """Merge Python files with intelligent import handling."""
+        all_imports = set()
+        all_from_imports: dict[str, set[str]] = {}
+        content_sections = []
+        exported_items = []
+
+        for fc in file_contents:
+            content = fc["content"]
+            name = fc["name"]
+
+            try:
+                tree = ast.parse(content)
+            except SyntaxError:
+                # Fall back to simple concatenation
+                content_sections.append((name, content))
+                continue
+
+            lines = content.splitlines(keepends=True)
+
+            # Extract imports
+            non_import_start = 0
+            for node in ast.iter_child_nodes(tree):
+                if isinstance(node, ast.Import):
+                    for alias in node.names:
+                        all_imports.add(alias.name)
+                    non_import_start = max(non_import_start, node.end_lineno or node.lineno)
+                elif isinstance(node, ast.ImportFrom):
+                    module = node.module or ""
+                    if module not in all_from_imports:
+                        all_from_imports[module] = set()
+                    for alias in node.names:
+                        all_from_imports[module].add(alias.name)
+                    non_import_start = max(non_import_start, node.end_lineno or node.lineno)
+                elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+                    # Module docstring - skip
+                    non_import_start = max(non_import_start, node.end_lineno or node.lineno)
+                else:
+                    break
+
+            # Extract non-import content
+            non_import_content = ''.join(lines[non_import_start:]).strip()
+
+            if non_import_content:
+                content_sections.append((name, non_import_content))
+
+            # Track exported items (classes, functions)
+            for node in ast.iter_child_nodes(tree):
+                if isinstance(node, ast.ClassDef):
+                    exported_items.append(node.name)
+                elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    exported_items.append(node.name)
+
+        # Build merged content
+        merged_lines = ['"""Merged module."""', '']
+
+        # Add sorted imports
+        if all_imports:
+            for imp in sorted(all_imports):
+                merged_lines.append(f"import {imp}")
+
+        if all_from_imports:
+            for module in sorted(all_from_imports.keys()):
+                items = sorted(all_from_imports[module])
+                if len(items) > 3:
+                    # Multi-line import
+                    merged_lines.append(f"from {module} import (")
+                    for item in items:
+                        merged_lines.append(f"    {item},")
+                    merged_lines.append(")")
+                else:
+                    merged_lines.append(f"from {module} import {', '.join(items)}")
+
+        if all_imports or all_from_imports:
+            merged_lines.append('')
+
+        # Add content sections
+        for name, section_content in content_sections:
+            if add_section_comments:
+                merged_lines.append('')
+                merged_lines.append(f"# {'=' * 60}")
+                merged_lines.append(f"# From: {name}")
+                merged_lines.append(f"# {'=' * 60}")
+                merged_lines.append('')
+
+            merged_lines.append(section_content)
+            merged_lines.append('')
+
+        # Add __all__ if we have exported items
+        if exported_items:
+            merged_lines.append('')
+            merged_lines.append(f"__all__ = {sorted(set(exported_items))!r}")
+
+        return '\n'.join(merged_lines) + '\n', exported_items
+
+    def _merge_js_files(
+        self,
+        file_contents: list[dict],
+        add_section_comments: bool
+    ) -> Tuple[str, list[str]]:
+        """Merge JavaScript/TypeScript files."""
+        all_imports = []
+        content_sections = []
+        exported_items = []
+        seen_imports = set()
+
+        import_pattern = re.compile(
+            r'^(import\s+(?:[\w{},*\s]+\s+from\s+)?[\'"][^\'"]+[\'"];?\s*)$',
+            re.MULTILINE
+        )
+        export_pattern = re.compile(
+            r'export\s+(?:default\s+)?(?:class|function|const|let|var|interface|type|enum)\s+(\w+)'
+        )
+
+        for fc in file_contents:
+            content = fc["content"]
+            name = fc["name"]
+
+            # Extract imports
+            imports = import_pattern.findall(content)
+            for imp in imports:
+                imp_normalized = imp.strip()
+                if imp_normalized not in seen_imports:
+                    all_imports.append(imp_normalized)
+                    seen_imports.add(imp_normalized)
+
+            # Remove imports from content
+            non_import_content = import_pattern.sub('', content).strip()
+
+            if non_import_content:
+                content_sections.append((name, non_import_content))
+
+            # Find exported items
+            for match in export_pattern.finditer(content):
+                exported_items.append(match.group(1))
+
+        # Build merged content
+        merged_lines = []
+
+        # Add imports
+        for imp in all_imports:
+            merged_lines.append(imp)
+
+        if all_imports:
+            merged_lines.append('')
+
+        # Add content sections
+        for name, section_content in content_sections:
+            if add_section_comments:
+                merged_lines.append('')
+                merged_lines.append(f"// {'=' * 60}")
+                merged_lines.append(f"// From: {name}")
+                merged_lines.append(f"// {'=' * 60}")
+                merged_lines.append('')
+
+            merged_lines.append(section_content)
+            merged_lines.append('')
+
+        return '\n'.join(merged_lines) + '\n', exported_items
+
+    def _merge_generic_files(
+        self,
+        file_contents: list[dict],
+        add_section_comments: bool
+    ) -> Tuple[str, list[str]]:
+        """Merge files generically (simple concatenation)."""
+        merged_lines = []
+
+        for fc in file_contents:
+            content = fc["content"]
+            name = fc["name"]
+
+            if add_section_comments:
+                merged_lines.append('')
+                merged_lines.append(f"# {'=' * 60}")
+                merged_lines.append(f"# From: {name}")
+                merged_lines.append(f"# {'=' * 60}")
+                merged_lines.append('')
+
+            merged_lines.append(content.strip())
+            merged_lines.append('')
+
+        return '\n'.join(merged_lines) + '\n', []
+
+    def _sort_by_dependency(self, file_contents: list[dict], lang: str) -> list[dict]:
+        """Sort files so that dependencies come before dependents."""
+        if lang != 'python':
+            return file_contents
+
+        # Build dependency graph
+        file_names = {fc["path"].stem: fc for fc in file_contents}
+        dependencies: dict[str, set[str]] = {name: set() for name in file_names}
+
+        for fc in file_contents:
+            content = fc["content"]
+            name = fc["path"].stem
+
+            try:
+                tree = ast.parse(content)
+                for node in ast.iter_child_nodes(tree):
+                    if isinstance(node, ast.ImportFrom) and node.module:
+                        # Check if this imports from another file in our set
+                        module_parts = node.module.split('.')
+                        for part in module_parts:
+                            if part in file_names:
+                                dependencies[name].add(part)
+            except SyntaxError:
+                continue
+
+        # Topological sort
+        sorted_names = []
+        visited = set()
+        temp_visited = set()
+
+        def visit(name: str):
+            if name in temp_visited:
+                return  # Circular dependency - skip
+            if name in visited:
+                return
+            temp_visited.add(name)
+            for dep in dependencies.get(name, []):
+                visit(dep)
+            temp_visited.remove(name)
+            visited.add(name)
+            sorted_names.append(name)
+
+        for name in file_names:
+            visit(name)
+
+        # Return files in sorted order
+        return [file_names[name] for name in sorted_names if name in file_names]
+
+    async def _update_imports_for_merge(
+        self,
+        source_files: list[Path],
+        dest_path: Path,
+        exported_items: list[str],
+        search_root: Path
+    ) -> dict:
+        """Update imports in other files after merging."""
+        results = {"files": [], "count": 0}
+
+        # Calculate module paths
+        source_modules = {}
+        for source_file in source_files:
+            try:
+                module = '.'.join(source_file.relative_to(search_root).with_suffix('').parts)
+            except ValueError:
+                module = source_file.stem
+            source_modules[module] = source_file.stem
+
+        try:
+            dest_module = '.'.join(dest_path.relative_to(search_root).with_suffix('').parts)
+        except ValueError:
+            dest_module = dest_path.stem
+
+        # Find all Python files
+        for file_path in search_root.rglob("*.py"):
+            if any(part in self.SKIP_DIRS for part in file_path.parts):
+                continue
+
+            # Skip source files and destination
+            if file_path.resolve() in [f.resolve() for f in source_files]:
+                continue
+            if file_path.resolve() == dest_path.resolve():
+                continue
+
+            count = await self._update_imports_in_file_for_merge(
+                file_path, source_modules, dest_module, exported_items
+            )
+
+            if count > 0:
+                results["files"].append(str(file_path))
+                results["count"] += count
+
+        return results
+
+    async def _update_imports_in_file_for_merge(
+        self,
+        file_path: Path,
+        source_modules: dict[str, str],
+        dest_module: str,
+        exported_items: list[str]
+    ) -> int:
+        """Update imports in a single file for merged modules."""
+        try:
+            async with aiofiles.open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = await f.read()
+        except Exception:
+            return 0
+
+        original_content = content
+        update_count = 0
+
+        # For each source module, update imports to destination
+        for old_module in source_modules:
+            # Pattern: from old_module import ...
+            pattern = re.compile(
+                rf'^(\s*from\s+){re.escape(old_module)}(\s+import\s+.+)$',
+                re.MULTILINE
+            )
+
+            def replace_import(match):
+                prefix = match.group(1)
+                import_part = match.group(2)
+                return f"{prefix}{dest_module}{import_part}"
+
+            new_content, n = pattern.subn(replace_import, content)
+            if n > 0:
+                content = new_content
+                update_count += n
+
+            # Pattern: import old_module
+            pattern = re.compile(
+                rf'^(\s*import\s+){re.escape(old_module)}(\s*(?:#.*)?)$',
+                re.MULTILINE
+            )
+            new_content, n = pattern.subn(rf'\g<1>{dest_module}\g<2>', content)
+            if n > 0:
+                content = new_content
+                update_count += n
+
+        # Write changes if any
+        if update_count > 0 and content != original_content:
+            async with aiofiles.open(file_path, 'w', encoding='utf-8') as f:
+                await f.write(content)
+
+        return update_count

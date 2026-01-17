@@ -1,27 +1,71 @@
 # Sindri Project Status Report
-**Date:** 2026-01-16 (SplitFileTool Feature)
-**Session:** Multi-File Refactoring - SplitFileTool Implementation
+**Date:** 2026-01-16 (MergeFilesTool Feature)
+**Session:** Multi-File Refactoring - MergeFilesTool Implementation
 **Agent:** Claude Opus 4.5
 
 ---
 
 ## 📋 Quick Start for Next Session
 
-**Current State:** ✅ **PRODUCTION READY (100%)** - SplitFileTool Complete! 🎉
-**Just Completed:** SplitFileTool for splitting large files into multiple smaller files ✓ (2026-01-16)
-**Test Status:** 1092/1092 backend tests + 104 frontend tests, **all passing (100%)** 🎉
-**Production Readiness:** 100% - Complete multi-file refactoring suite!
-**Next Priority:** 🎯 **Phase 9 Features** (CI/CD Integration, Remote Collaboration, MergeFilesTool)
+**Current State:** ✅ **PRODUCTION READY (100%)** - MergeFilesTool Complete! 🎉
+**Just Completed:** MergeFilesTool for merging multiple files into one ✓ (2026-01-16)
+**Test Status:** 1120/1120 backend tests + 104 frontend tests, **all passing (100%)** 🎉
+**Production Readiness:** 100% - Complete multi-file refactoring suite with split AND merge!
+**Next Priority:** 🎯 **Phase 9 Features** (CI/CD Integration, Remote Collaboration)
 
 ---
 
 ## 🎯 NEXT SESSION: Advanced Features
 
-**Goal:** Continue improving Sindri with Phase 9 features or additional refactoring patterns.
+**Goal:** Continue improving Sindri with Phase 9 features.
 
 ### What Was Just Completed ✅
 
-**SplitFileTool (2026-01-16):**
+**MergeFilesTool (2026-01-16):**
+
+Added comprehensive MergeFilesTool for merging multiple files into a single file:
+
+**Backend:**
+- New `MergeFilesTool` class in `sindri/tools/refactoring.py`
+- Inverse of SplitFileTool - combines multiple files into one
+- Intelligent Python import deduplication and organization
+- JavaScript/TypeScript import handling
+- Content ordering: preserve, alphabetical, or dependency-based
+- Section comments to mark merged content origins
+- Automatic import updates across codebase
+- `__all__` generation for merged Python modules
+- Dry run mode for previewing changes
+- Optional source file deletion after merge
+
+**Features:**
+- `merge_files(files=["user.py", "order.py"], destination="models.py")` - Merge specific files
+- `merge_files(pattern="src/utils/*.py", destination="utils.py")` - Merge via glob pattern
+- `merge_files(..., sort_order="alpha")` - Sort content alphabetically
+- `merge_files(..., sort_order="dependency")` - Order by dependencies (Python)
+- `merge_files(..., delete_sources=true)` - Remove source files after merge
+- `merge_files(..., add_section_comments=true)` - Mark sections from each file
+- `merge_files(..., dry_run=true)` - Preview merge without applying
+
+**Agent Integration:**
+- Added to **Brokkr** (orchestrator) tool list
+- Added to **Huginn** (coder) tool list
+- Total tools: 30 implemented
+
+**New Tests:**
+- 28 tests in `tests/test_merge_files.py`
+- Test categories: Basic merge, Python merge, JavaScript merge, Sort orders, Delete sources, Error handling, Edge cases, Integration, Split+Merge roundtrip
+
+**Files Created:**
+- `tests/test_merge_files.py` (~500 lines) - Comprehensive test coverage
+
+**Files Modified:**
+- `sindri/tools/refactoring.py` (+600 lines) - MergeFilesTool implementation
+- `sindri/tools/registry.py` (+2 lines) - Tool registration
+- `sindri/agents/registry.py` (+2 lines) - Agent tool lists
+
+---
+
+**Previous: SplitFileTool (2026-01-16):**
 
 Added comprehensive SplitFileTool for splitting large files into multiple smaller files:
 
