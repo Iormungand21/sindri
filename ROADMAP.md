@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **MergeFilesTool COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay + MoveFileTool + BatchRenameTool + SplitFileTool + MergeFilesTool. **100% production ready.** 1120/1120 backend tests + 104 frontend tests passing (100%).
+**Current Status:** ✅ **CI/CD Integration COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View + Session Replay + MoveFileTool + BatchRenameTool + SplitFileTool + MergeFilesTool + **CI/CD Tools**. **100% production ready.** 1183/1183 backend tests + 104 frontend tests passing (100%).
 
 ---
 
@@ -10,11 +10,11 @@
 
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
-### Current State (2026-01-16)
-- ✅ MergeFilesTool COMPLETE - Merge multiple files into one with import handling
-- ✅ 1120/1120 backend tests + 104 frontend tests passing (100%)
+### Current State (2026-01-17)
+- ✅ CI/CD Integration COMPLETE - Generate and validate GitHub Actions workflows
+- ✅ 1183/1183 backend tests + 104 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, Timeline View, Session Replay, MoveFileTool, BatchRenameTool, SplitFileTool, **MergeFilesTool**
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, Timeline View, Session Replay, MoveFileTool, BatchRenameTool, SplitFileTool, MergeFilesTool, **CI/CD Integration**
 
 ### Try It Out
 ```bash
@@ -58,7 +58,8 @@ cd sindri/web/static && npm run build  # Build frontend
 - ~~**BatchRenameTool:** Pattern-based batch file renaming with glob/regex~~ ✅ **COMPLETED!**
 - ~~**SplitFileTool:** Split large files into multiple smaller files~~ ✅ **COMPLETED!**
 - ~~**MergeFilesTool:** Merge multiple files into one with import handling~~ ✅ **COMPLETED!**
-- **Next:** CI/CD Integration, Remote Collaboration
+- ~~**CI/CD Integration:** GitHub Actions workflow generation and validation~~ ✅ **COMPLETED!**
+- **Next:** Remote Collaboration, Agent Fine-Tuning, Voice Interface
 
 **Complete multi-file refactoring suite with split AND merge! 🎉**
 
@@ -114,7 +115,7 @@ curl http://localhost:8000/api/agents | jq
 ## Tools & Models Reference
 
 **See [TOOLS_AND_MODELS_ANALYSIS.md](TOOLS_AND_MODELS_ANALYSIS.md) for comprehensive analysis:**
-- Current tools: 28 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, format_code, lint_code, rename_symbol, extract_function, inline_variable, move_file, batch_rename, execute_query, describe_schema, explain_query, shell, delegate) ✅
+- Current tools: 32 implemented (read_file, write_file, edit_file, list_directory, read_tree, search_code, find_symbol, git_status, git_diff, git_log, git_branch, http_request, http_get, http_post, run_tests, check_syntax, format_code, lint_code, rename_symbol, extract_function, inline_variable, move_file, batch_rename, split_file, merge_files, generate_workflow, validate_workflow, execute_query, describe_schema, explain_query, shell, delegate) ✅
 - Recommended additions: Additional multi-file patterns (split/merge files)
 - Current agents: **11 specialized agents** (Brokkr, Huginn, Mimir, Ratatoskr, Skald, Fenrir, Odin, **Heimdall, Baldr, Idunn, Vidar**) ✅
 - Current models: **All 15 models installed** ✅
@@ -1155,10 +1156,51 @@ sindri projects stats
 - Real-time co-coding
 - Review mode for code review
 
-### 9.3 CI/CD Integration
-- GitHub Actions integration
-- Automatic PR reviews
-- Test generation in CI
+### ✅ 9.3 CI/CD Integration (COMPLETED 2026-01-17)
+
+**Status:** ✅ Implemented and tested with 63 new tests
+
+#### Implementation Summary:
+
+**GenerateWorkflowTool** (`sindri/tools/cicd.py`):
+- ✅ Automatic project type detection (Python, Node.js, Rust, Go, generic)
+- ✅ Workflow types: test, lint, build, full, deploy, release
+- ✅ Deployment targets: Docker, PyPI, NPM, GHCR, Heroku
+- ✅ Matrix testing (multiple Python/Node versions)
+- ✅ Coverage integration (Codecov)
+- ✅ Dependency caching for faster CI
+- ✅ Dry run mode for previewing workflows
+
+**ValidateWorkflowTool** (`sindri/tools/cicd.py`):
+- ✅ YAML syntax validation
+- ✅ Workflow structure validation (on, jobs, steps)
+- ✅ Deprecated action detection with upgrade suggestions
+- ✅ Hardcoded secret detection
+- ✅ Support for validating single files or directories
+
+**Example Usage:**
+```bash
+# Generate a test workflow for Python project
+sindri run "Generate a CI test workflow for this project"
+
+# Generate full CI with matrix testing
+sindri run "Create a full CI workflow with Python 3.10, 3.11, 3.12"
+
+# Generate deployment workflow
+sindri run "Create a Docker deployment workflow"
+```
+
+**Files Created:**
+- `sindri/tools/cicd.py` (~1400 lines) - GenerateWorkflowTool, ValidateWorkflowTool
+- `tests/test_cicd.py` (~700 lines) - 63 comprehensive tests
+
+**Files Modified:**
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Added to Brokkr and Huginn
+
+**Test Results:**
+- 63 new tests added (all passing)
+- Total: 1183/1183 backend tests + 104 frontend tests (100%)
 
 ### 9.4 Agent Fine-Tuning
 - Collect successful interactions
@@ -1335,6 +1377,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-17 | 9.3 | ✅ **CI/CD Integration COMPLETE!** GenerateWorkflowTool + ValidateWorkflowTool for GitHub Actions, project type detection (Python/Node/Rust/Go), multiple workflow types (test/lint/build/full/deploy/release), matrix testing, deployment targets (Docker/PyPI/NPM/GHCR/Heroku), 63 tests |
 | 2026-01-16 | 9 | ✅ **BatchRenameTool COMPLETE!** Pattern-based batch file renaming with glob/regex, output placeholders, import updates, 32 tests |
 | 2026-01-16 | 9 | ✅ **MoveFileTool COMPLETE!** Move/rename files with automatic Python and JS/TS import updates, dry run mode, 28 tests |
 | 2026-01-16 | 8.3 | ✅ **Session Replay COMPLETE!** Step-by-step playback, speed controls (0.5x-4x), keyboard shortcuts, tool call visualization, 33 frontend tests |
@@ -1378,6 +1421,32 @@ All high-impact, low-effort improvements completed!
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 CI/CD INTEGRATION COMPLETE!** (2026-01-17)
+
+GitHub Actions workflow generation and validation for Sindri:
+1. ✅ **GenerateWorkflowTool** - Generate workflow YAML files
+   - Automatic project type detection (Python, Node.js, Rust, Go)
+   - Workflow types: test, lint, build, full, deploy, release
+   - Matrix testing support (multiple Python/Node versions)
+   - Deployment targets: Docker, PyPI, NPM, GHCR, Heroku
+   - Coverage integration (Codecov)
+   - Dependency caching for faster CI runs
+   - Dry run mode for previewing workflows
+2. ✅ **ValidateWorkflowTool** - Validate workflow files
+   - YAML syntax validation
+   - Workflow structure validation
+   - Deprecated action detection with upgrade suggestions
+   - Hardcoded secret detection
+3. ✅ **Agent Integration** - Added to Brokkr and Huginn agents
+4. ✅ **63 new tests** - Comprehensive coverage for all scenarios
+
+**Impact:**
+- Backend tests: 1120 → 1183 tests (+63 tests, 100% passing)
+- Total tools: 30 → 32 tools
+- Agents can now generate complete CI/CD pipelines for any project type
+
+---
 
 **🎉 BATCH RENAME TOOL COMPLETE!** (2026-01-16)
 

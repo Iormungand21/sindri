@@ -24,6 +24,7 @@ from sindri.tools.testing import RunTestsTool, CheckSyntaxTool
 from sindri.tools.formatting import FormatCodeTool, LintCodeTool
 from sindri.tools.refactoring import RenameSymbolTool, ExtractFunctionTool, InlineVariableTool, MoveFileTool, BatchRenameTool, SplitFileTool, MergeFilesTool
 from sindri.tools.sql import ExecuteQueryTool, DescribeSchemaTool, ExplainQueryTool
+from sindri.tools.cicd import GenerateWorkflowTool, ValidateWorkflowTool
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -259,4 +260,6 @@ class ToolRegistry:
         registry.register(ExecuteQueryTool(work_dir=work_dir))
         registry.register(DescribeSchemaTool(work_dir=work_dir))
         registry.register(ExplainQueryTool(work_dir=work_dir))
+        registry.register(GenerateWorkflowTool(work_dir=work_dir))
+        registry.register(ValidateWorkflowTool(work_dir=work_dir))
         return registry
