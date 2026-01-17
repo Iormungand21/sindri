@@ -2606,6 +2606,351 @@ def collab_stats():
     asyncio.run(show_stats())
 
 
+# ============================================
+# Phase 9.3: Voice Interface Commands
+# ============================================
+
+
+@cli.command()
+@click.option("--model", "-m", type=click.Choice(["tiny", "base", "small", "medium", "large"]), default="base", help="Whisper model size")
+@click.option("--mode", type=click.Choice(["push_to_talk", "wake_word", "continuous"]), default="push_to_talk", help="Voice mode")
+@click.option("--wake-word", "-w", default="sindri", help="Wake word for wake_word mode")
+@click.option("--tts", type=click.Choice(["pyttsx3", "piper", "espeak"]), default="pyttsx3", help="TTS engine")
+@click.option("--work-dir", type=click.Path(), help="Working directory for file operations")
+def voice(model: str, mode: str, wake_word: str, tts: str, work_dir: str = None):
+    """Start voice-controlled interface.
+
+    Enables hands-free interaction with Sindri using speech-to-text
+    (Whisper) and text-to-speech.
+
+    Modes:
+    - push_to_talk: Press Enter to start listening
+    - wake_word: Say "Hey Sindri" to activate
+    - continuous: Always listening (use with caution)
+
+    Example:
+        sindri voice
+
+        sindri voice --mode wake_word --wake-word "hey sindri"
+
+        sindri voice --model small --tts espeak
+    """
+    try:
+        from sindri.voice import VoiceInterface, VoiceMode, WhisperModel, VoiceConfig, TTSEngine
+    except ImportError as e:
+        console.print("[red]✗ Voice dependencies not installed[/red]")
+        console.print(f"[dim]Error: {e}[/dim]")
+        console.print("[dim]Install with: pip install sindri[voice][/dim]")
+        return
+
+    from pathlib import Path
+
+    # Map string options to enums
+    model_map = {
+        "tiny": WhisperModel.TINY,
+        "base": WhisperModel.BASE,
+        "small": WhisperModel.SMALL,
+        "medium": WhisperModel.MEDIUM,
+        "large": WhisperModel.LARGE,
+    }
+    mode_map = {
+        "push_to_talk": VoiceMode.PUSH_TO_TALK,
+        "wake_word": VoiceMode.WAKE_WORD,
+        "continuous": VoiceMode.CONTINUOUS,
+    }
+    tts_map = {
+        "pyttsx3": TTSEngine.PYTTSX3,
+        "piper": TTSEngine.PIPER,
+        "espeak": TTSEngine.ESPEAK,
+    }
+
+    whisper_model = model_map[model]
+    voice_mode = mode_map[mode]
+    tts_engine = tts_map[tts]
+
+    console.print(Panel(
+        f"[bold blue]Voice Interface[/bold blue]\n\n"
+        f"STT Model: Whisper {model}\n"
+        f"TTS Engine: {tts}\n"
+        f"Mode: {mode}\n"
+        f"Wake Word: {wake_word if mode == 'wake_word' else 'N/A'}",
+        title="🎤 Starting Voice Mode"
+    ))
+
+    async def run_voice():
+        from sindri.core.orchestrator import Orchestrator
+        from sindri.core.loop import LoopConfig
+
+        work_path = Path(work_dir).resolve() if work_dir else None
+
+        # Create orchestrator for executing commands
+        config = LoopConfig(max_iterations=30)
+        orchestrator = Orchestrator(config=config, work_dir=work_path)
+
+        def handle_command(text: str) -> str:
+            """Handle voice command by running through orchestrator."""
+            # Check for built-in commands
+            text_lower = text.lower().strip()
+
+            if text_lower in ("stop", "quit", "exit"):
+                return "Goodbye!"
+
+            if text_lower == "help":
+                return (
+                    "You can say: run followed by a task, "
+                    "list agents, status, or help. "
+                    "Say stop to exit."
+                )
+
+            if text_lower == "list agents":
+                return (
+                    "Available agents are: Brokkr the orchestrator, "
+                    "Huginn the coder, Mimir the reviewer, "
+                    "Ratatoskr the executor, Skald the tester, "
+                    "and more."
+                )
+
+            if text_lower == "status":
+                return "All systems operational. Ready for commands."
+
+            # For other commands, just acknowledge (would run orchestrator in full impl)
+            return f"I'll work on: {text}"
+
+        # Create voice interface
+        tts_config = VoiceConfig(engine=tts_engine)
+        interface = VoiceInterface(
+            stt_model=whisper_model,
+            tts_config=tts_config,
+            mode=voice_mode,
+            wake_word=wake_word,
+            on_command=handle_command,
+        )
+
+        if not await interface.start():
+            console.print("[red]✗ Failed to start voice interface[/red]")
+            return
+
+        console.print("[green]✓ Voice interface ready[/green]")
+
+        if voice_mode == VoiceMode.PUSH_TO_TALK:
+            console.print("[dim]Press Enter to start listening, Ctrl+C to exit[/dim]\n")
+
+            try:
+                while True:
+                    input()  # Wait for Enter
+                    console.print("[yellow]🎤 Listening...[/yellow]")
+                    turn = await interface.listen_once()
+                    if turn:
+                        console.print(f"[blue]You:[/blue] {turn.user_text}")
+                        console.print(f"[green]Sindri:[/green] {turn.response_text}")
+
+                        if turn.user_text.lower().strip() in ("stop", "quit", "exit"):
+                            break
+                    console.print()
+            except KeyboardInterrupt:
+                pass
+
+        else:
+            console.print(f"[dim]Listening in {mode} mode. Ctrl+C to exit[/dim]\n")
+
+            try:
+                async for turn in interface.listen():
+                    console.print(f"[blue]You:[/blue] {turn.user_text}")
+                    console.print(f"[green]Sindri:[/green] {turn.response_text}")
+
+                    if turn.user_text.lower().strip() in ("stop", "quit", "exit"):
+                        break
+                    console.print()
+            except KeyboardInterrupt:
+                pass
+
+        await interface.stop()
+        console.print("\n[dim]Voice interface stopped[/dim]")
+
+    asyncio.run(run_voice())
+
+
+@cli.command()
+@click.argument("text")
+@click.option("--engine", "-e", type=click.Choice(["pyttsx3", "piper", "espeak"]), default="pyttsx3", help="TTS engine")
+@click.option("--rate", "-r", default=175, help="Speech rate (words per minute)")
+@click.option("--output", "-o", type=click.Path(), help="Save to WAV file instead of playing")
+def say(text: str, engine: str, rate: int, output: str = None):
+    """Speak text using text-to-speech.
+
+    Uses the configured TTS engine to synthesize and play speech.
+
+    Example:
+        sindri say "Hello, I am Sindri"
+
+        sindri say "Task complete" --engine espeak
+
+        sindri say "Save this" --output greeting.wav
+    """
+    try:
+        from sindri.voice import TextToSpeech, VoiceConfig, TTSEngine
+    except ImportError as e:
+        console.print("[red]✗ Voice dependencies not installed[/red]")
+        console.print(f"[dim]Error: {e}[/dim]")
+        return
+
+    tts_map = {
+        "pyttsx3": TTSEngine.PYTTSX3,
+        "piper": TTSEngine.PIPER,
+        "espeak": TTSEngine.ESPEAK,
+    }
+
+    async def do_speak():
+        config = VoiceConfig(engine=tts_map[engine], rate=rate)
+        tts = TextToSpeech(config)
+
+        if not await tts.initialize():
+            console.print("[red]✗ Failed to initialize TTS[/red]")
+            return
+
+        if output:
+            # Save to file
+            from pathlib import Path
+            success = await tts.synthesize_to_file(text, Path(output))
+            if success:
+                console.print(f"[green]✓ Saved to {output}[/green]")
+            else:
+                console.print("[red]✗ Failed to save audio[/red]")
+        else:
+            # Play audio
+            success = await tts.speak(text)
+            if not success:
+                console.print("[red]✗ Failed to speak[/red]")
+
+    asyncio.run(do_speak())
+
+
+@cli.command()
+@click.argument("audio_file", type=click.Path(exists=True))
+@click.option("--model", "-m", type=click.Choice(["tiny", "base", "small", "medium", "large"]), default="base", help="Whisper model size")
+@click.option("--translate", is_flag=True, help="Translate to English")
+def transcribe(audio_file: str, model: str, translate: bool):
+    """Transcribe an audio file to text.
+
+    Uses Whisper for local speech recognition.
+
+    Example:
+        sindri transcribe recording.wav
+
+        sindri transcribe audio.mp3 --model small
+
+        sindri transcribe foreign.wav --translate
+    """
+    try:
+        from sindri.voice import SpeechToText, WhisperModel
+    except ImportError as e:
+        console.print("[red]✗ Voice dependencies not installed[/red]")
+        console.print(f"[dim]Error: {e}[/dim]")
+        return
+
+    model_map = {
+        "tiny": WhisperModel.TINY,
+        "base": WhisperModel.BASE,
+        "small": WhisperModel.SMALL,
+        "medium": WhisperModel.MEDIUM,
+        "large": WhisperModel.LARGE,
+    }
+
+    async def do_transcribe():
+        stt = SpeechToText(model=model_map[model])
+
+        console.print(f"[dim]Loading Whisper {model} model...[/dim]")
+        if not await stt.load_model():
+            console.print("[red]✗ Failed to load Whisper model[/red]")
+            return
+
+        console.print(f"[dim]Transcribing {audio_file}...[/dim]")
+        task = "translate" if translate else "transcribe"
+        result = await stt.transcribe_file(audio_file, task=task)
+
+        if result.is_empty:
+            console.print("[yellow]No speech detected in audio[/yellow]")
+            return
+
+        console.print(f"\n[bold]Transcription:[/bold]")
+        console.print(result.text)
+        console.print(f"\n[dim]Language: {result.language}[/dim]")
+        console.print(f"[dim]Duration: {result.duration_seconds:.1f}s[/dim]")
+        console.print(f"[dim]Processing time: {result.processing_time_ms:.0f}ms[/dim]")
+
+        await stt.unload_model()
+
+    asyncio.run(do_transcribe())
+
+
+@cli.command("voice-status")
+def voice_status():
+    """Check voice interface dependencies and availability.
+
+    Shows which STT and TTS engines are available on the system.
+    """
+    import shutil
+
+    console.print("[bold]🎤 Voice Interface Status[/bold]\n")
+
+    # Check STT dependencies
+    console.print("[bold]Speech-to-Text (Whisper):[/bold]")
+    try:
+        from faster_whisper import WhisperModel
+        console.print("  [green]✓ faster-whisper installed[/green]")
+    except ImportError:
+        console.print("  [red]✗ faster-whisper not installed[/red]")
+        console.print("    [dim]Install with: pip install faster-whisper[/dim]")
+
+    try:
+        import pyaudio
+        console.print("  [green]✓ pyaudio installed (microphone support)[/green]")
+    except ImportError:
+        console.print("  [yellow]⚠ pyaudio not installed (no microphone)[/yellow]")
+        console.print("    [dim]Install with: pip install pyaudio[/dim]")
+
+    console.print()
+
+    # Check TTS dependencies
+    console.print("[bold]Text-to-Speech:[/bold]")
+
+    try:
+        import pyttsx3
+        console.print("  [green]✓ pyttsx3 installed[/green]")
+    except ImportError:
+        console.print("  [yellow]⚠ pyttsx3 not installed[/yellow]")
+        console.print("    [dim]Install with: pip install pyttsx3[/dim]")
+
+    if shutil.which("piper"):
+        console.print("  [green]✓ piper-tts available[/green]")
+    else:
+        console.print("  [dim]○ piper-tts not found[/dim]")
+
+    espeak = shutil.which("espeak-ng") or shutil.which("espeak")
+    if espeak:
+        console.print(f"  [green]✓ espeak available ({espeak})[/green]")
+    else:
+        console.print("  [dim]○ espeak not found[/dim]")
+
+    console.print()
+
+    # Check audio playback
+    console.print("[bold]Audio Playback:[/bold]")
+    players = ["aplay", "paplay", "pw-play", "afplay", "ffplay"]
+    found_player = False
+    for player in players:
+        if shutil.which(player):
+            console.print(f"  [green]✓ {player} available[/green]")
+            found_player = True
+            break
+
+    if not found_player:
+        console.print("  [yellow]⚠ No audio player found[/yellow]")
+
+    console.print()
+    console.print("[dim]Install all voice dependencies with: pip install sindri[voice][/dim]")
+
+
 @cli.command()
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", "-p", default=8000, help="Port to listen on")

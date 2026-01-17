@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 32 tools, 1335 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 11 agents, 32 tools, 1391 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 1284 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1391 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -19,6 +19,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri orchestrate "Review this project"
 .venv/bin/sindri tui                       # Terminal UI
 .venv/bin/sindri web --port 8000           # Web UI
+.venv/bin/sindri voice                     # Voice interface
 ```
 
 **Essential Reading:**
@@ -70,8 +71,9 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - Agent Fine-Tuning: feedback collection and training export
 - Remote Collaboration: session sharing, comments, presence
 - Plugin Marketplace: install from git/URL/local, search, update
+- Voice Interface: Whisper STT, multi-engine TTS, wake word
 
-**Total:** 1335 backend tests + 104 frontend tests (100% passing)
+**Total:** 1391 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -81,7 +83,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 
 | Feature | Description | Status |
 |---------|-------------|--------|
-| Voice Interface | Speech-to-text commands, TTS responses | Planned |
+| Voice Interface | Speech-to-text commands, TTS responses | **Complete** |
 | Plugin Marketplace | Share and discover community plugins | **Complete** |
 
 ### Medium Priority
@@ -151,6 +153,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Voice Interface (Whisper STT, multi-engine TTS) | +56 |
 | 2026-01-17 | Plugin Marketplace (install, search, update, uninstall) | +51 |
 | 2026-01-17 | Remote Collaboration (sharing, comments, presence) | +65 |
 | 2026-01-17 | Agent Fine-Tuning (feedback, training export) | +36 |

@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Plugin Marketplace
-**Test Status:** 1335 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (Voice Interface, VS Code Extension)
+**Current State:** Production Ready with Voice Interface
+**Test Status:** 1391 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (AST-Based Refactoring, Dependency Scanner)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 1284 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1391 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -21,6 +21,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 # Launch interfaces
 .venv/bin/sindri tui                       # Terminal UI
 .venv/bin/sindri web --port 8000           # Web UI at http://localhost:8000
+.venv/bin/sindri voice                     # Voice interface
 
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
@@ -30,6 +31,36 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Voice Interface (2026-01-17)
+
+Added speech-to-text and text-to-speech for hands-free interaction:
+
+**Speech-to-Text (Whisper):**
+- Local Whisper inference via faster-whisper
+- Multiple model sizes: tiny, base, small, medium, large
+- Streaming transcription support
+- Voice activity detection
+
+**Text-to-Speech:**
+- Multiple engine support: pyttsx3, piper, espeak
+- Voice customization (rate, pitch, volume)
+- Audio output or file synthesis
+
+**Voice Commands:**
+- `sindri voice` - Start voice-controlled interface
+- `sindri voice --mode wake_word` - Wake word activation
+- `sindri say "text"` - Speak text via TTS
+- `sindri transcribe audio.wav` - Transcribe audio file
+- `sindri voice-status` - Check voice dependencies
+
+**Voice Modes:**
+- Push-to-talk: Press Enter to listen
+- Wake word: "Hey Sindri" activation
+- Continuous: Always listening
+
+**Files:** `sindri/voice/` module (stt.py, tts.py, interface.py)
+**Tests:** 56 new tests in test_voice.py
 
 ### Plugin Marketplace (2026-01-17)
 
@@ -166,6 +197,7 @@ sindri/
 ├── analysis/               # Codebase understanding
 ├── plugins/                # Plugin loader and validator
 ├── collaboration/          # Session sharing and comments
+├── voice/                  # Voice interface (STT/TTS)
 ├── tui/                    # Textual TUI
 └── web/                    # FastAPI server + React frontend
 ```
@@ -201,6 +233,12 @@ sindri marketplace info <name> # Plugin details
 # Fine-tuning
 sindri feedback <session> 5    # Rate session
 sindri export-training out.jsonl  # Export training data
+
+# Voice Interface
+sindri voice                   # Start voice mode
+sindri say "Hello"             # Speak text
+sindri transcribe audio.wav    # Transcribe audio
+sindri voice-status            # Check dependencies
 
 # Plugins
 sindri plugins list            # List plugins

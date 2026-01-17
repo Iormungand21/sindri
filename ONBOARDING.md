@@ -10,10 +10,10 @@ Welcome! This document will help you quickly understand the Sindri project and g
 
 **Key Facts:**
 - **Status:** Production Ready (v0.1.0)
-- **Tests:** 1335 backend + 104 frontend (100% passing)
+- **Tests:** 1391 backend + 104 frontend (100% passing)
 - **Agents:** 11 specialized agents
 - **Tools:** 32 tools
-- **Interfaces:** CLI, TUI (Textual), Web UI (React)
+- **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
 
 ---
 
@@ -24,7 +24,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see 1335 passed)
+# Run tests (should see 1391 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health
@@ -32,6 +32,9 @@ cd /home/ryan/projects/sindri
 
 # List agents
 .venv/bin/sindri agents
+
+# Check voice interface
+.venv/bin/sindri voice-status
 ```
 
 ---
@@ -128,9 +131,10 @@ sindri/
 ├── web/           # FastAPI + React frontend
 ├── plugins/       # Plugin system
 ├── collaboration/ # Session sharing, comments
+├── voice/         # Voice interface (STT/TTS)
 └── analysis/      # Codebase understanding
 
-tests/             # Pytest tests (1284 tests)
+tests/             # Pytest tests (1391 tests)
 docs/              # User documentation
 docs/archive/      # Historical documents
 ```
