@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** ✅ **Code Diff Viewer COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer. **100% production ready.** 1004/1004 backend tests + 53 frontend tests passing (100%). Ready for more Web UI Enhancements.
+**Current Status:** ✅ **Timeline View COMPLETE!** (v0.1.0) - 11 specialized agents + Code Diff Viewer + Timeline View. **100% production ready.** 1004/1004 backend tests + 71 frontend tests passing (100%). Ready for Session Replay.
 
 ---
 
@@ -11,16 +11,16 @@
 **Welcome!** You're picking up a solid, well-tested codebase. Here's what you need to know:
 
 ### Current State (2026-01-16)
-- ✅ Code Diff Viewer COMPLETE - Web UI file change visualization
-- ✅ 1004/1004 backend tests + 53 frontend tests passing (100%)
+- ✅ Timeline View COMPLETE - Web UI execution timeline visualization
+- ✅ 1004/1004 backend tests + 71 frontend tests passing (100%)
 - ✅ 100% production ready
-- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, **Code Diff Viewer**
+- ✅ Complete CLI suite, monitoring, error handling, parallel execution, streaming, smart agents, planning, learning, codebase understanding, plugins, metrics, history, web API + frontend, code search, git tools, HTTP client, testing tools, formatting tools, refactoring tools, SQL tools, multi-project memory, agent graph visualization, 11 specialized agents, Code Diff Viewer, **Timeline View**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v           # Should see 995 passed
-cd sindri/web/static && npm test -- --run  # 37 frontend tests
+.venv/bin/pytest tests/ -v           # Should see 1004 passed
+cd sindri/web/static && npm test -- --run  # 71 frontend tests
 .venv/bin/sindri doctor --verbose    # Check system health
 .venv/bin/sindri agents              # See all 11 agents
 .venv/bin/sindri sessions            # View past sessions
@@ -52,7 +52,7 @@ cd sindri/web/static && npm run build  # Build frontend
 
 ### 🎯 Recommended Next: Web UI Enhancements
 - ~~**Code Diff Viewer:** Before/after for file edits with syntax highlighting~~ ✅ **COMPLETED!**
-- **Timeline View:** Horizontal timeline showing parallel execution, filter by agent/status
+- ~~**Timeline View:** Horizontal timeline showing parallel execution, filter by agent/status~~ ✅ **COMPLETED!**
 - **Session Replay:** Step-by-step replay of past sessions with tool call visualization
 - **Effort:** 1-2 days per enhancement
 - **Impact:** MEDIUM - Better visualization and UX
@@ -76,7 +76,7 @@ curl http://localhost:8000/api/agents | jq
 
 **Features to Build:**
 1. ~~Code diff viewer for file changes~~ ✅ **COMPLETED!**
-2. Timeline view for task execution
+2. ~~Timeline view for task execution~~ ✅ **COMPLETED!**
 3. Session replay functionality
 
 ### Need Help?
@@ -120,7 +120,7 @@ curl http://localhost:8000/api/agents | jq
 - New agents fully operational: **Heimdall** (security), **Baldr** (debugging), **Idunn** (docs), **Vidar** (multi-lang) ✅
 
 **Next priorities:**
-- Web UI Enhancements: ~~Code Diff Viewer~~ ✅, Timeline View, Session Replay
+- Web UI Enhancements: ~~Code Diff Viewer~~ ✅, ~~Timeline View~~ ✅, Session Replay
 - Tools: Multi-file refactoring patterns (advanced)
 
 ---
@@ -1330,6 +1330,7 @@ All high-impact, low-effort improvements completed!
 
 | Date | Phase | Changes |
 |------|-------|---------|
+| 2026-01-16 | 8.3 | ✅ **Timeline View COMPLETE!** Horizontal timeline visualization, two view modes, event filtering, category colors, expand/collapse, 18 frontend tests |
 | 2026-01-16 | 8.3 | ✅ **Stale Session Cleanup!** Proper cleanup via `cleanup_stale_sessions()`, auto-cleanup on server startup, CLI `--cleanup` flag, fixed `/api/health` 404, removed stale workarounds |
 | 2026-01-16 | 8.3 | ✅ **D3.js Agent Graph COMPLETE!** Interactive visualization with delegation flow animation, click-to-view details, view mode toggle (15 frontend tests) |
 | 2026-01-16 | 8.4 | ✅ **Multi-Project Memory COMPLETE!** Cross-project search, project registry, tagging, privacy controls (47 tests) |
@@ -1362,13 +1363,33 @@ All high-impact, low-effort improvements completed!
 
 ---
 
-**Last Updated:** 2026-01-16 (Code Diff Viewer Complete)
-**Next Review:** When starting Timeline View or Session Replay
+**Last Updated:** 2026-01-16 (Timeline View Complete)
+**Next Review:** When starting Session Replay
 **Maintained By:** Project maintainers and contributors
 
 ---
 
 ## Recent Accomplishments 🎉
+
+**🎉 TIMELINE VIEW COMPLETE!** (2026-01-16)
+
+Execution timeline visualization for session analysis:
+1. ✅ **TimelineView Component** - Horizontal timeline with event dots
+   - Two view modes: Timeline (visual) and List (compact)
+   - Event categories with distinct colors
+   - Click to expand event details
+2. ✅ **Event Categories** - User Input, Assistant, Tool Call, Tool Result, File Read, File Write, File Edit
+3. ✅ **Filtering** - Filter by event category via dropdown
+4. ✅ **Statistics** - Duration, Events, Tool Calls, File Operations counts
+5. ✅ **Integration** - New tab in SessionDetail (Conversation | File Changes | Timeline)
+6. ✅ **18 new tests** - Comprehensive component test coverage
+
+**Impact:**
+- Frontend tests: 53 → 71 tests (+18 tests, 100% passing)
+- Better debugging and session analysis
+- Visual understanding of execution flow
+
+---
 
 **🎉 MULTI-PROJECT MEMORY COMPLETE!** (2026-01-16)
 

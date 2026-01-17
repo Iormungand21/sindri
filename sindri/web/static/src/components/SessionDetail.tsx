@@ -6,9 +6,10 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useSession, useFileChanges } from '../hooks/useApi'
 import { CodeDiffViewer } from './CodeDiffViewer'
+import { TimelineView } from './TimelineView'
 import type { Turn } from '../types/api'
 
-type TabId = 'conversation' | 'files'
+type TabId = 'conversation' | 'files' | 'timeline'
 
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -131,11 +132,21 @@ export function SessionDetail() {
           >
             📁 File Changes ({fileChanges?.total_changes ?? 0})
           </button>
+          <button
+            onClick={() => setActiveTab('timeline')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'timeline'
+                ? 'border-forge-500 text-forge-400'
+                : 'border-transparent text-sindri-400 hover:text-sindri-200'
+            }`}
+          >
+            📊 Timeline
+          </button>
         </div>
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'conversation' ? (
+      {activeTab === 'conversation' && (
         <div className="card p-4">
           <h2 className="text-lg font-semibold text-sindri-100 mb-4">
             Conversation ({session.turns?.length ?? 0} turns)
@@ -150,7 +161,9 @@ export function SessionDetail() {
             )}
           </div>
         </div>
-      ) : (
+      )}
+
+      {activeTab === 'files' && (
         <div className="card p-4">
           <h2 className="text-lg font-semibold text-sindri-100 mb-4">
             File Changes
@@ -159,6 +172,20 @@ export function SessionDetail() {
             fileChanges={fileChanges ?? null}
             isLoading={fileChangesLoading}
             error={fileChangesError}
+          />
+        </div>
+      )}
+
+      {activeTab === 'timeline' && (
+        <div className="card p-4">
+          <h2 className="text-lg font-semibold text-sindri-100 mb-4">
+            Execution Timeline
+          </h2>
+          <TimelineView
+            turns={session.turns ?? []}
+            fileChanges={fileChanges?.file_changes ?? null}
+            sessionStart={new Date(session.created_at)}
+            sessionEnd={session.completed_at ? new Date(session.completed_at) : null}
           />
         </div>
       )}
