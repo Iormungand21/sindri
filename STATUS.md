@@ -6,9 +6,9 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Docker Generator
-**Test Status:** 1513 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (AST-Based Refactoring, API Spec Generator)
+**Current State:** Production Ready with API Spec Generator
+**Test Status:** 1575 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (AST-Based Refactoring, Coverage Visualization)
 
 ### Try It Out
 ```bash
@@ -31,6 +31,44 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### API Spec Generator (2026-01-17)
+
+Added automatic OpenAPI 3.0 specification generation from route definitions:
+
+**Framework Detection:**
+- Auto-detects Python (Flask, FastAPI, Django), JavaScript/TypeScript (Express.js), Go (Gin, Echo), and Rust (Actix)
+- Detection from package files (pyproject.toml, package.json, go.mod, Cargo.toml)
+- Source code scanning for framework imports
+
+**Route Extraction:**
+- Flask: @app.route, Blueprint routes, method lists
+- FastAPI: @app.get/post/etc., APIRouter decorators
+- Django: urlpatterns, path(), re_path()
+- Express: app.get/post/etc., router methods
+- Gin/Echo: Go HTTP method handlers
+
+**OpenAPI Generation:**
+- Generates valid OpenAPI 3.0.3 specification
+- Path parameter extraction with type inference
+- Automatic request body for POST/PUT/PATCH methods
+- Multiple output formats (JSON, YAML)
+- Custom title, version, description, and servers
+
+**Validation:**
+- `validate_api_spec` tool checks for required fields
+- Validates HTTP methods and status codes
+- Warns about undefined path parameters
+- Checks for common issues
+
+**CLI Commands:**
+- `sindri api-spec` - Generate OpenAPI spec from routes
+- `sindri api-spec --path src/api --format yaml` - Custom path and format
+- `sindri api-spec --dry-run` - Preview without writing
+- `sindri validate-api-spec openapi.json` - Validate existing spec
+
+**Files:** `sindri/tools/api_spec.py`
+**Tests:** 62 new tests in test_api_spec.py
 
 ### Docker Generator (2026-01-17)
 
@@ -220,7 +258,7 @@ GitHub Actions workflow generation and validation:
 | Idunn | Documentation | llama3.1:8b |
 | Vidar | Multi-lang Coder | codestral:22b |
 
-### Tools (38 total)
+### Tools (40 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Search:** search_code, find_symbol
@@ -233,6 +271,7 @@ GitHub Actions workflow generation and validation:
 **CI/CD:** generate_workflow, validate_workflow
 **Security:** scan_dependencies, generate_sbom, check_outdated
 **Docker:** generate_dockerfile, generate_docker_compose, validate_dockerfile
+**API Spec:** generate_api_spec, validate_api_spec
 **Core:** shell, delegate
 
 ### Key Features
@@ -311,6 +350,12 @@ sindri scan --severity high    # Filter by severity
 sindri sbom                    # Generate SBOM
 sindri outdated                # Check outdated packages
 sindri security-status         # Check scanner availability
+
+# API Spec Generation
+sindri api-spec                # Generate OpenAPI spec
+sindri api-spec --format yaml  # Output as YAML
+sindri api-spec --dry-run      # Preview without writing
+sindri validate-api-spec spec.json  # Validate spec
 
 # Plugins
 sindri plugins list            # List plugins

@@ -27,6 +27,7 @@ from sindri.tools.sql import ExecuteQueryTool, DescribeSchemaTool, ExplainQueryT
 from sindri.tools.cicd import GenerateWorkflowTool, ValidateWorkflowTool
 from sindri.tools.dependency_scanner import ScanDependenciesTool, GenerateSBOMTool, CheckOutdatedTool
 from sindri.tools.docker import GenerateDockerfileTool, GenerateDockerComposeTool, ValidateDockerfileTool
+from sindri.tools.api_spec import GenerateApiSpecTool, ValidateApiSpecTool
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -270,4 +271,6 @@ class ToolRegistry:
         registry.register(GenerateDockerfileTool(work_dir=work_dir))
         registry.register(GenerateDockerComposeTool(work_dir=work_dir))
         registry.register(ValidateDockerfileTool(work_dir=work_dir))
+        registry.register(GenerateApiSpecTool(work_dir=work_dir))
+        registry.register(ValidateApiSpecTool(work_dir=work_dir))
         return registry

@@ -3170,6 +3170,121 @@ def security_status():
     console.print("[dim]Use 'sindri scan' to scan for vulnerabilities[/dim]")
 
 
+# ============================================
+# Phase 9.5: API Spec Generation Commands
+# ============================================
+
+
+@cli.command("api-spec")
+@click.option("--path", "-p", type=click.Path(exists=True), help="Project path to scan for routes")
+@click.option("--output", "-o", type=click.Path(), help="Output file path (default: openapi.json)")
+@click.option("--format", "-f", "output_format", type=click.Choice(["json", "yaml"]), default="json", help="Output format")
+@click.option("--title", "-t", help="API title (auto-detected if not provided)")
+@click.option("--version", "-v", "api_version", default="1.0.0", help="API version")
+@click.option("--description", "-d", help="API description")
+@click.option("--server", "-s", "servers", multiple=True, help="Server URL (can specify multiple)")
+@click.option("--framework", type=click.Choice(["flask", "fastapi", "express", "django", "gin", "echo"]), help="Override framework detection")
+@click.option("--dry-run", is_flag=True, help="Preview spec without creating file")
+def api_spec(path: str, output: str, output_format: str, title: str, api_version: str, description: str, servers: tuple, framework: str, dry_run: bool):
+    """Generate OpenAPI specification from route definitions.
+
+    Automatically detects the web framework and extracts route information
+    to generate an OpenAPI 3.0 specification.
+
+    Supported frameworks:
+    - Python: Flask, FastAPI, Django
+    - JavaScript/TypeScript: Express.js
+    - Go: Gin, Echo
+
+    Example:
+        sindri api-spec
+
+        sindri api-spec --path src/api --output docs/openapi.yaml --format yaml
+
+        sindri api-spec --title "My API" --version 2.0.0 --server https://api.example.com
+
+        sindri api-spec --framework flask --dry-run
+    """
+    from sindri.tools.api_spec import GenerateApiSpecTool
+    from pathlib import Path as P
+
+    async def do_generate():
+        tool = GenerateApiSpecTool(work_dir=P(path).resolve() if path else None)
+
+        result = await tool.execute(
+            path=path or ".",
+            output=output,
+            format=output_format,
+            title=title,
+            version=api_version,
+            description=description,
+            servers=list(servers) if servers else None,
+            framework=framework,
+            dry_run=dry_run,
+        )
+
+        if result.success:
+            meta = result.metadata
+            if dry_run:
+                console.print(f"[bold]OpenAPI Spec Preview[/bold] (dry run)\n")
+                console.print(f"Framework: {meta.get('framework', 'unknown')}")
+                console.print(f"Routes: {meta.get('routes_count', 0)}")
+                console.print(f"Would write to: {meta.get('output_file', 'openapi.json')}\n")
+                # Print a truncated preview
+                output_text = result.output
+                if len(output_text) > 2000:
+                    console.print(output_text[:2000])
+                    console.print("\n[dim]... (truncated)[/dim]")
+                else:
+                    console.print(output_text)
+            else:
+                console.print(f"[green]✓ OpenAPI spec generated: {meta.get('output_file')}[/green]")
+                console.print(f"[dim]Framework: {meta.get('framework')}, Routes: {meta.get('routes_count')}[/dim]")
+        else:
+            console.print(f"[red]✗ Generation failed: {result.error}[/red]")
+            if result.metadata.get("framework"):
+                console.print(f"[dim]Detected framework: {result.metadata.get('framework')}[/dim]")
+
+    asyncio.run(do_generate())
+
+
+@cli.command("validate-api-spec")
+@click.argument("file_path", type=click.Path(exists=True))
+def validate_api_spec(file_path: str):
+    """Validate an OpenAPI specification file.
+
+    Checks for:
+    - Valid JSON/YAML syntax
+    - Required OpenAPI fields
+    - Valid HTTP methods and status codes
+    - Path parameter definitions
+
+    Example:
+        sindri validate-api-spec openapi.json
+
+        sindri validate-api-spec docs/api.yaml
+    """
+    from sindri.tools.api_spec import ValidateApiSpecTool
+    from pathlib import Path as P
+
+    async def do_validate():
+        tool = ValidateApiSpecTool(work_dir=P(file_path).parent)
+
+        result = await tool.execute(file_path=file_path)
+
+        if result.success:
+            console.print(f"[green]✓ OpenAPI spec is valid: {file_path}[/green]")
+            if result.metadata.get("warnings"):
+                console.print("\n[yellow]Warnings:[/yellow]")
+                for warning in result.metadata["warnings"]:
+                    console.print(f"  ⚠ {warning}")
+        else:
+            console.print(f"[red]✗ Validation failed: {file_path}[/red]")
+            console.print(result.output)
+
+    asyncio.run(do_validate())
+
+
 @cli.command()
 @click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
 @click.option("--port", "-p", default=8000, help="Port to listen on")
