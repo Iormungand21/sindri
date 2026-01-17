@@ -4,13 +4,14 @@
 
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { useSession, useFileChanges } from '../hooks/useApi'
+import { useSession, useFileChanges, useCoverageSummary } from '../hooks/useApi'
 import { CodeDiffViewer } from './CodeDiffViewer'
 import { TimelineView } from './TimelineView'
 import { SessionReplay } from './SessionReplay'
+import { CoverageViewer } from './CoverageViewer'
 import type { Turn } from '../types/api'
 
-type TabId = 'conversation' | 'files' | 'timeline' | 'replay'
+type TabId = 'conversation' | 'files' | 'timeline' | 'replay' | 'coverage'
 
 export function SessionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -20,6 +21,7 @@ export function SessionDetail() {
     isLoading: fileChangesLoading,
     error: fileChangesError,
   } = useFileChanges(id ?? '')
+  const { data: coverageSummary } = useCoverageSummary(id ?? '')
   const [activeTab, setActiveTab] = useState<TabId>('conversation')
 
   if (isLoading) {
@@ -153,6 +155,16 @@ export function SessionDetail() {
           >
             ▶️ Replay
           </button>
+          <button
+            onClick={() => setActiveTab('coverage')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'coverage'
+                ? 'border-forge-500 text-forge-400'
+                : 'border-transparent text-sindri-400 hover:text-sindri-200'
+            }`}
+          >
+            📈 Coverage {coverageSummary ? `(${coverageSummary.line_percentage.toFixed(0)}%)` : ''}
+          </button>
         </div>
       </div>
 
@@ -211,6 +223,15 @@ export function SessionDetail() {
             sessionStart={new Date(session.created_at)}
             sessionEnd={session.completed_at ? new Date(session.completed_at) : null}
           />
+        </div>
+      )}
+
+      {activeTab === 'coverage' && (
+        <div className="card p-4">
+          <h2 className="text-lg font-semibold text-sindri-100 mb-4">
+            Code Coverage
+          </h2>
+          <CoverageViewer sessionId={id ?? ''} />
         </div>
       )}
     </div>

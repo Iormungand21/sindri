@@ -11,6 +11,10 @@ import type {
   TaskStatus,
   Metrics,
   FileChanges,
+  CoverageSummary,
+  CoverageDetail,
+  CoverageStats,
+  CoverageListItem,
 } from '../types/api'
 
 const API_BASE = '/api'
@@ -116,6 +120,55 @@ export async function getMetrics(): Promise<Metrics> {
 // Health check
 export async function checkHealth(): Promise<{ status: string }> {
   return fetchApi<{ status: string }>('/health')
+}
+
+// Coverage endpoints
+export async function getCoverageSummary(
+  sessionId: string
+): Promise<CoverageSummary> {
+  return fetchApi<CoverageSummary>(
+    `/sessions/${encodeURIComponent(sessionId)}/coverage`
+  )
+}
+
+export async function getCoverageDetail(
+  sessionId: string
+): Promise<CoverageDetail> {
+  return fetchApi<CoverageDetail>(
+    `/sessions/${encodeURIComponent(sessionId)}/coverage/detail`
+  )
+}
+
+export async function importCoverage(
+  sessionId: string,
+  coveragePath: string
+): Promise<CoverageSummary> {
+  return fetchApi<CoverageSummary>(
+    `/sessions/${encodeURIComponent(sessionId)}/coverage`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ coverage_path: coveragePath }),
+    }
+  )
+}
+
+export async function deleteCoverage(
+  sessionId: string
+): Promise<{ message: string }> {
+  return fetchApi<{ message: string }>(
+    `/sessions/${encodeURIComponent(sessionId)}/coverage`,
+    { method: 'DELETE' }
+  )
+}
+
+export async function listCoverageReports(
+  limit = 20
+): Promise<CoverageListItem[]> {
+  return fetchApi<CoverageListItem[]>(`/coverage?limit=${limit}`)
+}
+
+export async function getCoverageStats(): Promise<CoverageStats> {
+  return fetchApi<CoverageStats>('/coverage/stats')
 }
 
 export { ApiError }

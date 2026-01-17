@@ -6,9 +6,9 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with AST-Based Refactoring
-**Test Status:** 1630 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (Coverage Visualization, Team Mode)
+**Current State:** Production Ready with Coverage Visualization
+**Test Status:** 1670 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (Team Mode, IDE Plugins)
 
 ### Try It Out
 ```bash
@@ -31,6 +31,50 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Coverage Visualization (2026-01-17)
+
+Added code coverage visualization to the Web UI with support for multiple coverage formats:
+
+**Coverage Formats Supported:**
+- Cobertura XML (coverage.xml from pytest-cov, Istanbul)
+- LCOV (lcov.info from gcov, Istanbul)
+- JSON (coverage.json from coverage.py)
+
+**Features:**
+- Parse and store coverage data per session
+- Overall coverage stats (line rate, branch rate, files count)
+- Package/directory breakdown with expandable sections
+- File-level detail with covered/uncovered line numbers
+- Sort by coverage (lowest first), name, or size
+- Filter to show only low coverage files (<50%)
+- Color-coded coverage indicators (green >80%, yellow 50-80%, red <50%)
+
+**API Endpoints:**
+- `GET /api/sessions/{id}/coverage` - Get coverage summary
+- `GET /api/sessions/{id}/coverage/detail` - Get detailed breakdown
+- `POST /api/sessions/{id}/coverage` - Import coverage from file
+- `DELETE /api/sessions/{id}/coverage` - Delete coverage
+- `GET /api/coverage` - List all coverage reports
+- `GET /api/coverage/stats` - Get aggregate statistics
+
+**Web UI Integration:**
+- New "Coverage" tab in Session Detail view
+- Shows coverage percentage in tab label when available
+- Interactive package/file tree with expand/collapse
+- Coverage bars for visual progress indication
+
+**Files:**
+- `sindri/persistence/coverage.py` - Parser and storage (CoverageParser, CoverageStore)
+- `sindri/web/server.py` - API endpoints
+- `sindri/web/static/src/components/CoverageViewer.tsx` - React component
+- `sindri/web/static/src/hooks/useApi.ts` - Coverage hooks
+- `sindri/web/static/src/api/client.ts` - API client functions
+- `sindri/web/static/src/types/api.ts` - TypeScript types
+
+**Tests:** 40 new tests in test_coverage.py
+
+---
 
 ### AST-Based Refactoring with Tree-sitter (2026-01-17)
 
@@ -344,7 +388,7 @@ GitHub Actions workflow generation and validation:
 | Idunn | Documentation | llama3.1:8b |
 | Vidar | Multi-lang Coder | codestral:22b |
 
-### Tools (44 total)
+### Tools (45 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **AST:** parse_ast, find_references, symbol_info, ast_rename

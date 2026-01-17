@@ -101,6 +101,73 @@ export interface FileChanges {
   total_changes: number
 }
 
+// Coverage types
+export interface FileCoverage {
+  filename: string
+  lines_valid: number
+  lines_covered: number
+  line_rate: number
+  line_percentage: number
+  branches_valid: number
+  branches_covered: number
+  branch_rate: number
+  covered_lines: number[]
+  uncovered_lines: number[]
+}
+
+export interface PackageCoverage {
+  name: string
+  line_rate: number
+  branch_rate: number
+  lines_valid: number
+  lines_covered: number
+  files: FileCoverage[]
+}
+
+export interface CoverageSummary {
+  session_id: string | null
+  source: string
+  timestamp: string
+  line_rate: number
+  line_percentage: number
+  lines_valid: number
+  lines_covered: number
+  branch_rate: number
+  branch_percentage: number
+  branches_valid: number
+  branches_covered: number
+  files_count: number
+  packages_count: number
+}
+
+export interface CoverageDetail extends CoverageSummary {
+  packages: PackageCoverage[]
+}
+
+export interface CoverageStats {
+  total_reports: number
+  avg_line_rate: number
+  avg_line_percentage: number
+  max_line_rate: number
+  min_line_rate: number
+  total_files: number
+  total_lines: number
+  total_covered: number
+}
+
+export interface CoverageListItem {
+  session_id: string
+  line_rate: number
+  line_percentage: number
+  branch_rate: number
+  files_covered: number
+  lines_valid: number
+  lines_covered: number
+  created_at: string
+  task: string
+  status: string
+}
+
 // Event types from the EventBus
 export type EventType =
   | 'TASK_START'

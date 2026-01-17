@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 40 tools, 1575 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 11 agents, 45 tools, 1670 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -74,7 +74,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - Voice Interface: Whisper STT, multi-engine TTS, wake word
 - Dependency Scanner: pip-audit, npm audit, cargo audit, govulncheck, SBOM
 
-**Total:** 1630 backend tests + 104 frontend tests (100% passing)
+**Total:** 1670 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -95,7 +95,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 | Dependency Scanner | OWASP/npm audit vulnerability detection | **Complete** |
 | Docker Generator | Auto-generate Dockerfile/docker-compose | **Complete** |
 | API Spec Generator | OpenAPI from route definitions | **Complete** |
-| Coverage Visualization | Code coverage in Web UI | Idea |
+| Coverage Visualization | Code coverage in Web UI | **Complete** |
 
 ### Exploratory
 
@@ -154,6 +154,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Coverage Visualization (Cobertura XML, LCOV, JSON; Web UI) | +40 |
 | 2026-01-17 | AST-Based Refactoring (tree-sitter, Python/JS/TS/Rust/Go) | +55 |
 | 2026-01-17 | API Spec Generator (OpenAPI 3.0 from Flask/FastAPI/Express/Django/Gin/Echo) | +62 |
 | 2026-01-17 | Docker Generator (Dockerfile, docker-compose, validation) | +64 |

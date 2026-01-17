@@ -17,6 +17,10 @@ export const queryKeys = {
   taskStatus: (id: string) => ['tasks', id] as const,
   metrics: ['metrics'] as const,
   health: ['health'] as const,
+  coverageSummary: (id: string) => ['sessions', id, 'coverage'] as const,
+  coverageDetail: (id: string) => ['sessions', id, 'coverage', 'detail'] as const,
+  coverageList: (limit?: number) => ['coverage', { limit }] as const,
+  coverageStats: ['coverage', 'stats'] as const,
 }
 
 // Agent hooks
@@ -108,5 +112,69 @@ export function useHealth() {
     queryFn: api.checkHealth,
     refetchInterval: 10000, // Refresh every 10 seconds
     retry: false,
+  })
+}
+
+// Coverage hooks
+export function useCoverageSummary(sessionId: string) {
+  return useQuery({
+    queryKey: queryKeys.coverageSummary(sessionId),
+    queryFn: () => api.getCoverageSummary(sessionId),
+    enabled: !!sessionId,
+    staleTime: 1000 * 60 * 5, // 5 minutes - coverage doesn't change
+    retry: false, // Don't retry if not found
+  })
+}
+
+export function useCoverageDetail(sessionId: string) {
+  return useQuery({
+    queryKey: queryKeys.coverageDetail(sessionId),
+    queryFn: () => api.getCoverageDetail(sessionId),
+    enabled: !!sessionId,
+    staleTime: 1000 * 60 * 5,
+    retry: false,
+  })
+}
+
+export function useCoverageList(limit = 20) {
+  return useQuery({
+    queryKey: queryKeys.coverageList(limit),
+    queryFn: () => api.listCoverageReports(limit),
+    staleTime: 1000 * 60, // 1 minute
+  })
+}
+
+export function useCoverageStats() {
+  return useQuery({
+    queryKey: queryKeys.coverageStats,
+    queryFn: api.getCoverageStats,
+    staleTime: 1000 * 60, // 1 minute
+  })
+}
+
+export function useImportCoverage() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ sessionId, coveragePath }: { sessionId: string; coveragePath: string }) =>
+      api.importCoverage(sessionId, coveragePath),
+    onSuccess: (_data, variables) => {
+      // Invalidate coverage queries for this session
+      queryClient.invalidateQueries({ queryKey: ['sessions', variables.sessionId, 'coverage'] })
+      queryClient.invalidateQueries({ queryKey: ['coverage'] })
+    },
+  })
+}
+
+export function useDeleteCoverage() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (sessionId: string) => api.deleteCoverage(sessionId),
+    onSuccess: (_data, sessionId) => {
+      // Invalidate coverage queries
+      queryClient.invalidateQueries({ queryKey: ['sessions', sessionId, 'coverage'] })
+      queryClient.invalidateQueries({ queryKey: ['coverage'] })
+    },
   })
 }

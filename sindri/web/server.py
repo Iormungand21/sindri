@@ -162,6 +162,76 @@ class WebSocketMessage(BaseModel):
     timestamp: float
 
 
+# Coverage models
+class FileCoverageResponse(BaseModel):
+    """Coverage data for a single file."""
+
+    filename: str
+    lines_valid: int
+    lines_covered: int
+    line_rate: float
+    line_percentage: float
+    branches_valid: int = 0
+    branches_covered: int = 0
+    branch_rate: float = 0.0
+    covered_lines: list[int] = []
+    uncovered_lines: list[int] = []
+
+
+class PackageCoverageResponse(BaseModel):
+    """Coverage data for a package/directory."""
+
+    name: str
+    line_rate: float
+    branch_rate: float = 0.0
+    lines_valid: int
+    lines_covered: int
+    files: list[FileCoverageResponse] = []
+
+
+class CoverageSummaryResponse(BaseModel):
+    """Summary of coverage data."""
+
+    session_id: Optional[str] = None
+    source: str = ""
+    timestamp: str = ""
+    line_rate: float
+    line_percentage: float
+    lines_valid: int
+    lines_covered: int
+    branch_rate: float = 0.0
+    branch_percentage: float = 0.0
+    branches_valid: int = 0
+    branches_covered: int = 0
+    files_count: int
+    packages_count: int
+
+
+class CoverageDetailResponse(CoverageSummaryResponse):
+    """Detailed coverage response including package/file breakdown."""
+
+    packages: list[PackageCoverageResponse] = []
+
+
+class CoverageImportRequest(BaseModel):
+    """Request to import coverage from a file."""
+
+    coverage_path: str = Field(..., description="Path to coverage file (XML, JSON, or LCOV)")
+
+
+class CoverageStatsResponse(BaseModel):
+    """Aggregate coverage statistics."""
+
+    total_reports: int
+    avg_line_rate: float
+    avg_line_percentage: float
+    max_line_rate: float
+    min_line_rate: float
+    total_files: int
+    total_lines: int
+    total_covered: int
+
+
 # Collaboration models
 class ShareCreateRequest(BaseModel):
     """Request to create a session share."""
@@ -890,6 +960,175 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             )
 
         return metrics.to_dict()
+
+    # ===== Coverage Endpoints =====
+
+    async def _resolve_session_id(session_id: str) -> str:
+        """Resolve short session ID to full UUID."""
+        if len(session_id) >= 36:
+            return session_id
+
+        sessions = await api.state.list_sessions(limit=100)
+        matching = [s for s in sessions if s["id"].startswith(session_id)]
+        if not matching:
+            raise HTTPException(
+                status_code=404, detail=f"Session '{session_id}' not found"
+            )
+        if len(matching) > 1:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ambiguous session ID '{session_id}', matches: {[m['id'][:8] for m in matching]}",
+            )
+        return matching[0]["id"]
+
+    @app.get(
+        "/api/sessions/{session_id}/coverage",
+        response_model=CoverageSummaryResponse,
+        tags=["Coverage"],
+    )
+    async def get_session_coverage_summary(session_id: str):
+        """Get coverage summary for a session.
+
+        Returns high-level coverage metrics without detailed file breakdown.
+        """
+        from sindri.persistence.coverage import CoverageStore
+
+        full_id = await _resolve_session_id(session_id)
+        store = CoverageStore(api.state.db)
+
+        coverage = await store.load_coverage(full_id)
+        if not coverage:
+            raise HTTPException(
+                status_code=404, detail=f"Coverage not found for session '{session_id}'"
+            )
+
+        summary = coverage.get_summary()
+        return CoverageSummaryResponse(**summary)
+
+    @app.get(
+        "/api/sessions/{session_id}/coverage/detail",
+        response_model=CoverageDetailResponse,
+        tags=["Coverage"],
+    )
+    async def get_session_coverage_detail(session_id: str):
+        """Get detailed coverage for a session including file breakdown.
+
+        Returns complete coverage data with package and file-level details.
+        """
+        from sindri.persistence.coverage import CoverageStore
+
+        full_id = await _resolve_session_id(session_id)
+        store = CoverageStore(api.state.db)
+
+        coverage = await store.load_coverage(full_id)
+        if not coverage:
+            raise HTTPException(
+                status_code=404, detail=f"Coverage not found for session '{session_id}'"
+            )
+
+        # Build response with packages and files
+        packages = []
+        for pkg in coverage.packages:
+            files = []
+            for f in pkg.files:
+                files.append(
+                    FileCoverageResponse(
+                        filename=f.filename,
+                        lines_valid=f.lines_valid,
+                        lines_covered=f.lines_covered,
+                        line_rate=f.line_rate,
+                        line_percentage=f.line_percentage,
+                        branches_valid=f.branches_valid,
+                        branches_covered=f.branches_covered,
+                        branch_rate=f.branch_rate,
+                        covered_lines=f.covered_lines,
+                        uncovered_lines=f.uncovered_lines,
+                    )
+                )
+            packages.append(
+                PackageCoverageResponse(
+                    name=pkg.name,
+                    line_rate=pkg.line_rate,
+                    branch_rate=pkg.branch_rate,
+                    lines_valid=pkg.lines_valid,
+                    lines_covered=pkg.lines_covered,
+                    files=files,
+                )
+            )
+
+        summary = coverage.get_summary()
+        return CoverageDetailResponse(
+            **summary,
+            packages=packages,
+        )
+
+    @app.post(
+        "/api/sessions/{session_id}/coverage",
+        response_model=CoverageSummaryResponse,
+        tags=["Coverage"],
+    )
+    async def import_session_coverage(session_id: str, request: CoverageImportRequest):
+        """Import coverage data from a file for a session.
+
+        Supports Cobertura XML (coverage.xml), LCOV (lcov.info), and JSON formats.
+        """
+        from sindri.persistence.coverage import CoverageStore
+
+        full_id = await _resolve_session_id(session_id)
+        store = CoverageStore(api.state.db)
+
+        coverage_path = Path(request.coverage_path)
+        if not coverage_path.exists():
+            raise HTTPException(
+                status_code=400, detail=f"Coverage file not found: {request.coverage_path}"
+            )
+
+        try:
+            coverage = await store.import_from_file(full_id, coverage_path)
+            summary = coverage.get_summary()
+            return CoverageSummaryResponse(**summary)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        except Exception as e:
+            log.error("coverage_import_failed", error=str(e))
+            raise HTTPException(
+                status_code=500, detail=f"Failed to import coverage: {str(e)}"
+            )
+
+    @app.delete("/api/sessions/{session_id}/coverage", tags=["Coverage"])
+    async def delete_session_coverage(session_id: str):
+        """Delete coverage data for a session."""
+        from sindri.persistence.coverage import CoverageStore
+
+        full_id = await _resolve_session_id(session_id)
+        store = CoverageStore(api.state.db)
+
+        deleted = await store.delete_coverage(full_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=404, detail=f"Coverage not found for session '{session_id}'"
+            )
+
+        return {"message": "Coverage deleted", "session_id": full_id}
+
+    @app.get("/api/coverage", response_model=list[dict], tags=["Coverage"])
+    async def list_coverage_reports(
+        limit: int = Query(default=20, ge=1, le=100, description="Maximum reports to return"),
+    ):
+        """List recent coverage reports across all sessions."""
+        from sindri.persistence.coverage import CoverageStore
+
+        store = CoverageStore(api.state.db)
+        return await store.list_coverage(limit=limit)
+
+    @app.get("/api/coverage/stats", response_model=CoverageStatsResponse, tags=["Coverage"])
+    async def get_coverage_stats():
+        """Get aggregate coverage statistics across all sessions."""
+        from sindri.persistence.coverage import CoverageStore
+
+        store = CoverageStore(api.state.db)
+        stats = await store.get_aggregate_stats()
+        return CoverageStatsResponse(**stats)
 
     # ===== Collaboration Endpoints =====
 
