@@ -3952,5 +3952,133 @@ def validate_terraform(path: str, check_formatting: bool):
     asyncio.run(execute())
 
 
+# ============================================
+# Phase 9+: IDE Integration Commands
+# ============================================
+
+
+@cli.command()
+@click.option(
+    "--mode",
+    "-m",
+    type=click.Choice(["stdio", "http"]),
+    default="stdio",
+    help="Communication mode",
+)
+@click.option(
+    "--port",
+    "-p",
+    type=int,
+    default=9999,
+    help="Port for HTTP mode (default: 9999)",
+)
+@click.option(
+    "--work-dir",
+    "-w",
+    type=click.Path(exists=True),
+    help="Working directory for file operations",
+)
+def ide(mode: str, port: int, work_dir: str = None):
+    """Start IDE integration server.
+
+    Provides JSON-RPC interface for IDE plugins (Neovim, VS Code, etc.).
+
+    Modes:
+    - stdio: Communication over stdin/stdout (for Neovim)
+    - http: HTTP/WebSocket server (for VS Code, web editors)
+
+    Examples:
+        sindri ide                     # Start in stdio mode
+
+        sindri ide --mode stdio        # Explicit stdio mode (for Neovim)
+
+        sindri ide --mode http --port 9999  # Start HTTP server
+
+        sindri ide --work-dir ~/projects/myapp  # Set working directory
+    """
+    from pathlib import Path
+
+    from sindri.ide import IDEServer
+
+    work_path = Path(work_dir).resolve() if work_dir else Path.cwd()
+
+    if mode == "stdio":
+        console.print("[dim]Starting Sindri IDE server (stdio mode)...[/dim]", err=True)
+
+        async def run_stdio():
+            server = IDEServer(work_dir=work_path)
+            await server.run_stdio()
+
+        try:
+            asyncio.run(run_stdio())
+        except KeyboardInterrupt:
+            console.print("[dim]IDE server stopped[/dim]", err=True)
+
+    elif mode == "http":
+        console.print(
+            f"[bold blue]Starting Sindri IDE server on port {port}[/bold blue]"
+        )
+        console.print(f"[dim]Working directory: {work_path}[/dim]")
+        console.print("[dim]Press Ctrl+C to stop[/dim]")
+
+        # HTTP mode would use FastAPI, sharing code with web server
+        # For now, just show a message
+        console.print("[yellow]HTTP mode not yet implemented. Use stdio mode.[/yellow]")
+        console.print("[dim]For web access, use 'sindri web' instead.[/dim]")
+
+
+@cli.command("ide-status")
+def ide_status():
+    """Check IDE integration status.
+
+    Shows whether IDE server is running and connection information.
+    """
+    from pathlib import Path
+    import shutil
+
+    console.print("[bold]IDE Integration Status[/bold]\n")
+
+    # Check if sindri executable is findable
+    sindri_path = shutil.which("sindri")
+    if sindri_path:
+        console.print(f"[green]✓[/green] Sindri executable: {sindri_path}")
+    else:
+        console.print("[yellow]![/yellow] Sindri not in PATH")
+        console.print("[dim]  Add to PATH or use full path in IDE config[/dim]")
+
+    # Check Neovim plugin installation
+    nvim_plugin_paths = [
+        Path.home() / ".local/share/nvim/lazy/sindri.nvim",
+        Path.home() / ".local/share/nvim/site/pack/sindri/start/sindri.nvim",
+        Path.home() / ".config/nvim/lua/sindri",
+    ]
+
+    nvim_found = False
+    for nvim_path in nvim_plugin_paths:
+        if nvim_path.exists():
+            console.print(f"[green]✓[/green] Neovim plugin: {nvim_path}")
+            nvim_found = True
+            break
+
+    if not nvim_found:
+        console.print("[dim]-[/dim] Neovim plugin: not installed")
+        console.print("[dim]  Copy sindri/ide/nvim to your Neovim config[/dim]")
+
+    # Show available features
+    console.print("\n[bold]Available Features:[/bold]")
+    features = [
+        ("Task execution", "Run Sindri tasks from editor"),
+        ("Code explanation", "Explain selected code"),
+        ("Fix suggestions", "Get fixes for errors"),
+        ("Test generation", "Generate tests for code"),
+        ("Code refactoring", "Refactor selected code"),
+        ("Symbol search", "Find symbols in codebase"),
+        ("Agent info", "View agent capabilities"),
+    ]
+
+    for feature, desc in features:
+        console.print(f"  [green]✓[/green] {feature}: {desc}")
+
+
 if __name__ == "__main__":
     cli()

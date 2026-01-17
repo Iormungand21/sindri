@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Infrastructure as Code Generation
-**Test Status:** 1743 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (Team Mode, IDE Plugins, Fine-Tuning Pipeline)
+**Current State:** Production Ready with IDE Integration
+**Test Status:** 1799 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (Team Mode, Fine-Tuning Pipeline)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 1630 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1799 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -22,6 +22,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri tui                       # Terminal UI
 .venv/bin/sindri web --port 8000           # Web UI at http://localhost:8000
 .venv/bin/sindri voice                     # Voice interface
+.venv/bin/sindri ide                       # IDE server (stdio mode)
 
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
@@ -31,6 +32,69 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### IDE Integration (2026-01-17)
+
+Added IDE integration with JSON-RPC server and Neovim plugin for editor-based code assistance:
+
+**IDE Server (`sindri ide`):**
+- JSON-RPC 2.0 protocol over stdio (LSP-style)
+- Task execution from editor context
+- Code explanation, fix suggestions, test generation
+- Code refactoring with LLM assistance
+- File analysis and symbol search
+- Agent info and session management
+
+**Protocol Features:**
+- Full request/response lifecycle
+- Streaming token notifications
+- Task progress notifications
+- Document sync notifications
+
+**Neovim Plugin (`sindri/ide/nvim/`):**
+- Lua plugin with full JSON-RPC client
+- Commands: `:Sindri`, `:SindriRun`, `:SindriExplain`, `:SindriFix`, `:SindriTests`
+- Visual selection support for code operations
+- Floating window UI for results
+- Loading indicators with progress bars
+- Configurable keymaps (default: `<leader>s*`)
+
+**Supported Operations:**
+- `sindri/executeTask` - Run tasks with editor context
+- `sindri/explainCode` - Explain selected code
+- `sindri/suggestFix` - Suggest fixes for errors
+- `sindri/generateTests` - Generate unit tests
+- `sindri/refactorCode` - Refactor with various patterns
+- `sindri/analyzeFile` - Analyze file structure
+- `sindri/listAgents` - List available agents
+- `sindri/listSessions` - List past sessions
+
+**CLI Commands:**
+- `sindri ide` - Start IDE server (stdio mode, default)
+- `sindri ide --mode http` - HTTP mode (planned)
+- `sindri ide-status` - Check IDE integration status
+
+**Files:**
+- `sindri/ide/` - IDE integration module
+  - `protocol.py` - JSON-RPC protocol definitions
+  - `server.py` - IDE server implementation
+- `sindri/ide/nvim/` - Neovim plugin
+  - `lua/sindri/init.lua` - Main plugin module
+  - `lua/sindri/client.lua` - JSON-RPC client
+  - `lua/sindri/ui.lua` - Floating windows and UI
+
+**Installation (Neovim):**
+```lua
+-- Using lazy.nvim
+{ dir = "~/projects/sindri/sindri/ide/nvim" }
+
+-- Or copy to your Neovim config
+cp -r sindri/ide/nvim/lua/sindri ~/.config/nvim/lua/
+```
+
+**Tests:** 56 new tests (total: 1799 backend tests)
+
+---
 
 ### Infrastructure as Code Generation (2026-01-17)
 
