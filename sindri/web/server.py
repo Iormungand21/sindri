@@ -337,6 +337,44 @@ class CursorUpdateRequest(BaseModel):
     line_number: Optional[int] = Field(default=None, description="Line within turn")
 
 
+class ActivityResponse(BaseModel):
+    """Activity feed item response."""
+
+    id: str = Field(..., description="Activity ID")
+    team_id: str = Field(..., description="Team ID")
+    actor_id: str = Field(..., description="Actor user ID")
+    type: str = Field(..., description="Activity type")
+    target_id: Optional[str] = Field(default=None, description="Target ID")
+    target_type: Optional[str] = Field(default=None, description="Target type")
+    message: str = Field(..., description="Activity message")
+    metadata: dict = Field(default_factory=dict, description="Additional metadata")
+    created_at: str = Field(..., description="ISO timestamp")
+
+
+class ActivityCreateRequest(BaseModel):
+    """Request to create an activity."""
+
+    team_id: str = Field(..., min_length=1, description="Team ID")
+    actor_id: str = Field(..., min_length=1, description="Actor user ID")
+    type: str = Field(..., description="Activity type")
+    target_id: Optional[str] = Field(default=None, description="Target ID")
+    target_type: Optional[str] = Field(default=None, description="Target type")
+    message: str = Field(default="", description="Activity message")
+    metadata: dict = Field(default_factory=dict, description="Additional metadata")
+
+
+class ActivityStatsResponse(BaseModel):
+    """Activity statistics response."""
+
+    total_activities: int = Field(..., description="Total activities")
+    last_24h: int = Field(..., description="Activities in last 24 hours")
+    by_type: dict = Field(default_factory=dict, description="Count by type")
+    most_active_users: list = Field(
+        default_factory=list, description="Most active users"
+    )
+    type_breakdown: list = Field(default_factory=list, description="Type breakdown")
+
+
 class SindriAPI:
     """Sindri API application state."""
 
@@ -353,6 +391,7 @@ class SindriAPI:
         self.share_store: Optional["ShareStore"] = None
         self.comment_store: Optional["CommentStore"] = None
         self.presence_manager: Optional["PresenceManager"] = None
+        self.activity_store: Optional["ActivityStore"] = None
 
     async def initialize(self):
         """Initialize API components."""
@@ -363,10 +402,12 @@ class SindriAPI:
         from sindri.collaboration.sharing import ShareStore
         from sindri.collaboration.comments import CommentStore
         from sindri.collaboration.presence import PresenceManager
+        from sindri.collaboration.activity import ActivityStore
 
         self.share_store = ShareStore(self.state.db)
         self.comment_store = CommentStore(self.state.db)
         self.presence_manager = PresenceManager()
+        self.activity_store = ActivityStore(self.state.db)
 
         # Start presence cleanup task
         self.presence_manager.start_cleanup_task()
@@ -1508,6 +1549,185 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             "comments": comment_stats,
             "presence": presence_stats,
         }
+
+    # ===== Activity Feed Endpoints =====
+
+    @app.get(
+        "/api/teams/{team_id}/activities",
+        response_model=list[ActivityResponse],
+        tags=["Activity Feed"],
+    )
+    async def list_team_activities(
+        team_id: str,
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+        activity_type: Optional[str] = Query(default=None),
+    ):
+        """List activities for a team."""
+        from sindri.collaboration.activity import ActivityType
+
+        type_filter = None
+        if activity_type:
+            try:
+                type_filter = [ActivityType(activity_type)]
+            except ValueError:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid activity type: {activity_type}"
+                )
+
+        activities = await api.activity_store.list_by_team(
+            team_id=team_id,
+            limit=limit,
+            offset=offset,
+            activity_types=type_filter,
+        )
+
+        return [
+            ActivityResponse(
+                id=a.id,
+                team_id=a.team_id,
+                actor_id=a.actor_id,
+                type=a.type.value,
+                target_id=a.target_id,
+                target_type=a.target_type.value if a.target_type else None,
+                message=a.message,
+                metadata=a.metadata,
+                created_at=a.created_at.isoformat(),
+            )
+            for a in activities
+        ]
+
+    @app.get(
+        "/api/activities/{activity_id}",
+        response_model=ActivityResponse,
+        tags=["Activity Feed"],
+    )
+    async def get_activity(activity_id: str):
+        """Get a specific activity by ID."""
+        activity = await api.activity_store.get(activity_id)
+        if not activity:
+            raise HTTPException(status_code=404, detail="Activity not found")
+
+        return ActivityResponse(
+            id=activity.id,
+            team_id=activity.team_id,
+            actor_id=activity.actor_id,
+            type=activity.type.value,
+            target_id=activity.target_id,
+            target_type=activity.target_type.value if activity.target_type else None,
+            message=activity.message,
+            metadata=activity.metadata,
+            created_at=activity.created_at.isoformat(),
+        )
+
+    @app.post(
+        "/api/activities",
+        response_model=ActivityResponse,
+        tags=["Activity Feed"],
+    )
+    async def create_activity(request: ActivityCreateRequest):
+        """Create a new activity."""
+        from sindri.collaboration.activity import ActivityType, TargetType
+
+        try:
+            activity_type = ActivityType(request.type)
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid activity type: {request.type}"
+            )
+
+        target_type = None
+        if request.target_type:
+            try:
+                target_type = TargetType(request.target_type)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid target type: {request.target_type}"
+                )
+
+        activity = await api.activity_store.create(
+            team_id=request.team_id,
+            actor_id=request.actor_id,
+            activity_type=activity_type,
+            target_id=request.target_id,
+            target_type=target_type,
+            message=request.message,
+            metadata=request.metadata,
+        )
+
+        return ActivityResponse(
+            id=activity.id,
+            team_id=activity.team_id,
+            actor_id=activity.actor_id,
+            type=activity.type.value,
+            target_id=activity.target_id,
+            target_type=activity.target_type.value if activity.target_type else None,
+            message=activity.message,
+            metadata=activity.metadata,
+            created_at=activity.created_at.isoformat(),
+        )
+
+    @app.get(
+        "/api/users/{user_id}/activities",
+        response_model=list[ActivityResponse],
+        tags=["Activity Feed"],
+    )
+    async def list_user_activities(
+        user_id: str,
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+    ):
+        """List activities performed by a user."""
+        activities = await api.activity_store.list_by_user(
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+        )
+
+        return [
+            ActivityResponse(
+                id=a.id,
+                team_id=a.team_id,
+                actor_id=a.actor_id,
+                type=a.type.value,
+                target_id=a.target_id,
+                target_type=a.target_type.value if a.target_type else None,
+                message=a.message,
+                metadata=a.metadata,
+                created_at=a.created_at.isoformat(),
+            )
+            for a in activities
+        ]
+
+    @app.get(
+        "/api/activity/stats",
+        response_model=ActivityStatsResponse,
+        tags=["Activity Feed"],
+    )
+    async def get_activity_stats(
+        team_id: Optional[str] = Query(default=None),
+    ):
+        """Get activity statistics."""
+        stats = await api.activity_store.get_stats(team_id)
+
+        return ActivityStatsResponse(
+            total_activities=stats["total_activities"],
+            last_24h=stats["last_24h"],
+            by_type=stats["by_type"],
+            most_active_users=stats["most_active_users"],
+            type_breakdown=stats["type_breakdown"],
+        )
+
+    @app.delete(
+        "/api/activity/cleanup",
+        tags=["Activity Feed"],
+    )
+    async def cleanup_old_activities(
+        days: int = Query(default=90, ge=1, le=365),
+    ):
+        """Delete activities older than specified days."""
+        deleted = await api.activity_store.delete_old(days_old=days)
+        return {"deleted": deleted, "days": days}
 
     # Helper function for session ID resolution
     async def _resolve_session_id(api_instance: SindriAPI, session_id: str) -> str:

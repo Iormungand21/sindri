@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode and Notifications
-**Test Status:** 2011 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, and Activity Feed
+**Test Status:** 2067 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 10 Features (Advanced Team Collaboration - continued)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2011 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2067 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -33,6 +33,11 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri notifications user123     # View notifications
 .venv/bin/sindri notification-prefs user123  # View/update preferences
 
+# Activity Feed
+.venv/bin/sindri activity team123          # View team activity timeline
+.venv/bin/sindri activity-stats            # Activity statistics
+.venv/bin/sindri activity-stats --team team123  # Team-specific stats
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -41,6 +46,66 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Activity Feed System (2026-01-17)
+
+Added comprehensive activity feed for team collaboration timeline:
+
+**Activity Types (`sindri/collaboration/activity.py`):**
+- **Session Activities**: session_created, session_completed, session_failed, session_resumed
+- **Task Activities**: task_started, task_completed, task_delegated
+- **Comment Activities**: comment_added, comment_resolved, comment_replied
+- **Member Activities**: member_joined, member_left, member_role_changed, member_invited
+- **Sharing Activities**: session_shared, share_revoked
+- **Team Activities**: team_created, team_updated, team_settings_changed
+
+**Activity Feed Features:**
+- Target types: session, task, user, team, comment, share
+- Metadata storage for rich activity context
+- Query by team, user, or target
+- Date range filtering (start_date, end_date)
+- Pagination support (limit, offset)
+- Activity statistics per team or global
+- Automatic cleanup of old activities
+
+**Convenience Functions:**
+- `log_session_created()` - Log session creation
+- `log_session_completed()` - Log session completion with duration
+- `log_session_failed()` - Log session failure with error
+- `log_member_joined()` - Log member join (self or invited)
+- `log_member_left()` - Log member leave or removal
+- `log_role_changed()` - Log role changes
+- `log_comment_added()` - Log comment with preview
+- `log_session_shared()` - Log session sharing
+- `log_team_updated()` - Log team settings changes
+
+**CLI Commands:**
+- `sindri activity <team_id>` - List team activities
+- `sindri activity <team_id> --limit 50` - Paginate results
+- `sindri activity <team_id> --type session_created` - Filter by type
+- `sindri activity <team_id> --user <user_id>` - Filter by actor
+- `sindri activity-stats` - Global activity statistics
+- `sindri activity-stats --team <team_id>` - Team-specific stats
+- `sindri activity-cleanup --days 90` - Delete old activities
+- `sindri activity-cleanup --dry-run` - Preview cleanup
+
+**API Endpoints:**
+- `GET /api/teams/{team_id}/activities` - List team activities
+- `GET /api/activities/{activity_id}` - Get specific activity
+- `POST /api/activities` - Create activity
+- `GET /api/users/{user_id}/activities` - List user activities
+- `GET /api/activity/stats` - Get activity statistics
+- `DELETE /api/activity/cleanup` - Clean up old activities
+
+**Files:**
+- `sindri/collaboration/activity.py` - Activity feed system
+- Updated `sindri/collaboration/__init__.py` - Module exports
+- Updated `sindri/cli.py` - CLI commands
+- Updated `sindri/web/server.py` - API endpoints
+
+**Tests:** 56 new tests (total: 2067 backend tests)
+
+---
 
 ### Notification System (2026-01-17)
 

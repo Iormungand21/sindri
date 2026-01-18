@@ -8,6 +8,7 @@ This module provides infrastructure for:
 - User management (Team Mode)
 - Team-based collaboration with roles (Team Mode)
 - Notification system for team collaboration
+- Activity feed for team activity timeline
 """
 
 from sindri.collaboration.sharing import (
@@ -47,6 +48,21 @@ from sindri.collaboration.notifications import (
     notify_team_invite,
     notify_session_shared,
 )
+from sindri.collaboration.activity import (
+    Activity,
+    ActivityType,
+    ActivityStore,
+    TargetType,
+    log_session_created,
+    log_session_completed,
+    log_session_failed,
+    log_member_joined,
+    log_member_left,
+    log_role_changed,
+    log_comment_added,
+    log_session_shared,
+    log_team_updated,
+)
 
 __all__ = [
     # Sharing
@@ -80,4 +96,18 @@ __all__ = [
     "notify_comment",
     "notify_team_invite",
     "notify_session_shared",
+    # Activity Feed
+    "Activity",
+    "ActivityType",
+    "ActivityStore",
+    "TargetType",
+    "log_session_created",
+    "log_session_completed",
+    "log_session_failed",
+    "log_member_joined",
+    "log_member_left",
+    "log_role_changed",
+    "log_comment_added",
+    "log_session_shared",
+    "log_team_updated",
 ]

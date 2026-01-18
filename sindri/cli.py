@@ -3144,6 +3144,212 @@ def notification_stats(user: str = None):
 
 
 # ============================================
+# Phase 10.2: Activity Feed Commands
+# ============================================
+
+
+@cli.command("activity")
+@click.argument("team_id")
+@click.option("--limit", "-n", default=20, help="Maximum activities to show")
+@click.option("--offset", "-o", default=0, help="Offset for pagination")
+@click.option(
+    "--type",
+    "-t",
+    "activity_type",
+    type=click.Choice(
+        [
+            "session_created",
+            "session_completed",
+            "session_failed",
+            "member_joined",
+            "member_left",
+            "comment_added",
+            "session_shared",
+        ]
+    ),
+    help="Filter by activity type",
+)
+@click.option("--user", "-u", "user_id", help="Filter by actor user ID")
+def activity(
+    team_id: str,
+    limit: int = 20,
+    offset: int = 0,
+    activity_type: str = None,
+    user_id: str = None,
+):
+    """List activity feed for a team.
+
+    TEAM_ID is the team identifier.
+
+    Examples:
+
+        sindri activity team123
+
+        sindri activity team123 --limit 50
+
+        sindri activity team123 --type session_created
+
+        sindri activity team123 --user user456
+    """
+    from rich.table import Table
+    from sindri.collaboration import ActivityStore, ActivityType
+
+    async def list_activities():
+        store = ActivityStore()
+
+        # Get activities
+        if user_id:
+            activities = await store.list_by_user(user_id, limit=limit, offset=offset)
+            # Filter by team
+            activities = [a for a in activities if a.team_id == team_id]
+        else:
+            type_filter = None
+            if activity_type:
+                type_filter = [ActivityType(activity_type)]
+
+            activities = await store.list_by_team(
+                team_id=team_id,
+                limit=limit,
+                offset=offset,
+                activity_types=type_filter,
+            )
+
+        if not activities:
+            console.print(f"[yellow]No activities found for team {team_id}[/]")
+            return
+
+        # Get total count
+        total = await store.count_by_team(team_id)
+
+        table = Table(title=f"Activity Feed for {team_id} ({total} total)")
+        table.add_column("Time", width=16)
+        table.add_column("Type", width=18)
+        table.add_column("Actor", width=12)
+        table.add_column("Message", width=40)
+
+        type_icons = {
+            "session_created": "\U0001F4C4",
+            "session_completed": "\u2705",
+            "session_failed": "\u274C",
+            "session_resumed": "\u25B6",
+            "task_started": "\U0001F3C3",
+            "task_completed": "\u2713",
+            "task_delegated": "\U0001F4E4",
+            "comment_added": "\U0001F4AC",
+            "comment_resolved": "\u2714",
+            "comment_replied": "\U0001F5E8",
+            "member_joined": "\U0001F44B",
+            "member_left": "\U0001F6AA",
+            "member_role_changed": "\U0001F451",
+            "member_invited": "\u2709",
+            "session_shared": "\U0001F517",
+            "share_revoked": "\U0001F512",
+            "team_created": "\U0001F389",
+            "team_updated": "\u270E",
+            "team_settings_changed": "\u2699",
+        }
+
+        for a in activities:
+            time_str = a.created_at.strftime("%Y-%m-%d %H:%M")
+            icon = type_icons.get(a.type.value, "\U0001F4DD")
+
+            table.add_row(
+                time_str,
+                f"{icon} {a.type.value}",
+                a.actor_id[:12],
+                a.message[:40] + ("..." if len(a.message) > 40 else ""),
+            )
+
+        console.print(table)
+
+        if total > offset + len(activities):
+            console.print(
+                f"\n[dim]Showing {offset + 1}-{offset + len(activities)} of {total}. "
+                f"Use --offset {offset + limit} to see more.[/dim]"
+            )
+
+    asyncio.run(list_activities())
+
+
+@cli.command("activity-stats")
+@click.option("--team", "-t", "team_id", help="Show stats for specific team")
+def activity_stats(team_id: str = None):
+    """Show activity feed statistics.
+
+    Examples:
+
+        sindri activity-stats
+
+        sindri activity-stats --team team123
+    """
+    from sindri.collaboration import ActivityStore
+
+    async def show_stats():
+        store = ActivityStore()
+        stats = await store.get_stats(team_id)
+
+        if team_id:
+            console.print(f"[bold]\U0001F4CA Activity Statistics for {team_id}[/bold]\n")
+        else:
+            console.print("[bold]\U0001F4CA Global Activity Statistics[/bold]\n")
+
+        console.print(f"  Total activities: {stats['total_activities']}")
+        console.print(f"  Last 24 hours: {stats['last_24h']}")
+
+        if stats.get("by_type"):
+            console.print("\n  [bold]By Type:[/bold]")
+            for act_type, count in stats["by_type"].items():
+                console.print(f"    {act_type}: {count}")
+
+        if stats.get("most_active_users"):
+            console.print("\n  [bold]Most Active Users:[/bold]")
+            for user in stats["most_active_users"]:
+                console.print(f"    {user['user_id']}: {user['count']} activities")
+
+    asyncio.run(show_stats())
+
+
+@cli.command("activity-cleanup")
+@click.option(
+    "--days",
+    "-d",
+    default=90,
+    help="Delete activities older than this many days (default: 90)",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted without deleting")
+def activity_cleanup(days: int = 90, dry_run: bool = False):
+    """Clean up old activities from the activity feed.
+
+    Examples:
+
+        sindri activity-cleanup
+
+        sindri activity-cleanup --days 30
+
+        sindri activity-cleanup --days 30 --dry-run
+    """
+    from datetime import datetime, timedelta
+    from sindri.collaboration import ActivityStore
+
+    async def cleanup():
+        store = ActivityStore()
+
+        if dry_run:
+            # Count what would be deleted
+            cutoff = datetime.now() - timedelta(days=days)
+            stats = await store.get_stats()
+            console.print(
+                f"[yellow]Dry run: Would delete activities older than {cutoff.strftime('%Y-%m-%d')} ({days} days)[/]"
+            )
+            console.print(f"[yellow]Total activities in database: {stats['total_activities']}[/]")
+        else:
+            deleted = await store.delete_old(days_old=days)
+            console.print(f"[green]\u2713 Deleted {deleted} activities older than {days} days[/]")
+
+    asyncio.run(cleanup())
+
+
+# ============================================
 # Phase 9.3: Voice Interface Commands
 # ============================================
 

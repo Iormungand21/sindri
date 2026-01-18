@@ -79,8 +79,10 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - Notification System: mentions, comments, team invites, session activity
 - User notification preferences with quiet hours
 - CLI commands for notification management
+- Activity Feed: team activity timeline with filtering and statistics
+- Activity Feed API endpoints for web/mobile integration
 
-**Total:** 2011 backend tests + 104 frontend tests (100% passing)
+**Total:** 2067 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -160,6 +162,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Activity Feed (team timeline, filtering, stats, API endpoints) | +56 |
 | 2026-01-17 | Notification System (mentions, comments, team invites, preferences) | +56 |
 | 2026-01-17 | Team Mode (user accounts, teams, role-based permissions) | +84 |
 | 2026-01-17 | Fine-Tuning Pipeline (curation, registry, training, evaluation) | +72 |
