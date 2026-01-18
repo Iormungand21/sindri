@@ -21,6 +21,8 @@ from sindri.agents.prompts import (
     SAGA_PROMPT,
     # Phase 12: Text/Regex processing agent (2026-01-18)
     VOR_PROMPT,
+    # Phase 12: Browser automation agent (2026-01-18)
+    RAN_PROMPT,
 )
 
 # Agent Registry
@@ -65,7 +67,7 @@ AGENTS: dict[str, AgentDefinition] = {
         can_delegate=True,
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
         # Phase 11: Added skuld, kvasir, volundr, saga for multi-disciplinary domains
-        # Phase 12: Added vor for text/regex processing
+        # Phase 12: Added vor for text/regex processing, ran for browser automation
         delegate_to=[
             "huginn",
             "mimir",
@@ -81,6 +83,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "volundr",
             "saga",
             "vor",
+            "ran",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -529,6 +532,35 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to smaller model when VRAM is insufficient
         fallback_model="qwen2.5:3b-instruct-q8_0",
         fallback_vram_gb=3.0,
+    ),
+    # Phase 12: Browser automation agent (2026-01-18)
+    "ran": AgentDefinition(
+        name="ran",
+        role="Browser automation specialist - web scraping, testing, form automation",
+        model="qwen2.5-coder:7b",  # Good for web automation
+        system_prompt=RAN_PROMPT,
+        tools=[
+            "read_file",
+            "write_file",
+            "list_directory",
+            "browser_navigate",
+            "browser_click",
+            "browser_type",
+            "browser_screenshot",
+            "browser_extract",
+            "browser_execute_js",
+            "browser_pdf",
+            "browser_close",
+            "web_scrape",
+        ],
+        can_delegate=False,
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=20,  # Browser operations may need more iterations
+        temperature=0.3,  # Lower temp for precise automation
+        # Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5-coder:3b",
+        fallback_vram_gb=2.0,
     ),
 }
 

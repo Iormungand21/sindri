@@ -6,9 +6,9 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, Network/HTTP Diagnostic Tools, Database Tools, Video/Audio Processing Tools, and Profiling Tools
-**Test Status:** 3027 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 3 Remaining (Browser, Cloud Tools)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, Network/HTTP Diagnostic Tools, Database Tools, Video/Audio Processing Tools, Profiling Tools, and Browser Automation Tools
+**Test Status:** 3095 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 3 Remaining (Cloud Tools)
 
 ### Try It Out
 ```bash
@@ -16,7 +16,7 @@
 .venv/bin/pytest tests/ -v --tb=no -q    # 2920 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 16 agents
+.venv/bin/sindri agents                    # See all 17 agents
 
 # Launch interfaces
 .venv/bin/sindri tui                       # Terminal UI
@@ -133,6 +133,60 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Browser & Web Automation Tools (2026-01-18) - Phase 12 Tier 3
+
+Added comprehensive browser automation tools using Playwright and a lightweight web scraping tool:
+
+**New Agent:**
+- **Ran** (Norse sea goddess) - Browser automation specialist using qwen2.5-coder:7b
+
+**New Tools (9 total):**
+- `browser_navigate` - Navigate to URL and wait for page load (supports load, domcontentloaded, networkidle)
+- `browser_click` - Click element by CSS selector or visible text
+- `browser_type` - Type text into form fields with clear_first and press_enter options
+- `browser_screenshot` - Capture viewport, full page, or element screenshots (PNG/JPEG)
+- `browser_extract` - Extract text, attributes, or structured data from elements
+- `browser_execute_js` - Run JavaScript in page context, return results
+- `browser_pdf` - Save page as PDF with paper format, orientation, and scale options
+- `browser_close` - Close browser session and release resources
+- `web_scrape` - Lightweight web scraping with httpx (no JavaScript rendering, fast)
+
+**Key Features:**
+- Singleton browser session for multi-step workflows (navigate → interact → extract)
+- Security by default: blocks localhost, private IPs, cloud metadata endpoints
+- Lazy browser initialization (only starts when first tool is called)
+- CSS selector and text-based element selection
+- Configurable timeouts for all operations
+- Headless mode by default (can show browser for debugging)
+
+**Agent Assignment:**
+- **Ran** has access to all 9 browser/scraping tools plus read_file, write_file, list_directory
+- **Brokkr** can delegate to Ran for browser automation tasks
+
+**Dependencies:**
+- playwright>=1.40.0 (optional, in browser extras)
+- html2text>=2024.0.0 (optional, for markdown conversion)
+
+**Installation:**
+```bash
+pip install -e ".[browser]"
+playwright install chromium
+```
+
+**Files:**
+- `sindri/tools/browser.py` - Browser automation tool implementations
+- `sindri/tools/scraping.py` - Web scraping tool implementation
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Added Ran agent, updated Brokkr delegation
+- `sindri/agents/prompts.py` - RAN_PROMPT added
+- `pyproject.toml` - Added browser optional dependency
+- `tests/test_browser.py` - Browser tool tests
+- `tests/test_scraping.py` - Scraping tool tests
+
+**Tests:** +68 new tests (3095 total)
+
+---
 
 ### Python Profiling Tools (2026-01-18) - Phase 12 Tier 3
 
@@ -1713,7 +1767,7 @@ GitHub Actions workflow generation and validation:
 
 ## Project Summary
 
-### Agents (16 total)
+### Agents (17 total)
 
 | Agent | Role | Model |
 |-------|------|-------|
@@ -1733,8 +1787,9 @@ GitHub Actions workflow generation and validation:
 | Völundr | OpenSCAD 3D Modeler | qwen2.5-coder:7b |
 | Saga | Data Visualization | qwen2.5-coder:7b |
 | Vör | Text/Regex Processing | qwen2.5-coder:7b |
+| Ran | Browser Automation | qwen2.5-coder:7b |
 
-### Tools (122 total)
+### Tools (131 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Compression:** archive_create, archive_extract, archive_list, compress_file, decompress_file
@@ -1760,6 +1815,7 @@ GitHub Actions workflow generation and validation:
 **OpenSCAD:** generate_scad, render_preview, export_stl, validate_scad, parametrize_model, optimize_printability
 **DataViz:** analyze_data, suggest_viz, generate_d3, generate_matplotlib, generate_plotly, create_dashboard, export_interactive
 **Media:** audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles
+**Browser:** browser_navigate, browser_click, browser_type, browser_screenshot, browser_extract, browser_execute_js, browser_pdf, browser_close, web_scrape
 **Core:** shell, delegate
 
 ### Key Features

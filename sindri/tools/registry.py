@@ -181,6 +181,17 @@ from sindri.tools.profiling import (
     FlameGraphTool,
     ComplexityAnalyzeTool,
 )
+from sindri.tools.browser import (
+    BrowserNavigateTool,
+    BrowserClickTool,
+    BrowserTypeTool,
+    BrowserScreenshotTool,
+    BrowserExtractTool,
+    BrowserExecuteJsTool,
+    BrowserPdfTool,
+    BrowserCloseTool,
+)
+from sindri.tools.scraping import WebScrapeTool
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -555,4 +566,15 @@ class ToolRegistry:
         registry.register(BenchmarkFunctionTool(work_dir=work_dir))
         registry.register(FlameGraphTool(work_dir=work_dir))
         registry.register(ComplexityAnalyzeTool(work_dir=work_dir))
+        # Browser automation tools
+        registry.register(BrowserNavigateTool(work_dir=work_dir))
+        registry.register(BrowserClickTool(work_dir=work_dir))
+        registry.register(BrowserTypeTool(work_dir=work_dir))
+        registry.register(BrowserScreenshotTool(work_dir=work_dir))
+        registry.register(BrowserExtractTool(work_dir=work_dir))
+        registry.register(BrowserExecuteJsTool(work_dir=work_dir))
+        registry.register(BrowserPdfTool(work_dir=work_dir))
+        registry.register(BrowserCloseTool(work_dir=work_dir))
+        # Web scraping tool
+        registry.register(WebScrapeTool(work_dir=work_dir))
         return registry

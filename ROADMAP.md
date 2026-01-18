@@ -665,7 +665,7 @@ Based on research, these specialized models outperform general-purpose models fo
 |----------|-------|--------|--------|
 | Video/Audio | audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles | Medium | ✅ Complete |
 | Profiling | profile_python, profile_time, memory_analyze, detect_memory_leaks, benchmark_function, flame_graph, complexity_analyze | Medium | ✅ Complete |
-| Browser | browser_navigate, browser_screenshot | High | |
+| Browser | browser_navigate, browser_click, browser_type, browser_screenshot, browser_extract, browser_execute_js, browser_pdf, browser_close, web_scrape | High | ✅ Complete |
 | Cloud | aws_s3_*, docker_*, k8s_* | High | |
 
 ---
@@ -791,6 +791,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-18
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio + Profiling Tools (Tier 3 in progress) - 1/8 agents, 62/~100 tools
+**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio + Profiling + Browser Tools - 2/8 agents (Vör, Ran), 71/~100 tools
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
 **Maintained By:** Project contributors
