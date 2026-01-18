@@ -10,9 +10,9 @@ Welcome! This document will help you quickly understand the Sindri project and g
 
 **Key Facts:**
 - **Status:** Production Ready (v0.1.0)
-- **Tests:** 2647 backend + 104 frontend (100% passing)
-- **Agents:** 11 specialized agents
-- **Tools:** 53 tools
+- **Tests:** 2751 backend + 104 frontend (100% passing)
+- **Agents:** 16 specialized agents
+- **Tools:** 103 tools
 - **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
 
 ---
@@ -24,7 +24,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see 2647 passed)
+# Run tests (should see 2751 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health

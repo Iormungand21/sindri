@@ -120,6 +120,14 @@ from sindri.tools.crypto import (
     EncryptFileTool,
     DecryptFileTool,
 )
+from sindri.tools.system import (
+    ProcessListTool,
+    ProcessKillTool,
+    SystemInfoTool,
+    DiskUsageTool,
+    MemoryUsageTool,
+    EnvGetTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -443,4 +451,11 @@ class ToolRegistry:
         registry.register(UuidGenerateTool(work_dir=work_dir))
         registry.register(EncryptFileTool(work_dir=work_dir))
         registry.register(DecryptFileTool(work_dir=work_dir))
+        # System and process tools
+        registry.register(ProcessListTool(work_dir=work_dir))
+        registry.register(ProcessKillTool(work_dir=work_dir))
+        registry.register(SystemInfoTool(work_dir=work_dir))
+        registry.register(DiskUsageTool(work_dir=work_dir))
+        registry.register(MemoryUsageTool(work_dir=work_dir))
+        registry.register(EnvGetTool(work_dir=work_dir))
         return registry

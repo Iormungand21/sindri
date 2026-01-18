@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, and Crypto/Encoding Tools
-**Test Status:** 2699 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, and System/Process Tools
+**Test Status:** 2751 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 12 Features (Universal Tool Platform)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2699 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2751 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 16 agents
@@ -114,6 +114,38 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### System & Process Tools (2026-01-18) - Phase 12 Tier 1
+
+Added comprehensive system monitoring and process management tools using psutil:
+
+**New Tools (6 total):**
+- `process_list` - List running processes with filtering by name/user, sorting by cpu/memory/pid/name
+- `process_kill` - Kill process by PID or name with TERM/KILL/HUP signals
+- `system_info` - Get system information (OS, CPU cores/freq/usage, memory, uptime)
+- `disk_usage` - Check disk space for paths or all mounted partitions
+- `memory_usage` - Check RAM and swap usage with human-readable output
+- `env_get` - Get environment variables with regex filtering, option to hide values
+
+**Features:**
+- Cross-platform support via psutil (Linux, macOS, Windows)
+- Human-readable output formatting (sizes, durations)
+- Comprehensive filtering and sorting options
+- Security-conscious options (hide env values, graceful process termination)
+
+**Agent Assignment:**
+- Ratatoskr (fast executor) has access to all system tools
+
+**Files:**
+- `sindri/tools/system.py` - System tools implementation
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Added tools to Ratatoskr
+- `pyproject.toml` - Added psutil dependency
+- `tests/test_system.py` - Comprehensive test suite
+
+**Tests:** 52 new tests (total: 2751 backend tests)
+
+---
 
 ### Crypto & Encoding Tools (2026-01-18) - Phase 12 Tier 1
 
@@ -1469,11 +1501,12 @@ GitHub Actions workflow generation and validation:
 | Saga | Data Visualization | qwen2.5-coder:7b |
 | Vör | Text/Regex Processing | qwen2.5-coder:7b |
 
-### Tools (97 total)
+### Tools (103 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Compression:** archive_create, archive_extract, archive_list, compress_file, decompress_file
 **Crypto:** hash_file, hash_text, encode_base64, encode_url, jwt_decode, jwt_generate, uuid_generate, encrypt_file, decrypt_file
+**System:** process_list, process_kill, system_info, disk_usage, memory_usage, env_get
 **AST:** parse_ast, find_references, symbol_info, ast_rename
 **Search:** search_code, find_symbol
 **Git:** git_status, git_diff, git_log, git_branch
