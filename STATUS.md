@@ -6,9 +6,9 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, and LaTeX Generation
-**Test Status:** 2420 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 11 Features (Multi-Disciplinary Domain Agents - continued)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, and OpenSCAD 3D Modeling
+**Test Status:** 2475 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 11 Features (Multi-Disciplinary Domain Agents - Data Visualization Agent)
 
 ### Try It Out
 ```bash
@@ -16,7 +16,7 @@
 .venv/bin/pytest tests/ -v --tb=no -q    # 2303 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 12 agents
+.venv/bin/sindri agents                    # See all 14 agents
 
 # Launch interfaces
 .venv/bin/sindri tui                       # Terminal UI
@@ -80,6 +80,16 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri latex bib create -f refs.bib                   # Create bibliography
 .venv/bin/sindri latex compile document.tex                     # Compile to PDF
 
+# OpenSCAD 3D Modeling
+.venv/bin/sindri scad generate "A box with lid" -w 50 -h 30 -d 40  # Generate OpenSCAD code
+.venv/bin/sindri scad generate "Phone stand with 60 degree angle"  # Phone stand
+.venv/bin/sindri scad generate "Gear with 24 teeth" -o gear.scad   # Gear model
+.venv/bin/sindri scad preview model.scad                           # Render PNG preview
+.venv/bin/sindri scad export model.scad -o print.stl               # Export to STL
+.venv/bin/sindri scad validate model.scad                          # Validate code
+.venv/bin/sindri scad parametrize model.scad                       # Add parameters
+.venv/bin/sindri scad optimize model.scad                          # Print optimization tips
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -88,6 +98,59 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### OpenSCAD 3D Modeling System (2026-01-18) - Phase 11 Continued
+
+Added comprehensive OpenSCAD tools and the Völundr agent for parametric 3D model generation:
+
+**New Agent:**
+- **Völundr** (Norse master smith) - OpenSCAD specialist using qwen2.5-coder:7b
+
+**Model Types Supported:**
+- **Box with Lid** - Parametric containers with snap-fit or screw lids
+- **Phone Stand** - Adjustable angle stands for devices
+- **Gears** - Involute gear generation with configurable teeth
+- **Electronics Enclosures** - Cases with screw posts and ventilation
+
+**New Tools (6 total):**
+- `generate_scad` - Generate OpenSCAD code from text descriptions
+- `render_preview` - Render PNG or STL preview (requires OpenSCAD)
+- `export_stl` - Export to STL for 3D printing with quality settings
+- `validate_scad` - Check syntax, geometry issues, and best practices
+- `parametrize_model` - Convert hardcoded values to parameters
+- `optimize_printability` - Analyze and suggest print optimizations
+
+**CLI Commands:**
+- `sindri scad generate <description>` - Generate OpenSCAD model
+- `sindri scad preview <file>` - Render to PNG/STL
+- `sindri scad export <file>` - Export to STL for printing
+- `sindri scad validate <file>` - Validate syntax and geometry
+- `sindri scad parametrize <file>` - Add parameters to model
+- `sindri scad optimize <file>` - Get printability suggestions
+
+**Features:**
+- Template-based generation for common model types
+- FDM, SLA, and SLS printer support
+- Wall thickness and overhang detection
+- Tolerance suggestions for fits (press, sliding, loose)
+- Quality presets: draft, normal, high, ultra
+- Automatic syntax validation (braces, brackets, parentheses)
+
+**Agent Delegation:**
+- Brokkr can now delegate to Völundr for 3D modeling tasks
+- Völundr has access to read_file, write_file, search_code, and all OpenSCAD tools
+
+**Files:**
+- `sindri/tools/openscad.py` - OpenSCAD tools implementation
+- `sindri/agents/prompts.py` - VOLUNDR_PROMPT added
+- `sindri/agents/registry.py` - Völundr agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/cli.py` - CLI commands for scad group
+- `tests/test_openscad.py` - Comprehensive test suite
+
+**Tests:** 55 new tests (total: 2475 backend tests)
+
+---
 
 ### LaTeX Generation System (2026-01-18) - Phase 11 Continued
 
@@ -1146,7 +1209,7 @@ GitHub Actions workflow generation and validation:
 
 ## Project Summary
 
-### Agents (13 total)
+### Agents (14 total)
 
 | Agent | Role | Model |
 |-------|------|-------|
@@ -1163,8 +1226,9 @@ GitHub Actions workflow generation and validation:
 | Vidar | Multi-lang Coder | codestral:22b |
 | Skuld | Diagram Generator | qwen2.5-coder:7b |
 | Kvasir | LaTeX Specialist | llama3.1:8b |
+| Völundr | OpenSCAD 3D Modeler | qwen2.5-coder:7b |
 
-### Tools (65 total)
+### Tools (71 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **AST:** parse_ast, find_references, symbol_info, ast_rename
@@ -1183,6 +1247,7 @@ GitHub Actions workflow generation and validation:
 **Database Migrations:** generate_migration, migration_status, run_migrations, rollback_migration, validate_migrations
 **Diagrams:** generate_mermaid, generate_plantuml, generate_d2, diagram_from_code, generate_sequence_diagram, generate_er_diagram
 **LaTeX:** generate_latex, format_equations, generate_tikz, manage_bibliography, create_beamer, latex_to_pdf
+**OpenSCAD:** generate_scad, render_preview, export_stl, validate_scad, parametrize_model, optimize_printability
 **Core:** shell, delegate
 
 ### Key Features
@@ -1301,6 +1366,14 @@ sindri latex tikz <type>       # Generate TikZ diagram
 sindri latex beamer <title>    # Generate Beamer slides
 sindri latex bib <action>      # Manage bibliography
 sindri latex compile <file>    # Compile to PDF
+
+# OpenSCAD 3D Modeling
+sindri scad generate <desc>    # Generate OpenSCAD model
+sindri scad preview <file>     # Render PNG preview
+sindri scad export <file>      # Export to STL for printing
+sindri scad validate <file>    # Validate syntax/geometry
+sindri scad parametrize <file> # Add parameters
+sindri scad optimize <file>    # Print optimization tips
 ```
 
 ---

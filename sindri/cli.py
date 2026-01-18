@@ -7405,5 +7405,233 @@ def latex_compile(input_file: str, output_dir: str, engine: str, bibtex: bool, p
     asyncio.run(run())
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# OpenSCAD 3D Modeling Commands (Phase 11)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@cli.group()
+def scad():
+    """Generate parametric 3D models for 3D printing using OpenSCAD."""
+    pass
+
+
+@scad.command("generate")
+@click.argument("description")
+@click.option("--width", "-w", type=float, help="Width/X dimension in mm")
+@click.option("--height", "-h", type=float, help="Height/Z dimension in mm")
+@click.option("--depth", "-d", type=float, help="Depth/Y dimension in mm")
+@click.option("--wall", type=float, default=2.0, help="Wall thickness in mm (default: 2)")
+@click.option("--units", type=click.Choice(["mm", "cm", "inch"]), default="mm", help="Measurement units")
+@click.option("--output", "-o", type=click.Path(), help="Output .scad file path")
+def scad_generate(description: str, width: float, height: float, depth: float, wall: float, units: str, output: str):
+    """Generate OpenSCAD code from a text description.
+
+    Examples:
+
+        sindri scad generate "A box with lid" -w 50 -h 30 -d 40
+
+        sindri scad generate "Phone stand with 60 degree angle"
+
+        sindri scad generate "Gear with 24 teeth" -o gear.scad
+
+        sindri scad generate "Enclosure for Raspberry Pi" --wall 2.5
+    """
+    from sindri.tools.openscad import GenerateSCADTool
+
+    async def run():
+        tool = GenerateSCADTool()
+        result = await tool.execute(
+            description=description,
+            width=width,
+            height=height,
+            depth=depth,
+            wall_thickness=wall,
+            units=units,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@scad.command("preview")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--format", "-f", type=click.Choice(["png", "stl"]), default="png", help="Output format")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--size", "-s", default="800,600", help="Image size as width,height (for PNG)")
+@click.option("--colorscheme", "-c", type=click.Choice(["Cornfield", "Metallic", "Sunset", "Starnight", "Nature"]), default="Cornfield", help="Color scheme")
+def scad_preview(input_file: str, format: str, output: str, size: str, colorscheme: str):
+    """Render an OpenSCAD model to PNG or STL preview.
+
+    Requires OpenSCAD to be installed.
+
+    Examples:
+
+        sindri scad preview model.scad
+
+        sindri scad preview model.scad -f stl -o preview.stl
+
+        sindri scad preview model.scad --size 1920,1080 -c Metallic
+    """
+    from sindri.tools.openscad import RenderPreviewTool
+
+    async def run():
+        tool = RenderPreviewTool()
+        result = await tool.execute(
+            input_file=input_file,
+            format=format,
+            output_file=output,
+            image_size=size,
+            colorscheme=colorscheme,
+        )
+
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@scad.command("export")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--output", "-o", type=click.Path(), help="Output STL file path")
+@click.option("--quality", "-q", type=click.Choice(["draft", "normal", "high", "ultra"]), default="normal", help="Render quality")
+def scad_export(input_file: str, output: str, quality: str):
+    """Export an OpenSCAD model to STL for 3D printing.
+
+    Requires OpenSCAD to be installed.
+
+    Examples:
+
+        sindri scad export model.scad
+
+        sindri scad export model.scad -o print.stl
+
+        sindri scad export model.scad --quality high
+    """
+    from sindri.tools.openscad import ExportSTLTool
+
+    async def run():
+        tool = ExportSTLTool()
+        result = await tool.execute(
+            input_file=input_file,
+            output_file=output,
+            quality=quality,
+        )
+
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@scad.command("validate")
+@click.argument("input_file", type=click.Path(exists=True))
+def scad_validate(input_file: str):
+    """Validate OpenSCAD code for syntax and geometry issues.
+
+    Checks for common problems that cause print failures.
+
+    Examples:
+
+        sindri scad validate model.scad
+    """
+    from sindri.tools.openscad import ValidateSCADTool
+
+    async def run():
+        tool = ValidateSCADTool()
+        result = await tool.execute(input_file=input_file)
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Validation errors found:[/red]")
+            console.print(result.output)
+            if result.error:
+                console.print(f"[red]{result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@scad.command("parametrize")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--output", "-o", type=click.Path(), help="Output file (default: overwrite input)")
+@click.option("--prefix", "-p", default="", help="Prefix for generated parameter names")
+def scad_parametrize(input_file: str, output: str, prefix: str):
+    """Convert hardcoded values to parameters in an OpenSCAD file.
+
+    Makes models more customizable.
+
+    Examples:
+
+        sindri scad parametrize model.scad
+
+        sindri scad parametrize model.scad -o parametric.scad
+
+        sindri scad parametrize model.scad --prefix box_
+    """
+    from sindri.tools.openscad import ParametrizeTool
+
+    async def run():
+        tool = ParametrizeTool()
+        result = await tool.execute(
+            input_file=input_file,
+            output_file=output,
+            prefix=prefix,
+        )
+
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@scad.command("optimize")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--nozzle", type=float, default=0.4, help="Nozzle diameter in mm (default: 0.4)")
+@click.option("--layer", type=float, default=0.2, help="Layer height in mm (default: 0.2)")
+@click.option("--printer", type=click.Choice(["fdm", "sla", "sls"]), default="fdm", help="Printer type")
+def scad_optimize(input_file: str, nozzle: float, layer: float, printer: str):
+    """Analyze model and suggest optimizations for 3D printing.
+
+    Checks wall thickness, overhangs, tolerances, etc.
+
+    Examples:
+
+        sindri scad optimize model.scad
+
+        sindri scad optimize model.scad --nozzle 0.6 --layer 0.3
+
+        sindri scad optimize model.scad --printer sla
+    """
+    from sindri.tools.openscad import OptimizePrintabilityTool
+
+    async def run():
+        tool = OptimizePrintabilityTool()
+        result = await tool.execute(
+            input_file=input_file,
+            nozzle_diameter=nozzle,
+            layer_height=layer,
+            printer_type=printer,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()

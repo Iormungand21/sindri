@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that serves as a **multi-disciplinary one-stop shop** for creative and technical work. Beyond code, Sindri coordinates specialized agents for 3D modeling, music composition, electronics design, data visualization, game development, scientific documentation, and more — all using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 12 agents, 59 tools, 2356 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 14 agents, 71 tools, 2475 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -94,7 +94,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - Rate limiting and usage tracking
 - Key expiration and revocation
 
-**Total:** 2303 backend tests + 104 frontend tests (100% passing)
+**Total:** 2475 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -135,6 +135,8 @@ Sindri's architecture naturally supports specialized agents beyond software deve
 
 **Completed:**
 - Diagram Generation Agent ("Skuld") - Mermaid, PlantUML, D2 diagram generation (2026-01-18)
+- LaTeX Generation Agent ("Kvasir") - Academic documents, equations, TikZ, Beamer (2026-01-18)
+- OpenSCAD 3D Modeling Agent ("Völundr") - Parametric models for 3D printing (2026-01-18)
 
 ### 3D Modeling & CAD
 
@@ -155,7 +157,7 @@ Generate parametric 3D models for 3D printing using code-based CAD.
 - "Design a parametric box with lid and hinge"
 - "Generate a gear with 24 teeth, module 1.5"
 
-**Status:** Planned
+**Status:** ✅ Complete (2026-01-18)
 
 #### Blender Python Agent ("Dvalin" - Dwarf Craftsman)
 3D modeling and animation via Blender's Python API.

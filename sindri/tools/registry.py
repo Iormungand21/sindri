@@ -78,6 +78,14 @@ from sindri.tools.latex import (
     CreateBeamerTool,
     LatexToPdfTool,
 )
+from sindri.tools.openscad import (
+    GenerateSCADTool,
+    RenderPreviewTool,
+    ExportSTLTool,
+    ValidateSCADTool,
+    ParametrizeTool,
+    OptimizePrintabilityTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -364,4 +372,11 @@ class ToolRegistry:
         registry.register(ManageBibliographyTool(work_dir=work_dir))
         registry.register(CreateBeamerTool(work_dir=work_dir))
         registry.register(LatexToPdfTool(work_dir=work_dir))
+        # OpenSCAD 3D modeling tools
+        registry.register(GenerateSCADTool(work_dir=work_dir))
+        registry.register(RenderPreviewTool(work_dir=work_dir))
+        registry.register(ExportSTLTool(work_dir=work_dir))
+        registry.register(ValidateSCADTool(work_dir=work_dir))
+        registry.register(ParametrizeTool(work_dir=work_dir))
+        registry.register(OptimizePrintabilityTool(work_dir=work_dir))
         return registry

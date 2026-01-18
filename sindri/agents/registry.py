@@ -17,6 +17,7 @@ from sindri.agents.prompts import (
     # Phase 11: Multi-disciplinary agents (2026-01-18)
     SKULD_PROMPT,
     KVASIR_PROMPT,
+    VOLUNDR_PROMPT,
 )
 
 # Agent Registry
@@ -73,6 +74,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "vidar",
             "skuld",
             "kvasir",
+            "volundr",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -358,6 +360,33 @@ AGENTS: dict[str, AgentDefinition] = {
         priority=2,
         max_iterations=15,
         temperature=0.3,  # Lower temp for precise LaTeX generation
+        # Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
+    ),
+    "volundr": AgentDefinition(
+        name="volundr",
+        role="OpenSCAD specialist - parametric 3D models for 3D printing",
+        model="qwen2.5-coder:7b",  # Good for code generation
+        system_prompt=VOLUNDR_PROMPT,
+        tools=[
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            "search_code",
+            "generate_scad",
+            "render_preview",
+            "export_stl",
+            "validate_scad",
+            "parametrize_model",
+            "optimize_printability",
+        ],
+        can_delegate=False,
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=15,
+        temperature=0.3,  # Lower temp for precise code generation
         # Fallback to smaller model when VRAM is insufficient
         fallback_model="qwen2.5:3b-instruct-q8_0",
         fallback_vram_gb=3.0,
