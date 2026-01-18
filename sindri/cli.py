@@ -7149,5 +7149,261 @@ def diagram_er(source: str, fmt: str, title: str, show_types: bool, output: str)
     asyncio.run(run())
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# LaTeX Commands
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@cli.group()
+def latex():
+    """Generate LaTeX documents, equations, and presentations."""
+    pass
+
+
+@latex.command("document")
+@click.argument("title")
+@click.option("--author", "-a", help="Author name")
+@click.option("--class", "doc_class", type=click.Choice(["article", "report", "book"]), default="article", help="Document class")
+@click.option("--style", "-s", type=click.Choice(["ieee", "acm", "apa", "plain"]), help="Academic paper style")
+@click.option("--sections", "-S", multiple=True, help="Section titles")
+@click.option("--abstract", help="Document abstract")
+@click.option("--two-column", is_flag=True, help="Use two-column layout")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def latex_document(title: str, author: str, doc_class: str, style: str, sections: tuple, abstract: str, two_column: bool, output: str):
+    """Generate a LaTeX document.
+
+    Examples:
+
+        sindri latex document "My Paper" --author "J. Smith"
+
+        sindri latex document "Research" --style ieee --sections Introduction --sections Methods
+
+        sindri latex document "Thesis" --class report -o thesis.tex
+    """
+    from sindri.tools.latex import GenerateLatexTool
+
+    async def run():
+        tool = GenerateLatexTool()
+        result = await tool.execute(
+            title=title,
+            author=author,
+            document_class=doc_class,
+            style=style,
+            sections=list(sections) if sections else None,
+            abstract=abstract,
+            two_column=two_column,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@latex.command("equation")
+@click.argument("expression")
+@click.option("--display", "-d", is_flag=True, help="Use display math mode")
+@click.option("--numbered", "-n", is_flag=True, help="Add equation number")
+@click.option("--label", "-l", help="LaTeX label for cross-referencing")
+@click.option("--align", is_flag=True, help="Use align environment for multi-line")
+def latex_equation(expression: str, display: bool, numbered: bool, label: str, align: bool):
+    """Convert mathematical notation to LaTeX.
+
+    Examples:
+
+        sindri latex equation "x^2 + 2x + 1"
+
+        sindri latex equation "integral from 0 to infinity of e^(-x) dx" --display
+
+        sindri latex equation "alpha + beta = gamma" -d -n --label eq:greek
+    """
+    from sindri.tools.latex import FormatEquationsTool
+
+    async def run():
+        tool = FormatEquationsTool()
+        result = await tool.execute(
+            expression=expression,
+            display=display,
+            numbered=numbered,
+            label=label,
+            align=align,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@latex.command("tikz")
+@click.argument("diagram_type", type=click.Choice(["graph", "neural_network", "flowchart", "tree", "plot", "timeline", "venn"]))
+@click.option("--title", "-t", help="Diagram title")
+@click.option("--scale", type=float, default=1.0, help="Scale factor")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def latex_tikz(diagram_type: str, title: str, scale: float, output: str):
+    """Generate TikZ diagrams.
+
+    Examples:
+
+        sindri latex tikz neural_network
+
+        sindri latex tikz graph --title "System Architecture"
+
+        sindri latex tikz flowchart --scale 1.5 -o flow.tex
+    """
+    from sindri.tools.latex import GenerateTikzTool
+
+    async def run():
+        tool = GenerateTikzTool()
+        result = await tool.execute(
+            diagram_type=diagram_type,
+            title=title,
+            scale=scale,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@latex.command("beamer")
+@click.argument("title")
+@click.option("--author", "-a", help="Presenter name")
+@click.option("--theme", "-t", type=click.Choice(["default", "Madrid", "Berlin", "Copenhagen", "Warsaw"]), default="Madrid", help="Beamer theme")
+@click.option("--slides", "-s", multiple=True, help="Slide titles")
+@click.option("--subtitle", help="Presentation subtitle")
+@click.option("--institute", help="Institution/organization")
+@click.option("--no-toc", is_flag=True, help="Skip table of contents")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def latex_beamer(title: str, author: str, theme: str, slides: tuple, subtitle: str, institute: str, no_toc: bool, output: str):
+    """Generate a Beamer presentation.
+
+    Examples:
+
+        sindri latex beamer "My Talk" --author "J. Smith"
+
+        sindri latex beamer "Workshop" --theme Berlin --slides Setup --slides Demo
+
+        sindri latex beamer "Conference" -t Madrid --subtitle "A Great Talk" -o slides.tex
+    """
+    from sindri.tools.latex import CreateBeamerTool
+
+    async def run():
+        tool = CreateBeamerTool()
+        result = await tool.execute(
+            title=title,
+            author=author,
+            theme=theme,
+            slides=list(slides) if slides else None,
+            subtitle=subtitle,
+            institute=institute,
+            toc=not no_toc,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@latex.command("bib")
+@click.argument("action", type=click.Choice(["create", "add", "list", "validate", "format"]))
+@click.option("--file", "-f", "bib_file", type=click.Path(), help="Bibliography file path")
+@click.option("--type", "entry_type", type=click.Choice(["article", "book", "inproceedings", "misc"]), help="Entry type (for add)")
+@click.option("--key", "-k", help="Citation key")
+@click.option("--author", "-a", help="Author(s)")
+@click.option("--title", "-t", help="Title")
+@click.option("--year", "-y", help="Year")
+@click.option("--journal", "-j", help="Journal name")
+@click.option("--doi", help="DOI")
+def latex_bib(action: str, bib_file: str, entry_type: str, key: str, author: str, title: str, year: str, journal: str, doi: str):
+    """Manage BibTeX bibliographies.
+
+    Examples:
+
+        sindri latex bib create -f refs.bib
+
+        sindri latex bib add -f refs.bib --type article -a "Smith, J." -t "Great Paper" -y 2024
+
+        sindri latex bib list -f refs.bib
+
+        sindri latex bib validate -f refs.bib
+    """
+    from sindri.tools.latex import ManageBibliographyTool
+
+    async def run():
+        tool = ManageBibliographyTool()
+        result = await tool.execute(
+            action=action,
+            bib_file=bib_file,
+            output_file=bib_file if action == "create" else None,
+            entry_type=entry_type,
+            key=key,
+            author=author,
+            title=title,
+            year=year,
+            journal=journal,
+            doi=doi,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@latex.command("compile")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--output-dir", "-o", type=click.Path(), help="Output directory for PDF")
+@click.option("--engine", "-e", type=click.Choice(["pdflatex", "xelatex", "lualatex"]), default="pdflatex", help="LaTeX engine")
+@click.option("--bibtex", "-b", is_flag=True, help="Run BibTeX for bibliography")
+@click.option("--passes", "-p", type=int, default=2, help="Number of compilation passes")
+def latex_compile(input_file: str, output_dir: str, engine: str, bibtex: bool, passes: int):
+    """Compile LaTeX document to PDF.
+
+    Requires a LaTeX distribution (texlive, miktex) to be installed.
+
+    Examples:
+
+        sindri latex compile document.tex
+
+        sindri latex compile paper.tex -b -o build/
+
+        sindri latex compile thesis.tex --engine xelatex --passes 3
+    """
+    from sindri.tools.latex import LatexToPdfTool
+
+    async def run():
+        tool = LatexToPdfTool()
+        result = await tool.execute(
+            input_file=input_file,
+            output_dir=output_dir,
+            engine=engine,
+            bibtex=bibtex,
+            passes=passes,
+        )
+
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()

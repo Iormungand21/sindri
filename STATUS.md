@@ -6,8 +6,8 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, and Diagram Generation
-**Test Status:** 2356 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, and LaTeX Generation
+**Test Status:** 2420 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 11 Features (Multi-Disciplinary Domain Agents - continued)
 
 ### Try It Out
@@ -72,6 +72,14 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri diagram er models.py --format mermaid         # ER diagram from SQLAlchemy
 .venv/bin/sindri diagram sequence -p User -p API -p DB         # Quick sequence diagram
 
+# LaTeX Generation
+.venv/bin/sindri latex document "My Paper" --author "J. Smith"  # Generate LaTeX document
+.venv/bin/sindri latex equation "x^2 + 2x + 1" --display       # Format equations
+.venv/bin/sindri latex tikz neural_network --scale 1.5         # TikZ neural network diagram
+.venv/bin/sindri latex beamer "My Talk" --theme Madrid         # Beamer presentation
+.venv/bin/sindri latex bib create -f refs.bib                   # Create bibliography
+.venv/bin/sindri latex compile document.tex                     # Compile to PDF
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -80,6 +88,58 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### LaTeX Generation System (2026-01-18) - Phase 11 Continued
+
+Added comprehensive LaTeX generation tools and the Kvasir agent for academic documentation:
+
+**New Agent:**
+- **Kvasir** (Norse being of ultimate wisdom) - LaTeX specialist using llama3.1:8b
+
+**Document Types Supported:**
+- **Article** - Academic papers with IEEE, ACM, APA styles
+- **Report** - Long documents with chapters and table of contents
+- **Book** - Full-length books with front/back matter
+- **Beamer** - Presentation slides with multiple themes
+
+**New Tools (6 total):**
+- `generate_latex` - Create complete LaTeX documents with custom structure
+- `format_equations` - Convert math notation to LaTeX (Unicode, natural language)
+- `generate_tikz` - TikZ diagrams (neural networks, graphs, flowcharts, plots)
+- `manage_bibliography` - BibTeX management (create, add, validate, format)
+- `create_beamer` - Generate Beamer presentations with themes
+- `latex_to_pdf` - Compile LaTeX to PDF (requires texlive)
+
+**CLI Commands:**
+- `sindri latex document <title>` - Generate LaTeX document
+- `sindri latex equation <expr>` - Format mathematical expression
+- `sindri latex tikz <type>` - Generate TikZ diagram
+- `sindri latex beamer <title>` - Generate Beamer presentation
+- `sindri latex bib <action>` - Manage bibliographies
+- `sindri latex compile <file>` - Compile LaTeX to PDF
+
+**Features:**
+- Unicode to LaTeX conversion (Greek letters, math symbols)
+- Natural language math parsing ("integral from 0 to 1 of x dx")
+- TikZ diagram types: neural networks, graphs, flowcharts, plots, timelines, Venn
+- Multiple Beamer themes: Madrid, Berlin, Copenhagen, Warsaw
+- Academic paper styles: IEEE, ACM, APA, plain
+
+**Agent Delegation:**
+- Brokkr can now delegate to Kvasir for LaTeX-related tasks
+- Kvasir has access to read_file, write_file, search_code, and all LaTeX tools
+
+**Files:**
+- `sindri/tools/latex.py` - LaTeX generation tools implementation
+- `sindri/agents/prompts.py` - KVASIR_PROMPT added
+- `sindri/agents/registry.py` - Kvasir agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/cli.py` - CLI commands for latex group
+- `tests/test_latex.py` - Comprehensive test suite
+
+**Tests:** 64 new tests (total: 2420 backend tests)
+
+---
 
 ### Diagram Generation System (2026-01-18) - Phase 11 Start
 
@@ -1086,7 +1146,7 @@ GitHub Actions workflow generation and validation:
 
 ## Project Summary
 
-### Agents (12 total)
+### Agents (13 total)
 
 | Agent | Role | Model |
 |-------|------|-------|
@@ -1102,8 +1162,9 @@ GitHub Actions workflow generation and validation:
 | Idunn | Documentation | llama3.1:8b |
 | Vidar | Multi-lang Coder | codestral:22b |
 | Skuld | Diagram Generator | qwen2.5-coder:7b |
+| Kvasir | LaTeX Specialist | llama3.1:8b |
 
-### Tools (59 total)
+### Tools (65 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **AST:** parse_ast, find_references, symbol_info, ast_rename
@@ -1121,6 +1182,7 @@ GitHub Actions workflow generation and validation:
 **Infrastructure as Code:** generate_terraform, generate_pulumi, validate_terraform
 **Database Migrations:** generate_migration, migration_status, run_migrations, rollback_migration, validate_migrations
 **Diagrams:** generate_mermaid, generate_plantuml, generate_d2, diagram_from_code, generate_sequence_diagram, generate_er_diagram
+**LaTeX:** generate_latex, format_equations, generate_tikz, manage_bibliography, create_beamer, latex_to_pdf
 **Core:** shell, delegate
 
 ### Key Features
@@ -1231,6 +1293,14 @@ sindri diagram plantuml <type> # Generate PlantUML diagram
 sindri diagram from-code <path>  # Extract diagram from code
 sindri diagram sequence        # Generate sequence diagram
 sindri diagram er [source]     # Generate ER diagram
+
+# LaTeX
+sindri latex document <title>  # Generate LaTeX document
+sindri latex equation <expr>   # Format math expression
+sindri latex tikz <type>       # Generate TikZ diagram
+sindri latex beamer <title>    # Generate Beamer slides
+sindri latex bib <action>      # Manage bibliography
+sindri latex compile <file>    # Compile to PDF
 ```
 
 ---

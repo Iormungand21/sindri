@@ -70,6 +70,14 @@ from sindri.tools.diagrams import (
     GenerateSequenceDiagramTool,
     GenerateERDiagramTool,
 )
+from sindri.tools.latex import (
+    GenerateLatexTool,
+    FormatEquationsTool,
+    GenerateTikzTool,
+    ManageBibliographyTool,
+    CreateBeamerTool,
+    LatexToPdfTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -349,4 +357,11 @@ class ToolRegistry:
         registry.register(DiagramFromCodeTool(work_dir=work_dir))
         registry.register(GenerateSequenceDiagramTool(work_dir=work_dir))
         registry.register(GenerateERDiagramTool(work_dir=work_dir))
+        # LaTeX generation tools
+        registry.register(GenerateLatexTool(work_dir=work_dir))
+        registry.register(FormatEquationsTool(work_dir=work_dir))
+        registry.register(GenerateTikzTool(work_dir=work_dir))
+        registry.register(ManageBibliographyTool(work_dir=work_dir))
+        registry.register(CreateBeamerTool(work_dir=work_dir))
+        registry.register(LatexToPdfTool(work_dir=work_dir))
         return registry

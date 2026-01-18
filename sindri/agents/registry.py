@@ -16,6 +16,7 @@ from sindri.agents.prompts import (
     VIDAR_PROMPT,
     # Phase 11: Multi-disciplinary agents (2026-01-18)
     SKULD_PROMPT,
+    KVASIR_PROMPT,
 )
 
 # Agent Registry
@@ -71,6 +72,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "idunn",
             "vidar",
             "skuld",
+            "kvasir",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -329,6 +331,33 @@ AGENTS: dict[str, AgentDefinition] = {
         priority=2,
         max_iterations=15,
         temperature=0.3,  # Lower temp for precise diagram generation
+        # Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
+    ),
+    "kvasir": AgentDefinition(
+        name="kvasir",
+        role="LaTeX specialist - documents, equations, TikZ, Beamer, BibTeX",
+        model="llama3.1:8b",  # Good for documentation and structured output
+        system_prompt=KVASIR_PROMPT,
+        tools=[
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            "search_code",
+            "generate_latex",
+            "format_equations",
+            "generate_tikz",
+            "manage_bibliography",
+            "create_beamer",
+            "latex_to_pdf",
+        ],
+        can_delegate=False,
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=15,
+        temperature=0.3,  # Lower temp for precise LaTeX generation
         # Fallback to smaller model when VRAM is insufficient
         fallback_model="qwen2.5:3b-instruct-q8_0",
         fallback_vram_gb=3.0,
