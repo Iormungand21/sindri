@@ -55,6 +55,13 @@ from sindri.tools.iac import (
     GeneratePulumiTool,
     ValidateTerraformTool,
 )
+from sindri.tools.migrations import (
+    GenerateMigrationTool,
+    MigrationStatusTool,
+    RunMigrationsTool,
+    RollbackMigrationTool,
+    ValidateMigrationsTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -321,4 +328,10 @@ class ToolRegistry:
         registry.register(GenerateTerraformTool(work_dir=work_dir))
         registry.register(GeneratePulumiTool(work_dir=work_dir))
         registry.register(ValidateTerraformTool(work_dir=work_dir))
+        # Database Migration tools
+        registry.register(GenerateMigrationTool(work_dir=work_dir))
+        registry.register(MigrationStatusTool(work_dir=work_dir))
+        registry.register(RunMigrationsTool(work_dir=work_dir))
+        registry.register(RollbackMigrationTool(work_dir=work_dir))
+        registry.register(ValidateMigrationsTool(work_dir=work_dir))
         return registry

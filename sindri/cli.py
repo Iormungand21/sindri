@@ -5000,6 +5000,279 @@ def validate_terraform(path: str, check_formatting: bool):
 
 
 # ============================================
+# Phase 10+: Database Migration Commands
+# ============================================
+
+
+@cli.command("migrate")
+@click.option(
+    "--path", "-p", type=click.Path(exists=True), help="Project path (default: current)"
+)
+@click.option(
+    "--framework",
+    "-f",
+    type=click.Choice([
+        "alembic", "django", "prisma", "knex", "sequelize",
+        "goose", "diesel", "seaorm", "atlas"
+    ]),
+    help="Override detected framework",
+)
+@click.option("--target", "-t", help="Target revision (default: latest)")
+@click.option("--dry-run", is_flag=True, help="Preview SQL without applying")
+def migrate(path: str, framework: str, target: str, dry_run: bool):
+    """Run pending database migrations.
+
+    Automatically detects the migration framework and applies pending migrations.
+
+    Examples:
+        sindri migrate
+
+        sindri migrate --framework alembic --target head
+
+        sindri migrate --dry-run
+
+        sindri migrate --path /app --framework prisma
+    """
+    from sindri.tools.migrations import RunMigrationsTool
+    from pathlib import Path
+
+    async def execute():
+        work_path = Path(path).resolve() if path else Path.cwd()
+        tool = RunMigrationsTool(work_dir=work_path)
+
+        result = await tool.execute(
+            path=str(work_path),
+            framework=framework,
+            target=target,
+            dry_run=dry_run,
+        )
+
+        if result.success:
+            console.print(f"[green]✓[/green] {result.output}")
+        else:
+            console.print(f"[red]✗[/red] {result.error or result.output}")
+
+    asyncio.run(execute())
+
+
+@cli.command("migrate-status")
+@click.option(
+    "--path", "-p", type=click.Path(exists=True), help="Project path (default: current)"
+)
+@click.option(
+    "--framework",
+    "-f",
+    type=click.Choice([
+        "alembic", "django", "prisma", "knex", "sequelize",
+        "goose", "diesel", "seaorm", "atlas"
+    ]),
+    help="Override detected framework",
+)
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def migrate_status(path: str, framework: str, verbose: bool):
+    """Check status of database migrations.
+
+    Shows which migrations have been applied and which are pending.
+
+    Examples:
+        sindri migrate-status
+
+        sindri migrate-status --verbose
+
+        sindri migrate-status --framework django
+    """
+    from sindri.tools.migrations import MigrationStatusTool
+    from pathlib import Path
+
+    async def execute():
+        work_path = Path(path).resolve() if path else Path.cwd()
+        tool = MigrationStatusTool(work_dir=work_path)
+
+        result = await tool.execute(
+            path=str(work_path),
+            framework=framework,
+            verbose=verbose,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]✗[/red] {result.error}")
+
+    asyncio.run(execute())
+
+
+@cli.command("migrate-generate")
+@click.argument("name")
+@click.option(
+    "--path", "-p", type=click.Path(exists=True), help="Project path (default: current)"
+)
+@click.option(
+    "--framework",
+    "-f",
+    type=click.Choice([
+        "alembic", "django", "prisma", "knex", "sequelize",
+        "goose", "diesel", "seaorm", "atlas"
+    ]),
+    help="Override detected framework",
+)
+@click.option("--message", "-m", help="Migration description/message")
+@click.option("--auto", is_flag=True, help="Auto-generate from model changes (Alembic, Prisma, Django)")
+@click.option("--sql", help="SQL content for the migration")
+@click.option("--sql-down", help="SQL content for rollback")
+@click.option("--dry-run", is_flag=True, help="Preview without creating file")
+def migrate_generate(
+    name: str,
+    path: str,
+    framework: str,
+    message: str,
+    auto: bool,
+    sql: str,
+    sql_down: str,
+    dry_run: bool,
+):
+    """Generate a new database migration.
+
+    Creates a new migration file based on the detected framework.
+
+    Examples:
+        sindri migrate-generate add_users_table
+
+        sindri migrate-generate create_posts --message "Add posts table"
+
+        sindri migrate-generate add_index --auto
+
+        sindri migrate-generate add_column --sql "ALTER TABLE users ADD email TEXT;"
+
+        sindri migrate-generate --dry-run test_migration
+    """
+    from sindri.tools.migrations import GenerateMigrationTool
+    from pathlib import Path
+
+    async def execute():
+        work_path = Path(path).resolve() if path else Path.cwd()
+        tool = GenerateMigrationTool(work_dir=work_path)
+
+        result = await tool.execute(
+            name=name,
+            path=str(work_path),
+            framework=framework,
+            message=message,
+            auto=auto,
+            sql=sql,
+            sql_down=sql_down,
+            dry_run=dry_run,
+        )
+
+        if result.success:
+            console.print(f"[green]✓[/green] {result.output}")
+        else:
+            console.print(f"[red]✗[/red] {result.error}")
+
+    asyncio.run(execute())
+
+
+@cli.command("migrate-rollback")
+@click.option(
+    "--path", "-p", type=click.Path(exists=True), help="Project path (default: current)"
+)
+@click.option(
+    "--framework",
+    "-f",
+    type=click.Choice([
+        "alembic", "django", "prisma", "knex", "sequelize",
+        "goose", "diesel", "seaorm", "atlas"
+    ]),
+    help="Override detected framework",
+)
+@click.option("--steps", "-n", type=int, default=1, help="Number of migrations to rollback (default: 1)")
+@click.option("--target", "-t", help="Target revision to rollback to")
+@click.option("--dry-run", is_flag=True, help="Preview SQL without rolling back")
+def migrate_rollback(path: str, framework: str, steps: int, target: str, dry_run: bool):
+    """Rollback database migrations.
+
+    Reverts migrations to a previous state.
+
+    Examples:
+        sindri migrate-rollback
+
+        sindri migrate-rollback --steps 3
+
+        sindri migrate-rollback --target abc123
+
+        sindri migrate-rollback --dry-run
+    """
+    from sindri.tools.migrations import RollbackMigrationTool
+    from pathlib import Path
+
+    async def execute():
+        work_path = Path(path).resolve() if path else Path.cwd()
+        tool = RollbackMigrationTool(work_dir=work_path)
+
+        result = await tool.execute(
+            path=str(work_path),
+            framework=framework,
+            steps=steps,
+            target=target,
+            dry_run=dry_run,
+        )
+
+        if result.success:
+            console.print(f"[green]✓[/green] {result.output}")
+        else:
+            console.print(f"[red]✗[/red] {result.error}")
+
+    asyncio.run(execute())
+
+
+@cli.command("migrate-validate")
+@click.option(
+    "--path", "-p", type=click.Path(exists=True), help="Project path (default: current)"
+)
+@click.option(
+    "--framework",
+    "-f",
+    type=click.Choice([
+        "alembic", "django", "prisma", "knex", "sequelize",
+        "goose", "diesel", "seaorm", "atlas"
+    ]),
+    help="Override detected framework",
+)
+@click.option("--check-down/--no-check-down", default=True, help="Verify down migrations exist")
+def migrate_validate(path: str, framework: str, check_down: bool):
+    """Validate database migrations for consistency.
+
+    Checks for issues like missing down migrations, syntax errors, and consistency problems.
+
+    Examples:
+        sindri migrate-validate
+
+        sindri migrate-validate --framework alembic
+
+        sindri migrate-validate --no-check-down
+    """
+    from sindri.tools.migrations import ValidateMigrationsTool
+    from pathlib import Path
+
+    async def execute():
+        work_path = Path(path).resolve() if path else Path.cwd()
+        tool = ValidateMigrationsTool(work_dir=work_path)
+
+        result = await tool.execute(
+            path=str(work_path),
+            framework=framework,
+            check_down=check_down,
+        )
+
+        if result.success:
+            console.print(f"[green]✓[/green] {result.output}")
+        else:
+            console.print(f"[yellow]![/yellow] {result.output}")
+
+    asyncio.run(execute())
+
+
+# ============================================
 # Phase 9+: IDE Integration Commands
 # ============================================
 

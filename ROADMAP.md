@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 2011 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2189 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -85,7 +85,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - HMAC-SHA256 signature verification for webhook security
 - Retry logic with exponential backoff for reliable delivery
 
-**Total:** 2124 backend tests + 104 frontend tests (100% passing)
+**Total:** 2189 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -107,6 +107,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 | Docker Generator | Auto-generate Dockerfile/docker-compose | **Complete** |
 | API Spec Generator | OpenAPI from route definitions | **Complete** |
 | Coverage Visualization | Code coverage in Web UI | **Complete** |
+| Database Migrations | Multi-framework migration management (Alembic, Django, Prisma, Knex, Goose, Diesel) | **Complete** |
 
 ### Exploratory
 
@@ -165,6 +166,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Database Migrations (Alembic, Django, Prisma, Knex, Goose, Diesel, SeaORM) | +65 |
 | 2026-01-17 | Webhooks (Slack/Discord/Generic HTTP, HMAC signatures, retry logic) | +57 |
 | 2026-01-17 | Activity Feed (team timeline, filtering, stats, API endpoints) | +56 |
 | 2026-01-17 | Notification System (mentions, comments, team invites, preferences) | +56 |

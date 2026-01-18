@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, and Webhooks
-**Test Status:** 2124 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, and Database Migrations
+**Test Status:** 2189 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 10 Features (Advanced Team Collaboration - continued)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2124 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2189 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -28,6 +28,12 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri finetune stats            # View training data statistics
 .venv/bin/sindri finetune train            # Start model fine-tuning
 .venv/bin/sindri finetune models           # List fine-tuned models
+
+# Database Migrations
+.venv/bin/sindri migrate                   # Apply pending migrations
+.venv/bin/sindri migrate-status            # Check migration status
+.venv/bin/sindri migrate-generate add_users  # Generate new migration
+.venv/bin/sindri migrate-validate          # Validate migrations
 
 # Notifications
 .venv/bin/sindri notifications user123     # View notifications
@@ -51,6 +57,64 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Database Migration Tools (2026-01-17)
+
+Added comprehensive database migration management tools with multi-framework support:
+
+**Supported Frameworks:**
+- **Python**: Alembic (SQLAlchemy), Django
+- **Node.js**: Prisma, Knex, Sequelize
+- **Go**: Goose, Atlas
+- **Rust**: Diesel, SeaORM
+
+**Migration Tools (`sindri/tools/migrations.py`):**
+- `generate_migration` - Generate new migration files with SQL content
+- `migration_status` - Check pending/applied migrations
+- `run_migrations` - Apply pending migrations to database
+- `rollback_migration` - Rollback to previous migration state
+- `validate_migrations` - Check migration consistency and issues
+
+**Auto-Detection Features:**
+- Automatically detects framework from project files
+- Supports pyproject.toml, package.json, go.mod, Cargo.toml
+- Detects configuration files (alembic.ini, knexfile.js, etc.)
+- Falls back to manual framework specification
+
+**Migration Generation:**
+- Framework-specific templates for each supported ORM
+- Timestamp-based naming for unique identifiers
+- Support for custom SQL up/down migrations
+- Auto-generation from model changes (Alembic, Prisma, Django)
+- Dry-run mode for previewing without creating files
+
+**Validation Features:**
+- Checks for required migration components
+- Warns about missing down/rollback migrations
+- Validates migration file structure
+- Reports counts and statistics
+
+**CLI Commands:**
+- `sindri migrate` - Run pending migrations
+- `sindri migrate --dry-run` - Preview SQL without applying
+- `sindri migrate --framework alembic --target head` - Target specific revision
+- `sindri migrate-status` - Show migration status
+- `sindri migrate-status --verbose` - Detailed status
+- `sindri migrate-generate <name>` - Create new migration
+- `sindri migrate-generate <name> --auto` - Auto-generate from models
+- `sindri migrate-generate <name> --sql "..."` - Include custom SQL
+- `sindri migrate-rollback` - Rollback last migration
+- `sindri migrate-rollback --steps 3` - Rollback multiple
+- `sindri migrate-validate` - Validate all migrations
+
+**Files:**
+- `sindri/tools/migrations.py` - Migration tools implementation
+- Updated `sindri/tools/registry.py` - Tool registration
+- Updated `sindri/cli.py` - CLI commands
+
+**Tests:** 65 new tests (total: 2189 backend tests)
+
+---
 
 ### Webhooks System (2026-01-17)
 
@@ -829,7 +893,7 @@ GitHub Actions workflow generation and validation:
 | Idunn | Documentation | llama3.1:8b |
 | Vidar | Multi-lang Coder | codestral:22b |
 
-### Tools (48 total)
+### Tools (53 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **AST:** parse_ast, find_references, symbol_info, ast_rename
@@ -845,6 +909,7 @@ GitHub Actions workflow generation and validation:
 **Docker:** generate_dockerfile, generate_docker_compose, validate_dockerfile
 **API Spec:** generate_api_spec, validate_api_spec
 **Infrastructure as Code:** generate_terraform, generate_pulumi, validate_terraform
+**Database Migrations:** generate_migration, migration_status, run_migrations, rollback_migration, validate_migrations
 **Core:** shell, delegate
 
 ### Key Features
