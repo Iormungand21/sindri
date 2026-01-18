@@ -6894,5 +6894,260 @@ def finetune_delete(model_id: int, force: bool):
     asyncio.run(run())
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Diagram Generation Commands (Phase 11)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@cli.group()
+def diagram():
+    """Generate technical diagrams (Mermaid, PlantUML, D2)."""
+    pass
+
+
+@diagram.command("mermaid")
+@click.argument("diagram_type", type=click.Choice(["sequence", "class", "flowchart", "er", "state", "gantt", "mindmap"]))
+@click.option("--title", "-t", help="Diagram title")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--direction", "-d", type=click.Choice(["TB", "LR", "BT", "RL"]), default="TB", help="Flowchart direction")
+def diagram_mermaid(diagram_type: str, title: str, output: str, direction: str):
+    """Generate a Mermaid diagram.
+
+    Examples:
+
+        sindri diagram mermaid sequence --title "Login Flow"
+
+        sindri diagram mermaid flowchart -d LR -o diagram.md
+
+        sindri diagram mermaid er --title "Database Schema"
+    """
+    from sindri.tools.diagrams import GenerateMermaidTool
+
+    async def run():
+        tool = GenerateMermaidTool()
+        result = await tool.execute(
+            diagram_type=diagram_type,
+            title=title,
+            output_file=output,
+            direction=direction,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@diagram.command("plantuml")
+@click.argument("diagram_type", type=click.Choice(["sequence", "class", "activity", "component", "usecase", "deployment"]))
+@click.option("--title", "-t", help="Diagram title")
+@click.option("--theme", help="PlantUML theme")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def diagram_plantuml(diagram_type: str, title: str, theme: str, output: str):
+    """Generate a PlantUML diagram.
+
+    Examples:
+
+        sindri diagram plantuml sequence --title "API Flow"
+
+        sindri diagram plantuml class --theme blueprint
+
+        sindri diagram plantuml component -o architecture.puml
+    """
+    from sindri.tools.diagrams import GeneratePlantUMLTool
+
+    async def run():
+        tool = GeneratePlantUMLTool()
+        result = await tool.execute(
+            diagram_type=diagram_type,
+            title=title,
+            theme=theme,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@diagram.command("d2")
+@click.option("--title", "-t", help="Diagram title")
+@click.option("--direction", "-d", type=click.Choice(["right", "down", "left", "up"]), default="right", help="Layout direction")
+@click.option("--theme", help="D2 theme ID (0-100)")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def diagram_d2(title: str, direction: str, theme: str, output: str):
+    """Generate a D2 diagram.
+
+    Examples:
+
+        sindri diagram d2 --title "System Architecture"
+
+        sindri diagram d2 -d down --theme 1
+
+        sindri diagram d2 -o architecture.d2
+    """
+    from sindri.tools.diagrams import GenerateD2Tool
+
+    async def run():
+        tool = GenerateD2Tool()
+        result = await tool.execute(
+            title=title,
+            direction=direction,
+            theme=theme,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@diagram.command("from-code")
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--type", "diagram_type", type=click.Choice(["class", "dependencies", "architecture", "call_graph"]), default="class", help="Diagram type")
+@click.option("--format", "fmt", type=click.Choice(["mermaid", "plantuml", "d2"]), default="mermaid", help="Output format")
+@click.option("--include-private", is_flag=True, help="Include private methods/attributes")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def diagram_from_code(path: str, diagram_type: str, fmt: str, include_private: bool, output: str):
+    """Generate diagram from source code.
+
+    Analyzes Python, JavaScript, TypeScript, Go, and Rust code.
+
+    Examples:
+
+        sindri diagram from-code src/models.py --type class
+
+        sindri diagram from-code . --type architecture --format d2
+
+        sindri diagram from-code lib/ --type dependencies -o deps.md
+    """
+    from pathlib import Path
+    from sindri.tools.diagrams import DiagramFromCodeTool
+
+    async def run():
+        tool = DiagramFromCodeTool()
+
+        path_obj = Path(path)
+        if path_obj.is_file():
+            result = await tool.execute(
+                diagram_type=diagram_type,
+                file_path=path,
+                format=fmt,
+                include_private=include_private,
+                output_file=output,
+            )
+        else:
+            result = await tool.execute(
+                diagram_type=diagram_type,
+                path=path,
+                format=fmt,
+                include_private=include_private,
+                output_file=output,
+            )
+
+        if result.success:
+            console.print(result.output)
+            if result.metadata:
+                console.print(f"\n[dim]Files analyzed: {result.metadata.get('files_analyzed', 0)}[/dim]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@diagram.command("sequence")
+@click.option("--participants", "-p", multiple=True, help="Participant names (can specify multiple)")
+@click.option("--format", "fmt", type=click.Choice(["mermaid", "plantuml"]), default="mermaid", help="Output format")
+@click.option("--title", "-t", help="Diagram title")
+@click.option("--autonumber", is_flag=True, help="Add step numbers")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def diagram_sequence(participants: tuple, fmt: str, title: str, autonumber: bool, output: str):
+    """Generate a sequence diagram interactively.
+
+    Examples:
+
+        sindri diagram sequence -p User -p API -p Database
+
+        sindri diagram sequence -p Client -p Server --title "Auth Flow" --autonumber
+
+        sindri diagram sequence -p A -p B -p C --format plantuml -o flow.puml
+    """
+    from sindri.tools.diagrams import GenerateSequenceDiagramTool
+
+    async def run():
+        tool = GenerateSequenceDiagramTool()
+        result = await tool.execute(
+            participants=list(participants) if participants else None,
+            format=fmt,
+            title=title,
+            autonumber=autonumber,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@diagram.command("er")
+@click.argument("source", type=click.Path(exists=True), required=False)
+@click.option("--format", "fmt", type=click.Choice(["mermaid", "plantuml", "d2"]), default="mermaid", help="Output format")
+@click.option("--title", "-t", help="Diagram title")
+@click.option("--show-types/--no-types", default=True, help="Show column types")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def diagram_er(source: str, fmt: str, title: str, show_types: bool, output: str):
+    """Generate an ER diagram from database schema.
+
+    SOURCE can be a Python file with SQLAlchemy models or a SQL file.
+
+    Examples:
+
+        sindri diagram er models.py
+
+        sindri diagram er schema.sql --format plantuml
+
+        sindri diagram er app/db/models.py --title "User DB" -o schema.md
+    """
+    from sindri.tools.diagrams import GenerateERDiagramTool
+
+    async def run():
+        tool = GenerateERDiagramTool()
+
+        kwargs = {
+            "format": fmt,
+            "title": title,
+            "show_types": show_types,
+            "output_file": output,
+        }
+
+        if source:
+            if source.endswith(".sql"):
+                kwargs["sql_file"] = source
+            else:
+                kwargs["file_path"] = source
+
+        result = await tool.execute(**kwargs)
+
+        if result.success:
+            console.print(result.output)
+            if result.metadata:
+                console.print(f"\n[dim]Tables found: {result.metadata.get('tables_count', 0)}[/dim]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()

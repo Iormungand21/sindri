@@ -62,6 +62,14 @@ from sindri.tools.migrations import (
     RollbackMigrationTool,
     ValidateMigrationsTool,
 )
+from sindri.tools.diagrams import (
+    GenerateMermaidTool,
+    GeneratePlantUMLTool,
+    GenerateD2Tool,
+    DiagramFromCodeTool,
+    GenerateSequenceDiagramTool,
+    GenerateERDiagramTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -334,4 +342,11 @@ class ToolRegistry:
         registry.register(RunMigrationsTool(work_dir=work_dir))
         registry.register(RollbackMigrationTool(work_dir=work_dir))
         registry.register(ValidateMigrationsTool(work_dir=work_dir))
+        # Diagram generation tools
+        registry.register(GenerateMermaidTool(work_dir=work_dir))
+        registry.register(GeneratePlantUMLTool(work_dir=work_dir))
+        registry.register(GenerateD2Tool(work_dir=work_dir))
+        registry.register(DiagramFromCodeTool(work_dir=work_dir))
+        registry.register(GenerateSequenceDiagramTool(work_dir=work_dir))
+        registry.register(GenerateERDiagramTool(work_dir=work_dir))
         return registry

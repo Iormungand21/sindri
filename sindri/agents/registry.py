@@ -14,6 +14,8 @@ from sindri.agents.prompts import (
     BALDR_PROMPT,
     IDUNN_PROMPT,
     VIDAR_PROMPT,
+    # Phase 11: Multi-disciplinary agents (2026-01-18)
+    SKULD_PROMPT,
 )
 
 # Agent Registry
@@ -57,6 +59,7 @@ AGENTS: dict[str, AgentDefinition] = {
         ],
         can_delegate=True,
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
+        # Phase 11: Added skuld for diagram generation
         delegate_to=[
             "huginn",
             "mimir",
@@ -67,6 +70,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "baldr",
             "idunn",
             "vidar",
+            "skuld",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -298,6 +302,36 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to smaller model when VRAM is insufficient
         fallback_model="qwen2.5-coder:7b",
         fallback_vram_gb=5.0,
+    ),
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Phase 11: Multi-Disciplinary Domain Agents (2026-01-18)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    "skuld": AgentDefinition(
+        name="skuld",
+        role="Diagram generation specialist - Mermaid, PlantUML, D2 visualization",
+        model="qwen2.5-coder:7b",  # Good for structured output generation
+        system_prompt=SKULD_PROMPT,
+        tools=[
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            "search_code",
+            "generate_mermaid",
+            "generate_plantuml",
+            "generate_d2",
+            "diagram_from_code",
+            "generate_sequence_diagram",
+            "generate_er_diagram",
+        ],
+        can_delegate=False,
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=15,
+        temperature=0.3,  # Lower temp for precise diagram generation
+        # Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
     ),
 }
 

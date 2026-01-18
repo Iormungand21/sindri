@@ -1,14 +1,14 @@
 # Sindri Project Status Report
-**Date:** 2026-01-17
+**Date:** 2026-01-18
 **Status:** Production Ready (100%)
 
 ---
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, and API Keys
-**Test Status:** 2303 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 10 Features (Advanced Team Collaboration - continued)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, and Diagram Generation
+**Test Status:** 2356 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 11 Features (Multi-Disciplinary Domain Agents - continued)
 
 ### Try It Out
 ```bash
@@ -16,7 +16,7 @@
 .venv/bin/pytest tests/ -v --tb=no -q    # 2303 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 11 agents
+.venv/bin/sindri agents                    # See all 12 agents
 
 # Launch interfaces
 .venv/bin/sindri tui                       # Terminal UI
@@ -64,6 +64,14 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri api-key-revoke <key_id>   # Revoke a key
 .venv/bin/sindri api-key-global-stats      # Global statistics
 
+# Diagram Generation
+.venv/bin/sindri diagram mermaid sequence --title "Auth Flow"  # Mermaid sequence diagram
+.venv/bin/sindri diagram mermaid flowchart -d LR -o flow.md    # Mermaid flowchart
+.venv/bin/sindri diagram plantuml class --theme blueprint      # PlantUML class diagram
+.venv/bin/sindri diagram from-code ./sindri --type class       # Extract class diagram from code
+.venv/bin/sindri diagram er models.py --format mermaid         # ER diagram from SQLAlchemy
+.venv/bin/sindri diagram sequence -p User -p API -p DB         # Quick sequence diagram
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -72,6 +80,59 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Diagram Generation System (2026-01-18) - Phase 11 Start
+
+Added comprehensive diagram generation tools and the Skuld agent for technical visualization:
+
+**New Agent:**
+- **Skuld** (Norn of the Future) - Diagram generation specialist using qwen2.5-coder:7b
+
+**Diagram Formats Supported:**
+- **Mermaid.js** - GitHub/GitLab/Notion compatible
+- **PlantUML** - Enterprise standard, rich UML support
+- **D2** - Modern aesthetics, auto-layout
+
+**Diagram Types:**
+- Sequence diagrams (API flows, service interactions)
+- Class diagrams (OOP structures)
+- ER diagrams (database schemas)
+- Flowcharts (processes, decision trees)
+- State diagrams (state machines)
+- Architecture diagrams (system overview)
+- Mind maps, Gantt charts
+
+**New Tools (6 total):**
+- `generate_mermaid` - Create Mermaid.js diagrams with all diagram types
+- `generate_plantuml` - Create PlantUML diagrams (sequence, class, component, etc.)
+- `generate_d2` - Create D2 diagrams with containers and shapes
+- `diagram_from_code` - Extract diagrams from Python/JS/TS/Go/Rust code
+- `generate_sequence_diagram` - Specialized sequence diagram generation
+- `generate_er_diagram` - ER diagrams from SQLAlchemy/SQL files
+
+**CLI Commands:**
+- `sindri diagram mermaid <type>` - Generate Mermaid diagram
+- `sindri diagram plantuml <type>` - Generate PlantUML diagram
+- `sindri diagram d2` - Generate D2 diagram
+- `sindri diagram from-code <path>` - Generate diagram from source code
+- `sindri diagram sequence` - Generate sequence diagram with participants
+- `sindri diagram er [source]` - Generate ER diagram from models/SQL
+
+**Agent Delegation:**
+- Brokkr can now delegate to Skuld for diagram generation tasks
+- Skuld has access to read_file, write_file, search_code, and all diagram tools
+
+**Files:**
+- `sindri/tools/diagrams.py` - Diagram generation tools implementation
+- `sindri/agents/prompts.py` - SKULD_PROMPT added
+- `sindri/agents/registry.py` - Skuld agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/cli.py` - CLI commands for diagram group
+- `tests/test_diagrams.py` - Comprehensive test suite
+
+**Tests:** 53 new tests (total: 2356 backend tests)
+
+---
 
 ### API Keys System (2026-01-17)
 
@@ -1025,7 +1086,7 @@ GitHub Actions workflow generation and validation:
 
 ## Project Summary
 
-### Agents (11 total)
+### Agents (12 total)
 
 | Agent | Role | Model |
 |-------|------|-------|
@@ -1040,8 +1101,9 @@ GitHub Actions workflow generation and validation:
 | Baldr | Debugger | deepseek-r1:14b |
 | Idunn | Documentation | llama3.1:8b |
 | Vidar | Multi-lang Coder | codestral:22b |
+| Skuld | Diagram Generator | qwen2.5-coder:7b |
 
-### Tools (53 total)
+### Tools (59 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **AST:** parse_ast, find_references, symbol_info, ast_rename
@@ -1058,6 +1120,7 @@ GitHub Actions workflow generation and validation:
 **API Spec:** generate_api_spec, validate_api_spec
 **Infrastructure as Code:** generate_terraform, generate_pulumi, validate_terraform
 **Database Migrations:** generate_migration, migration_status, run_migrations, rollback_migration, validate_migrations
+**Diagrams:** generate_mermaid, generate_plantuml, generate_d2, diagram_from_code, generate_sequence_diagram, generate_er_diagram
 **Core:** shell, delegate
 
 ### Key Features
@@ -1161,6 +1224,13 @@ sindri plugins init --tool x   # Create tool template
 # Projects
 sindri projects add <path>     # Register project
 sindri projects search "query" # Cross-project search
+
+# Diagrams
+sindri diagram mermaid <type>  # Generate Mermaid diagram
+sindri diagram plantuml <type> # Generate PlantUML diagram
+sindri diagram from-code <path>  # Extract diagram from code
+sindri diagram sequence        # Generate sequence diagram
+sindri diagram er [source]     # Generate ER diagram
 ```
 
 ---

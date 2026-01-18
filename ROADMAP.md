@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that serves as a **multi-disciplinary one-stop shop** for creative and technical work. Beyond code, Sindri coordinates specialized agents for 3D modeling, music composition, electronics design, data visualization, game development, scientific documentation, and more — all using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 53 tools, 2303 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 12 agents, 59 tools, 2356 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -129,9 +129,12 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 
 ---
 
-## Phase 11: Multi-Disciplinary Domain Agents (Planned)
+## Phase 11: Multi-Disciplinary Domain Agents (In Progress)
 
 Sindri's architecture naturally supports specialized agents beyond software development. This phase expands Sindri into a **universal creative and technical assistant**.
+
+**Completed:**
+- Diagram Generation Agent ("Skuld") - Mermaid, PlantUML, D2 diagram generation (2026-01-18)
 
 ### 3D Modeling & CAD
 
@@ -278,7 +281,7 @@ Auto-generate technical diagrams from code or descriptions.
 - "Create an ER diagram from this SQLAlchemy model"
 - "Visualize the architecture of this microservices app"
 
-**Status:** Planned
+**Status:** ✅ Complete (2026-01-18)
 
 ---
 
