@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, and Network/HTTP Diagnostic Tools
-**Test Status:** 2894 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 2 continues (Database tools next)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, Network/HTTP Diagnostic Tools, and Database Tools (sql_generate, db_seed)
+**Test Status:** 2920 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 3 (Video/Audio Profiling, Browser, Cloud Tools)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2894 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2920 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 16 agents
@@ -133,6 +133,44 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Database Tools (2026-01-18) - Phase 12 Tier 2 Complete
+
+Added database tools for SQL generation and test data seeding:
+
+**New Tools (2 total):**
+- `sql_generate` - Generate SQL queries from natural language descriptions
+- `db_seed` - Generate realistic test data using Faker library
+
+**sql_generate Features:**
+- Pattern-based natural language to SQL conversion
+- Supports SELECT, COUNT, GROUP BY, JOIN, ORDER BY, LIMIT patterns
+- Schema-aware validation when database path provided
+- Multiple query patterns: "Get all users", "Count orders per customer", "Top 10 products by price"
+
+**db_seed Features:**
+- Automatic data type detection from column names (email → fake.email(), etc.)
+- Foreign key relationship handling
+- Batch inserts for performance (configurable batch size)
+- Reproducible seeding with random seed support
+- Locale support for localized test data
+- Clear existing data option before seeding
+
+**Agent Assignment:**
+- **Fenrir** (SQL specialist) has access to both tools
+
+**Dependencies:**
+- faker>=24.0.0 (new dependency)
+
+**Files:**
+- `sindri/tools/sql.py` - Added SqlGenerateTool and DbSeedTool classes
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Updated Fenrir's tools list
+- `sindri/agents/prompts.py` - Updated FENRIR_PROMPT with new tool documentation
+
+**Tests:** +26 new tests (2920 total)
+
+---
 
 ### Network & HTTP Diagnostic Tools (2026-01-18) - Phase 12 Tier 2
 
@@ -1624,7 +1662,7 @@ GitHub Actions workflow generation and validation:
 | Saga | Data Visualization | qwen2.5-coder:7b |
 | Vör | Text/Regex Processing | qwen2.5-coder:7b |
 
-### Tools (109 total)
+### Tools (111 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Compression:** archive_create, archive_extract, archive_list, compress_file, decompress_file
@@ -1638,7 +1676,7 @@ GitHub Actions workflow generation and validation:
 **Testing:** run_tests, check_syntax
 **Formatting:** format_code, lint_code
 **Refactoring:** rename_symbol, extract_function, inline_variable, move_file, batch_rename, split_file, merge_files
-**SQL:** execute_query, describe_schema, explain_query
+**SQL:** execute_query, describe_schema, explain_query, sql_generate, db_seed
 **CI/CD:** generate_workflow, validate_workflow
 **Security:** scan_dependencies, generate_sbom, check_outdated
 **Docker:** generate_dockerfile, generate_docker_compose, validate_dockerfile

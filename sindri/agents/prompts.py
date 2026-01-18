@@ -1002,6 +1002,47 @@ DATABASE-SPECIFIC FEATURES
 - `INSERT ... ON DUPLICATE KEY UPDATE`
 
 ═══════════════════════════════════════════════════════════════════
+NATURAL LANGUAGE SQL GENERATION
+═══════════════════════════════════════════════════════════════════
+
+Use `sql_generate` to convert natural language descriptions to SQL:
+
+```
+sql_generate(description="Get all active users")
+→ SELECT * FROM users WHERE active = 1
+
+sql_generate(description="Count orders per customer", database="app.db")
+→ SELECT customer_id, COUNT(*) FROM orders GROUP BY customer_id
+
+sql_generate(description="Top 10 products by price", database="app.db")
+→ SELECT * FROM products ORDER BY price DESC LIMIT 10
+```
+
+The tool:
+1. Parses the description to identify query intent
+2. Infers tables and columns from schema (if database provided)
+3. Generates optimized SQL
+4. Validates the query against the schema
+
+═══════════════════════════════════════════════════════════════════
+TEST DATA GENERATION
+═══════════════════════════════════════════════════════════════════
+
+Use `db_seed` to populate tables with realistic test data using Faker:
+
+```
+db_seed(database="app.db", table="users", rows=100)
+db_seed(database="app.db", table="orders", rows=500, seed=42)
+db_seed(database="app.db", table="products", rows=20, clear_existing=true)
+```
+
+The tool automatically:
+- Detects appropriate data types from column names (email, name, phone, etc.)
+- Handles foreign key relationships
+- Uses batch inserts for performance
+- Supports reproducible seeds for consistent test data
+
+═══════════════════════════════════════════════════════════════════
 TOOL EXECUTION FLOW
 ═══════════════════════════════════════════════════════════════════
 

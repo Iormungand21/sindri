@@ -3,12 +3,24 @@
 import asyncio
 import re
 import sqlite3
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 import structlog
 
 from sindri.tools.base import Tool, ToolResult
 
+if TYPE_CHECKING:
+    from faker import Faker
+
 log = structlog.get_logger()
+
+
+# Check if faker is available
+try:
+    from faker import Faker
+
+    FAKER_AVAILABLE = True
+except ImportError:
+    FAKER_AVAILABLE = False
 
 
 def _format_table(headers: list[str], rows: list[tuple]) -> str:
@@ -680,4 +692,919 @@ Useful for optimizing slow queries."""
                 output="",
                 error=f"Failed to explain query: {str(e)}",
                 metadata={"database": str(db_path)},
+            )
+
+
+class SqlGenerateTool(Tool):
+    """Generate SQL queries from natural language descriptions.
+
+    Uses pattern matching to convert common query descriptions into SQL.
+    Optionally validates against the database schema.
+    """
+
+    name = "sql_generate"
+    description = """Generate SQL queries from natural language descriptions.
+
+Examples:
+- sql_generate(description="Get all users")
+- sql_generate(description="Find active users where age > 25", database="app.db")
+- sql_generate(description="Count orders per customer", database="app.db")
+- sql_generate(description="Top 10 products by price", database="app.db", table="products")
+
+Returns generated SQL query. Use with execute_query to run the query."""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "description": {
+                "type": "string",
+                "description": "Natural language description of the query",
+            },
+            "database": {
+                "type": "string",
+                "description": "Path to database file (optional, for schema context and validation)",
+            },
+            "table": {
+                "type": "string",
+                "description": "Primary table name (optional, will infer from description)",
+            },
+            "dialect": {
+                "type": "string",
+                "enum": ["sqlite", "postgresql", "mysql"],
+                "description": "SQL dialect (default: sqlite)",
+            },
+            "validate": {
+                "type": "boolean",
+                "description": "Validate generated SQL against schema (default: true if database provided)",
+            },
+        },
+        "required": ["description"],
+    }
+
+    # Query patterns for natural language parsing
+    QUERY_PATTERNS = {
+        # SELECT patterns
+        "select_all": [
+            r"^(get|find|show|list|select|fetch|retrieve)\s+(all\s+)?(\w+)$",
+            r"^(get|find|show|list)\s+everything\s+(from\s+)?(\w+)$",
+        ],
+        "select_where": [
+            r"^(get|find|show|list|select)\s+(all\s+)?(\w+)\s+(where|with|having)\s+(.+)$",
+            r"^(get|find|show|list)\s+(\w+)\s+(that|which)\s+(are|is|have|has)\s+(.+)$",
+        ],
+        "count": [
+            r"^count\s+(all\s+)?(\w+)$",
+            r"^how\s+many\s+(\w+)(\s+are\s+there)?$",
+            r"^(get|find)\s+(the\s+)?(count|number)\s+of\s+(\w+)$",
+        ],
+        "count_where": [
+            r"^count\s+(\w+)\s+(where|with|having)\s+(.+)$",
+            r"^how\s+many\s+(\w+)\s+(where|with|having|are)\s+(.+)$",
+        ],
+        "top_n": [
+            r"^(top|first)\s+(\d+)\s+(\w+)(\s+by\s+(\w+))?(\s+(asc|desc))?$",
+            r"^(get|find|show)\s+(the\s+)?(top|first)\s+(\d+)\s+(\w+)(\s+by\s+(\w+))?$",
+        ],
+        "group_by": [
+            r"^(count|sum|avg|average|min|max)\s+(\w+)\s+(per|by|for each|grouped by)\s+(\w+)$",
+            r"^(\w+)\s+(per|by|for each)\s+(\w+)$",
+        ],
+        "join": [
+            r"^(get|find|show|list)\s+(\w+)\s+with\s+(their\s+)?(\w+)$",
+            r"^(get|find|show)\s+(\w+)\s+(and|with)\s+(\w+)\s+from\s+(\w+)$",
+        ],
+        "order_by": [
+            r"^(get|find|show|list)\s+(all\s+)?(\w+)\s+(sorted|ordered)\s+by\s+(\w+)(\s+(asc|desc))?$",
+        ],
+        "distinct": [
+            r"^(get|find|show|list)\s+(unique|distinct)\s+(\w+)(\s+from\s+(\w+))?$",
+        ],
+    }
+
+    # Column/condition patterns
+    CONDITION_PATTERNS = {
+        "equals": r"(\w+)\s*=\s*['\"]?([^'\"]+)['\"]?",
+        "not_equals": r"(\w+)\s*(!?=|<>)\s*['\"]?([^'\"]+)['\"]?",
+        "greater": r"(\w+)\s*>\s*(\d+(?:\.\d+)?)",
+        "less": r"(\w+)\s*<\s*(\d+(?:\.\d+)?)",
+        "like": r"(\w+)\s+(like|contains|starts with|ends with)\s+['\"]?([^'\"]+)['\"]?",
+        "is_true": r"(\w+)\s+is\s+(true|active|enabled)",
+        "is_false": r"(\w+)\s+is\s+(false|inactive|disabled)",
+        "is_null": r"(\w+)\s+is\s+(null|empty|none)",
+        "is_not_null": r"(\w+)\s+is\s+not\s+(null|empty|none)",
+    }
+
+    def _parse_description(self, description: str, table_hint: Optional[str] = None) -> dict:
+        """Parse natural language description into query components.
+
+        Args:
+            description: Natural language query description
+            table_hint: Optional table name hint
+
+        Returns:
+            Dict with query_type, table, columns, conditions, etc.
+        """
+        desc_lower = description.lower().strip()
+        result = {
+            "query_type": "select",
+            "table": table_hint,
+            "columns": ["*"],
+            "conditions": [],
+            "order_by": None,
+            "limit": None,
+            "group_by": None,
+            "aggregate": None,
+            "join": None,
+        }
+
+        # Try to match patterns
+        for pattern_type, patterns in self.QUERY_PATTERNS.items():
+            for pattern in patterns:
+                match = re.match(pattern, desc_lower, re.IGNORECASE)
+                if match:
+                    groups = match.groups()
+                    return self._process_pattern_match(pattern_type, groups, result, desc_lower)
+
+        # Fallback: extract table from description if not matched
+        words = desc_lower.split()
+        for i, word in enumerate(words):
+            if word in ("from", "in"):
+                if i + 1 < len(words):
+                    result["table"] = words[i + 1].rstrip("s")  # Singularize
+                    break
+
+        # If still no table, use the first noun-like word
+        if not result["table"]:
+            for word in words:
+                if word not in (
+                    "get",
+                    "find",
+                    "show",
+                    "list",
+                    "all",
+                    "the",
+                    "a",
+                    "an",
+                    "select",
+                    "from",
+                    "where",
+                ):
+                    result["table"] = word
+                    break
+
+        return result
+
+    def _process_pattern_match(
+        self, pattern_type: str, groups: tuple, result: dict, description: str
+    ) -> dict:
+        """Process a matched pattern and update result dict."""
+        if pattern_type == "select_all":
+            # Groups: (verb, 'all ', table)
+            result["table"] = groups[-1] if groups[-1] else groups[-2]
+
+        elif pattern_type == "select_where":
+            # Groups: (verb, 'all ', table, 'where', condition)
+            result["table"] = groups[2] if len(groups) > 2 else groups[1]
+            if len(groups) > 4:
+                result["conditions"] = [self._parse_condition(groups[-1])]
+            elif len(groups) > 3:
+                result["conditions"] = [self._parse_condition(groups[-1])]
+
+        elif pattern_type == "count":
+            result["query_type"] = "count"
+            result["aggregate"] = "COUNT"
+            # Find the table name
+            for g in groups:
+                if g and g not in ("all ", "the ", "count", "number"):
+                    result["table"] = g
+                    break
+
+        elif pattern_type == "count_where":
+            result["query_type"] = "count"
+            result["aggregate"] = "COUNT"
+            result["table"] = groups[0]
+            if len(groups) > 2:
+                result["conditions"] = [self._parse_condition(groups[-1])]
+
+        elif pattern_type == "top_n":
+            # Groups vary: (verb?, 'the '?, 'top', n, table, 'by col', col, 'asc/desc')
+            for g in groups:
+                if g and g.isdigit():
+                    result["limit"] = int(g)
+                elif g and g not in ("top", "first", "get", "find", "show", "the "):
+                    if not g.startswith("by") and not g in ("asc", "desc"):
+                        result["table"] = g
+                    elif g in ("asc", "desc"):
+                        result["order_by"] = (result.get("order_by_col"), g.upper())
+                    elif g.startswith("by"):
+                        result["order_by_col"] = g[3:] if g.startswith("by ") else None
+            # Extract order_by column from description if present
+            by_match = re.search(r"by\s+(\w+)", description)
+            if by_match:
+                direction = "DESC"  # Default for "top N" is descending
+                if "asc" in description.lower():
+                    direction = "ASC"
+                result["order_by"] = (by_match.group(1), direction)
+
+        elif pattern_type == "group_by":
+            # Groups: (agg, col, 'per', group_col) or (col, 'per', group_col)
+            result["query_type"] = "aggregate"
+            if groups[0].upper() in ("COUNT", "SUM", "AVG", "AVERAGE", "MIN", "MAX"):
+                result["aggregate"] = groups[0].upper().replace("AVERAGE", "AVG")
+                result["columns"] = [groups[1]]
+                result["group_by"] = groups[-1]
+                result["table"] = groups[1]  # Infer table from column
+            else:
+                result["aggregate"] = "COUNT"
+                result["columns"] = [groups[0]]
+                result["group_by"] = groups[-1]
+                result["table"] = groups[0]
+
+        elif pattern_type == "join":
+            # Groups: (verb, table1, 'their ', table2)
+            result["table"] = groups[1]
+            result["join"] = {"table": groups[-1], "type": "LEFT"}
+
+        elif pattern_type == "order_by":
+            result["table"] = groups[2] if groups[2] else groups[1]
+            direction = groups[-1].upper() if groups[-1] else "ASC"
+            result["order_by"] = (groups[-3] or groups[-2], direction)
+
+        elif pattern_type == "distinct":
+            result["query_type"] = "distinct"
+            result["columns"] = [groups[2]]
+            if groups[-1]:
+                result["table"] = groups[-1]
+            else:
+                result["table"] = groups[2]
+
+        return result
+
+    def _parse_condition(self, condition_str: str) -> str:
+        """Parse a condition string into SQL WHERE clause."""
+        condition_str = condition_str.strip()
+
+        # Check for explicit comparisons
+        for pattern_name, pattern in self.CONDITION_PATTERNS.items():
+            match = re.search(pattern, condition_str, re.IGNORECASE)
+            if match:
+                groups = match.groups()
+                col = groups[0]
+
+                if pattern_name == "equals":
+                    val = groups[1]
+                    if val.isdigit():
+                        return f"{col} = {val}"
+                    return f"{col} = '{val}'"
+                elif pattern_name == "greater":
+                    return f"{col} > {groups[1]}"
+                elif pattern_name == "less":
+                    return f"{col} < {groups[1]}"
+                elif pattern_name == "like":
+                    val = groups[2]
+                    if "starts with" in condition_str.lower():
+                        return f"{col} LIKE '{val}%'"
+                    elif "ends with" in condition_str.lower():
+                        return f"{col} LIKE '%{val}'"
+                    else:
+                        return f"{col} LIKE '%{val}%'"
+                elif pattern_name == "is_true":
+                    return f"{col} = 1"
+                elif pattern_name == "is_false":
+                    return f"{col} = 0"
+                elif pattern_name == "is_null":
+                    return f"{col} IS NULL"
+                elif pattern_name == "is_not_null":
+                    return f"{col} IS NOT NULL"
+
+        # Fallback: try to interpret as "column = value" or boolean
+        words = condition_str.split()
+        if len(words) >= 1:
+            col = words[0]
+            if len(words) == 1:
+                # Single word might be a boolean column
+                return f"{col} = 1"
+            elif len(words) >= 2:
+                # Try to extract value
+                val = " ".join(words[1:])
+                if val.isdigit():
+                    return f"{col} = {val}"
+                return f"{col} = '{val}'"
+
+        return condition_str
+
+    def _build_sql(self, parsed: dict, schema_info: Optional[dict] = None) -> str:
+        """Build SQL query from parsed components.
+
+        Args:
+            parsed: Parsed query components
+            schema_info: Optional schema information for validation
+
+        Returns:
+            SQL query string
+        """
+        table = parsed["table"]
+        if not table:
+            return "-- Could not determine table from description"
+
+        # Clean up table name (remove trailing 's' for plurals if needed)
+        if schema_info and table not in schema_info.get("tables", {}):
+            # Try singular form
+            singular = table.rstrip("s")
+            if singular in schema_info.get("tables", {}):
+                table = singular
+
+        query_type = parsed["query_type"]
+
+        if query_type == "count":
+            sql = f"SELECT COUNT(*) FROM {table}"
+        elif query_type == "aggregate":
+            agg = parsed["aggregate"]
+            col = parsed["columns"][0] if parsed["columns"] else "*"
+            group_col = parsed["group_by"]
+            sql = f"SELECT {group_col}, {agg}({col}) FROM {table}"
+            if group_col:
+                sql += f" GROUP BY {group_col}"
+        elif query_type == "distinct":
+            col = parsed["columns"][0] if parsed["columns"] else "*"
+            sql = f"SELECT DISTINCT {col} FROM {table}"
+        else:
+            # Regular SELECT
+            columns = ", ".join(parsed["columns"])
+            sql = f"SELECT {columns} FROM {table}"
+
+        # Add JOIN
+        if parsed.get("join"):
+            join_info = parsed["join"]
+            join_table = join_info["table"]
+            join_type = join_info.get("type", "LEFT")
+            # Infer join condition (assume table_id pattern)
+            join_col = f"{table.rstrip('s')}_id"
+            sql += f" {join_type} JOIN {join_table} ON {table}.id = {join_table}.{join_col}"
+
+        # Add WHERE
+        if parsed["conditions"]:
+            where_clauses = " AND ".join(c for c in parsed["conditions"] if c)
+            if where_clauses:
+                sql += f" WHERE {where_clauses}"
+
+        # Add ORDER BY
+        if parsed["order_by"]:
+            col, direction = parsed["order_by"]
+            sql += f" ORDER BY {col} {direction}"
+
+        # Add LIMIT
+        if parsed["limit"]:
+            sql += f" LIMIT {parsed['limit']}"
+
+        return sql
+
+    def _get_schema_info(self, db_path: str) -> Optional[dict]:
+        """Get schema information from database."""
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Get tables
+            cursor.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+            )
+            tables = {row[0]: {} for row in cursor.fetchall()}
+
+            # Get columns for each table
+            for table_name in tables:
+                cursor.execute(f"PRAGMA table_info('{table_name}')")
+                columns = cursor.fetchall()
+                tables[table_name] = {col[1]: col[2] for col in columns}
+
+            conn.close()
+            return {"tables": tables}
+        except Exception:
+            return None
+
+    def _validate_sql(self, sql: str, db_path: str) -> tuple[bool, str]:
+        """Validate SQL against database schema.
+
+        Returns:
+            Tuple of (is_valid, error_message)
+        """
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            # Use EXPLAIN to check syntax without executing
+            cursor.execute(f"EXPLAIN {sql}")
+            conn.close()
+            return True, ""
+        except sqlite3.Error as e:
+            return False, str(e)
+
+    async def execute(
+        self,
+        description: str,
+        database: Optional[str] = None,
+        table: Optional[str] = None,
+        dialect: str = "sqlite",
+        validate: bool = True,
+        **kwargs,
+    ) -> ToolResult:
+        """Generate SQL from natural language description.
+
+        Args:
+            description: Natural language description of the query
+            database: Optional database path for schema context
+            table: Optional primary table name
+            dialect: SQL dialect (default: sqlite)
+            validate: Validate generated SQL against schema
+
+        Returns:
+            ToolResult with generated SQL
+        """
+        log.info("sql_generate", description=description[:100], table=table)
+
+        # Get schema info if database provided
+        schema_info = None
+        if database:
+            db_path = self._resolve_path(database)
+            if db_path.exists():
+                schema_info = self._get_schema_info(str(db_path))
+
+        # Parse description
+        parsed = self._parse_description(description, table)
+
+        # If table hint provided, use it
+        if table:
+            parsed["table"] = table
+        # If schema available and table not found, try to match
+        elif schema_info and not parsed["table"]:
+            tables = list(schema_info.get("tables", {}).keys())
+            if len(tables) == 1:
+                parsed["table"] = tables[0]
+
+        # Build SQL
+        sql = self._build_sql(parsed, schema_info)
+
+        # Validate if requested and database provided
+        validation_note = ""
+        if validate and database:
+            db_path = self._resolve_path(database)
+            if db_path.exists():
+                is_valid, error = self._validate_sql(sql, str(db_path))
+                if not is_valid:
+                    validation_note = f"\n\n⚠️ Validation warning: {error}"
+
+        output = f"Generated SQL:\n\n{sql}{validation_note}"
+
+        return ToolResult(
+            success=True,
+            output=output,
+            metadata={
+                "sql": sql,
+                "parsed": {
+                    "table": parsed.get("table"),
+                    "query_type": parsed.get("query_type"),
+                    "has_conditions": bool(parsed.get("conditions")),
+                    "has_order": bool(parsed.get("order_by")),
+                    "has_limit": bool(parsed.get("limit")),
+                    "has_join": bool(parsed.get("join")),
+                },
+                "dialect": dialect,
+                "validated": validate and database is not None,
+            },
+        )
+
+
+class DbSeedTool(Tool):
+    """Generate realistic test data for database tables using Faker.
+
+    Automatically detects appropriate data generators based on column names.
+    """
+
+    name = "db_seed"
+    description = """Generate realistic test data for a database table using Faker.
+
+Examples:
+- db_seed(database="app.db", table="users", rows=100)
+- db_seed(database="app.db", table="orders", rows=50, seed=42)
+- db_seed(database="app.db", table="products", rows=20, clear_existing=true)
+
+Automatically detects data types from column names (email, name, phone, etc.)."""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "database": {
+                "type": "string",
+                "description": "Path to SQLite database file",
+            },
+            "table": {
+                "type": "string",
+                "description": "Table name to seed with data",
+            },
+            "rows": {
+                "type": "integer",
+                "description": "Number of rows to generate (default: 10, max: 10000)",
+            },
+            "seed": {
+                "type": "integer",
+                "description": "Random seed for reproducible data generation",
+            },
+            "locale": {
+                "type": "string",
+                "description": "Faker locale for localized data (default: en_US)",
+            },
+            "batch_size": {
+                "type": "integer",
+                "description": "Rows per INSERT batch (default: 100)",
+            },
+            "clear_existing": {
+                "type": "boolean",
+                "description": "Delete existing rows before seeding (default: false)",
+            },
+        },
+        "required": ["database", "table"],
+    }
+
+    # Default row limits
+    DEFAULT_ROWS = 10
+    MAX_ROWS = 10000
+    DEFAULT_BATCH_SIZE = 100
+
+    # Column name to Faker method mapping
+    COLUMN_FAKER_MAP = {
+        # Names
+        "name": "name",
+        "full_name": "name",
+        "first_name": "first_name",
+        "last_name": "last_name",
+        "username": "user_name",
+        "user_name": "user_name",
+        # Contact
+        "email": "email",
+        "phone": "phone_number",
+        "phone_number": "phone_number",
+        "mobile": "phone_number",
+        "address": "address",
+        "street": "street_address",
+        "city": "city",
+        "state": "state",
+        "country": "country",
+        "zip": "zipcode",
+        "zipcode": "zipcode",
+        "postal": "zipcode",
+        "postal_code": "zipcode",
+        # Dates
+        "created_at": "date_time",
+        "updated_at": "date_time",
+        "birth_date": "date_of_birth",
+        "birthday": "date_of_birth",
+        "date": "date",
+        "datetime": "date_time",
+        "timestamp": "date_time",
+        # Text content
+        "description": "text",
+        "content": "paragraph",
+        "body": "paragraph",
+        "title": "sentence",
+        "headline": "sentence",
+        "summary": "sentence",
+        "bio": "paragraph",
+        "about": "paragraph",
+        # Business
+        "company": "company",
+        "company_name": "company",
+        "job": "job",
+        "job_title": "job",
+        "position": "job",
+        "department": "bs",
+        # Money
+        "price": "pydecimal",
+        "amount": "pydecimal",
+        "cost": "pydecimal",
+        "total": "pydecimal",
+        "salary": "pydecimal",
+        # Identifiers
+        "uuid": "uuid4",
+        "guid": "uuid4",
+        "url": "url",
+        "website": "url",
+        "ip": "ipv4",
+        "ip_address": "ipv4",
+        # Product
+        "product": "word",
+        "product_name": "word",
+        "category": "word",
+        "color": "color_name",
+        "size": "word",
+        # Status
+        "status": "word",
+        "active": "boolean",
+        "enabled": "boolean",
+        "verified": "boolean",
+        "is_active": "boolean",
+    }
+
+    def _get_faker_method(
+        self, column_name: str, column_type: str, faker: "Faker"
+    ) -> callable:
+        """Get appropriate Faker method for a column.
+
+        Args:
+            column_name: Name of the column
+            column_type: SQLite column type
+            faker: Faker instance
+
+        Returns:
+            Callable that generates appropriate data
+        """
+        col_lower = column_name.lower()
+
+        # Check column name mapping first
+        if col_lower in self.COLUMN_FAKER_MAP:
+            method_name = self.COLUMN_FAKER_MAP[col_lower]
+            method = getattr(faker, method_name, None)
+            if method:
+                # Special handling for decimal types
+                if method_name == "pydecimal":
+                    return lambda: float(faker.pydecimal(min_value=1, max_value=1000, right_digits=2))
+                return method
+
+        # Check for partial matches
+        for pattern, method_name in self.COLUMN_FAKER_MAP.items():
+            if pattern in col_lower:
+                method = getattr(faker, method_name, None)
+                if method:
+                    if method_name == "pydecimal":
+                        return lambda: float(faker.pydecimal(min_value=1, max_value=1000, right_digits=2))
+                    return method
+
+        # Fall back to type-based generation
+        type_upper = column_type.upper() if column_type else "TEXT"
+
+        if "INT" in type_upper:
+            return lambda: faker.random_int(min=1, max=10000)
+        elif "REAL" in type_upper or "FLOAT" in type_upper or "DOUBLE" in type_upper:
+            return lambda: float(faker.pydecimal(min_value=1, max_value=1000, right_digits=2))
+        elif "BOOL" in type_upper:
+            return faker.boolean
+        elif "DATE" in type_upper or "TIME" in type_upper:
+            return faker.date_time
+        else:
+            # Default to text
+            return lambda: faker.sentence(nb_words=4)
+
+    def _get_table_info(self, conn: sqlite3.Connection, table: str) -> list[dict]:
+        """Get column information for a table.
+
+        Returns:
+            List of dicts with column info (name, type, nullable, pk, has_default)
+        """
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA table_info('{table}')")
+        columns = []
+        for row in cursor.fetchall():
+            columns.append({
+                "cid": row[0],
+                "name": row[1],
+                "type": row[2],
+                "not_null": bool(row[3]),
+                "default": row[4],
+                "pk": bool(row[5]),
+            })
+        return columns
+
+    def _get_foreign_keys(self, conn: sqlite3.Connection, table: str) -> dict:
+        """Get foreign key constraints for a table.
+
+        Returns:
+            Dict mapping column name to (ref_table, ref_column)
+        """
+        cursor = conn.cursor()
+        cursor.execute(f"PRAGMA foreign_key_list('{table}')")
+        fks = {}
+        for row in cursor.fetchall():
+            fks[row[3]] = (row[2], row[4])  # column -> (ref_table, ref_column)
+        return fks
+
+    def _get_valid_fk_values(
+        self, conn: sqlite3.Connection, ref_table: str, ref_column: str
+    ) -> list:
+        """Get valid values for a foreign key column."""
+        cursor = conn.cursor()
+        cursor.execute(f"SELECT {ref_column} FROM {ref_table}")
+        return [row[0] for row in cursor.fetchall()]
+
+    async def execute(
+        self,
+        database: str,
+        table: str,
+        rows: int = DEFAULT_ROWS,
+        seed: Optional[int] = None,
+        locale: str = "en_US",
+        batch_size: int = DEFAULT_BATCH_SIZE,
+        clear_existing: bool = False,
+        **kwargs,
+    ) -> ToolResult:
+        """Generate and insert test data.
+
+        Args:
+            database: Path to SQLite database file
+            table: Table name to seed
+            rows: Number of rows to generate
+            seed: Random seed for reproducibility
+            locale: Faker locale
+            batch_size: Rows per INSERT batch
+            clear_existing: Delete existing rows before seeding
+
+        Returns:
+            ToolResult with seeding results
+        """
+        if not FAKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Faker library not installed. Install with: pip install faker",
+                suggestion="Run: pip install faker>=24.0.0",
+            )
+
+        db_path = self._resolve_path(database)
+        if not db_path.exists():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Database not found: {db_path}",
+                metadata={"database": str(db_path)},
+            )
+
+        # Cap rows
+        rows = min(rows, self.MAX_ROWS)
+
+        log.info(
+            "db_seed",
+            database=str(db_path),
+            table=table,
+            rows=rows,
+            seed=seed,
+        )
+
+        def _seed_in_thread():
+            """Execute seeding in thread."""
+            # Import here to avoid issues if not installed
+            from faker import Faker as FakerClass
+
+            faker = FakerClass(locale)
+            if seed is not None:
+                FakerClass.seed(seed)
+
+            conn = sqlite3.connect(str(db_path))
+            try:
+                cursor = conn.cursor()
+
+                # Verify table exists
+                cursor.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (table,),
+                )
+                if not cursor.fetchone():
+                    return {"error": f"Table '{table}' not found in database"}
+
+                # Get table structure
+                columns = self._get_table_info(conn, table)
+                fks = self._get_foreign_keys(conn, table)
+
+                # Get valid FK values
+                fk_values = {}
+                for col, (ref_table, ref_col) in fks.items():
+                    values = self._get_valid_fk_values(conn, ref_table, ref_col)
+                    if values:
+                        fk_values[col] = values
+
+                # Filter out auto-increment primary keys
+                insertable_columns = [
+                    c for c in columns
+                    if not (c["pk"] and c["type"].upper() == "INTEGER")
+                ]
+
+                if not insertable_columns:
+                    return {"error": "No insertable columns found (all are auto-increment PKs)"}
+
+                # Clear existing data if requested
+                deleted = 0
+                if clear_existing:
+                    cursor.execute(f"DELETE FROM {table}")
+                    deleted = cursor.rowcount
+                    conn.commit()
+
+                # Generate data
+                col_names = [c["name"] for c in insertable_columns]
+                col_types = {c["name"]: c["type"] for c in insertable_columns}
+
+                # Get Faker methods for each column
+                faker_methods = {}
+                for col in insertable_columns:
+                    col_name = col["name"]
+                    if col_name in fks and col_name in fk_values:
+                        # Foreign key: select from valid values
+                        valid = fk_values[col_name]
+                        faker_methods[col_name] = lambda v=valid: faker.random_element(v)
+                    else:
+                        faker_methods[col_name] = self._get_faker_method(
+                            col_name, col_types[col_name], faker
+                        )
+
+                # Insert in batches
+                inserted = 0
+                placeholders = ", ".join(["?" for _ in col_names])
+                insert_sql = f"INSERT INTO {table} ({', '.join(col_names)}) VALUES ({placeholders})"
+
+                batch = []
+                for _ in range(rows):
+                    row_data = []
+                    for col_name in col_names:
+                        value = faker_methods[col_name]()
+                        # Convert special types
+                        if hasattr(value, "isoformat"):  # datetime
+                            value = value.isoformat()
+                        elif isinstance(value, bool):
+                            value = 1 if value else 0
+                        row_data.append(value)
+                    batch.append(tuple(row_data))
+
+                    if len(batch) >= batch_size:
+                        cursor.executemany(insert_sql, batch)
+                        inserted += len(batch)
+                        batch = []
+
+                # Insert remaining
+                if batch:
+                    cursor.executemany(insert_sql, batch)
+                    inserted += len(batch)
+
+                conn.commit()
+
+                # Get sample data
+                cursor.execute(f"SELECT * FROM {table} LIMIT 5")
+                sample_rows = cursor.fetchall()
+                sample_headers = [desc[0] for desc in cursor.description]
+
+                return {
+                    "inserted": inserted,
+                    "deleted": deleted,
+                    "columns": col_names,
+                    "sample_headers": sample_headers,
+                    "sample_rows": sample_rows,
+                }
+            finally:
+                conn.close()
+
+        try:
+            loop = asyncio.get_event_loop()
+            result = await loop.run_in_executor(None, _seed_in_thread)
+
+            if "error" in result:
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error=result["error"],
+                    metadata={"database": str(db_path), "table": table},
+                )
+
+            # Format output
+            lines = [f"✓ Seeded {result['inserted']} rows into '{table}'"]
+            if result["deleted"]:
+                lines.append(f"  (deleted {result['deleted']} existing rows)")
+            lines.append("")
+            lines.append("Columns seeded:")
+            for col in result["columns"]:
+                lines.append(f"  - {col}")
+            lines.append("")
+            lines.append("Sample data:")
+            lines.append(_format_table(result["sample_headers"], result["sample_rows"]))
+
+            return ToolResult(
+                success=True,
+                output="\n".join(lines),
+                metadata={
+                    "database": str(db_path),
+                    "table": table,
+                    "rows_inserted": result["inserted"],
+                    "rows_deleted": result["deleted"],
+                    "columns": result["columns"],
+                    "seed": seed,
+                },
+            )
+
+        except sqlite3.Error as e:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"SQLite error: {str(e)}",
+                metadata={"database": str(db_path), "table": table},
+            )
+        except Exception as e:
+            log.error("db_seed_error", error=str(e), database=str(db_path))
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Failed to seed database: {str(e)}",
+                metadata={"database": str(db_path), "table": table},
             )

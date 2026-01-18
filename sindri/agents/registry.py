@@ -244,6 +244,8 @@ AGENTS: dict[str, AgentDefinition] = {
             "execute_query",
             "describe_schema",
             "explain_query",
+            "sql_generate",
+            "db_seed",
             "shell",
         ],
         can_delegate=False,

@@ -656,7 +656,7 @@ Based on research, these specialized models outperform general-purpose models fo
 |----------|-------|--------|--------|
 | Image | image_resize, image_crop, image_convert, image_rotate, image_thumbnail, image_info | Medium | ✅ Complete |
 | Document | pdf_extract_text, pdf_to_markdown, pdf_merge, pdf_split, ocr_image, spreadsheet_read, spreadsheet_write | Medium | ✅ Complete |
-| Database | sql_explain_plan, sql_generate, db_seed | Medium | |
+| Database | sql_generate, db_seed | Medium | ✅ Complete |
 | Network | http_trace, dns_lookup, curl_generate, ssl_analyze, port_check, ping_host | Medium | ✅ Complete |
 
 **Tier 3 - High Value, Higher Complexity**

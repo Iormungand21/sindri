@@ -31,7 +31,13 @@ from sindri.tools.refactoring import (
     SplitFileTool,
     MergeFilesTool,
 )
-from sindri.tools.sql import ExecuteQueryTool, DescribeSchemaTool, ExplainQueryTool
+from sindri.tools.sql import (
+    ExecuteQueryTool,
+    DescribeSchemaTool,
+    ExplainQueryTool,
+    SqlGenerateTool,
+    DbSeedTool,
+)
 from sindri.tools.cicd import GenerateWorkflowTool, ValidateWorkflowTool
 from sindri.tools.dependency_scanner import (
     ScanDependenciesTool,
@@ -400,6 +406,8 @@ class ToolRegistry:
         registry.register(ExecuteQueryTool(work_dir=work_dir))
         registry.register(DescribeSchemaTool(work_dir=work_dir))
         registry.register(ExplainQueryTool(work_dir=work_dir))
+        registry.register(SqlGenerateTool(work_dir=work_dir))
+        registry.register(DbSeedTool(work_dir=work_dir))
         registry.register(GenerateWorkflowTool(work_dir=work_dir))
         registry.register(ValidateWorkflowTool(work_dir=work_dir))
         registry.register(ScanDependenciesTool(work_dir=work_dir))

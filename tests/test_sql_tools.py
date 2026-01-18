@@ -6,7 +6,13 @@ import tempfile
 import os
 from pathlib import Path
 
-from sindri.tools.sql import ExecuteQueryTool, DescribeSchemaTool, ExplainQueryTool
+from sindri.tools.sql import (
+    ExecuteQueryTool,
+    DescribeSchemaTool,
+    ExplainQueryTool,
+    SqlGenerateTool,
+    DbSeedTool,
+)
 
 
 # =============================================================================
@@ -754,3 +760,471 @@ async def test_execute_query_long_text(temp_db):
     assert result.success is True
     # Output should be truncated
     assert "..." in result.output or long_name[:50] in result.output
+
+
+# =============================================================================
+# SqlGenerateTool Tests
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_select_all():
+    """Test generating SELECT * query."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    result = await tool.execute(description="Get all users")
+
+    assert result.success is True
+    assert "SELECT" in result.output.upper()
+    assert "users" in result.output.lower()
+    assert result.metadata["sql"] is not None
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_select_all_with_database(temp_db):
+    """Test generating SELECT * query with database context."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    result = await tool.execute(description="Get all users", database=temp_db)
+
+    assert result.success is True
+    assert "SELECT" in result.output.upper()
+    assert "users" in result.output.lower()
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_count():
+    """Test generating COUNT query."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    result = await tool.execute(description="Count users")
+
+    assert result.success is True
+    assert "COUNT" in result.output.upper()
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_count_how_many():
+    """Test generating COUNT query with 'how many' phrasing."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    result = await tool.execute(description="How many orders are there")
+
+    assert result.success is True
+    assert "COUNT" in result.output.upper()
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_top_n():
+    """Test generating TOP N query."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    result = await tool.execute(description="Top 10 products by price")
+
+    assert result.success is True
+    assert "LIMIT" in result.output.upper()
+    assert "10" in result.output
+    assert "ORDER BY" in result.output.upper()
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_with_table_hint():
+    """Test generating query with explicit table hint."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    result = await tool.execute(description="Get all items", table="products")
+
+    assert result.success is True
+    assert "products" in result.output.lower()
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_validation(temp_db):
+    """Test SQL validation against schema."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    result = await tool.execute(
+        description="Get all users", database=temp_db, validate=True
+    )
+
+    assert result.success is True
+    assert result.metadata.get("validated") is True
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_group_by():
+    """Test generating GROUP BY query."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    result = await tool.execute(description="Count orders per customer")
+
+    assert result.success is True
+    assert "COUNT" in result.output.upper()
+    assert "GROUP BY" in result.output.upper()
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_schema():
+    """Test SqlGenerateTool schema format."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    schema = tool.get_schema()
+
+    assert schema["type"] == "function"
+    assert schema["function"]["name"] == "sql_generate"
+    assert "description" in schema["function"]["parameters"]["properties"]
+    assert "database" in schema["function"]["parameters"]["properties"]
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_returns_metadata():
+    """Test that sql_generate returns proper metadata."""
+    from sindri.tools.sql import SqlGenerateTool
+
+    tool = SqlGenerateTool()
+    result = await tool.execute(description="Get all users")
+
+    assert result.success is True
+    assert "sql" in result.metadata
+    assert "parsed" in result.metadata
+    assert "dialect" in result.metadata
+
+
+# =============================================================================
+# DbSeedTool Tests
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_db_seed_basic(temp_db):
+    """Test basic data seeding."""
+    from sindri.tools.sql import DbSeedTool
+
+    tool = DbSeedTool()
+    result = await tool.execute(database=temp_db, table="users", rows=5)
+
+    assert result.success is True
+    assert result.metadata.get("rows_inserted") == 5
+    assert "Seeded 5 rows" in result.output
+
+
+@pytest.mark.asyncio
+async def test_db_seed_with_count(temp_db):
+    """Test seeding with specific row count."""
+    from sindri.tools.sql import DbSeedTool
+
+    tool = DbSeedTool()
+    result = await tool.execute(database=temp_db, table="users", rows=20)
+
+    assert result.success is True
+    assert result.metadata.get("rows_inserted") == 20
+
+
+@pytest.mark.asyncio
+async def test_db_seed_reproducible_seed(temp_db):
+    """Test seeding with seed is reproducible."""
+    from sindri.tools.sql import DbSeedTool, ExecuteQueryTool
+
+    tool = DbSeedTool()
+    query_tool = ExecuteQueryTool()
+
+    # Seed with specific seed
+    await tool.execute(
+        database=temp_db,
+        table="users",
+        rows=3,
+        seed=42,
+        clear_existing=True,
+    )
+
+    # Query the data
+    data1 = await query_tool.execute(
+        database=temp_db,
+        query="SELECT name, email FROM users ORDER BY id LIMIT 3",
+    )
+
+    # Clear and reseed with same seed
+    await tool.execute(
+        database=temp_db,
+        table="users",
+        rows=3,
+        seed=42,
+        clear_existing=True,
+    )
+
+    data2 = await query_tool.execute(
+        database=temp_db,
+        query="SELECT name, email FROM users ORDER BY id LIMIT 3",
+    )
+
+    # Should be identical
+    assert data1.output == data2.output
+
+
+@pytest.mark.asyncio
+async def test_db_seed_different_seeds_different_data(temp_db):
+    """Test that different seeds produce different data."""
+    from sindri.tools.sql import DbSeedTool, ExecuteQueryTool
+
+    tool = DbSeedTool()
+    query_tool = ExecuteQueryTool()
+
+    # Seed with seed 1
+    await tool.execute(
+        database=temp_db, table="users", rows=3, seed=1, clear_existing=True
+    )
+    data1 = await query_tool.execute(
+        database=temp_db, query="SELECT name FROM users ORDER BY id"
+    )
+
+    # Seed with seed 2
+    await tool.execute(
+        database=temp_db, table="users", rows=3, seed=2, clear_existing=True
+    )
+    data2 = await query_tool.execute(
+        database=temp_db, query="SELECT name FROM users ORDER BY id"
+    )
+
+    # Should be different
+    assert data1.output != data2.output
+
+
+@pytest.mark.asyncio
+async def test_db_seed_clear_existing(temp_db):
+    """Test clearing existing data before seeding."""
+    from sindri.tools.sql import DbSeedTool, ExecuteQueryTool
+
+    tool = DbSeedTool()
+    query_tool = ExecuteQueryTool()
+
+    # Check initial count (should have 5 from fixture)
+    initial = await query_tool.execute(
+        database=temp_db, query="SELECT COUNT(*) as cnt FROM users"
+    )
+    assert "5" in initial.output
+
+    # Seed without clearing - should add
+    await tool.execute(database=temp_db, table="users", rows=3, clear_existing=False)
+    after_add = await query_tool.execute(
+        database=temp_db, query="SELECT COUNT(*) as cnt FROM users"
+    )
+    assert "8" in after_add.output  # 5 + 3
+
+    # Seed with clearing - should replace
+    result = await tool.execute(
+        database=temp_db, table="users", rows=2, clear_existing=True
+    )
+    after_clear = await query_tool.execute(
+        database=temp_db, query="SELECT COUNT(*) as cnt FROM users"
+    )
+    assert "2" in after_clear.output  # Only the 2 new ones
+    assert result.metadata.get("rows_deleted") == 8  # Deleted the 8
+
+
+@pytest.mark.asyncio
+async def test_db_seed_table_not_found(temp_db):
+    """Test error when table doesn't exist."""
+    from sindri.tools.sql import DbSeedTool
+
+    tool = DbSeedTool()
+    result = await tool.execute(database=temp_db, table="nonexistent_table", rows=5)
+
+    assert result.success is False
+    assert "not found" in result.error.lower()
+
+
+@pytest.mark.asyncio
+async def test_db_seed_database_not_found():
+    """Test error when database doesn't exist."""
+    from sindri.tools.sql import DbSeedTool
+
+    tool = DbSeedTool()
+    result = await tool.execute(database="/nonexistent/database.db", table="users", rows=5)
+
+    assert result.success is False
+    assert "Database not found" in result.error
+
+
+@pytest.mark.asyncio
+async def test_db_seed_max_rows_limit(empty_db):
+    """Test that rows are capped at MAX_ROWS."""
+    import sqlite3
+    from sindri.tools.sql import DbSeedTool
+
+    # Create a simple table with no uniqueness constraints
+    conn = sqlite3.connect(empty_db)
+    conn.execute(
+        """
+        CREATE TABLE items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            value REAL
+        )
+    """
+    )
+    conn.commit()
+    conn.close()
+
+    tool = DbSeedTool()
+    # Request more than MAX_ROWS (10000)
+    result = await tool.execute(database=empty_db, table="items", rows=20000)
+
+    assert result.success is True
+    # Should be capped at 10000
+    assert result.metadata.get("rows_inserted") == 10000
+
+
+@pytest.mark.asyncio
+async def test_db_seed_schema():
+    """Test DbSeedTool schema format."""
+    from sindri.tools.sql import DbSeedTool
+
+    tool = DbSeedTool()
+    schema = tool.get_schema()
+
+    assert schema["type"] == "function"
+    assert schema["function"]["name"] == "db_seed"
+    assert "database" in schema["function"]["parameters"]["properties"]
+    assert "table" in schema["function"]["parameters"]["properties"]
+    assert "rows" in schema["function"]["parameters"]["properties"]
+    assert "seed" in schema["function"]["parameters"]["properties"]
+
+
+@pytest.mark.asyncio
+async def test_db_seed_foreign_keys(temp_db):
+    """Test seeding table with foreign keys."""
+    from sindri.tools.sql import DbSeedTool, ExecuteQueryTool
+
+    tool = DbSeedTool()
+    query_tool = ExecuteQueryTool()
+
+    # Seed users first (table fixture already has 5)
+    # Now seed orders (has FK to users)
+    result = await tool.execute(database=temp_db, table="orders", rows=10)
+
+    assert result.success is True
+
+    # Verify FK integrity - all user_ids should exist in users
+    integrity = await query_tool.execute(
+        database=temp_db,
+        query="""
+            SELECT COUNT(*) FROM orders o
+            WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = o.user_id)
+        """,
+    )
+    assert "0" in integrity.output  # No orphaned records
+
+
+@pytest.mark.asyncio
+async def test_db_seed_shows_sample_data(temp_db):
+    """Test that seeding shows sample data in output."""
+    from sindri.tools.sql import DbSeedTool
+
+    tool = DbSeedTool()
+    result = await tool.execute(database=temp_db, table="users", rows=5, clear_existing=True)
+
+    assert result.success is True
+    assert "Sample data:" in result.output
+    assert "Columns seeded:" in result.output
+
+
+@pytest.mark.asyncio
+async def test_db_seed_metadata(temp_db):
+    """Test that db_seed returns proper metadata."""
+    from sindri.tools.sql import DbSeedTool
+
+    tool = DbSeedTool()
+    result = await tool.execute(
+        database=temp_db, table="users", rows=5, seed=123, clear_existing=True
+    )
+
+    assert result.success is True
+    assert "rows_inserted" in result.metadata
+    assert "rows_deleted" in result.metadata
+    assert "columns" in result.metadata
+    assert "seed" in result.metadata
+    assert result.metadata["seed"] == 123
+
+
+# =============================================================================
+# Integration Tests for New Tools
+# =============================================================================
+
+
+@pytest.mark.asyncio
+async def test_sql_generate_and_execute(temp_db):
+    """Test generating SQL and executing it."""
+    from sindri.tools.sql import SqlGenerateTool, ExecuteQueryTool
+
+    gen_tool = SqlGenerateTool()
+    exec_tool = ExecuteQueryTool()
+
+    # Generate SQL
+    gen_result = await gen_tool.execute(
+        description="Get all users", database=temp_db
+    )
+    assert gen_result.success is True
+
+    # Extract the SQL from metadata
+    sql = gen_result.metadata.get("sql")
+    assert sql is not None
+
+    # Execute the generated SQL
+    exec_result = await exec_tool.execute(database=temp_db, query=sql)
+    assert exec_result.success is True
+    # Should find the 5 users from fixture
+    assert exec_result.metadata.get("row_count") == 5
+
+
+@pytest.mark.asyncio
+async def test_seed_and_query(temp_db):
+    """Test seeding data and querying it."""
+    from sindri.tools.sql import DbSeedTool, ExecuteQueryTool
+
+    seed_tool = DbSeedTool()
+    query_tool = ExecuteQueryTool()
+
+    # Seed some data
+    seed_result = await seed_tool.execute(
+        database=temp_db, table="users", rows=10, clear_existing=True
+    )
+    assert seed_result.success is True
+
+    # Query the seeded data
+    query_result = await query_tool.execute(
+        database=temp_db, query="SELECT COUNT(*) as cnt FROM users"
+    )
+    assert query_result.success is True
+    assert "10" in query_result.output
+
+
+@pytest.mark.asyncio
+async def test_fenrir_has_new_sql_tools():
+    """Test that Fenrir agent has new SQL tools configured."""
+    from sindri.agents.registry import AGENTS
+
+    fenrir = AGENTS.get("fenrir")
+    assert fenrir is not None
+    assert "sql_generate" in fenrir.tools
+    assert "db_seed" in fenrir.tools
+
+
+@pytest.mark.asyncio
+async def test_new_tools_in_registry():
+    """Test that new SQL tools are properly registered."""
+    from sindri.tools.registry import ToolRegistry
+
+    registry = ToolRegistry.default()
+
+    # Check all SQL tools are registered
+    assert registry.get_tool("sql_generate") is not None
+    assert registry.get_tool("db_seed") is not None
