@@ -2863,6 +2863,287 @@ def collab_stats():
 
 
 # ============================================
+# Phase 10: Notification Commands
+# ============================================
+
+
+@cli.command("notifications")
+@click.option("--unread", "-u", is_flag=True, help="Show only unread notifications")
+@click.option("--all", "-a", "show_all", is_flag=True, help="Include archived notifications")
+@click.option(
+    "--type",
+    "-t",
+    "notif_type",
+    type=click.Choice(
+        ["mention", "comment", "team_invite", "team_joined", "session_shared"]
+    ),
+    help="Filter by notification type",
+)
+@click.option("--limit", "-n", default=20, help="Maximum notifications to show")
+@click.argument("user_id")
+def notifications(
+    user_id: str,
+    unread: bool = False,
+    show_all: bool = False,
+    notif_type: str = None,
+    limit: int = 20,
+):
+    """List notifications for a user.
+
+    USER_ID is the user identifier.
+
+    Examples:
+
+        sindri notifications user123
+
+        sindri notifications user123 --unread
+
+        sindri notifications user123 --type mention
+    """
+    from rich.table import Table
+    from sindri.collaboration import NotificationStore, NotificationType
+
+    async def list_notifications():
+        store = NotificationStore()
+
+        # Map type string to enum
+        type_filter = None
+        if notif_type:
+            type_map = {
+                "mention": NotificationType.MENTION,
+                "comment": NotificationType.COMMENT,
+                "team_invite": NotificationType.TEAM_INVITE,
+                "team_joined": NotificationType.TEAM_JOINED,
+                "session_shared": NotificationType.SESSION_SHARED,
+            }
+            type_filter = type_map.get(notif_type)
+
+        notifications = await store.get_user_notifications(
+            user_id=user_id,
+            unread_only=unread,
+            include_archived=show_all,
+            notification_type=type_filter,
+            limit=limit,
+        )
+
+        if not notifications:
+            console.print(f"[yellow]No notifications found for {user_id}[/]")
+            return
+
+        # Get unread count
+        unread_count = await store.get_unread_count(user_id)
+
+        table = Table(title=f"Notifications for {user_id} ({unread_count} unread)")
+        table.add_column("ID", width=8)
+        table.add_column("", width=2)  # Read indicator
+        table.add_column("Type", width=12)
+        table.add_column("Title", width=30)
+        table.add_column("Time", width=16)
+
+        type_icons = {
+            "mention": "@",
+            "comment": "\U0001F4AC",
+            "comment_reply": "\U0001F5E8",
+            "team_invite": "\U0001F465",
+            "team_joined": "\U0001F44B",
+            "team_left": "\U0001F6AA",
+            "team_role_changed": "\U0001F451",
+            "session_shared": "\U0001F4E4",
+            "session_activity": "\u26A1",
+        }
+
+        for n in notifications:
+            read_mark = " " if n.is_read else "\U0001F534"
+            icon = type_icons.get(n.type.value, "\U0001F514")
+            time_str = n.created_at.strftime("%Y-%m-%d %H:%M")
+            style = "dim" if n.is_read else ""
+
+            table.add_row(
+                n.id[:8],
+                read_mark,
+                f"{icon} {n.type.value}",
+                n.title[:30],
+                time_str,
+                style=style,
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Use 'sindri notification-read <id>' to mark as read[/dim]")
+
+    asyncio.run(list_notifications())
+
+
+@cli.command("notification-read")
+@click.argument("notification_id")
+def notification_read(notification_id: str):
+    """Mark a notification as read.
+
+    NOTIFICATION_ID is the full ID or first 8 characters.
+
+    Example:
+        sindri notification-read abc12345
+    """
+    from sindri.collaboration import NotificationStore
+
+    async def mark_read():
+        store = NotificationStore()
+
+        # Try to find the notification by prefix
+        success = await store.mark_read(notification_id)
+
+        if success:
+            console.print(f"[green]\u2713 Notification marked as read[/green]")
+        else:
+            console.print(f"[yellow]\u26A0 Notification not found or already read[/]")
+
+    asyncio.run(mark_read())
+
+
+@cli.command("notification-read-all")
+@click.argument("user_id")
+def notification_read_all(user_id: str):
+    """Mark all notifications as read for a user.
+
+    USER_ID is the user identifier.
+
+    Example:
+        sindri notification-read-all user123
+    """
+    from sindri.collaboration import NotificationStore
+
+    async def mark_all():
+        store = NotificationStore()
+        count = await store.mark_all_read(user_id)
+        console.print(f"[green]\u2713 Marked {count} notifications as read[/green]")
+
+    asyncio.run(mark_all())
+
+
+@cli.command("notification-prefs")
+@click.argument("user_id")
+@click.option("--enabled/--disabled", default=None, help="Enable/disable all notifications")
+@click.option("--mentions/--no-mentions", default=None, help="Enable/disable mention notifications")
+@click.option("--comments/--no-comments", default=None, help="Enable/disable comment notifications")
+@click.option("--teams/--no-teams", default=None, help="Enable/disable team notifications")
+@click.option("--sessions/--no-sessions", default=None, help="Enable/disable session notifications")
+@click.option("--quiet-start", type=int, help="Quiet hours start (0-23)")
+@click.option("--quiet-end", type=int, help="Quiet hours end (0-23)")
+def notification_prefs(
+    user_id: str,
+    enabled: bool = None,
+    mentions: bool = None,
+    comments: bool = None,
+    teams: bool = None,
+    sessions: bool = None,
+    quiet_start: int = None,
+    quiet_end: int = None,
+):
+    """View or update notification preferences for a user.
+
+    USER_ID is the user identifier.
+
+    With no options, shows current preferences.
+    With options, updates the specified settings.
+
+    Examples:
+
+        sindri notification-prefs user123
+
+        sindri notification-prefs user123 --no-mentions
+
+        sindri notification-prefs user123 --quiet-start 22 --quiet-end 7
+    """
+    from sindri.collaboration import NotificationStore
+
+    async def manage_prefs():
+        store = NotificationStore()
+
+        # Check if any update flags provided
+        has_updates = any(
+            x is not None
+            for x in [enabled, mentions, comments, teams, sessions, quiet_start, quiet_end]
+        )
+
+        if has_updates:
+            # Update preferences
+            prefs = await store.update_preferences(
+                user_id=user_id,
+                enabled=enabled,
+                mention_enabled=mentions,
+                comment_enabled=comments,
+                team_enabled=teams,
+                session_enabled=sessions,
+                quiet_hours_start=quiet_start,
+                quiet_hours_end=quiet_end,
+            )
+            console.print("[green]\u2713 Preferences updated[/green]\n")
+        else:
+            prefs = await store.get_preferences(user_id)
+
+        # Display current preferences
+        console.print(f"[bold]Notification Preferences for {user_id}[/bold]\n")
+
+        status = "[green]Enabled[/green]" if prefs.enabled else "[red]Disabled[/red]"
+        console.print(f"  Global: {status}")
+
+        console.print("\n  [bold]Notification Types:[/bold]")
+        console.print(f"    Mentions: {'[green]\u2713[/green]' if prefs.mention_enabled else '[red]\u2717[/red]'}")
+        console.print(f"    Comments: {'[green]\u2713[/green]' if prefs.comment_enabled else '[red]\u2717[/red]'}")
+        console.print(f"    Team events: {'[green]\u2713[/green]' if prefs.team_enabled else '[red]\u2717[/red]'}")
+        console.print(f"    Session events: {'[green]\u2713[/green]' if prefs.session_enabled else '[red]\u2717[/red]'}")
+
+        console.print("\n  [bold]Quiet Hours:[/bold]")
+        if prefs.quiet_hours_start is not None and prefs.quiet_hours_end is not None:
+            console.print(f"    {prefs.quiet_hours_start:02d}:00 - {prefs.quiet_hours_end:02d}:00")
+        else:
+            console.print("    Not configured")
+
+    asyncio.run(manage_prefs())
+
+
+@cli.command("notification-stats")
+@click.option("--user", "-u", help="Show stats for specific user")
+def notification_stats(user: str = None):
+    """Show notification statistics.
+
+    Examples:
+
+        sindri notification-stats
+
+        sindri notification-stats --user user123
+    """
+    from sindri.collaboration import NotificationStore
+
+    async def show_stats():
+        store = NotificationStore()
+
+        stats = await store.get_statistics(user)
+
+        if user:
+            console.print(f"[bold]\U0001F514 Notification Statistics for {user}[/bold]\n")
+        else:
+            console.print("[bold]\U0001F514 Global Notification Statistics[/bold]\n")
+
+        console.print(f"  Total notifications: {stats['total']}")
+        console.print(f"  Unread: {stats['unread']}")
+        console.print(f"  Read: {stats['read']}")
+        console.print(f"  Archived: {stats['archived']}")
+
+        if not user and "users_with_notifications" in stats:
+            console.print(f"  Users with notifications: {stats['users_with_notifications']}")
+
+        if user:
+            # Also show type breakdown for user
+            type_counts = await store.get_type_counts(user)
+            if type_counts:
+                console.print("\n  [bold]By Type:[/bold]")
+                for notif_type, count in type_counts.items():
+                    console.print(f"    {notif_type}: {count}")
+
+    asyncio.run(show_stats())
+
+
+# ============================================
 # Phase 9.3: Voice Interface Commands
 # ============================================
 

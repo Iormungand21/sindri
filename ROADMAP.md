@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 48 tools, 1955 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 11 agents, 48 tools, 2011 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 1955 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2011 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -75,7 +75,12 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - Dependency Scanner: pip-audit, npm audit, cargo audit, govulncheck, SBOM
 - Team Mode: user accounts, team management, role-based permissions
 
-**Total:** 1955 backend tests + 104 frontend tests (100% passing)
+### Phase 10: Advanced Team Collaboration (In Progress)
+- Notification System: mentions, comments, team invites, session activity
+- User notification preferences with quiet hours
+- CLI commands for notification management
+
+**Total:** 2011 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -155,6 +160,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Notification System (mentions, comments, team invites, preferences) | +56 |
 | 2026-01-17 | Team Mode (user accounts, teams, role-based permissions) | +84 |
 | 2026-01-17 | Fine-Tuning Pipeline (curation, registry, training, evaluation) | +72 |
 | 2026-01-17 | IDE Integration (JSON-RPC server, Neovim plugin) | +56 |

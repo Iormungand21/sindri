@@ -7,6 +7,7 @@ This module provides infrastructure for:
 - Collaborative session viewing
 - User management (Team Mode)
 - Team-based collaboration with roles (Team Mode)
+- Notification system for team collaboration
 """
 
 from sindri.collaboration.sharing import (
@@ -35,6 +36,17 @@ from sindri.collaboration.teams import (
     TeamSession,
     TeamStore,
 )
+from sindri.collaboration.notifications import (
+    Notification,
+    NotificationType,
+    NotificationPriority,
+    NotificationPreferences,
+    NotificationStore,
+    notify_mention,
+    notify_comment,
+    notify_team_invite,
+    notify_session_shared,
+)
 
 __all__ = [
     # Sharing
@@ -58,4 +70,14 @@ __all__ = [
     "TeamMembership",
     "TeamSession",
     "TeamStore",
+    # Notifications
+    "Notification",
+    "NotificationType",
+    "NotificationPriority",
+    "NotificationPreferences",
+    "NotificationStore",
+    "notify_mention",
+    "notify_comment",
+    "notify_team_invite",
+    "notify_session_shared",
 ]

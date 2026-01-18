@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode
-**Test Status:** 1955 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 10 Features (Advanced Team Collaboration)
+**Current State:** Production Ready with Team Mode and Notifications
+**Test Status:** 2011 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 10 Features (Advanced Team Collaboration - continued)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 1955 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2011 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -29,6 +29,10 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri finetune train            # Start model fine-tuning
 .venv/bin/sindri finetune models           # List fine-tuned models
 
+# Notifications
+.venv/bin/sindri notifications user123     # View notifications
+.venv/bin/sindri notification-prefs user123  # View/update preferences
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -37,6 +41,61 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Notification System (2026-01-17)
+
+Added comprehensive notification system for team collaboration:
+
+**Notification Types (`sindri/collaboration/notifications.py`):**
+- **MENTION**: User was @mentioned in a comment
+- **COMMENT**: New comment on user's session
+- **COMMENT_REPLY**: Reply to user's comment
+- **TEAM_INVITE**: Invited to join a team
+- **TEAM_JOINED**: Someone joined user's team
+- **TEAM_LEFT**: Someone left user's team
+- **TEAM_ROLE_CHANGED**: User's role in team changed
+- **SESSION_SHARED**: Session was shared with user
+- **SESSION_ACTIVITY**: Activity on followed session
+
+**Notification Features:**
+- Priority levels: low, normal, high, urgent
+- Read/unread status tracking with timestamps
+- Archive functionality for old notifications
+- Automatic cleanup of old read notifications
+- Source tracking (user, team, session, comment IDs)
+
+**User Preferences:**
+- Global enable/disable for all notifications
+- Per-type notification control (mentions, comments, team events, session events)
+- Quiet hours configuration (e.g., 22:00 - 07:00)
+- Quiet hours can span midnight
+
+**Convenience Functions:**
+- `notify_mention()` - Create mention notification
+- `notify_comment()` - Create comment notification
+- `notify_team_invite()` - Create team invite notification
+- `notify_session_shared()` - Create session shared notification
+
+**CLI Commands:**
+- `sindri notifications <user_id>` - List notifications
+- `sindri notifications <user_id> --unread` - Show only unread
+- `sindri notifications <user_id> --type mention` - Filter by type
+- `sindri notification-read <id>` - Mark notification as read
+- `sindri notification-read-all <user_id>` - Mark all as read
+- `sindri notification-prefs <user_id>` - View preferences
+- `sindri notification-prefs <user_id> --no-mentions` - Update preferences
+- `sindri notification-prefs <user_id> --quiet-start 22 --quiet-end 7` - Set quiet hours
+- `sindri notification-stats` - Global statistics
+- `sindri notification-stats --user <user_id>` - User statistics
+
+**Files:**
+- `sindri/collaboration/notifications.py` - Notification system
+- Updated `sindri/collaboration/__init__.py` - Module exports
+- Updated `sindri/cli.py` - CLI commands
+
+**Tests:** 56 new tests (total: 2011 backend tests)
+
+---
 
 ### Team Mode (2026-01-17)
 
