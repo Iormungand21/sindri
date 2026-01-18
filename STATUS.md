@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, and Image Manipulation Tools
-**Test Status:** 2799 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, and Document Processing Tools
+**Test Status:** 2841 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 2 continues
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2799 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2841 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 16 agents
@@ -115,6 +115,16 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri image thumbnail photo.jpg --size 128             # Create thumbnail
 .venv/bin/sindri image info photo.jpg                             # Get image info
 
+# Document Processing
+.venv/bin/sindri doc extract document.pdf                         # Extract text from PDF
+.venv/bin/sindri doc extract scanned.pdf --ocr                    # OCR scanned PDFs
+.venv/bin/sindri doc to-markdown document.pdf -o output.md        # PDF to Markdown
+.venv/bin/sindri doc merge -o combined.pdf file1.pdf file2.pdf    # Merge PDFs
+.venv/bin/sindri doc split book.pdf --single-pages                # Split PDF into pages
+.venv/bin/sindri doc ocr scan.png -o text.txt                     # OCR image to text
+.venv/bin/sindri doc read data.csv -n 100 -f json                 # Read spreadsheet
+.venv/bin/sindri doc write output.xlsx -d '[{"col": "val"}]'      # Write spreadsheet
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -123,6 +133,37 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Document Processing Tools (2026-01-18) - Phase 12 Tier 2
+
+Added comprehensive document processing tools for PDFs, spreadsheets, and OCR:
+
+**New Tools (7 total):**
+- `pdf_extract_text` - Extract text from PDFs (with optional OCR for scanned documents)
+- `pdf_to_markdown` - Convert PDF to clean Markdown preserving structure
+- `pdf_merge` - Merge multiple PDF files into one
+- `pdf_split` - Split PDF by page ranges or into single pages
+- `ocr_image` - Extract text from images using Tesseract OCR
+- `spreadsheet_read` - Read CSV/Excel files with filtering and limiting
+- `spreadsheet_write` - Write data to CSV/Excel files
+
+**CLI Commands:**
+- `sindri doc extract <file>` - Extract text from PDF
+- `sindri doc to-markdown <file>` - Convert PDF to Markdown
+- `sindri doc merge -o <out> <files...>` - Merge PDFs
+- `sindri doc split <file>` - Split PDF
+- `sindri doc ocr <file>` - OCR image to text
+- `sindri doc read <file>` - Read spreadsheet
+- `sindri doc write <file>` - Write spreadsheet
+
+**Dependencies:**
+- PyMuPDF (fitz) for PDF operations
+- pandas + openpyxl for spreadsheet handling
+- pytesseract (optional) for OCR
+
+**Tests:** +42 new tests (2841 total)
+
+---
 
 ### Image Manipulation Tools (2026-01-18) - Phase 12 Tier 2
 

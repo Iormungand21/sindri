@@ -8392,5 +8392,287 @@ def image_info(input_file: str):
     asyncio.run(run())
 
 
+# =============================================================================
+# Document Processing Commands
+# =============================================================================
+
+
+@cli.group()
+def doc():
+    """Document processing commands - PDFs, spreadsheets, and OCR.
+
+    Extract text from PDFs, convert to Markdown, merge/split PDFs,
+    perform OCR on images, and read/write spreadsheet files.
+    """
+    pass
+
+
+@doc.command("extract")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("-o", "--output", help="Output file path for extracted text")
+@click.option("--start-page", type=int, default=1, help="Starting page (1-indexed)")
+@click.option("--end-page", type=int, help="Ending page (1-indexed)")
+@click.option("--ocr", is_flag=True, help="Use OCR for scanned documents")
+@click.option("--ocr-lang", default="eng", help="OCR language code (default: eng)")
+def doc_extract(input_file: str, output: str, start_page: int, end_page: int, ocr: bool, ocr_lang: str):
+    """Extract text from a PDF file.
+
+    Examples:
+
+        sindri doc extract document.pdf
+
+        sindri doc extract scanned.pdf --ocr
+
+        sindri doc extract book.pdf --start-page 10 --end-page 20 -o chapter.txt
+    """
+    from sindri.tools.documents import PdfExtractTextTool
+
+    async def run():
+        tool = PdfExtractTextTool()
+        result = await tool.execute(
+            input=input_file,
+            output=output,
+            start_page=start_page,
+            end_page=end_page,
+            use_ocr=ocr,
+            ocr_language=ocr_lang,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@doc.command("to-markdown")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("-o", "--output", help="Output Markdown file path")
+@click.option("--start-page", type=int, default=1, help="Starting page (1-indexed)")
+@click.option("--end-page", type=int, help="Ending page (1-indexed)")
+@click.option("--images/--no-images", default=False, help="Include images")
+def doc_to_markdown(input_file: str, output: str, start_page: int, end_page: int, images: bool):
+    """Convert a PDF file to Markdown format.
+
+    Attempts to preserve document structure including headers, paragraphs, and lists.
+
+    Examples:
+
+        sindri doc to-markdown document.pdf
+
+        sindri doc to-markdown paper.pdf -o paper.md
+
+        sindri doc to-markdown book.pdf --start-page 1 --end-page 50
+    """
+    from sindri.tools.documents import PdfToMarkdownTool
+
+    async def run():
+        tool = PdfToMarkdownTool()
+        result = await tool.execute(
+            input=input_file,
+            output=output,
+            start_page=start_page,
+            end_page=end_page,
+            include_images=images,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@doc.command("merge")
+@click.option("-o", "--output", required=True, help="Output PDF file path")
+@click.argument("files", nargs=-1, required=True, type=click.Path(exists=True))
+def doc_merge(output: str, files: tuple):
+    """Merge multiple PDF files into one.
+
+    Files are merged in the order provided.
+
+    Examples:
+
+        sindri doc merge -o combined.pdf file1.pdf file2.pdf file3.pdf
+
+        sindri doc merge -o book.pdf chapter*.pdf
+    """
+    from sindri.tools.documents import PdfMergeTool
+
+    if len(files) < 2:
+        console.print("[red]Error: At least 2 PDF files are required for merging[/red]")
+        return
+
+    async def run():
+        tool = PdfMergeTool()
+        result = await tool.execute(
+            output=output,
+            inputs=list(files),
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@doc.command("split")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("-o", "--output", help="Output file path (for single range)")
+@click.option("-d", "--output-dir", help="Output directory for split files")
+@click.option("--start-page", type=int, help="Starting page (1-indexed)")
+@click.option("--end-page", type=int, help="Ending page (1-indexed)")
+@click.option("--ranges", help="Comma-separated page ranges (e.g., '1-5,6-10')")
+@click.option("--single-pages", is_flag=True, help="Split into individual pages")
+def doc_split(input_file: str, output: str, output_dir: str, start_page: int, end_page: int, ranges: str, single_pages: bool):
+    """Split a PDF file by page ranges.
+
+    Examples:
+
+        sindri doc split document.pdf --single-pages
+
+        sindri doc split book.pdf --start-page 1 --end-page 10 -o chapter1.pdf
+
+        sindri doc split book.pdf --ranges "1-10,11-20,21-30" -d ./chapters/
+    """
+    from sindri.tools.documents import PdfSplitTool
+
+    async def run():
+        tool = PdfSplitTool()
+        result = await tool.execute(
+            input=input_file,
+            output=output,
+            output_dir=output_dir,
+            start_page=start_page,
+            end_page=end_page,
+            ranges=ranges,
+            single_pages=single_pages,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@doc.command("ocr")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("-o", "--output", help="Output file path for extracted text")
+@click.option("-l", "--language", default="eng", help="OCR language code (default: eng)")
+@click.option("--config", default="", help="Additional tesseract config options")
+def doc_ocr(input_file: str, output: str, language: str, config: str):
+    """Extract text from an image using OCR.
+
+    Requires tesseract-ocr to be installed on the system.
+
+    Examples:
+
+        sindri doc ocr scan.png
+
+        sindri doc ocr document.jpg -o extracted.txt
+
+        sindri doc ocr german.png -l deu
+    """
+    from sindri.tools.documents import OcrImageTool
+
+    async def run():
+        tool = OcrImageTool()
+        result = await tool.execute(
+            input=input_file,
+            output=output,
+            language=language,
+            config=config,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@doc.command("read")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("-s", "--sheet", help="Sheet name for Excel files")
+@click.option("-c", "--columns", multiple=True, help="Columns to include")
+@click.option("-n", "--limit", type=int, help="Maximum number of rows")
+@click.option("--skip", type=int, default=0, help="Number of rows to skip")
+@click.option("-f", "--format", "output_format", type=click.Choice(["table", "json", "csv"]), default="table", help="Output format")
+def doc_read(input_file: str, sheet: str, columns: tuple, limit: int, skip: int, output_format: str):
+    """Read data from a spreadsheet file (CSV, Excel).
+
+    Examples:
+
+        sindri doc read data.csv
+
+        sindri doc read report.xlsx -s "Sales"
+
+        sindri doc read large.csv -n 100 -f json
+
+        sindri doc read data.xlsx -c name -c email -c phone
+    """
+    from sindri.tools.documents import SpreadsheetReadTool
+
+    async def run():
+        tool = SpreadsheetReadTool()
+        result = await tool.execute(
+            input=input_file,
+            sheet=sheet,
+            columns=list(columns) if columns else None,
+            limit=limit,
+            skip_rows=skip,
+            output_format=output_format,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@doc.command("write")
+@click.argument("output_file", type=click.Path())
+@click.option("-d", "--data", required=True, help="JSON data to write")
+@click.option("-s", "--sheet", default="Sheet1", help="Sheet name for Excel files")
+@click.option("--index/--no-index", default=False, help="Include row index")
+def doc_write(output_file: str, data: str, sheet: str, index: bool):
+    """Write data to a spreadsheet file (CSV, Excel).
+
+    Data should be provided as a JSON array of objects.
+
+    Examples:
+
+        sindri doc write output.csv -d '[{"name": "John", "age": 30}]'
+
+        sindri doc write report.xlsx -d '[{"col1": 1, "col2": 2}]' -s "Data"
+    """
+    from sindri.tools.documents import SpreadsheetWriteTool
+
+    async def run():
+        tool = SpreadsheetWriteTool()
+        result = await tool.execute(
+            output=output_file,
+            data=data,
+            sheet=sheet,
+            include_index=index,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()

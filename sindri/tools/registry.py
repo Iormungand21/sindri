@@ -136,6 +136,15 @@ from sindri.tools.images import (
     ImageThumbnailTool,
     ImageInfoTool,
 )
+from sindri.tools.documents import (
+    PdfExtractTextTool,
+    PdfToMarkdownTool,
+    PdfMergeTool,
+    PdfSplitTool,
+    OcrImageTool,
+    SpreadsheetReadTool,
+    SpreadsheetWriteTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -473,4 +482,12 @@ class ToolRegistry:
         registry.register(ImageRotateTool(work_dir=work_dir))
         registry.register(ImageThumbnailTool(work_dir=work_dir))
         registry.register(ImageInfoTool(work_dir=work_dir))
+        # Document processing tools
+        registry.register(PdfExtractTextTool(work_dir=work_dir))
+        registry.register(PdfToMarkdownTool(work_dir=work_dir))
+        registry.register(PdfMergeTool(work_dir=work_dir))
+        registry.register(PdfSplitTool(work_dir=work_dir))
+        registry.register(OcrImageTool(work_dir=work_dir))
+        registry.register(SpreadsheetReadTool(work_dir=work_dir))
+        registry.register(SpreadsheetWriteTool(work_dir=work_dir))
         return registry
