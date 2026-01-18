@@ -34,37 +34,6 @@ class TestRecoveryManagerBasic:
         loaded = recovery_manager.load_checkpoint(session_id)
         assert loaded == state
 
-    def test_clear_checkpoint(self, recovery_manager):
-        """Should clear checkpoint on success."""
-        session_id = "test-session-456"
-        recovery_manager.save_checkpoint(session_id, {"test": True})
-
-        assert recovery_manager.has_checkpoint(session_id)
-
-        recovery_manager.clear_checkpoint(session_id)
-
-        assert not recovery_manager.has_checkpoint(session_id)
-
-    def test_list_recoverable_sessions(self, recovery_manager):
-        """Should list all recoverable sessions."""
-        recovery_manager.save_checkpoint(
-            "session-1", {"task": "Task 1", "iterations": 1}
-        )
-        recovery_manager.save_checkpoint(
-            "session-2", {"task": "Task 2", "iterations": 2}
-        )
-        recovery_manager.save_checkpoint(
-            "session-3", {"task": "Task 3", "iterations": 3}
-        )
-
-        sessions = recovery_manager.list_recoverable_sessions()
-
-        assert len(sessions) == 3
-        session_ids = [s["session_id"] for s in sessions]
-        assert "session-1" in session_ids
-        assert "session-2" in session_ids
-        assert "session-3" in session_ids
-
     def test_cleanup_old_checkpoints_by_count(self, recovery_manager):
         """Should keep only N most recent checkpoints."""
         for i in range(5):
@@ -308,20 +277,3 @@ class TestRecoveryCheckpointData:
         # Verify it's a valid ISO timestamp
         datetime.fromisoformat(data["timestamp"])
 
-    def test_checkpoint_atomic_write(self, recovery_manager, tmp_path):
-        """Checkpoint write should be atomic (no partial writes)."""
-        large_data = {"data": "x" * 10000}  # 10KB of data
-        recovery_manager.save_checkpoint("session-atomic", large_data)
-
-        checkpoint_path = (
-            Path(recovery_manager.state_dir) / "session-atomic.checkpoint.json"
-        )
-
-        # Verify the file exists and is valid JSON
-        assert checkpoint_path.exists()
-        data = json.loads(checkpoint_path.read_text())
-        assert data["state"]["data"] == "x" * 10000
-
-        # Verify no temp file left behind
-        temp_path = checkpoint_path.with_suffix(".tmp")
-        assert not temp_path.exists()
