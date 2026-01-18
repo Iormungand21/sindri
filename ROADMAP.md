@@ -661,12 +661,12 @@ Based on research, these specialized models outperform general-purpose models fo
 
 **Tier 3 - High Value, Higher Complexity**
 
-| Category | Tools | Effort |
-|----------|-------|--------|
-| Video/Audio | video_transcribe, video_generate_subtitles | Medium |
-| Profiling | profile_python, flame_graph | Medium |
-| Browser | browser_navigate, browser_screenshot | High |
-| Cloud | aws_s3_*, docker_*, k8s_* | High |
+| Category | Tools | Effort | Status |
+|----------|-------|--------|--------|
+| Video/Audio | audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles | Medium | ✅ Complete |
+| Profiling | profile_python, flame_graph | Medium | |
+| Browser | browser_navigate, browser_screenshot | High | |
+| Cloud | aws_s3_*, docker_*, k8s_* | High | |
 
 ---
 
@@ -732,6 +732,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-18 | Video/Audio Processing Tools (audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles) | +50 |
 | 2026-01-18 | Network & HTTP Diagnostic Tools (http_trace, dns_lookup, curl_generate, ssl_analyze, port_check, ping_host) | +53 |
 | 2026-01-18 | Document Processing Tools (pdf_extract_text, pdf_to_markdown, pdf_merge, pdf_split, ocr_image, spreadsheet_read, spreadsheet_write) | +42 |
 | 2026-01-18 | Image Manipulation Tools (image_resize, image_crop, image_convert, image_rotate, image_thumbnail, image_info) | +48 |
@@ -789,6 +790,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-18
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Tier 1 Complete + Image, Document & Network Tools (Tier 2 progress) - 1/8 agents, 44/~100 tools
+**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio Tools (Tier 3 started) - 1/8 agents, 55/~100 tools
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
 **Maintained By:** Project contributors

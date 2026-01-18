@@ -159,6 +159,19 @@ from sindri.tools.network import (
     PortCheckTool,
     PingHostTool,
 )
+from sindri.tools.media import (
+    AudioTranscribeTool,
+    VideoExtractAudioTool,
+    VideoTranscribeTool,
+    VideoGenerateSubtitlesTool,
+    AudioConvertTool,
+    VideoConvertTool,
+    VideoTrimTool,
+    VideoThumbnailTool,
+    VideoConcatTool,
+    TtsGenerateTool,
+    VideoAddSubtitlesTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -513,4 +526,16 @@ class ToolRegistry:
         registry.register(SslAnalyzeTool(work_dir=work_dir))
         registry.register(PortCheckTool(work_dir=work_dir))
         registry.register(PingHostTool(work_dir=work_dir))
+        # Video and audio processing tools
+        registry.register(AudioTranscribeTool(work_dir=work_dir))
+        registry.register(VideoExtractAudioTool(work_dir=work_dir))
+        registry.register(VideoTranscribeTool(work_dir=work_dir))
+        registry.register(VideoGenerateSubtitlesTool(work_dir=work_dir))
+        registry.register(AudioConvertTool(work_dir=work_dir))
+        registry.register(VideoConvertTool(work_dir=work_dir))
+        registry.register(VideoTrimTool(work_dir=work_dir))
+        registry.register(VideoThumbnailTool(work_dir=work_dir))
+        registry.register(VideoConcatTool(work_dir=work_dir))
+        registry.register(TtsGenerateTool(work_dir=work_dir))
+        registry.register(VideoAddSubtitlesTool(work_dir=work_dir))
         return registry

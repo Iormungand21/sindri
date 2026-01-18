@@ -39,6 +39,7 @@ ast = [
     "tree-sitter-rust>=0.24.0",
     "tree-sitter-go>=0.25.0",
 ]
+media = ["ffmpeg-python>=0.2.0"]
 
 [project.scripts]
 sindri = "sindri.cli:cli"

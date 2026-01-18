@@ -6,9 +6,9 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, Network/HTTP Diagnostic Tools, and Database Tools (sql_generate, db_seed)
-**Test Status:** 2920 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 3 (Video/Audio Profiling, Browser, Cloud Tools)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, Network/HTTP Diagnostic Tools, Database Tools, and Video/Audio Processing Tools
+**Test Status:** 2970+ backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 3 Remaining (Profiling, Browser, Cloud Tools)
 
 ### Try It Out
 ```bash
@@ -133,6 +133,44 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Video/Audio Processing Tools (2026-01-18) - Phase 12 Tier 3
+
+Added comprehensive video and audio processing tools using FFmpeg and Whisper:
+
+**New Tools (11 total):**
+- `audio_transcribe` - Transcribe audio files to text using Whisper (tiny/base/small/medium/large)
+- `video_transcribe` - Extract and transcribe speech from video files
+- `video_generate_subtitles` - Generate SRT/VTT subtitle files from audio/video
+- `video_extract_audio` - Extract audio track from video (mp3/wav/flac/aac/ogg)
+- `audio_convert` - Convert between audio formats with bitrate control
+- `video_convert` - Convert between video formats (mp4/mkv/webm/avi/mov) with CRF quality
+- `video_trim` - Cut video to time range (supports HH:MM:SS and seconds)
+- `video_thumbnail` - Generate thumbnail image at specific timestamp
+- `video_concat` - Join multiple videos into one
+- `tts_generate` - Text-to-speech synthesis with voice control
+- `video_add_subtitles` - Burn subtitles into video (hardcoded)
+
+**Agent Assignment:**
+- **Ratatoskr** (fast executor) has access to all 11 media tools
+
+**Dependencies:**
+- FFmpeg binary (system) - Required for video/audio processing
+- ffmpeg-python>=0.2.0 (optional, in media extras)
+- faster-whisper>=1.0.0 (existing voice extras, for transcription)
+- pyttsx3>=2.90 (existing voice extras, for TTS)
+
+**Files:**
+- `sindri/tools/media.py` - All media tool implementations
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Added tools to Ratatoskr
+- `sindri/agents/prompts.py` - Updated Ratatoskr prompt
+- `pyproject.toml` - Added media optional dependency
+- `tests/test_media.py` - Comprehensive test suite
+
+**Tests:** +50 new tests
+
+---
 
 ### Database Tools (2026-01-18) - Phase 12 Tier 2 Complete
 
@@ -1662,7 +1700,7 @@ GitHub Actions workflow generation and validation:
 | Saga | Data Visualization | qwen2.5-coder:7b |
 | Vör | Text/Regex Processing | qwen2.5-coder:7b |
 
-### Tools (111 total)
+### Tools (122 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Compression:** archive_create, archive_extract, archive_list, compress_file, decompress_file
@@ -1687,6 +1725,7 @@ GitHub Actions workflow generation and validation:
 **LaTeX:** generate_latex, format_equations, generate_tikz, manage_bibliography, create_beamer, latex_to_pdf
 **OpenSCAD:** generate_scad, render_preview, export_stl, validate_scad, parametrize_model, optimize_printability
 **DataViz:** analyze_data, suggest_viz, generate_d3, generate_matplotlib, generate_plotly, create_dashboard, export_interactive
+**Media:** audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles
 **Core:** shell, delegate
 
 ### Key Features
