@@ -18,6 +18,7 @@ from sindri.agents.prompts import (
     SKULD_PROMPT,
     KVASIR_PROMPT,
     VOLUNDR_PROMPT,
+    SAGA_PROMPT,
 )
 
 # Agent Registry
@@ -61,7 +62,7 @@ AGENTS: dict[str, AgentDefinition] = {
         ],
         can_delegate=True,
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
-        # Phase 11: Added skuld for diagram generation
+        # Phase 11: Added skuld, kvasir, volundr, saga for multi-disciplinary domains
         delegate_to=[
             "huginn",
             "mimir",
@@ -75,6 +76,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "skuld",
             "kvasir",
             "volundr",
+            "saga",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -381,6 +383,34 @@ AGENTS: dict[str, AgentDefinition] = {
             "validate_scad",
             "parametrize_model",
             "optimize_printability",
+        ],
+        can_delegate=False,
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=15,
+        temperature=0.3,  # Lower temp for precise code generation
+        # Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
+    ),
+    "saga": AgentDefinition(
+        name="saga",
+        role="Data visualization specialist - D3.js, matplotlib, Plotly dashboards",
+        model="qwen2.5-coder:7b",  # Good for code generation
+        system_prompt=SAGA_PROMPT,
+        tools=[
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            "search_code",
+            "analyze_data",
+            "suggest_viz",
+            "generate_d3",
+            "generate_matplotlib",
+            "generate_plotly",
+            "create_dashboard",
+            "export_interactive",
         ],
         can_delegate=False,
         estimated_vram_gb=5.0,

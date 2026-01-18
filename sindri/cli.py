@@ -7633,5 +7633,328 @@ def scad_optimize(input_file: str, nozzle: float, layer: float, printer: str):
     asyncio.run(run())
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Data Visualization Commands (Phase 11)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@cli.group()
+def viz():
+    """Data visualization commands - analyze data and generate charts.
+
+    Generate visualizations using D3.js, matplotlib, or Plotly.
+    """
+    pass
+
+
+@viz.command("analyze")
+@click.argument("file_path", type=click.Path(exists=True))
+@click.option("--columns", "-c", multiple=True, help="Specific columns to analyze")
+@click.option("--format", "-f", "output_format", type=click.Choice(["table", "json"]), default="table")
+def viz_analyze(file_path: str, columns: tuple, output_format: str):
+    """Analyze a data file and show statistics.
+
+    Supports CSV and JSON files. Shows column types, statistics, and correlations.
+
+    Examples:
+
+        sindri viz analyze sales.csv
+
+        sindri viz analyze data.json -c revenue -c date
+
+        sindri viz analyze data.csv --format json
+    """
+    from sindri.tools.dataviz import AnalyzeDataTool
+
+    async def run():
+        tool = AnalyzeDataTool()
+        result = await tool.execute(
+            file_path=file_path,
+            columns=list(columns) if columns else None,
+        )
+
+        if result.success:
+            if output_format == "json":
+                # Extract metadata as JSON
+                import json
+                console.print(json.dumps(result.metadata, indent=2))
+            else:
+                console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@viz.command("suggest")
+@click.argument("file_path", type=click.Path(exists=True))
+@click.option("--goal", "-g", type=click.Choice(["comparison", "distribution", "relationship", "trend", "composition"]),
+              help="Visualization goal to focus recommendations")
+@click.option("--max", "-m", "max_suggestions", type=int, default=5, help="Maximum suggestions (default: 5)")
+def viz_suggest(file_path: str, goal: str, max_suggestions: int):
+    """Suggest appropriate visualizations for a dataset.
+
+    Analyzes data structure and recommends chart types with rationale.
+
+    Examples:
+
+        sindri viz suggest sales.csv
+
+        sindri viz suggest data.json --goal trend
+
+        sindri viz suggest data.csv -g comparison -m 3
+    """
+    from sindri.tools.dataviz import SuggestVisualizationTool
+
+    async def run():
+        tool = SuggestVisualizationTool()
+        result = await tool.execute(
+            file_path=file_path,
+            goal=goal,
+            max_suggestions=max_suggestions,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@viz.command("d3")
+@click.argument("chart_type", type=click.Choice(["bar", "line", "scatter", "pie", "heatmap", "histogram", "area"]))
+@click.argument("file_path", type=click.Path(exists=True))
+@click.option("--x", "-x", required=True, help="Column for x-axis")
+@click.option("--y", "-y", help="Column for y-axis")
+@click.option("--color", "-c", help="Column for color grouping")
+@click.option("--title", "-t", help="Chart title")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--width", "-w", type=int, default=800, help="Chart width (default: 800)")
+@click.option("--height", "-h", "chart_height", type=int, default=500, help="Chart height (default: 500)")
+def viz_d3(chart_type: str, file_path: str, x: str, y: str, color: str, title: str, output: str, width: int, chart_height: int):
+    """Generate a D3.js interactive visualization.
+
+    Creates JavaScript code for interactive charts with tooltips and animations.
+
+    Examples:
+
+        sindri viz d3 bar sales.csv -x category -y revenue
+
+        sindri viz d3 line data.csv -x date -y value -t "Sales Trend"
+
+        sindri viz d3 scatter data.csv -x x -y y -c category -o chart.js
+    """
+    from sindri.tools.dataviz import GenerateD3Tool
+
+    async def run():
+        tool = GenerateD3Tool()
+        result = await tool.execute(
+            chart_type=chart_type,
+            file_path=file_path,
+            x=x,
+            y=y,
+            color=color,
+            title=title,
+            output_file=output,
+            width=width,
+            height=chart_height,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@viz.command("matplotlib")
+@click.argument("chart_type", type=click.Choice(["bar", "line", "scatter", "pie", "heatmap", "histogram", "box", "violin"]))
+@click.argument("file_path", type=click.Path(exists=True))
+@click.option("--x", "-x", required=True, help="Column for x-axis")
+@click.option("--y", "-y", help="Column for y-axis")
+@click.option("--hue", help="Column for color grouping")
+@click.option("--title", "-t", help="Chart title")
+@click.option("--style", "-s", default="seaborn-v0_8-whitegrid", help="Matplotlib style")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def viz_matplotlib(chart_type: str, file_path: str, x: str, y: str, hue: str, title: str, style: str, output: str):
+    """Generate Python matplotlib visualization code.
+
+    Creates static chart code using matplotlib.pyplot.
+
+    Examples:
+
+        sindri viz matplotlib bar sales.csv -x category -y revenue
+
+        sindri viz matplotlib histogram data.csv -x value
+
+        sindri viz matplotlib scatter data.csv -x x -y y --hue category
+    """
+    from sindri.tools.dataviz import GenerateMatplotlibTool
+
+    async def run():
+        tool = GenerateMatplotlibTool()
+        result = await tool.execute(
+            chart_type=chart_type,
+            file_path=file_path,
+            x=x,
+            y=y,
+            hue=hue,
+            title=title,
+            style=style,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@viz.command("plotly")
+@click.argument("chart_type", type=click.Choice([
+    "bar", "line", "scatter", "pie", "heatmap", "histogram", "box", "violin", "scatter_3d", "surface", "sunburst", "treemap"
+]))
+@click.argument("file_path", type=click.Path(exists=True))
+@click.option("--x", "-x", required=True, help="Column for x-axis")
+@click.option("--y", "-y", help="Column for y-axis")
+@click.option("--z", "-z", help="Column for z-axis (3D charts)")
+@click.option("--color", "-c", help="Column for color grouping")
+@click.option("--title", "-t", help="Chart title")
+@click.option("--language", "-l", type=click.Choice(["python", "javascript"]), default="python", help="Output language")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+def viz_plotly(chart_type: str, file_path: str, x: str, y: str, z: str, color: str, title: str, language: str, output: str):
+    """Generate Plotly interactive visualization code.
+
+    Creates interactive charts using plotly.express (Python) or Plotly.js (JavaScript).
+
+    Examples:
+
+        sindri viz plotly scatter data.csv -x x -y y -c category
+
+        sindri viz plotly scatter_3d data.csv -x x -y y -z z
+
+        sindri viz plotly bar sales.csv -x category -y revenue -l javascript
+    """
+    from sindri.tools.dataviz import GeneratePlotlyTool
+
+    async def run():
+        tool = GeneratePlotlyTool()
+        result = await tool.execute(
+            chart_type=chart_type,
+            file_path=file_path,
+            x=x,
+            y=y,
+            z=z,
+            color=color,
+            title=title,
+            language=language,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@viz.command("dashboard")
+@click.argument("file_path", type=click.Path(exists=True))
+@click.option("--config", "-c", type=click.Path(exists=True), help="Dashboard config JSON file")
+@click.option("--output", "-o", required=True, type=click.Path(), help="Output file path")
+@click.option("--title", "-t", help="Dashboard title")
+@click.option("--format", "-f", "output_format", type=click.Choice(["html", "python"]), default="html", help="Output format")
+@click.option("--rows", "-r", type=int, default=2, help="Grid rows (default: 2)")
+@click.option("--cols", type=int, default=2, help="Grid columns (default: 2)")
+def viz_dashboard(file_path: str, config: str, output: str, title: str, output_format: str, rows: int, cols: int):
+    """Create a multi-chart dashboard.
+
+    Arranges multiple charts in a grid layout.
+
+    Config JSON format:
+    {"charts": [{"type": "bar", "x": "col1", "y": "col2", "position": [0, 0]}]}
+
+    Examples:
+
+        sindri viz dashboard data.csv -c config.json -o dashboard.html
+
+        sindri viz dashboard data.csv -o dash.py --format python -t "Sales Dashboard"
+    """
+    import json as json_module
+    from sindri.tools.dataviz import CreateDashboardTool
+
+    charts = []
+    if config:
+        with open(config) as f:
+            charts = json_module.load(f).get("charts", [])
+
+    async def run():
+        tool = CreateDashboardTool()
+        result = await tool.execute(
+            file_path=file_path,
+            charts=charts,
+            title=title,
+            output_format=output_format,
+            output_file=output,
+            rows=rows,
+            cols=cols,
+        )
+
+        if result.success:
+            console.print(f"[green]Dashboard created: {output}[/green]")
+            if output_format == "python":
+                console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@viz.command("export")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--output", "-o", required=True, type=click.Path(), help="Output HTML file path")
+@click.option("--library", "-l", type=click.Choice(["d3", "plotly"]), default="d3", help="JS library")
+@click.option("--title", "-t", help="Page title")
+@click.option("--responsive/--no-responsive", default=True, help="Make chart responsive")
+@click.option("--export-button/--no-export-button", default=True, help="Add PNG/SVG export button")
+def viz_export(input_file: str, output: str, library: str, title: str, responsive: bool, export_button: bool):
+    """Export visualization as standalone HTML.
+
+    Creates a self-contained HTML file with embedded JavaScript.
+
+    Examples:
+
+        sindri viz export chart.js -o visualization.html
+
+        sindri viz export chart.js -o viz.html -l plotly -t "My Chart"
+
+        sindri viz export chart.js -o viz.html --no-export-button
+    """
+    from sindri.tools.dataviz import ExportInteractiveTool
+
+    async def run():
+        tool = ExportInteractiveTool()
+        result = await tool.execute(
+            file_path=input_file,
+            library=library,
+            title=title,
+            responsive=responsive,
+            include_export_button=export_button,
+            output_file=output,
+        )
+
+        if result.success:
+            console.print(f"[green]Exported: {output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()

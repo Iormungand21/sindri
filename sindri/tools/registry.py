@@ -86,6 +86,15 @@ from sindri.tools.openscad import (
     ParametrizeTool,
     OptimizePrintabilityTool,
 )
+from sindri.tools.dataviz import (
+    AnalyzeDataTool,
+    SuggestVisualizationTool,
+    GenerateD3Tool,
+    GenerateMatplotlibTool,
+    GeneratePlotlyTool,
+    CreateDashboardTool,
+    ExportInteractiveTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -379,4 +388,12 @@ class ToolRegistry:
         registry.register(ValidateSCADTool(work_dir=work_dir))
         registry.register(ParametrizeTool(work_dir=work_dir))
         registry.register(OptimizePrintabilityTool(work_dir=work_dir))
+        # Data visualization tools
+        registry.register(AnalyzeDataTool(work_dir=work_dir))
+        registry.register(SuggestVisualizationTool(work_dir=work_dir))
+        registry.register(GenerateD3Tool(work_dir=work_dir))
+        registry.register(GenerateMatplotlibTool(work_dir=work_dir))
+        registry.register(GeneratePlotlyTool(work_dir=work_dir))
+        registry.register(CreateDashboardTool(work_dir=work_dir))
+        registry.register(ExportInteractiveTool(work_dir=work_dir))
         return registry

@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that serves as a **multi-disciplinary one-stop shop** for creative and technical work. Beyond code, Sindri coordinates specialized agents for 3D modeling, music composition, electronics design, data visualization, game development, scientific documentation, and more — all using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 14 agents, 71 tools, 2475 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 15 agents, 78 tools, 2535 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 2303 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2535 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -137,6 +137,7 @@ Sindri's architecture naturally supports specialized agents beyond software deve
 - Diagram Generation Agent ("Skuld") - Mermaid, PlantUML, D2 diagram generation (2026-01-18)
 - LaTeX Generation Agent ("Kvasir") - Academic documents, equations, TikZ, Beamer (2026-01-18)
 - OpenSCAD 3D Modeling Agent ("Völundr") - Parametric models for 3D printing (2026-01-18)
+- Data Visualization Agent ("Saga") - D3.js, matplotlib, Plotly charts and dashboards (2026-01-18)
 
 ### 3D Modeling & CAD
 
@@ -253,7 +254,7 @@ Transform data into interactive visualizations.
 - "Build a dashboard showing sales trends by region"
 - "Visualize this algorithm's performance over time"
 
-**Status:** Planned
+**Status:** ✅ Complete (2026-01-18)
 
 ---
 
@@ -331,7 +332,7 @@ Academic paper formatting, equations, and documentation.
 - "Create a Beamer presentation from this outline"
 - "Generate a TikZ diagram of this neural network"
 
-**Status:** Planned
+**Status:** ✅ Complete (2026-01-18)
 
 ---
 
@@ -355,8 +356,8 @@ Academic paper formatting, equations, and documentation.
 2. ✅ LaTeX Agent - COMPLETE (Kvasir)
 
 **Tier 2 - Core Differentiators (Medium complexity, unique value)**
-3. OpenSCAD Agent - Unique maker/3D printing integration
-4. Data Visualization Agent - Broad applicability
+3. ✅ OpenSCAD Agent - COMPLETE (Völundr)
+4. ✅ Data Visualization Agent - COMPLETE (Saga)
 
 **Tier 3 - Advanced Domains (High complexity, specialized)**
 5. KiCad Agent - Hardware maker community
@@ -731,6 +732,10 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-18 | Data Visualization Agent - Saga (D3.js, matplotlib, Plotly, dashboards) | +60 |
+| 2026-01-18 | OpenSCAD 3D Modeling Agent - Völundr (parametric models, STL export) | +55 |
+| 2026-01-18 | LaTeX Generation Agent - Kvasir (documents, TikZ, Beamer, BibTeX) | +64 |
+| 2026-01-18 | Diagram Generation Agent - Skuld (Mermaid, PlantUML, D2) | +53 |
 | 2026-01-17 | API Keys (programmatic access, scopes, rate limiting, usage tracking) | +62 |
 | 2026-01-17 | Audit Log System (security/compliance logging, brute force detection) | +52 |
 | 2026-01-17 | Database Migrations (Alembic, Django, Prisma, Knex, Goose, Diesel, SeaORM) | +65 |
@@ -775,7 +780,7 @@ cd sindri/web/static && npm test -- --run
 
 ---
 
-**Last Updated:** 2026-01-17
-**Phase 11 Added:** Multi-Disciplinary Domain Agents (OpenSCAD, Music, KiCad, Diagrams, Data Viz, Game Dev, LaTeX, Blender)
+**Last Updated:** 2026-01-18
+**Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
 **Maintained By:** Project contributors

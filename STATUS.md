@@ -6,17 +6,17 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, and OpenSCAD 3D Modeling
-**Test Status:** 2475 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 11 Features (Multi-Disciplinary Domain Agents - Data Visualization Agent)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, and Data Visualization
+**Test Status:** 2535 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 12 Features (Universal Tool Platform)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2303 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2535 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 14 agents
+.venv/bin/sindri agents                    # See all 15 agents
 
 # Launch interfaces
 .venv/bin/sindri tui                       # Terminal UI
@@ -90,6 +90,15 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri scad parametrize model.scad                       # Add parameters
 .venv/bin/sindri scad optimize model.scad                          # Print optimization tips
 
+# Data Visualization
+.venv/bin/sindri viz analyze data.csv                              # Analyze dataset structure
+.venv/bin/sindri viz suggest data.csv --goal comparison            # Suggest visualizations
+.venv/bin/sindri viz d3 bar data.csv -x category -y value          # Generate D3.js bar chart
+.venv/bin/sindri viz matplotlib scatter data.csv -x x -y y         # Generate matplotlib scatter
+.venv/bin/sindri viz plotly line data.csv -x time -y value         # Generate Plotly line chart
+.venv/bin/sindri viz dashboard data.csv -c config.json -o out.html # Create multi-chart dashboard
+.venv/bin/sindri viz export chart_code.js -o chart.html            # Export standalone HTML
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -98,6 +107,68 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Data Visualization System (2026-01-18) - Phase 11 Complete
+
+Added comprehensive data visualization tools and the Saga agent for creating charts and dashboards:
+
+**New Agent:**
+- **Saga** (Norse goddess of history) - Data visualization specialist using qwen2.5-coder:7b
+
+**Visualization Libraries Supported:**
+- **D3.js** - Interactive browser visualizations with transitions and tooltips
+- **matplotlib** - Python static charts with seaborn-style aesthetics
+- **Plotly** - Interactive Python/JavaScript charts with 3D support
+
+**Chart Types:**
+- Bar, line, scatter, pie, histogram, heatmap
+- Area charts, box plots, violin plots
+- 3D scatter and surface plots (Plotly)
+- Treemaps and sunburst charts
+
+**New Tools (7 total):**
+- `analyze_data` - Parse CSV/JSON, compute statistics (mean, std, correlation)
+- `suggest_viz` - Recommend chart types based on data structure and goals
+- `generate_d3` - Generate complete D3.js code with SVG, scales, axes, tooltips
+- `generate_matplotlib` - Generate Python matplotlib code with styles
+- `generate_plotly` - Generate Plotly code (Python or JavaScript)
+- `create_dashboard` - Multi-chart layouts with grid positioning
+- `export_interactive` - Bundle as standalone HTML with embedded data
+
+**CLI Commands:**
+- `sindri viz analyze <file>` - Analyze dataset structure and statistics
+- `sindri viz suggest <file>` - Get visualization recommendations
+- `sindri viz d3 <type> <file>` - Generate D3.js chart code
+- `sindri viz matplotlib <type> <file>` - Generate matplotlib code
+- `sindri viz plotly <type> <file>` - Generate Plotly code
+- `sindri viz dashboard <file>` - Create multi-chart dashboard
+- `sindri viz export <code>` - Export as standalone HTML
+
+**Features:**
+- Column type detection (numeric, categorical, datetime)
+- Correlation matrix generation
+- Goal-based suggestions (comparison, trend, distribution, relationship)
+- Interactive tooltips and transitions in D3.js
+- Multiple matplotlib styles (seaborn, ggplot, etc.)
+- Plotly 3D chart support
+- Responsive HTML export with CDN resources
+- Dashboard grid layouts with configurable rows/columns
+
+**Agent Delegation:**
+- Brokkr can now delegate to Saga for data visualization tasks
+- Saga has access to read_file, write_file, search_code, and all DataViz tools
+
+**Files:**
+- `sindri/tools/dataviz.py` - Data visualization tools implementation
+- `sindri/agents/prompts.py` - SAGA_PROMPT added
+- `sindri/agents/registry.py` - Saga agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/cli.py` - CLI commands for viz group
+- `tests/test_dataviz.py` - Comprehensive test suite
+
+**Tests:** 60 new tests (total: 2535 backend tests)
+
+---
 
 ### OpenSCAD 3D Modeling System (2026-01-18) - Phase 11 Continued
 
@@ -1209,7 +1280,7 @@ GitHub Actions workflow generation and validation:
 
 ## Project Summary
 
-### Agents (14 total)
+### Agents (15 total)
 
 | Agent | Role | Model |
 |-------|------|-------|
@@ -1227,8 +1298,9 @@ GitHub Actions workflow generation and validation:
 | Skuld | Diagram Generator | qwen2.5-coder:7b |
 | Kvasir | LaTeX Specialist | llama3.1:8b |
 | Völundr | OpenSCAD 3D Modeler | qwen2.5-coder:7b |
+| Saga | Data Visualization | qwen2.5-coder:7b |
 
-### Tools (71 total)
+### Tools (78 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **AST:** parse_ast, find_references, symbol_info, ast_rename
@@ -1248,6 +1320,7 @@ GitHub Actions workflow generation and validation:
 **Diagrams:** generate_mermaid, generate_plantuml, generate_d2, diagram_from_code, generate_sequence_diagram, generate_er_diagram
 **LaTeX:** generate_latex, format_equations, generate_tikz, manage_bibliography, create_beamer, latex_to_pdf
 **OpenSCAD:** generate_scad, render_preview, export_stl, validate_scad, parametrize_model, optimize_printability
+**DataViz:** analyze_data, suggest_viz, generate_d3, generate_matplotlib, generate_plotly, create_dashboard, export_interactive
 **Core:** shell, delegate
 
 ### Key Features
@@ -1374,6 +1447,15 @@ sindri scad export <file>      # Export to STL for printing
 sindri scad validate <file>    # Validate syntax/geometry
 sindri scad parametrize <file> # Add parameters
 sindri scad optimize <file>    # Print optimization tips
+
+# Data Visualization
+sindri viz analyze <file>      # Analyze dataset structure
+sindri viz suggest <file>      # Suggest chart types for data
+sindri viz d3 <type> <file>    # Generate D3.js chart code
+sindri viz matplotlib <type> <file>  # Generate matplotlib code
+sindri viz plotly <type> <file>  # Generate Plotly code
+sindri viz dashboard <file>    # Create multi-chart dashboard
+sindri viz export <code>       # Export as standalone HTML
 ```
 
 ---
