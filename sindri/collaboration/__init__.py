@@ -75,6 +75,25 @@ from sindri.collaboration.webhooks import (
     trigger_webhook_event,
     verify_webhook_signature,
 )
+from sindri.collaboration.audit import (
+    AuditLogEntry,
+    AuditCategory,
+    AuditAction,
+    AuditSeverity,
+    AuditOutcome,
+    AuditQuery,
+    AuditStore,
+    audit_login_success,
+    audit_login_failed,
+    audit_logout,
+    audit_permission_change,
+    audit_role_change,
+    audit_session_access,
+    audit_access_denied,
+    audit_suspicious_activity,
+    audit_brute_force_detected,
+    check_brute_force,
+)
 
 __all__ = [
     # Sharing
@@ -132,4 +151,22 @@ __all__ = [
     "WebhookDeliveryService",
     "trigger_webhook_event",
     "verify_webhook_signature",
+    # Audit Logging
+    "AuditLogEntry",
+    "AuditCategory",
+    "AuditAction",
+    "AuditSeverity",
+    "AuditOutcome",
+    "AuditQuery",
+    "AuditStore",
+    "audit_login_success",
+    "audit_login_failed",
+    "audit_logout",
+    "audit_permission_change",
+    "audit_role_change",
+    "audit_session_access",
+    "audit_access_denied",
+    "audit_suspicious_activity",
+    "audit_brute_force_detected",
+    "check_brute_force",
 ]

@@ -3910,6 +3910,453 @@ def webhook_cleanup(days: int = 7, dry_run: bool = False):
 
 
 # ============================================
+# Phase 10: Audit Log Commands
+# ============================================
+
+
+@cli.command("audit")
+@click.option("--team-id", "-t", help="Filter by team ID")
+@click.option("--actor", "-a", help="Filter by actor/user ID")
+@click.option(
+    "--category",
+    "-c",
+    type=click.Choice(
+        [
+            "authentication",
+            "authorization",
+            "data_access",
+            "data_modification",
+            "administrative",
+            "security",
+            "system",
+        ]
+    ),
+    help="Filter by category",
+)
+@click.option(
+    "--severity",
+    "-s",
+    type=click.Choice(["info", "warning", "error", "critical"]),
+    help="Filter by severity",
+)
+@click.option("--security", is_flag=True, help="Show only security-related events")
+@click.option("--compliance", is_flag=True, help="Show only compliance-relevant events")
+@click.option("--hours", "-h", default=24, help="Show events from last N hours (default: 24)")
+@click.option("--limit", "-l", default=50, help="Maximum entries to show (default: 50)")
+def audit(
+    team_id: str = None,
+    actor: str = None,
+    category: str = None,
+    severity: str = None,
+    security: bool = False,
+    compliance: bool = False,
+    hours: int = 24,
+    limit: int = 50,
+):
+    """View audit logs for compliance and security tracking.
+
+    Examples:
+
+        sindri audit
+
+        sindri audit --security --hours 6
+
+        sindri audit --category authentication --actor user123
+
+        sindri audit --team-id team456 --compliance
+    """
+    from datetime import datetime, timedelta
+
+    from sindri.collaboration import (
+        AuditCategory,
+        AuditQuery,
+        AuditSeverity,
+        AuditStore,
+    )
+
+    async def show_audit():
+        store = AuditStore()
+
+        # Build query
+        query = AuditQuery(
+            start_date=datetime.now() - timedelta(hours=hours),
+            team_id=team_id,
+            actor_id=actor,
+            security_only=security,
+            compliance_only=compliance,
+            limit=limit,
+        )
+
+        if category:
+            query.categories = [AuditCategory(category)]
+
+        if severity:
+            query.severities = [AuditSeverity(severity)]
+
+        entries = await store.query(query)
+
+        if not entries:
+            console.print("[yellow]No audit entries found matching criteria[/]")
+            return
+
+        console.print(f"\n[bold]Audit Log ({len(entries)} entries)[/]\n")
+
+        # Severity colors
+        severity_colors = {
+            "info": "blue",
+            "warning": "yellow",
+            "error": "red",
+            "critical": "bold red",
+        }
+
+        for entry in entries:
+            color = severity_colors.get(entry.severity.value, "white")
+            timestamp = entry.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+            console.print(
+                f"[dim]{timestamp}[/] [{color}]{entry.severity.value.upper():8}[/] "
+                f"[cyan]{entry.category.value:15}[/] "
+                f"[white]{entry.action.value}[/]"
+            )
+
+            if entry.actor_id:
+                console.print(f"  [dim]Actor: {entry.actor_id}[/]")
+
+            if entry.target_type and entry.target_id:
+                console.print(f"  [dim]Target: {entry.target_type}/{entry.target_id}[/]")
+
+            if entry.details:
+                console.print(f"  [dim]{entry.details}[/]")
+
+            if entry.ip_address:
+                console.print(f"  [dim]IP: {entry.ip_address}[/]")
+
+            console.print()
+
+    asyncio.run(show_audit())
+
+
+@cli.command("audit-stats")
+@click.option("--team-id", "-t", help="Filter by team ID")
+@click.option("--days", "-d", default=7, help="Stats for last N days (default: 7)")
+def audit_stats(team_id: str = None, days: int = 7):
+    """View audit log statistics.
+
+    Examples:
+
+        sindri audit-stats
+
+        sindri audit-stats --team-id team123
+
+        sindri audit-stats --days 30
+    """
+    from datetime import datetime, timedelta
+
+    from sindri.collaboration import AuditStore
+
+    async def show_stats():
+        store = AuditStore()
+
+        stats = await store.get_statistics(
+            start_date=datetime.now() - timedelta(days=days),
+            team_id=team_id,
+        )
+
+        console.print(f"\n[bold]Audit Statistics (last {days} days)[/]\n")
+
+        # Summary
+        console.print(f"[cyan]Total Events:[/] {stats['total_events']}")
+        console.print(f"[cyan]Security Events:[/] {stats['security_events']}")
+        console.print(f"[cyan]Failed Logins:[/] {stats['failed_logins']}")
+
+        # By category
+        if stats["by_category"]:
+            console.print("\n[bold]By Category:[/]")
+            for cat, count in stats["by_category"].items():
+                console.print(f"  {cat}: {count}")
+
+        # By severity
+        if stats["by_severity"]:
+            console.print("\n[bold]By Severity:[/]")
+            severity_colors = {
+                "info": "blue",
+                "warning": "yellow",
+                "error": "red",
+                "critical": "bold red",
+            }
+            for sev, count in stats["by_severity"].items():
+                color = severity_colors.get(sev, "white")
+                console.print(f"  [{color}]{sev}[/]: {count}")
+
+        # By outcome
+        if stats["by_outcome"]:
+            console.print("\n[bold]By Outcome:[/]")
+            for outcome, count in stats["by_outcome"].items():
+                color = "green" if outcome == "success" else "red"
+                console.print(f"  [{color}]{outcome}[/]: {count}")
+
+        # Top actions
+        if stats["top_actions"]:
+            console.print("\n[bold]Top Actions:[/]")
+            for action, count in list(stats["top_actions"].items())[:5]:
+                console.print(f"  {action}: {count}")
+
+        # Top actors
+        if stats["top_actors"]:
+            console.print("\n[bold]Top Actors:[/]")
+            for actor, count in list(stats["top_actors"].items())[:5]:
+                console.print(f"  {actor}: {count}")
+
+    asyncio.run(show_stats())
+
+
+@cli.command("audit-security")
+@click.option("--hours", "-h", default=24, help="Show events from last N hours (default: 24)")
+@click.option("--team-id", "-t", help="Filter by team ID")
+def audit_security(hours: int = 24, team_id: str = None):
+    """View security-related audit events.
+
+    This is a shortcut for `sindri audit --security`.
+
+    Examples:
+
+        sindri audit-security
+
+        sindri audit-security --hours 6
+
+        sindri audit-security --team-id team123
+    """
+    from sindri.collaboration import AuditStore
+
+    async def show_security():
+        store = AuditStore()
+
+        entries = await store.get_security_events(hours=hours, team_id=team_id)
+
+        if not entries:
+            console.print("[green]\u2713 No security events in the last {hours} hours[/]")
+            return
+
+        console.print(
+            f"\n[bold red]Security Events ({len(entries)} in last {hours} hours)[/]\n"
+        )
+
+        severity_colors = {
+            "info": "blue",
+            "warning": "yellow",
+            "error": "red",
+            "critical": "bold red",
+        }
+
+        for entry in entries:
+            color = severity_colors.get(entry.severity.value, "white")
+            timestamp = entry.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+
+            console.print(
+                f"[dim]{timestamp}[/] [{color}]{entry.severity.value.upper():8}[/] "
+                f"[white]{entry.action.value}[/]"
+            )
+
+            if entry.actor_id:
+                console.print(f"  [dim]Actor: {entry.actor_id}[/]")
+
+            if entry.ip_address:
+                console.print(f"  [dim]IP: {entry.ip_address}[/]")
+
+            if entry.details:
+                console.print(f"  [dim]{entry.details}[/]")
+
+            console.print()
+
+    asyncio.run(show_security())
+
+
+@cli.command("audit-export")
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["json", "csv"]),
+    default="json",
+    help="Export format (default: json)",
+)
+@click.option("--output", "-o", required=True, help="Output file path")
+@click.option("--days", "-d", default=30, help="Export entries from last N days (default: 30)")
+@click.option("--team-id", "-t", help="Filter by team ID")
+@click.option("--security", is_flag=True, help="Export only security events")
+@click.option("--compliance", is_flag=True, help="Export only compliance-relevant events")
+def audit_export(
+    format: str = "json",
+    output: str = None,
+    days: int = 30,
+    team_id: str = None,
+    security: bool = False,
+    compliance: bool = False,
+):
+    """Export audit logs to file.
+
+    Examples:
+
+        sindri audit-export -o audit.json
+
+        sindri audit-export -f csv -o audit.csv --days 90
+
+        sindri audit-export -o security.json --security
+
+        sindri audit-export -o compliance.json --compliance --team-id team123
+    """
+    from datetime import datetime, timedelta
+    from pathlib import Path
+
+    from sindri.collaboration import AuditQuery, AuditStore
+
+    async def export_logs():
+        store = AuditStore()
+
+        query = AuditQuery(
+            start_date=datetime.now() - timedelta(days=days),
+            team_id=team_id,
+            security_only=security,
+            compliance_only=compliance,
+            limit=100000,  # Large limit for export
+        )
+
+        with console.status(f"[bold green]Exporting audit logs..."):
+            data = await store.export_logs(query, format=format)
+
+        output_path = Path(output)
+        output_path.write_text(data)
+
+        # Count entries
+        entries = await store.query(query)
+        console.print(
+            f"[green]\u2713 Exported {len(entries)} audit entries to {output_path}[/]"
+        )
+
+    asyncio.run(export_logs())
+
+
+@cli.command("audit-cleanup")
+@click.option(
+    "--days",
+    "-d",
+    default=90,
+    help="Delete entries older than this many days (default: 90)",
+)
+@click.option(
+    "--keep-security",
+    is_flag=True,
+    default=True,
+    help="Keep security events regardless of age (default: True)",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted without deleting")
+def audit_cleanup(days: int = 90, keep_security: bool = True, dry_run: bool = False):
+    """Clean up old audit log entries.
+
+    By default, security events (errors, critical, security category)
+    are preserved regardless of age.
+
+    Examples:
+
+        sindri audit-cleanup
+
+        sindri audit-cleanup --days 60
+
+        sindri audit-cleanup --no-keep-security
+
+        sindri audit-cleanup --dry-run
+    """
+    from sindri.collaboration import AuditStore
+
+    async def cleanup():
+        store = AuditStore()
+
+        if dry_run:
+            stats = await store.get_statistics()
+            console.print(
+                f"[yellow]Dry run: Would delete non-security entries older than {days} days[/]"
+            )
+            console.print(f"[yellow]Total entries in database: {stats['total_events']}[/]")
+            if keep_security:
+                console.print("[yellow]Security events would be preserved[/]")
+        else:
+            deleted = await store.cleanup_old_entries(days=days, keep_security=keep_security)
+            console.print(
+                f"[green]\u2713 Deleted {deleted} audit entries older than {days} days[/]"
+            )
+            if keep_security:
+                console.print("[dim]Security events were preserved[/]")
+
+    asyncio.run(cleanup())
+
+
+@cli.command("audit-failed-logins")
+@click.option("--hours", "-h", default=1, help="Show failed logins from last N hours (default: 1)")
+@click.option("--ip", help="Filter by IP address")
+@click.option("--username", "-u", help="Filter by username")
+def audit_failed_logins(hours: int = 1, ip: str = None, username: str = None):
+    """View failed login attempts.
+
+    Useful for detecting brute force attacks.
+
+    Examples:
+
+        sindri audit-failed-logins
+
+        sindri audit-failed-logins --hours 6
+
+        sindri audit-failed-logins --ip 192.168.1.100
+
+        sindri audit-failed-logins --username admin
+    """
+    from sindri.collaboration import AuditStore
+
+    async def show_failed():
+        store = AuditStore()
+
+        entries = await store.get_failed_logins(
+            hours=hours, ip_address=ip, actor_id=username
+        )
+
+        if not entries:
+            console.print(
+                f"[green]\u2713 No failed logins in the last {hours} hour(s)[/]"
+            )
+            return
+
+        console.print(
+            f"\n[bold yellow]Failed Login Attempts ({len(entries)} in last {hours} hour(s))[/]\n"
+        )
+
+        # Group by IP
+        by_ip: dict[str, list] = {}
+        for entry in entries:
+            ip_key = entry.ip_address or "unknown"
+            by_ip.setdefault(ip_key, []).append(entry)
+
+        # Show summary by IP
+        for ip_addr, ip_entries in sorted(
+            by_ip.items(), key=lambda x: len(x[1]), reverse=True
+        ):
+            console.print(f"[bold]IP: {ip_addr}[/] ({len(ip_entries)} attempts)")
+            for entry in ip_entries[:5]:  # Show first 5 per IP
+                timestamp = entry.timestamp.strftime("%H:%M:%S")
+                console.print(f"  [dim]{timestamp}[/] - {entry.actor_id or 'unknown user'}")
+            if len(ip_entries) > 5:
+                console.print(f"  [dim]... and {len(ip_entries) - 5} more[/]")
+            console.print()
+
+        # Brute force warning
+        for ip_addr, ip_entries in by_ip.items():
+            if len(ip_entries) >= 5:
+                console.print(
+                    f"[bold red]\u26a0 Potential brute force from {ip_addr} "
+                    f"({len(ip_entries)} attempts)[/]"
+                )
+
+    asyncio.run(show_failed())
+
+
+# ============================================
 # Phase 9.3: Voice Interface Commands
 # ============================================
 

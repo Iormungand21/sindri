@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, and Database Migrations
-**Test Status:** 2189 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, and Audit Logging
+**Test Status:** 2241 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 10 Features (Advanced Team Collaboration - continued)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2189 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2241 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -49,6 +49,13 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri webhook-create team123 "Alerts" https://hooks.slack.com/...  # Create webhook
 .venv/bin/sindri webhook-test <webhook_id>  # Send test event
 
+# Audit Logs
+.venv/bin/sindri audit                     # View recent audit events
+.venv/bin/sindri audit --security          # Security-only events
+.venv/bin/sindri audit-stats               # Audit statistics
+.venv/bin/sindri audit-failed-logins       # Failed login attempts
+.venv/bin/sindri audit-export -o audit.json  # Export audit logs
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -57,6 +64,85 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Audit Log System (2026-01-17)
+
+Added comprehensive audit logging system for security and compliance tracking:
+
+**Audit Categories:**
+- **Authentication**: login_success, login_failed, logout, password_changed, token_generated, session_expired
+- **Authorization**: permission_granted, permission_revoked, role_assigned, role_removed, access_denied
+- **Data Access**: session_viewed, session_exported, data_downloaded, search_performed, report_generated
+- **Data Modification**: user/team/session CRUD, comment/share operations, webhook management
+- **Administrative**: settings_changed, backup operations, maintenance events
+- **Security**: suspicious_activity, brute_force_detected, rate_limit_exceeded, invalid_token
+
+**Audit Features:**
+- Severity levels: info, warning, error, critical
+- Outcome tracking: success, failure, partial, unknown
+- Actor/target tracking with type and ID
+- IP address and user agent logging
+- Metadata storage for structured context
+- Team and session association
+- Request correlation IDs
+- Duration tracking for operations
+
+**Security Features:**
+- `is_security_event` property for quick security filtering
+- `is_compliance_relevant` property for compliance reporting
+- Brute force detection with configurable thresholds
+- Failed login tracking by IP and username
+- Security event retention during cleanup
+
+**Query Capabilities:**
+- Filter by category, action, severity, outcome
+- Filter by actor, target, team, IP address
+- Date range filtering
+- Search text in details/metadata
+- Security-only and compliance-only filters
+- Pagination support (limit/offset)
+
+**Export Formats:**
+- JSON export with full audit data
+- CSV export for spreadsheet analysis
+
+**CLI Commands:**
+- `sindri audit` - View recent audit events with filters
+- `sindri audit --security` - Show only security events
+- `sindri audit --compliance` - Show only compliance-relevant events
+- `sindri audit --category authentication` - Filter by category
+- `sindri audit --actor user123` - Filter by actor
+- `sindri audit-stats` - View audit statistics
+- `sindri audit-stats --days 30` - Stats for specific period
+- `sindri audit-security` - Shortcut for security events
+- `sindri audit-export -o audit.json` - Export to JSON
+- `sindri audit-export -f csv -o audit.csv` - Export to CSV
+- `sindri audit-export --compliance` - Export compliance events
+- `sindri audit-cleanup` - Clean up old entries (preserves security events)
+- `sindri audit-cleanup --days 60` - Custom retention period
+- `sindri audit-failed-logins` - View failed login attempts
+- `sindri audit-failed-logins --ip 192.168.1.1` - Filter by IP
+
+**Convenience Functions:**
+- `audit_login_success()` - Log successful login
+- `audit_login_failed()` - Log failed login attempt
+- `audit_logout()` - Log user logout
+- `audit_permission_change()` - Log permission grant/revoke
+- `audit_role_change()` - Log role changes
+- `audit_session_access()` - Log session view/export
+- `audit_access_denied()` - Log denied access attempts
+- `audit_suspicious_activity()` - Log suspicious behavior
+- `audit_brute_force_detected()` - Log brute force detection
+- `check_brute_force()` - Check if IP is potentially brute forcing
+
+**Files:**
+- `sindri/collaboration/audit.py` - Audit log system implementation
+- Updated `sindri/collaboration/__init__.py` - Module exports
+- Updated `sindri/cli.py` - CLI commands
+
+**Tests:** 52 new tests (total: 2241 backend tests)
+
+---
 
 ### Database Migration Tools (2026-01-17)
 
