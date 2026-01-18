@@ -128,6 +128,14 @@ from sindri.tools.system import (
     MemoryUsageTool,
     EnvGetTool,
 )
+from sindri.tools.images import (
+    ImageResizeTool,
+    ImageCropTool,
+    ImageConvertTool,
+    ImageRotateTool,
+    ImageThumbnailTool,
+    ImageInfoTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -458,4 +466,11 @@ class ToolRegistry:
         registry.register(DiskUsageTool(work_dir=work_dir))
         registry.register(MemoryUsageTool(work_dir=work_dir))
         registry.register(EnvGetTool(work_dir=work_dir))
+        # Image manipulation tools
+        registry.register(ImageResizeTool(work_dir=work_dir))
+        registry.register(ImageCropTool(work_dir=work_dir))
+        registry.register(ImageConvertTool(work_dir=work_dir))
+        registry.register(ImageRotateTool(work_dir=work_dir))
+        registry.register(ImageThumbnailTool(work_dir=work_dir))
+        registry.register(ImageInfoTool(work_dir=work_dir))
         return registry

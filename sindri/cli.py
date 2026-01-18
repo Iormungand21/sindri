@@ -8145,5 +8145,252 @@ def archive_decompress(input_file: str, output: str, fmt: str):
     asyncio.run(run())
 
 
+# =============================================================================
+# Image Manipulation Commands
+# =============================================================================
+
+
+@cli.group()
+def image():
+    """Image manipulation commands.
+
+    Resize, crop, convert, rotate, and process images (JPEG, PNG, GIF, WebP, etc).
+    """
+    pass
+
+
+@image.command("resize")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--width", "-w", type=int, help="Target width in pixels")
+@click.option("--height", "-h", type=int, help="Target height in pixels")
+@click.option("--scale", "-s", type=int, help="Scale percentage (e.g., 50 for half size)")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--maintain-aspect", "-m", is_flag=True, default=True, help="Maintain aspect ratio (default: true)")
+@click.option("--quality", "-q", type=int, default=85, help="Output quality 1-100 for JPEG/WebP (default: 85)")
+@click.option("--resample", "-r", type=click.Choice(["nearest", "bilinear", "bicubic", "lanczos"]),
+              default="lanczos", help="Resampling method (default: lanczos)")
+def image_resize(input_file: str, width: int, height: int, scale: int, output: str,
+                 maintain_aspect: bool, quality: int, resample: str):
+    """Resize an image to specified dimensions or scale.
+
+    Examples:
+
+        sindri image resize photo.jpg --width 800
+
+        sindri image resize photo.jpg -w 640 -h 480
+
+        sindri image resize photo.jpg --scale 50
+
+        sindri image resize photo.jpg -w 1024 -m -o resized.jpg
+    """
+    from sindri.tools.images import ImageResizeTool
+
+    if width is None and height is None and scale is None:
+        console.print("[red]Error: Must specify --width, --height, or --scale[/red]")
+        return
+
+    async def run():
+        tool = ImageResizeTool()
+        result = await tool.execute(
+            input=input_file,
+            output=output,
+            width=width,
+            height=height,
+            scale=scale,
+            maintain_aspect=maintain_aspect,
+            quality=quality,
+            resample=resample,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@image.command("crop")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--x", type=int, required=True, help="X coordinate of top-left corner")
+@click.option("--y", type=int, required=True, help="Y coordinate of top-left corner")
+@click.option("--width", "-w", type=int, required=True, help="Crop width in pixels")
+@click.option("--height", "-h", type=int, required=True, help="Crop height in pixels")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--quality", "-q", type=int, default=85, help="Output quality 1-100 for JPEG/WebP")
+def image_crop(input_file: str, x: int, y: int, width: int, height: int, output: str, quality: int):
+    """Crop an image to a specified region.
+
+    Examples:
+
+        sindri image crop photo.jpg --x 0 --y 0 --width 640 --height 480
+
+        sindri image crop image.png --x 100 --y 100 -w 200 -h 200 -o cropped.png
+    """
+    from sindri.tools.images import ImageCropTool
+
+    async def run():
+        tool = ImageCropTool()
+        result = await tool.execute(
+            input=input_file,
+            x=x,
+            y=y,
+            width=width,
+            height=height,
+            output=output,
+            quality=quality,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@image.command("convert")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--format", "-f", "fmt", type=click.Choice(["jpeg", "png", "gif", "webp", "bmp", "tiff"]),
+              required=True, help="Target format")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--quality", "-q", type=int, default=85, help="Output quality 1-100 for JPEG/WebP")
+def image_convert(input_file: str, fmt: str, output: str, quality: int):
+    """Convert an image to a different format.
+
+    Examples:
+
+        sindri image convert photo.jpg --format png
+
+        sindri image convert image.png -f webp -q 90 -o compressed.webp
+
+        sindri image convert old.bmp --format jpeg -o modern.jpg
+    """
+    from sindri.tools.images import ImageConvertTool
+
+    async def run():
+        tool = ImageConvertTool()
+        result = await tool.execute(
+            input=input_file,
+            format=fmt,
+            output=output,
+            quality=quality,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@image.command("rotate")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--angle", "-a", type=float, required=True, help="Rotation angle in degrees (positive = counter-clockwise)")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--expand", "-e", is_flag=True, help="Expand image to fit rotated content")
+@click.option("--fill", type=str, help="Fill color for areas outside rotated image (e.g., 'white', '#FF0000')")
+@click.option("--quality", "-q", type=int, default=85, help="Output quality 1-100 for JPEG/WebP")
+def image_rotate(input_file: str, angle: float, output: str, expand: bool, fill: str, quality: int):
+    """Rotate an image by specified degrees.
+
+    Examples:
+
+        sindri image rotate photo.jpg --angle 90
+
+        sindri image rotate photo.jpg -a 45 --expand
+
+        sindri image rotate photo.png -a 30 --fill white -o rotated.png
+    """
+    from sindri.tools.images import ImageRotateTool
+
+    async def run():
+        tool = ImageRotateTool()
+        result = await tool.execute(
+            input=input_file,
+            angle=angle,
+            output=output,
+            expand=expand,
+            fill_color=fill,
+            quality=quality,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@image.command("thumbnail")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--size", "-s", type=int, default=128, help="Maximum size for both dimensions (default: 128)")
+@click.option("--max-width", type=int, help="Maximum width (use with --max-height for different aspect)")
+@click.option("--max-height", type=int, help="Maximum height (use with --max-width for different aspect)")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option("--quality", "-q", type=int, default=85, help="Output quality 1-100 for JPEG/WebP")
+def image_thumbnail(input_file: str, size: int, max_width: int, max_height: int, output: str, quality: int):
+    """Generate a thumbnail from an image.
+
+    Preserves aspect ratio while fitting within the specified dimensions.
+
+    Examples:
+
+        sindri image thumbnail photo.jpg
+
+        sindri image thumbnail photo.jpg --size 256
+
+        sindri image thumbnail photo.jpg --max-width 200 --max-height 150 -o thumb.jpg
+    """
+    from sindri.tools.images import ImageThumbnailTool
+
+    async def run():
+        tool = ImageThumbnailTool()
+        result = await tool.execute(
+            input=input_file,
+            max_size=size if max_width is None and max_height is None else None,
+            max_width=max_width,
+            max_height=max_height,
+            output=output,
+            quality=quality,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@image.command("info")
+@click.argument("input_file", type=click.Path(exists=True))
+def image_info(input_file: str):
+    """Get information and metadata from an image.
+
+    Shows dimensions, format, mode, file size, and EXIF data if available.
+
+    Examples:
+
+        sindri image info photo.jpg
+
+        sindri image info screenshot.png
+    """
+    from sindri.tools.images import ImageInfoTool
+
+    async def run():
+        tool = ImageInfoTool()
+        result = await tool.execute(input=input_file)
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()

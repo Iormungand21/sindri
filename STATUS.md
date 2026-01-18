@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, and System/Process Tools
-**Test Status:** 2751 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 12 Features (Universal Tool Platform)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, and Image Manipulation Tools
+**Test Status:** 2799 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 2 continues
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2751 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2799 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 16 agents
@@ -106,6 +106,15 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri archive compress data.json -f gzip               # Compress file
 .venv/bin/sindri archive decompress data.json.gz                  # Decompress file
 
+# Image Manipulation
+.venv/bin/sindri image resize photo.jpg --width 800               # Resize to width
+.venv/bin/sindri image resize photo.jpg --scale 50                # Scale by percentage
+.venv/bin/sindri image crop photo.jpg --x 0 --y 0 -w 640 -h 480   # Crop region
+.venv/bin/sindri image convert photo.png --format webp -q 90      # Convert format
+.venv/bin/sindri image rotate photo.jpg --angle 90 --expand       # Rotate image
+.venv/bin/sindri image thumbnail photo.jpg --size 128             # Create thumbnail
+.venv/bin/sindri image info photo.jpg                             # Get image info
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -114,6 +123,49 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Image Manipulation Tools (2026-01-18) - Phase 12 Tier 2
+
+Added comprehensive image manipulation tools using Pillow (PIL):
+
+**New Tools (6 total):**
+- `image_resize` - Resize images to width/height or scale percentage with aspect ratio preservation
+- `image_crop` - Crop images to specified rectangular region
+- `image_convert` - Convert between formats (JPEG, PNG, GIF, WebP, BMP, TIFF)
+- `image_rotate` - Rotate images by degrees with expand/fill options
+- `image_thumbnail` - Generate thumbnails preserving aspect ratio
+- `image_info` - Get image metadata (dimensions, format, mode, EXIF)
+
+**Features:**
+- Multiple resampling methods (nearest, bilinear, bicubic, lanczos)
+- Quality control for JPEG/WebP output
+- RGBA to RGB conversion with transparency handling
+- Default output path generation with descriptive suffixes
+- Comprehensive error handling and validation
+
+**CLI Commands:**
+- `sindri image resize <file> --width 800` - Resize to width
+- `sindri image resize <file> --scale 50` - Scale by percentage
+- `sindri image crop <file> --x 0 --y 0 -w 640 -h 480` - Crop region
+- `sindri image convert <file> --format webp` - Convert format
+- `sindri image rotate <file> --angle 90 --expand` - Rotate
+- `sindri image thumbnail <file> --size 128` - Create thumbnail
+- `sindri image info <file>` - Get image metadata
+
+**Agent Assignment:**
+- Ratatoskr (fast executor) has access to all image tools
+
+**Files:**
+- `sindri/tools/images.py` - Image tools implementation
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Added tools to Ratatoskr
+- `sindri/cli.py` - CLI commands for image group
+- `pyproject.toml` - Added Pillow>=10.0.0 dependency
+- `tests/test_images.py` - Comprehensive test suite
+
+**Tests:** 48 new tests (total: 2799 backend tests)
+
+---
 
 ### System & Process Tools (2026-01-18) - Phase 12 Tier 1
 
@@ -1501,12 +1553,13 @@ GitHub Actions workflow generation and validation:
 | Saga | Data Visualization | qwen2.5-coder:7b |
 | Vör | Text/Regex Processing | qwen2.5-coder:7b |
 
-### Tools (103 total)
+### Tools (109 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Compression:** archive_create, archive_extract, archive_list, compress_file, decompress_file
 **Crypto:** hash_file, hash_text, encode_base64, encode_url, jwt_decode, jwt_generate, uuid_generate, encrypt_file, decrypt_file
 **System:** process_list, process_kill, system_info, disk_usage, memory_usage, env_get
+**Image:** image_resize, image_crop, image_convert, image_rotate, image_thumbnail, image_info
 **AST:** parse_ast, find_references, symbol_info, ast_rename
 **Search:** search_code, find_symbol
 **Git:** git_status, git_diff, git_log, git_branch

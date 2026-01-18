@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that serves as a **multi-disciplinary one-stop shop** for creative and technical work. Beyond code, Sindri coordinates specialized agents for 3D modeling, music composition, electronics design, data visualization, game development, scientific documentation, and more — all using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 16 agents, 103 tools, 2751 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 16 agents, 109 tools, 2799 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -652,12 +652,12 @@ Based on research, these specialized models outperform general-purpose models fo
 
 **Tier 2 - High Value, Medium Complexity**
 
-| Category | Tools | Effort |
-|----------|-------|--------|
-| Image | image_resize, image_crop, image_annotate | Medium |
-| Document | pdf_extract_text, pdf_to_markdown, ocr_image | Medium |
-| Database | sql_explain_plan, sql_generate, db_seed | Medium |
-| Network | http_trace, dns_lookup, curl_generate | Medium |
+| Category | Tools | Effort | Status |
+|----------|-------|--------|--------|
+| Image | image_resize, image_crop, image_convert, image_rotate, image_thumbnail, image_info | Medium | ✅ Complete |
+| Document | pdf_extract_text, pdf_to_markdown, ocr_image | Medium | |
+| Database | sql_explain_plan, sql_generate, db_seed | Medium | |
+| Network | http_trace, dns_lookup, curl_generate | Medium | |
 
 **Tier 3 - High Value, Higher Complexity**
 
@@ -732,6 +732,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-18 | Image Manipulation Tools (image_resize, image_crop, image_convert, image_rotate, image_thumbnail, image_info) | +48 |
 | 2026-01-18 | System & Process Tools (process_list, process_kill, system_info, disk_usage, memory_usage, env_get) | +52 |
 | 2026-01-18 | Crypto & Encoding Tools (hash_file, hash_text, encode_base64, encode_url, jwt_decode, jwt_generate, uuid_generate, encrypt_file, decrypt_file) | +52 |
 | 2026-01-18 | Compression Tools (archive_create, archive_extract, archive_list, compress_file, decompress_file) | +40 |
@@ -786,6 +787,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-18
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Text/Regex Tools + Compression Tools + Crypto/Encoding Tools + System Tools complete (Tier 1 Complete, 1/8 agents, 25/~100 tools)
+**Phase 12 Progress:** Tier 1 Complete + Image Tools (Tier 2 started) - 1/8 agents, 31/~100 tools
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
 **Maintained By:** Project contributors
