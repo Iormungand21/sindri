@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, and Audit Logging
-**Test Status:** 2241 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, and API Keys
+**Test Status:** 2303 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 10 Features (Advanced Team Collaboration - continued)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2241 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2303 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -56,6 +56,14 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri audit-failed-logins       # Failed login attempts
 .venv/bin/sindri audit-export -o audit.json  # Export audit logs
 
+# API Keys
+.venv/bin/sindri api-keys                  # List API keys
+.venv/bin/sindri api-key-create user123 "CI Key" -s read -s write  # Create key
+.venv/bin/sindri api-key-info <key_id>     # View key details
+.venv/bin/sindri api-key-stats <key_id>    # View usage statistics
+.venv/bin/sindri api-key-revoke <key_id>   # Revoke a key
+.venv/bin/sindri api-key-global-stats      # Global statistics
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -64,6 +72,60 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### API Keys System (2026-01-17)
+
+Added comprehensive API key management for programmatic access and CI/CD integration:
+
+**Key Features:**
+- Secure key generation with `sk_` prefix (test keys use `sk_test_`)
+- SHA-256 key hashing (only hash is stored, full key shown once at creation)
+- Scope-based permissions with hierarchy (admin includes all, write includes read)
+- Key expiration with configurable days until expiration
+- Rate limiting (configurable requests per minute)
+- Team-based key restrictions
+- Usage tracking with IP, endpoint, and duration logging
+
+**Scopes:**
+- **Read**: read, read:sessions, read:agents, read:metrics
+- **Write**: write, write:sessions, write:tasks (includes read)
+- **Team**: team:read, team:write, team:admin
+- **Webhooks**: webhooks, webhooks:manage
+- **Admin**: Full access (all scopes)
+
+**CLI Commands:**
+- `sindri api-keys` - List API keys (filter by user/team)
+- `sindri api-key-create <user_id> <name> --scope read --scope write` - Create key
+- `sindri api-key-info <key_id>` - View key details
+- `sindri api-key-stats <key_id>` - Usage statistics
+- `sindri api-key-revoke <key_id>` - Revoke (can re-enable later)
+- `sindri api-key-enable <key_id>` - Re-enable revoked key
+- `sindri api-key-delete <key_id>` - Permanently delete
+- `sindri api-key-global-stats` - Global statistics
+- `sindri api-key-cleanup --days 90` - Clean up old keys
+
+**API Endpoints:**
+- `GET /api/api-keys` - List keys (filter by user/team)
+- `POST /api/api-keys` - Create key (returns full key once)
+- `GET /api/api-keys/{id}` - Get key details
+- `PATCH /api/api-keys/{id}` - Update key settings
+- `POST /api/api-keys/{id}/revoke` - Revoke key
+- `POST /api/api-keys/{id}/enable` - Re-enable key
+- `DELETE /api/api-keys/{id}` - Delete key
+- `GET /api/api-keys/{id}/stats` - Get usage statistics
+- `GET /api/api-key/stats` - Global statistics
+- `POST /api/api-key/verify` - Verify key (X-API-Key header)
+- `DELETE /api/api-key/cleanup` - Clean up old keys
+
+**Files:**
+- `sindri/collaboration/api_keys.py` - API keys system implementation
+- Updated `sindri/collaboration/__init__.py` - Module exports
+- Updated `sindri/cli.py` - CLI commands
+- Updated `sindri/web/server.py` - API endpoints
+
+**Tests:** 62 new tests (total: 2303 backend tests)
+
+---
 
 ### Audit Log System (2026-01-17)
 

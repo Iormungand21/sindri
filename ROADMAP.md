@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 53 tools, 2241 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 11 agents, 53 tools, 2303 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 2241 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2303 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -89,8 +89,12 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - Data access and modification auditing
 - Security event detection (brute force, suspicious activity)
 - Compliance-focused exports (JSON, CSV)
+- API Keys: programmatic access for CI/CD and automation
+- Scope-based permissions with hierarchy
+- Rate limiting and usage tracking
+- Key expiration and revocation
 
-**Total:** 2241 backend tests + 104 frontend tests (100% passing)
+**Total:** 2303 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -171,6 +175,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | API Keys (programmatic access, scopes, rate limiting, usage tracking) | +62 |
 | 2026-01-17 | Audit Log System (security/compliance logging, brute force detection) | +52 |
 | 2026-01-17 | Database Migrations (Alembic, Django, Prisma, Knex, Goose, Diesel, SeaORM) | +65 |
 | 2026-01-17 | Webhooks (Slack/Discord/Generic HTTP, HMAC signatures, retry logic) | +57 |

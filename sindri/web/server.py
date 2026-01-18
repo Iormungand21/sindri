@@ -27,6 +27,7 @@ from fastapi import (
     WebSocketDisconnect,
     HTTPException,
     Query,
+    Header,
     BackgroundTasks,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -454,6 +455,83 @@ class WebhookTriggerRequest(BaseModel):
     data: dict = Field(default_factory=dict, description="Event data")
 
 
+# API Key Models
+class APIKeyResponse(BaseModel):
+    """API key response (without sensitive data)."""
+
+    id: str = Field(..., description="API key ID")
+    user_id: str = Field(..., description="Owner user ID")
+    name: str = Field(..., description="Key name")
+    key_prefix: str = Field(..., description="Key prefix for identification")
+    key_suffix: str = Field(..., description="Key suffix for display")
+    scopes: list[str] = Field(..., description="Granted scopes")
+    description: str = Field(default="", description="Key description")
+    created_at: str = Field(..., description="ISO timestamp")
+    expires_at: Optional[str] = Field(default=None, description="Expiration time")
+    last_used_at: Optional[str] = Field(default=None, description="Last usage time")
+    last_used_ip: Optional[str] = Field(default=None, description="Last client IP")
+    use_count: int = Field(..., description="Total use count")
+    rate_limit: int = Field(..., description="Rate limit (req/min)")
+    is_active: bool = Field(..., description="Is key active")
+    is_valid: bool = Field(..., description="Is key valid (active and not expired)")
+    team_id: Optional[str] = Field(default=None, description="Team restriction")
+
+
+class APIKeyCreatedResponse(BaseModel):
+    """Response when API key is created (includes full key)."""
+
+    key: APIKeyResponse = Field(..., description="API key details")
+    api_key: str = Field(..., description="Full API key (shown only once)")
+
+
+class APIKeyCreateRequest(BaseModel):
+    """Request to create an API key."""
+
+    user_id: str = Field(..., description="User ID for key owner")
+    name: str = Field(..., min_length=1, max_length=100, description="Key name")
+    scopes: list[str] = Field(..., min_length=1, description="Scopes to grant")
+    description: str = Field(default="", max_length=500, description="Description")
+    expires_in_days: Optional[int] = Field(
+        default=None, ge=1, le=365, description="Days until expiration"
+    )
+    rate_limit: int = Field(default=0, ge=0, description="Rate limit (0=unlimited)")
+    team_id: Optional[str] = Field(default=None, description="Restrict to team")
+    test_mode: bool = Field(default=False, description="Create test key")
+
+
+class APIKeyUpdateRequest(BaseModel):
+    """Request to update an API key."""
+
+    name: Optional[str] = Field(default=None, min_length=1, max_length=100)
+    description: Optional[str] = Field(default=None, max_length=500)
+    scopes: Optional[list[str]] = Field(default=None)
+    rate_limit: Optional[int] = Field(default=None, ge=0)
+    is_active: Optional[bool] = Field(default=None)
+
+
+class APIKeyStatsResponse(BaseModel):
+    """API key usage statistics."""
+
+    total_requests: int = Field(..., description="Total requests")
+    unique_ips: int = Field(..., description="Unique IP addresses")
+    avg_duration_ms: float = Field(..., description="Average request duration")
+    status_counts: dict = Field(..., description="Requests by status code")
+    top_endpoints: dict = Field(..., description="Top endpoints by usage")
+    daily_usage: dict = Field(..., description="Daily request counts")
+    period_days: int = Field(..., description="Stats period in days")
+
+
+class APIKeyGlobalStatsResponse(BaseModel):
+    """Global API key statistics."""
+
+    total_keys: int = Field(..., description="Total keys")
+    active_keys: int = Field(..., description="Active keys")
+    revoked_keys: int = Field(..., description="Revoked keys")
+    expired_keys: int = Field(..., description="Expired keys")
+    top_scopes: dict = Field(..., description="Most common scopes")
+    usage_24h: int = Field(..., description="Usage in last 24 hours")
+
+
 class SindriAPI:
     """Sindri API application state."""
 
@@ -472,6 +550,7 @@ class SindriAPI:
         self.presence_manager: Optional["PresenceManager"] = None
         self.activity_store: Optional["ActivityStore"] = None
         self.webhook_store: Optional["WebhookStore"] = None
+        self.api_key_store: Optional["APIKeyStore"] = None
 
     async def initialize(self):
         """Initialize API components."""
@@ -484,12 +563,14 @@ class SindriAPI:
         from sindri.collaboration.presence import PresenceManager
         from sindri.collaboration.activity import ActivityStore
         from sindri.collaboration.webhooks import WebhookStore
+        from sindri.collaboration.api_keys import APIKeyStore
 
         self.share_store = ShareStore(self.state.db)
         self.comment_store = CommentStore(self.state.db)
         self.presence_manager = PresenceManager()
         self.webhook_store = WebhookStore(self.state.db)
         self.activity_store = ActivityStore(self.state.db)
+        self.api_key_store = APIKeyStore(self.state.db)
 
         # Start presence cleanup task
         self.presence_manager.start_cleanup_task()
@@ -2165,6 +2246,305 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         """Delete old webhook delivery records."""
         deleted = await api.webhook_store.cleanup_old_deliveries(days=days)
         return {"deleted": deleted, "days": days}
+
+    # ===== API Keys Endpoints =====
+
+    @app.get(
+        "/api/api-keys",
+        response_model=list[APIKeyResponse],
+        tags=["API Keys"],
+    )
+    async def list_api_keys(
+        user_id: Optional[str] = Query(default=None, description="Filter by user"),
+        team_id: Optional[str] = Query(default=None, description="Filter by team"),
+        include_inactive: bool = Query(default=False, description="Include revoked keys"),
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+    ):
+        """List API keys with optional filters."""
+        keys = await api.api_key_store.list_keys(
+            user_id=user_id,
+            team_id=team_id,
+            include_inactive=include_inactive,
+            limit=limit,
+            offset=offset,
+        )
+        return [
+            APIKeyResponse(
+                id=k.id,
+                user_id=k.user_id,
+                name=k.name,
+                key_prefix=k.key_prefix,
+                key_suffix=k.key_suffix,
+                scopes=[s.value for s in k.scopes],
+                description=k.description,
+                created_at=k.created_at.isoformat(),
+                expires_at=k.expires_at.isoformat() if k.expires_at else None,
+                last_used_at=k.last_used_at.isoformat() if k.last_used_at else None,
+                last_used_ip=k.last_used_ip,
+                use_count=k.use_count,
+                rate_limit=k.rate_limit,
+                is_active=k.is_active,
+                is_valid=k.is_valid,
+                team_id=k.team_id,
+            )
+            for k in keys
+        ]
+
+    @app.post(
+        "/api/api-keys",
+        response_model=APIKeyCreatedResponse,
+        status_code=201,
+        tags=["API Keys"],
+    )
+    async def create_api_key(request: APIKeyCreateRequest):
+        """Create a new API key.
+
+        The full API key is returned only once in this response.
+        Store it securely as it cannot be retrieved later.
+        """
+        from sindri.collaboration.api_keys import APIKeyScope
+
+        try:
+            scopes = [APIKeyScope(s) for s in request.scopes]
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"Invalid scope: {e}")
+
+        api_key, full_key = await api.api_key_store.create_key(
+            user_id=request.user_id,
+            name=request.name,
+            scopes=scopes,
+            description=request.description,
+            expires_in_days=request.expires_in_days,
+            rate_limit=request.rate_limit,
+            team_id=request.team_id,
+            test_mode=request.test_mode,
+        )
+
+        return APIKeyCreatedResponse(
+            key=APIKeyResponse(
+                id=api_key.id,
+                user_id=api_key.user_id,
+                name=api_key.name,
+                key_prefix=api_key.key_prefix,
+                key_suffix=api_key.key_suffix,
+                scopes=[s.value for s in api_key.scopes],
+                description=api_key.description,
+                created_at=api_key.created_at.isoformat(),
+                expires_at=api_key.expires_at.isoformat() if api_key.expires_at else None,
+                last_used_at=None,
+                last_used_ip=None,
+                use_count=0,
+                rate_limit=api_key.rate_limit,
+                is_active=True,
+                is_valid=True,
+                team_id=api_key.team_id,
+            ),
+            api_key=full_key,
+        )
+
+    @app.get(
+        "/api/api-keys/{key_id}",
+        response_model=APIKeyResponse,
+        tags=["API Keys"],
+    )
+    async def get_api_key(key_id: str):
+        """Get details about a specific API key."""
+        api_key = await api.api_key_store.get_key(key_id)
+        if not api_key:
+            raise HTTPException(status_code=404, detail="API key not found")
+
+        return APIKeyResponse(
+            id=api_key.id,
+            user_id=api_key.user_id,
+            name=api_key.name,
+            key_prefix=api_key.key_prefix,
+            key_suffix=api_key.key_suffix,
+            scopes=[s.value for s in api_key.scopes],
+            description=api_key.description,
+            created_at=api_key.created_at.isoformat(),
+            expires_at=api_key.expires_at.isoformat() if api_key.expires_at else None,
+            last_used_at=api_key.last_used_at.isoformat() if api_key.last_used_at else None,
+            last_used_ip=api_key.last_used_ip,
+            use_count=api_key.use_count,
+            rate_limit=api_key.rate_limit,
+            is_active=api_key.is_active,
+            is_valid=api_key.is_valid,
+            team_id=api_key.team_id,
+        )
+
+    @app.patch(
+        "/api/api-keys/{key_id}",
+        response_model=APIKeyResponse,
+        tags=["API Keys"],
+    )
+    async def update_api_key(key_id: str, request: APIKeyUpdateRequest):
+        """Update an API key's settings."""
+        from sindri.collaboration.api_keys import APIKeyScope
+
+        scopes = None
+        if request.scopes is not None:
+            try:
+                scopes = [APIKeyScope(s) for s in request.scopes]
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"Invalid scope: {e}")
+
+        api_key = await api.api_key_store.update_key(
+            key_id=key_id,
+            name=request.name,
+            description=request.description,
+            scopes=scopes,
+            rate_limit=request.rate_limit,
+            is_active=request.is_active,
+        )
+
+        if not api_key:
+            raise HTTPException(status_code=404, detail="API key not found")
+
+        return APIKeyResponse(
+            id=api_key.id,
+            user_id=api_key.user_id,
+            name=api_key.name,
+            key_prefix=api_key.key_prefix,
+            key_suffix=api_key.key_suffix,
+            scopes=[s.value for s in api_key.scopes],
+            description=api_key.description,
+            created_at=api_key.created_at.isoformat(),
+            expires_at=api_key.expires_at.isoformat() if api_key.expires_at else None,
+            last_used_at=api_key.last_used_at.isoformat() if api_key.last_used_at else None,
+            last_used_ip=api_key.last_used_ip,
+            use_count=api_key.use_count,
+            rate_limit=api_key.rate_limit,
+            is_active=api_key.is_active,
+            is_valid=api_key.is_valid,
+            team_id=api_key.team_id,
+        )
+
+    @app.post(
+        "/api/api-keys/{key_id}/revoke",
+        tags=["API Keys"],
+    )
+    async def revoke_api_key(key_id: str):
+        """Revoke an API key (can be re-enabled later)."""
+        success = await api.api_key_store.revoke_key(key_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="API key not found")
+        return {"status": "revoked", "key_id": key_id}
+
+    @app.post(
+        "/api/api-keys/{key_id}/enable",
+        tags=["API Keys"],
+    )
+    async def enable_api_key(key_id: str):
+        """Re-enable a revoked API key."""
+        api_key = await api.api_key_store.update_key(key_id, is_active=True)
+        if not api_key:
+            raise HTTPException(status_code=404, detail="API key not found")
+        return {"status": "enabled", "key_id": key_id}
+
+    @app.delete(
+        "/api/api-keys/{key_id}",
+        tags=["API Keys"],
+    )
+    async def delete_api_key(key_id: str):
+        """Permanently delete an API key."""
+        success = await api.api_key_store.delete_key(key_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="API key not found")
+        return {"status": "deleted", "key_id": key_id}
+
+    @app.get(
+        "/api/api-keys/{key_id}/stats",
+        response_model=APIKeyStatsResponse,
+        tags=["API Keys"],
+    )
+    async def get_api_key_stats(
+        key_id: str,
+        days: int = Query(default=30, ge=1, le=365),
+    ):
+        """Get usage statistics for an API key."""
+        api_key = await api.api_key_store.get_key(key_id)
+        if not api_key:
+            raise HTTPException(status_code=404, detail="API key not found")
+
+        stats = await api.api_key_store.get_usage_stats(key_id, days=days)
+        return APIKeyStatsResponse(**stats)
+
+    @app.get(
+        "/api/api-key/stats",
+        response_model=APIKeyGlobalStatsResponse,
+        tags=["API Keys"],
+    )
+    async def get_global_api_key_stats():
+        """Get global API key statistics."""
+        stats = await api.api_key_store.get_global_stats()
+        return APIKeyGlobalStatsResponse(**stats)
+
+    @app.post(
+        "/api/api-key/verify",
+        tags=["API Keys"],
+    )
+    async def verify_api_key_endpoint(
+        api_key: str = Header(..., alias="X-API-Key"),
+        required_scope: Optional[str] = Query(default=None),
+    ):
+        """Verify an API key and return its details if valid.
+
+        This endpoint can be used by other services to validate API keys.
+        """
+        from sindri.collaboration.api_keys import APIKeyScope
+
+        scope = None
+        if required_scope:
+            try:
+                scope = APIKeyScope(required_scope)
+            except ValueError:
+                raise HTTPException(status_code=400, detail=f"Invalid scope: {required_scope}")
+
+        key = await api.api_key_store.verify_key(
+            api_key,
+            required_scope=scope,
+        )
+
+        if not key:
+            raise HTTPException(status_code=401, detail="Invalid or expired API key")
+
+        return {
+            "valid": True,
+            "key_id": key.id,
+            "user_id": key.user_id,
+            "scopes": [s.value for s in key.scopes],
+            "team_id": key.team_id,
+        }
+
+    @app.delete(
+        "/api/api-key/cleanup",
+        tags=["API Keys"],
+    )
+    async def cleanup_api_keys(
+        days: int = Query(default=90, ge=30, le=365),
+        dry_run: bool = Query(default=True, description="Preview without deleting"),
+    ):
+        """Clean up old expired or revoked API keys."""
+        count = await api.api_key_store.cleanup_expired_keys(
+            delete=not dry_run,
+            older_than_days=days,
+        )
+
+        result = {
+            "count": count,
+            "days": days,
+            "dry_run": dry_run,
+        }
+
+        if not dry_run:
+            # Also clean usage records
+            usage_count = await api.api_key_store.cleanup_old_usage_records(
+                older_than_days=days
+            )
+            result["usage_records_deleted"] = usage_count
+
+        return result
 
     # Helper function for session ID resolution
     async def _resolve_session_id(api_instance: SindriAPI, session_id: str) -> str:

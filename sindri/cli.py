@@ -4357,6 +4357,460 @@ def audit_failed_logins(hours: int = 1, ip: str = None, username: str = None):
 
 
 # ============================================
+# Phase 10: API Keys Commands
+# ============================================
+
+
+@cli.command("api-keys")
+@click.option("--user-id", "-u", help="Filter by user ID")
+@click.option("--team-id", "-t", help="Filter by team ID")
+@click.option("--all", "include_all", is_flag=True, help="Include inactive/revoked keys")
+@click.option("--limit", "-l", default=20, help="Maximum keys to show (default: 20)")
+def api_keys(
+    user_id: str = None,
+    team_id: str = None,
+    include_all: bool = False,
+    limit: int = 20,
+):
+    """List API keys for a user or team.
+
+    Examples:
+
+        sindri api-keys
+
+        sindri api-keys --user-id user123
+
+        sindri api-keys --team-id team456 --all
+    """
+    from sindri.collaboration import APIKeyStore
+
+    async def list_keys():
+        store = APIKeyStore()
+        keys = await store.list_keys(
+            user_id=user_id,
+            team_id=team_id,
+            include_inactive=include_all,
+            limit=limit,
+        )
+
+        if not keys:
+            console.print("[yellow]No API keys found[/]")
+            return
+
+        console.print(f"\n[bold]API Keys ({len(keys)})[/]\n")
+
+        for key in keys:
+            status = "[green]\u2713[/]" if key.is_valid else "[red]\u2717[/]"
+            expired = " [dim](expired)[/]" if key.is_expired else ""
+            inactive = " [dim](revoked)[/]" if not key.is_active else ""
+
+            console.print(
+                f"{status} [bold]{key.name}[/] [dim]({key.display_key})[/]{expired}{inactive}"
+            )
+            console.print(f"   ID: [cyan]{key.id}[/]")
+            console.print(f"   Scopes: [dim]{', '.join(s.value for s in key.scopes)}[/]")
+
+            if key.last_used_at:
+                last_used = key.last_used_at.strftime("%Y-%m-%d %H:%M")
+                console.print(f"   Last used: [dim]{last_used}[/] ({key.use_count} uses)")
+            else:
+                console.print("   Last used: [dim]never[/]")
+
+            if key.expires_at:
+                expires = key.expires_at.strftime("%Y-%m-%d %H:%M")
+                console.print(f"   Expires: [dim]{expires}[/]")
+
+            console.print()
+
+    asyncio.run(list_keys())
+
+
+@cli.command("api-key-create")
+@click.argument("user_id")
+@click.argument("name")
+@click.option(
+    "--scope",
+    "-s",
+    multiple=True,
+    type=click.Choice(
+        [
+            "read",
+            "write",
+            "admin",
+            "read:sessions",
+            "read:agents",
+            "read:metrics",
+            "write:sessions",
+            "write:tasks",
+            "team:read",
+            "team:write",
+            "team:admin",
+            "webhooks",
+            "webhooks:manage",
+        ]
+    ),
+    help="Scopes to grant (can specify multiple)",
+)
+@click.option("--description", "-d", default="", help="Key description")
+@click.option("--expires-days", "-e", type=int, help="Days until expiration")
+@click.option("--rate-limit", "-r", type=int, default=0, help="Requests per minute (0 = unlimited)")
+@click.option("--team-id", "-t", help="Restrict key to a specific team")
+@click.option("--test", is_flag=True, help="Create a test/sandbox key")
+def api_key_create(
+    user_id: str,
+    name: str,
+    scope: tuple = (),
+    description: str = "",
+    expires_days: int = None,
+    rate_limit: int = 0,
+    team_id: str = None,
+    test: bool = False,
+):
+    """Create a new API key.
+
+    The full API key is displayed only once - save it securely!
+
+    Examples:
+
+        sindri api-key-create user123 "CI/CD Key" --scope read --scope write
+
+        sindri api-key-create user123 "Read-Only" -s read -d "For monitoring"
+
+        sindri api-key-create user123 "Temp Key" -s read -e 30 --rate-limit 100
+    """
+    from sindri.collaboration import APIKeyScope, APIKeyStore
+
+    if not scope:
+        console.print("[yellow]Warning: No scopes specified, key will have no permissions[/]")
+        console.print("Use --scope to grant permissions (e.g., --scope read --scope write)")
+        return
+
+    async def create():
+        store = APIKeyStore()
+
+        scopes = [APIKeyScope(s) for s in scope]
+
+        api_key, full_key = await store.create_key(
+            user_id=user_id,
+            name=name,
+            scopes=scopes,
+            description=description,
+            expires_in_days=expires_days,
+            rate_limit=rate_limit,
+            team_id=team_id,
+            test_mode=test,
+        )
+
+        console.print("\n[bold green]\u2713 API Key Created Successfully[/]\n")
+        console.print(f"[bold]Key ID:[/] {api_key.id}")
+        console.print(f"[bold]Name:[/] {api_key.name}")
+        console.print(f"[bold]Scopes:[/] {', '.join(s.value for s in api_key.scopes)}")
+
+        if api_key.expires_at:
+            console.print(f"[bold]Expires:[/] {api_key.expires_at.strftime('%Y-%m-%d %H:%M')}")
+
+        if api_key.rate_limit > 0:
+            console.print(f"[bold]Rate Limit:[/] {api_key.rate_limit} req/min")
+
+        console.print()
+        console.print("[bold yellow]\u26a0 IMPORTANT: Copy your API key now![/]")
+        console.print("[yellow]This is the only time you will see the full key.[/]\n")
+        console.print(f"[bold white on black] {full_key} [/]")
+        console.print()
+
+    asyncio.run(create())
+
+
+@cli.command("api-key-info")
+@click.argument("key_id")
+def api_key_info(key_id: str):
+    """Show detailed information about an API key.
+
+    Example:
+
+        sindri api-key-info abc123def456
+    """
+    from sindri.collaboration import APIKeyStore
+
+    async def show_info():
+        store = APIKeyStore()
+        key = await store.get_key(key_id)
+
+        if not key:
+            console.print(f"[red]API key not found: {key_id}[/]")
+            return
+
+        status = "[green]Active[/]" if key.is_valid else "[red]Invalid[/]"
+        if key.is_expired:
+            status = "[yellow]Expired[/]"
+        elif not key.is_active:
+            status = "[red]Revoked[/]"
+
+        console.print(f"\n[bold]API Key: {key.name}[/] {status}\n")
+        console.print(f"[bold]ID:[/] {key.id}")
+        console.print(f"[bold]Display Key:[/] {key.display_key}")
+        console.print(f"[bold]User ID:[/] {key.user_id}")
+        console.print(f"[bold]Scopes:[/] {', '.join(s.value for s in key.scopes)}")
+
+        if key.description:
+            console.print(f"[bold]Description:[/] {key.description}")
+
+        console.print(f"[bold]Created:[/] {key.created_at.strftime('%Y-%m-%d %H:%M')}")
+
+        if key.expires_at:
+            console.print(f"[bold]Expires:[/] {key.expires_at.strftime('%Y-%m-%d %H:%M')}")
+        else:
+            console.print("[bold]Expires:[/] Never")
+
+        if key.last_used_at:
+            console.print(f"[bold]Last Used:[/] {key.last_used_at.strftime('%Y-%m-%d %H:%M')}")
+            if key.last_used_ip:
+                console.print(f"[bold]Last IP:[/] {key.last_used_ip}")
+        else:
+            console.print("[bold]Last Used:[/] Never")
+
+        console.print(f"[bold]Use Count:[/] {key.use_count}")
+
+        if key.rate_limit > 0:
+            console.print(f"[bold]Rate Limit:[/] {key.rate_limit} req/min")
+        else:
+            console.print("[bold]Rate Limit:[/] Unlimited")
+
+        if key.team_id:
+            console.print(f"[bold]Team Restricted:[/] {key.team_id}")
+
+        console.print()
+
+    asyncio.run(show_info())
+
+
+@cli.command("api-key-revoke")
+@click.argument("key_id")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
+def api_key_revoke(key_id: str, yes: bool = False):
+    """Revoke an API key (can be re-enabled later).
+
+    Example:
+
+        sindri api-key-revoke abc123def456
+
+        sindri api-key-revoke abc123def456 --yes
+    """
+    from sindri.collaboration import APIKeyStore
+
+    async def revoke():
+        store = APIKeyStore()
+        key = await store.get_key(key_id)
+
+        if not key:
+            console.print(f"[red]API key not found: {key_id}[/]")
+            return
+
+        if not key.is_active:
+            console.print(f"[yellow]Key is already revoked: {key.name}[/]")
+            return
+
+        if not yes:
+            if not click.confirm(f"Revoke API key '{key.name}'?"):
+                console.print("[yellow]Cancelled[/]")
+                return
+
+        success = await store.revoke_key(key_id)
+
+        if success:
+            console.print(f"[green]\u2713 API key revoked: {key.name}[/]")
+        else:
+            console.print("[red]Failed to revoke key[/]")
+
+    asyncio.run(revoke())
+
+
+@cli.command("api-key-enable")
+@click.argument("key_id")
+def api_key_enable(key_id: str):
+    """Re-enable a revoked API key.
+
+    Example:
+
+        sindri api-key-enable abc123def456
+    """
+    from sindri.collaboration import APIKeyStore
+
+    async def enable():
+        store = APIKeyStore()
+        key = await store.get_key(key_id)
+
+        if not key:
+            console.print(f"[red]API key not found: {key_id}[/]")
+            return
+
+        if key.is_active:
+            console.print(f"[yellow]Key is already active: {key.name}[/]")
+            return
+
+        updated = await store.update_key(key_id, is_active=True)
+
+        if updated:
+            console.print(f"[green]\u2713 API key re-enabled: {key.name}[/]")
+        else:
+            console.print("[red]Failed to enable key[/]")
+
+    asyncio.run(enable())
+
+
+@cli.command("api-key-delete")
+@click.argument("key_id")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
+def api_key_delete(key_id: str, yes: bool = False):
+    """Permanently delete an API key.
+
+    This cannot be undone. Use api-key-revoke instead if you want to disable temporarily.
+
+    Example:
+
+        sindri api-key-delete abc123def456 --yes
+    """
+    from sindri.collaboration import APIKeyStore
+
+    async def delete():
+        store = APIKeyStore()
+        key = await store.get_key(key_id)
+
+        if not key:
+            console.print(f"[red]API key not found: {key_id}[/]")
+            return
+
+        if not yes:
+            console.print(f"[bold yellow]\u26a0 This will permanently delete the key: {key.name}[/]")
+            if not click.confirm("Are you sure?"):
+                console.print("[yellow]Cancelled[/]")
+                return
+
+        success = await store.delete_key(key_id)
+
+        if success:
+            console.print(f"[green]\u2713 API key deleted: {key.name}[/]")
+        else:
+            console.print("[red]Failed to delete key[/]")
+
+    asyncio.run(delete())
+
+
+@cli.command("api-key-stats")
+@click.argument("key_id")
+@click.option("--days", "-d", default=30, help="Stats for last N days (default: 30)")
+def api_key_stats(key_id: str, days: int = 30):
+    """View usage statistics for an API key.
+
+    Example:
+
+        sindri api-key-stats abc123def456
+
+        sindri api-key-stats abc123def456 --days 7
+    """
+    from sindri.collaboration import APIKeyStore
+
+    async def show_stats():
+        store = APIKeyStore()
+        key = await store.get_key(key_id)
+
+        if not key:
+            console.print(f"[red]API key not found: {key_id}[/]")
+            return
+
+        stats = await store.get_usage_stats(key_id, days=days)
+
+        console.print(f"\n[bold]Usage Stats: {key.name}[/] (last {days} days)\n")
+        console.print(f"[bold]Total Requests:[/] {stats['total_requests']}")
+        console.print(f"[bold]Unique IPs:[/] {stats['unique_ips']}")
+        console.print(f"[bold]Avg Duration:[/] {stats['avg_duration_ms']:.1f} ms")
+
+        if stats["status_counts"]:
+            console.print("\n[bold]By Status Code:[/]")
+            for status, count in sorted(stats["status_counts"].items()):
+                color = "green" if 200 <= status < 300 else "yellow" if 300 <= status < 400 else "red"
+                console.print(f"  [{color}]{status}[/]: {count}")
+
+        if stats["top_endpoints"]:
+            console.print("\n[bold]Top Endpoints:[/]")
+            for endpoint, count in list(stats["top_endpoints"].items())[:5]:
+                console.print(f"  {endpoint}: {count}")
+
+        if stats["daily_usage"]:
+            console.print("\n[bold]Daily Usage:[/]")
+            for day, count in list(stats["daily_usage"].items())[-7:]:
+                bar = "\u2588" * min(count // 10, 20)
+                console.print(f"  {day}: {bar} {count}")
+
+        console.print()
+
+    asyncio.run(show_stats())
+
+
+@cli.command("api-key-global-stats")
+def api_key_global_stats():
+    """View global API key statistics.
+
+    Example:
+
+        sindri api-key-global-stats
+    """
+    from sindri.collaboration import APIKeyStore
+
+    async def show_global():
+        store = APIKeyStore()
+        stats = await store.get_global_stats()
+
+        console.print("\n[bold]Global API Key Statistics[/]\n")
+        console.print(f"[bold]Total Keys:[/] {stats['total_keys']}")
+        console.print(f"[bold]Active:[/] [green]{stats['active_keys']}[/]")
+        console.print(f"[bold]Revoked:[/] [red]{stats['revoked_keys']}[/]")
+        console.print(f"[bold]Expired:[/] [yellow]{stats['expired_keys']}[/]")
+        console.print(f"[bold]Usage (24h):[/] {stats['usage_24h']} requests")
+
+        if stats["top_scopes"]:
+            console.print("\n[bold]Top Scopes:[/]")
+            for scope, count in list(stats["top_scopes"].items())[:5]:
+                console.print(f"  {scope}: {count} keys")
+
+        console.print()
+
+    asyncio.run(show_global())
+
+
+@cli.command("api-key-cleanup")
+@click.option("--days", "-d", default=90, help="Delete keys expired/revoked more than N days ago")
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted without deleting")
+def api_key_cleanup(days: int = 90, dry_run: bool = False):
+    """Clean up old expired or revoked API keys.
+
+    Example:
+
+        sindri api-key-cleanup --dry-run
+
+        sindri api-key-cleanup --days 30
+    """
+    from sindri.collaboration import APIKeyStore
+
+    async def cleanup():
+        store = APIKeyStore()
+
+        count = await store.cleanup_expired_keys(delete=not dry_run, older_than_days=days)
+
+        if dry_run:
+            console.print(f"[yellow]Would delete {count} old keys (dry run)[/]")
+        else:
+            console.print(f"[green]\u2713 Cleaned up {count} old keys[/]")
+
+        # Also clean usage records
+        usage_count = await store.cleanup_old_usage_records(older_than_days=days)
+        if not dry_run:
+            console.print(f"[green]\u2713 Cleaned up {usage_count} old usage records[/]")
+
+    asyncio.run(cleanup())
+
+
+# ============================================
 # Phase 9.3: Voice Interface Commands
 # ============================================
 

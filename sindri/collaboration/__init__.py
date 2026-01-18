@@ -94,6 +94,14 @@ from sindri.collaboration.audit import (
     audit_brute_force_detected,
     check_brute_force,
 )
+from sindri.collaboration.api_keys import (
+    APIKey,
+    APIKeyScope,
+    APIKeyStore,
+    APIKeyUsageRecord,
+    authenticate_api_key,
+    create_api_key_for_user,
+)
 
 __all__ = [
     # Sharing
@@ -169,4 +177,11 @@ __all__ = [
     "audit_suspicious_activity",
     "audit_brute_force_detected",
     "check_brute_force",
+    # API Keys
+    "APIKey",
+    "APIKeyScope",
+    "APIKeyStore",
+    "APIKeyUsageRecord",
+    "authenticate_api_key",
+    "create_api_key_for_user",
 ]
