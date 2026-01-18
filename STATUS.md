@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Fine-Tuning Pipeline
-**Test Status:** 1871 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (Team Mode)
+**Current State:** Production Ready with Team Mode
+**Test Status:** 1955 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 10 Features (Advanced Team Collaboration)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 1871 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1955 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -37,6 +37,52 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Team Mode (2026-01-17)
+
+Added multi-user collaboration with team management and role-based permissions:
+
+**User Management (`sindri/collaboration/users.py`):**
+- User accounts with secure password hashing (PBKDF2-SHA256)
+- Authentication with username/password
+- User profiles with display names and preferences
+- Account activation/deactivation
+- User search by username, email, or display name
+
+**Team Management (`sindri/collaboration/teams.py`):**
+- Create and manage teams with owners
+- Invite codes for easy team joining
+- Role-based access control with 4 roles:
+  - **Owner**: Full control including team deletion
+  - **Admin**: Manage team settings and members
+  - **Member**: Create and run sessions
+  - **Viewer**: Read-only access to team sessions
+- Role hierarchy with permission inheritance
+- Ownership transfer between members
+
+**Team Sessions:**
+- Associate sessions with teams
+- Shared sessions visible to all team members
+- Private sessions only visible to creator
+- Session access control based on membership
+
+**Permission Checking:**
+- `can_user_access_session()` - Check session access
+- `get_user_role()` - Get user's team role
+- Role-based permission properties (can_view, can_create_sessions, etc.)
+
+**Statistics:**
+- Per-team statistics (members by role, session count)
+- Global statistics (total teams, memberships, sessions)
+
+**Files:**
+- `sindri/collaboration/users.py` - User management
+- `sindri/collaboration/teams.py` - Team management and permissions
+- Updated `sindri/collaboration/__init__.py` - Module exports
+
+**Tests:** 84 new tests (total: 1955 backend tests)
+
+---
 
 ### Fine-Tuning Pipeline (2026-01-17)
 

@@ -5,6 +5,8 @@ This module provides infrastructure for:
 - Real-time presence tracking
 - Review comments and annotations
 - Collaborative session viewing
+- User management (Team Mode)
+- Team-based collaboration with roles (Team Mode)
 """
 
 from sindri.collaboration.sharing import (
@@ -22,6 +24,17 @@ from sindri.collaboration.presence import (
     Participant,
     PresenceManager,
 )
+from sindri.collaboration.users import (
+    User,
+    UserStore,
+)
+from sindri.collaboration.teams import (
+    Team,
+    TeamRole,
+    TeamMembership,
+    TeamSession,
+    TeamStore,
+)
 
 __all__ = [
     # Sharing
@@ -36,4 +49,13 @@ __all__ = [
     # Presence
     "Participant",
     "PresenceManager",
+    # Users (Team Mode)
+    "User",
+    "UserStore",
+    # Teams (Team Mode)
+    "Team",
+    "TeamRole",
+    "TeamMembership",
+    "TeamSession",
+    "TeamStore",
 ]
