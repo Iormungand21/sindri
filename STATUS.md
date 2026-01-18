@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, and Document Processing Tools
-**Test Status:** 2841 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 2 continues
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, and Network/HTTP Diagnostic Tools
+**Test Status:** 2894 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 2 continues (Database tools next)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2841 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2894 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 16 agents
@@ -133,6 +133,36 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Network & HTTP Diagnostic Tools (2026-01-18) - Phase 12 Tier 2
+
+Added comprehensive network diagnostic tools for debugging, testing, and connectivity analysis:
+
+**New Tools (6 total):**
+- `http_trace` - Detailed HTTP request tracing with timing breakdown, redirects, headers
+- `dns_lookup` - DNS resolution for multiple record types (A, AAAA, MX, TXT, CNAME, NS, etc.)
+- `curl_generate` - Generate curl commands from parameters (headers, auth, JSON body)
+- `ssl_analyze` - SSL/TLS certificate analysis (expiry, chain, cipher, SANs)
+- `port_check` - Check if network ports are open (single or multiple ports)
+- `ping_host` - Network connectivity test via ICMP ping
+
+**Agent Assignments:**
+- **Ratatoskr** (fast executor): All 6 tools for quick diagnostics
+- **Heimdall** (security): ssl_analyze, port_check for security auditing
+
+**Key Features:**
+- Security by default: blocks localhost, private IPs, cloud metadata endpoints
+- Async execution with proper timeout handling
+- Detailed metadata in results for programmatic use
+- Cross-platform ping support (Linux/macOS/Windows)
+
+**Dependencies:**
+- dnspython>=2.6.0 (new dependency)
+- httpx, ssl, cryptography (existing)
+
+**Tests:** +53 new tests (2894 total)
+
+---
 
 ### Document Processing Tools (2026-01-18) - Phase 12 Tier 2
 

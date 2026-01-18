@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that serves as a **multi-disciplinary one-stop shop** for creative and technical work. Beyond code, Sindri coordinates specialized agents for 3D modeling, music composition, electronics design, data visualization, game development, scientific documentation, and more — all using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 16 agents, 116 tools, 2841 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 16 agents, 122 tools, 2894 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -657,7 +657,7 @@ Based on research, these specialized models outperform general-purpose models fo
 | Image | image_resize, image_crop, image_convert, image_rotate, image_thumbnail, image_info | Medium | ✅ Complete |
 | Document | pdf_extract_text, pdf_to_markdown, pdf_merge, pdf_split, ocr_image, spreadsheet_read, spreadsheet_write | Medium | ✅ Complete |
 | Database | sql_explain_plan, sql_generate, db_seed | Medium | |
-| Network | http_trace, dns_lookup, curl_generate | Medium | |
+| Network | http_trace, dns_lookup, curl_generate, ssl_analyze, port_check, ping_host | Medium | ✅ Complete |
 
 **Tier 3 - High Value, Higher Complexity**
 
@@ -732,6 +732,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-18 | Network & HTTP Diagnostic Tools (http_trace, dns_lookup, curl_generate, ssl_analyze, port_check, ping_host) | +53 |
 | 2026-01-18 | Document Processing Tools (pdf_extract_text, pdf_to_markdown, pdf_merge, pdf_split, ocr_image, spreadsheet_read, spreadsheet_write) | +42 |
 | 2026-01-18 | Image Manipulation Tools (image_resize, image_crop, image_convert, image_rotate, image_thumbnail, image_info) | +48 |
 | 2026-01-18 | System & Process Tools (process_list, process_kill, system_info, disk_usage, memory_usage, env_get) | +52 |
@@ -788,6 +789,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-18
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Tier 1 Complete + Image & Document Tools (Tier 2 progress) - 1/8 agents, 38/~100 tools
+**Phase 12 Progress:** Tier 1 Complete + Image, Document & Network Tools (Tier 2 progress) - 1/8 agents, 44/~100 tools
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
 **Maintained By:** Project contributors

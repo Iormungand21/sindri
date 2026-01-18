@@ -196,6 +196,13 @@ AGENTS: dict[str, AgentDefinition] = {
             "ocr_image",
             "spreadsheet_read",
             "spreadsheet_write",
+            # Network and HTTP diagnostic tools
+            "http_trace",
+            "dns_lookup",
+            "curl_generate",
+            "ssl_analyze",
+            "port_check",
+            "ping_host",
         ],
         can_delegate=False,
         estimated_vram_gb=3.0,
@@ -269,7 +276,17 @@ AGENTS: dict[str, AgentDefinition] = {
         role="Security guardian - vulnerability detection and OWASP analysis",
         model="qwen3:14b",  # Reasoning model with thinking mode for security analysis
         system_prompt=HEIMDALL_PROMPT,
-        tools=["read_file", "search_code", "git_diff", "git_log", "lint_code", "shell"],
+        tools=[
+            "read_file",
+            "search_code",
+            "git_diff",
+            "git_log",
+            "lint_code",
+            "shell",
+            # Network security tools
+            "ssl_analyze",
+            "port_check",
+        ],
         can_delegate=True,
         delegate_to=["mimir"],  # Can escalate to code reviewer
         estimated_vram_gb=10.0,
