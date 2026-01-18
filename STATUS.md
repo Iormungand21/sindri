@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, and Compression Tools
-**Test Status:** 2647 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, and Crypto/Encoding Tools
+**Test Status:** 2699 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 12 Features (Universal Tool Platform)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2647 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2699 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 16 agents
@@ -114,6 +114,51 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Crypto & Encoding Tools (2026-01-18) - Phase 12 Tier 1
+
+Added comprehensive crypto and encoding tools for security and data processing:
+
+**New Tools (9 total):**
+- `hash_file` - Calculate file hashes (MD5, SHA1, SHA256, SHA512, BLAKE2b, BLAKE2s)
+- `hash_text` - Calculate text hashes with configurable encoding
+- `encode_base64` - Base64 encode/decode with URL-safe variant
+- `encode_url` - URL encode/decode with plus-mode for query strings
+- `jwt_decode` - Decode JWT tokens (with optional verification)
+- `jwt_generate` - Generate JWT tokens with expiration support
+- `uuid_generate` - Generate UUIDs (v1, v4, v5 with namespaces)
+- `encrypt_file` - Encrypt files with AES (Fernet) and password-based key derivation
+- `decrypt_file` - Decrypt files encrypted with encrypt_file
+
+**Hash Algorithms:**
+- MD5, SHA1 (for checksums only)
+- SHA256, SHA512 (cryptographic)
+- BLAKE2b, BLAKE2s (fast, secure)
+
+**JWT Features:**
+- HS256, HS384, HS512 signing algorithms
+- Unverified decode mode for inspection
+- Automatic iat (issued-at) timestamp
+- Configurable expiration time
+
+**Encryption:**
+- Fernet (AES-128-CBC with HMAC-SHA256)
+- PBKDF2-SHA256 key derivation (480,000 iterations)
+- Automatic salt generation
+
+**Agent Assignment:**
+- Ratatoskr (fast executor) has access to all crypto/encoding tools
+
+**Files:**
+- `sindri/tools/crypto.py` - Crypto tools implementation
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Added tools to Ratatoskr
+- `pyproject.toml` - Added PyJWT and cryptography dependencies
+- `tests/test_crypto.py` - Comprehensive test suite
+
+**Tests:** 52 new tests (total: 2699 backend tests)
+
+---
 
 ### Test Suite Optimization (2026-01-18)
 
@@ -1424,10 +1469,11 @@ GitHub Actions workflow generation and validation:
 | Saga | Data Visualization | qwen2.5-coder:7b |
 | Vör | Text/Regex Processing | qwen2.5-coder:7b |
 
-### Tools (88 total)
+### Tools (97 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Compression:** archive_create, archive_extract, archive_list, compress_file, decompress_file
+**Crypto:** hash_file, hash_text, encode_base64, encode_url, jwt_decode, jwt_generate, uuid_generate, encrypt_file, decrypt_file
 **AST:** parse_ast, find_references, symbol_info, ast_rename
 **Search:** search_code, find_symbol
 **Git:** git_status, git_diff, git_log, git_branch

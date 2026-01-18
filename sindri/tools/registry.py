@@ -109,6 +109,17 @@ from sindri.tools.compression import (
     CompressFileTool,
     DecompressFileTool,
 )
+from sindri.tools.crypto import (
+    HashFileTool,
+    HashTextTool,
+    EncodeBase64Tool,
+    EncodeUrlTool,
+    JwtDecodeTool,
+    JwtGenerateTool,
+    UuidGenerateTool,
+    EncryptFileTool,
+    DecryptFileTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -422,4 +433,14 @@ class ToolRegistry:
         registry.register(ArchiveListTool(work_dir=work_dir))
         registry.register(CompressFileTool(work_dir=work_dir))
         registry.register(DecompressFileTool(work_dir=work_dir))
+        # Crypto and encoding tools
+        registry.register(HashFileTool(work_dir=work_dir))
+        registry.register(HashTextTool(work_dir=work_dir))
+        registry.register(EncodeBase64Tool(work_dir=work_dir))
+        registry.register(EncodeUrlTool(work_dir=work_dir))
+        registry.register(JwtDecodeTool(work_dir=work_dir))
+        registry.register(JwtGenerateTool(work_dir=work_dir))
+        registry.register(UuidGenerateTool(work_dir=work_dir))
+        registry.register(EncryptFileTool(work_dir=work_dir))
+        registry.register(DecryptFileTool(work_dir=work_dir))
         return registry

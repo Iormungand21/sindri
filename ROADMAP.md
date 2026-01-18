@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that serves as a **multi-disciplinary one-stop shop** for creative and technical work. Beyond code, Sindri coordinates specialized agents for 3D modeling, music composition, electronics design, data visualization, game development, scientific documentation, and more — all using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 16 agents, 88 tools, 2650 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 16 agents, 97 tools, 2699 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 2650 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2699 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -647,7 +647,7 @@ Based on research, these specialized models outperform general-purpose models fo
 |----------|-------|--------|--------|
 | Text/Regex | regex_generate, regex_explain, regex_test, text_transform, text_extract | Low | ✅ Complete |
 | Compression | archive_create, archive_extract, archive_list, compress_file, decompress_file | Low | ✅ Complete |
-| Crypto/Encoding | hash_file, encode_base64, jwt_decode | Low | Planned |
+| Crypto/Encoding | hash_file, hash_text, encode_base64, encode_url, jwt_decode, jwt_generate, uuid_generate, encrypt_file, decrypt_file | Low | ✅ Complete |
 | System | process_list, system_info, disk_usage | Low | Planned |
 
 **Tier 2 - High Value, Medium Complexity**
@@ -732,6 +732,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-18 | Crypto & Encoding Tools (hash_file, hash_text, encode_base64, encode_url, jwt_decode, jwt_generate, uuid_generate, encrypt_file, decrypt_file) | +52 |
 | 2026-01-18 | Compression Tools (archive_create, archive_extract, archive_list, compress_file, decompress_file) | +40 |
 | 2026-01-18 | Text/Regex Tools + Vör Agent (regex_generate, regex_explain, regex_test, text_transform, text_extract) | +75 |
 | 2026-01-18 | Data Visualization Agent - Saga (D3.js, matplotlib, Plotly, dashboards) | +60 |
@@ -784,6 +785,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-18
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Text/Regex Tools + Compression Tools complete (1/8 agents, 10/~100 tools)
+**Phase 12 Progress:** Text/Regex Tools + Compression Tools + Crypto/Encoding Tools complete (1/8 agents, 19/~100 tools)
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
 **Maintained By:** Project contributors
