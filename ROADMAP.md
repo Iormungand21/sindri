@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that serves as a **multi-disciplinary one-stop shop** for creative and technical work. Beyond code, Sindri coordinates specialized agents for 3D modeling, music composition, electronics design, data visualization, game development, scientific documentation, and more — all using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 15 agents, 78 tools, 2535 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 16 agents, 83 tools, 2610 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 2535 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2610 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -643,12 +643,12 @@ Based on research, these specialized models outperform general-purpose models fo
 
 **Tier 1 - High ROI, Low Complexity (Implement First)**
 
-| Category | Tools | Effort |
-|----------|-------|--------|
-| Text/Regex | regex_generate, regex_explain, text_transform | Low |
-| Compression | archive_create, archive_extract | Low |
-| Crypto/Encoding | hash_file, encode_base64, jwt_decode | Low |
-| System | process_list, system_info, disk_usage | Low |
+| Category | Tools | Effort | Status |
+|----------|-------|--------|--------|
+| Text/Regex | regex_generate, regex_explain, regex_test, text_transform, text_extract | Low | ✅ Complete |
+| Compression | archive_create, archive_extract | Low | Planned |
+| Crypto/Encoding | hash_file, encode_base64, jwt_decode | Low | Planned |
+| System | process_list, system_info, disk_usage | Low | Planned |
 
 **Tier 2 - High Value, Medium Complexity**
 
@@ -677,7 +677,7 @@ Based on research, these specialized models outperform general-purpose models fo
 - Extend **Heimdall** (Security) with network analysis tools
 
 **Tier 2 - New Lightweight Agents**
-- **Vör** (Regex/Text) - General text processing, pattern generation
+- ✅ **Vör** (Regex/Text) - General text processing, pattern generation - COMPLETE (2026-01-18)
 - **Sif** (Shell/SysAdmin) - System automation, scripting
 
 **Tier 3 - New Specialized Agents**
@@ -732,6 +732,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-18 | Text/Regex Tools + Vör Agent (regex_generate, regex_explain, regex_test, text_transform, text_extract) | +75 |
 | 2026-01-18 | Data Visualization Agent - Saga (D3.js, matplotlib, Plotly, dashboards) | +60 |
 | 2026-01-18 | OpenSCAD 3D Modeling Agent - Völundr (parametric models, STL export) | +55 |
 | 2026-01-18 | LaTeX Generation Agent - Kvasir (documents, TikZ, Beamer, BibTeX) | +64 |
@@ -782,5 +783,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-18
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
+**Phase 12 Progress:** Text/Regex Tools + Vör Agent complete (1/8 agents, 5/~100 tools)
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
 **Maintained By:** Project contributors

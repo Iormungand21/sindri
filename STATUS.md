@@ -6,17 +6,17 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, and Data Visualization
-**Test Status:** 2535 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, and Text/Regex Processing
+**Test Status:** 2610 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 12 Features (Universal Tool Platform)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2535 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2610 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 15 agents
+.venv/bin/sindri agents                    # See all 16 agents
 
 # Launch interfaces
 .venv/bin/sindri tui                       # Terminal UI
@@ -107,6 +107,48 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Text/Regex Processing Tools (2026-01-18) - Phase 12 Start
+
+Added comprehensive text and regex processing tools with the Vör agent for pattern matching and text manipulation:
+
+**New Agent:**
+- **Vör** (Norse goddess of wisdom and attention to detail) - Regex and text processing specialist using qwen2.5-coder:7b
+
+**New Tools (5 total):**
+- `regex_generate` - Generate regex patterns from natural language descriptions
+- `regex_explain` - Explain what a regex pattern matches in plain English
+- `regex_test` - Test regex against sample text, show matches and groups
+- `text_transform` - Apply transformations (case, naming conventions, replacements)
+- `text_extract` - Extract all pattern matches from text with groups
+
+**Supported Patterns:**
+- Email addresses, URLs, phone numbers, IP addresses
+- Dates (ISO, US), times (12h, 24h)
+- UUIDs, hex colors, semantic versions
+- Credit cards, SSNs, MAC addresses
+- Custom patterns from examples or descriptions
+
+**Text Transformations:**
+- Case: upper, lower, title, capitalize, swapcase
+- Naming: snake_case, camelCase, PascalCase, kebab-case, slugify
+- Whitespace: strip, lstrip, rstrip, normalize_whitespace
+- Pattern: replace, regex_replace, reverse, remove_punctuation
+
+**Agent Delegation:**
+- Brokkr can now delegate to Vör for regex/text processing tasks
+- Vör has access to read_file, write_file, search_code, and all text/regex tools
+
+**Files:**
+- `sindri/tools/text_regex.py` - Text/regex tools implementation
+- `sindri/agents/prompts.py` - VOR_PROMPT added
+- `sindri/agents/registry.py` - Vör agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `tests/test_text_regex.py` - Comprehensive test suite
+
+**Tests:** 75 new tests (total: 2610 backend tests)
+
+---
 
 ### Data Visualization System (2026-01-18) - Phase 11 Complete
 
@@ -1280,7 +1322,7 @@ GitHub Actions workflow generation and validation:
 
 ## Project Summary
 
-### Agents (15 total)
+### Agents (16 total)
 
 | Agent | Role | Model |
 |-------|------|-------|
@@ -1299,8 +1341,9 @@ GitHub Actions workflow generation and validation:
 | Kvasir | LaTeX Specialist | llama3.1:8b |
 | Völundr | OpenSCAD 3D Modeler | qwen2.5-coder:7b |
 | Saga | Data Visualization | qwen2.5-coder:7b |
+| Vör | Text/Regex Processing | qwen2.5-coder:7b |
 
-### Tools (78 total)
+### Tools (83 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **AST:** parse_ast, find_references, symbol_info, ast_rename

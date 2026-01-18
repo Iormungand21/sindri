@@ -19,6 +19,8 @@ from sindri.agents.prompts import (
     KVASIR_PROMPT,
     VOLUNDR_PROMPT,
     SAGA_PROMPT,
+    # Phase 12: Text/Regex processing agent (2026-01-18)
+    VOR_PROMPT,
 )
 
 # Agent Registry
@@ -63,6 +65,7 @@ AGENTS: dict[str, AgentDefinition] = {
         can_delegate=True,
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
         # Phase 11: Added skuld, kvasir, volundr, saga for multi-disciplinary domains
+        # Phase 12: Added vor for text/regex processing
         delegate_to=[
             "huginn",
             "mimir",
@@ -77,6 +80,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "kvasir",
             "volundr",
             "saga",
+            "vor",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -417,6 +421,35 @@ AGENTS: dict[str, AgentDefinition] = {
         priority=2,
         max_iterations=15,
         temperature=0.3,  # Lower temp for precise code generation
+        # Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
+    ),
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Phase 12: Text/Regex Processing Agent (2026-01-18)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    "vor": AgentDefinition(
+        name="vor",
+        role="Regex and text processing specialist - pattern matching, parsing, extraction",
+        model="qwen2.5-coder:7b",  # Good for pattern generation
+        system_prompt=VOR_PROMPT,
+        tools=[
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            "search_code",
+            "regex_generate",
+            "regex_explain",
+            "regex_test",
+            "text_transform",
+            "text_extract",
+        ],
+        can_delegate=False,
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=15,
+        temperature=0.3,  # Lower temp for precise pattern generation
         # Fallback to smaller model when VRAM is insufficient
         fallback_model="qwen2.5:3b-instruct-q8_0",
         fallback_vram_gb=3.0,

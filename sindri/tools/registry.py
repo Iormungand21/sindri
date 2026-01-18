@@ -95,6 +95,13 @@ from sindri.tools.dataviz import (
     CreateDashboardTool,
     ExportInteractiveTool,
 )
+from sindri.tools.text_regex import (
+    RegexGenerateTool,
+    RegexExplainTool,
+    RegexTestTool,
+    TextTransformTool,
+    TextExtractTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -396,4 +403,10 @@ class ToolRegistry:
         registry.register(GeneratePlotlyTool(work_dir=work_dir))
         registry.register(CreateDashboardTool(work_dir=work_dir))
         registry.register(ExportInteractiveTool(work_dir=work_dir))
+        # Text and regex tools
+        registry.register(RegexGenerateTool(work_dir=work_dir))
+        registry.register(RegexExplainTool(work_dir=work_dir))
+        registry.register(RegexTestTool(work_dir=work_dir))
+        registry.register(TextTransformTool(work_dir=work_dir))
+        registry.register(TextExtractTool(work_dir=work_dir))
         return registry
