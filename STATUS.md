@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with IDE Integration
-**Test Status:** 1799 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 9 Features (Team Mode, Fine-Tuning Pipeline)
+**Current State:** Production Ready with Fine-Tuning Pipeline
+**Test Status:** 1871 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 9 Features (Team Mode)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 1799 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1871 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -24,6 +24,11 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri voice                     # Voice interface
 .venv/bin/sindri ide                       # IDE server (stdio mode)
 
+# Fine-tune models
+.venv/bin/sindri finetune stats            # View training data statistics
+.venv/bin/sindri finetune train            # Start model fine-tuning
+.venv/bin/sindri finetune models           # List fine-tuned models
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -32,6 +37,86 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Fine-Tuning Pipeline (2026-01-17)
+
+Added complete fine-tuning pipeline for training local LLMs based on session feedback:
+
+**Data Curation (`sindri/finetuning/curator.py`):**
+- Filters sessions by rating, turn count, error status
+- Deduplicates similar conversations using content hashing
+- Balances training data across task categories
+- Computes quality scores based on ratings, tags, and completion status
+- Task classification: code generation, bug fix, refactoring, testing, documentation, explanation, debugging, review
+
+**Model Registry (`sindri/finetuning/registry.py`):**
+- Track fine-tuned models with metadata
+- Version management (auto-increment per model name)
+- Training parameters storage (base model, context length, temperature, quantization)
+- Training metrics tracking (sessions used, tokens trained, training time)
+- Model status lifecycle: training → ready → active → archived
+
+**Training Orchestrator (`sindri/finetuning/trainer.py`):**
+- End-to-end training workflow
+- Automatic data curation and export
+- Ollama Modelfile generation
+- Direct integration with `ollama create`
+- Progress callbacks for UI integration
+- Dry-run mode for previewing training data
+
+**Model Evaluation (`sindri/finetuning/evaluator.py`):**
+- Benchmark suites with test prompts
+- Pattern matching for quality assessment
+- Response time measurement
+- Model comparison (A/B testing)
+- Improvement tracking (before/after fine-tuning)
+
+**CLI Commands:**
+- `sindri finetune prepare` - Analyze and prepare training data
+- `sindri finetune train` - Start model fine-tuning
+- `sindri finetune models` - List fine-tuned models
+- `sindri finetune evaluate <model>` - Benchmark model performance
+- `sindri finetune compare <a> <b>` - Compare two models
+- `sindri finetune deploy <id>` - Set model as active
+- `sindri finetune stats` - View pipeline statistics
+- `sindri finetune info <id>` - Show model details
+- `sindri finetune delete <id>` - Archive a model
+
+**Example Workflow:**
+```bash
+# 1. Collect feedback on sessions (existing command)
+sindri feedback <session-id> 5 --tag correct --tag efficient
+
+# 2. View available training data
+sindri finetune stats
+
+# 3. Prepare and preview training data
+sindri finetune prepare --min-rating 4
+
+# 4. Train a custom model
+sindri finetune train --base-model qwen2.5-coder:7b --name my-coder
+
+# 5. Evaluate the model
+sindri finetune evaluate my-coder
+
+# 6. Compare with base model
+sindri finetune compare qwen2.5-coder:7b my-coder
+
+# 7. Deploy if satisfied
+sindri finetune deploy 1
+```
+
+**Files:**
+- `sindri/finetuning/` - New module
+  - `__init__.py` - Module exports
+  - `curator.py` - Data curation and quality scoring
+  - `registry.py` - Model registry with SQLite persistence
+  - `trainer.py` - Training orchestrator with Ollama integration
+  - `evaluator.py` - Model evaluation and comparison
+
+**Tests:** 72 new tests (total: 1871 backend tests)
+
+---
 
 ### IDE Integration (2026-01-17)
 

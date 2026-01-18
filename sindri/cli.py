@@ -4080,5 +4080,598 @@ def ide_status():
         console.print(f"  [green]✓[/green] {feature}: {desc}")
 
 
+# Fine-tuning Pipeline Commands
+@cli.group()
+def finetune():
+    """Fine-tune local LLMs based on session feedback.
+
+    Commands for the complete fine-tuning pipeline:
+    - prepare: Curate and prepare training data
+    - train: Start model training
+    - models: List fine-tuned models
+    - evaluate: Benchmark model performance
+    - compare: Compare two models
+    - deploy: Set a model as active
+    """
+    pass
+
+
+@finetune.command("prepare")
+@click.option("--min-rating", default=4, help="Minimum feedback rating (1-5)")
+@click.option("--max-sessions", default=500, help="Maximum sessions to include")
+@click.option("--deduplicate/--no-deduplicate", default=True, help="Enable deduplication")
+@click.option("--balance/--no-balance", default=False, help="Balance across categories")
+def finetune_prepare(
+    min_rating: int,
+    max_sessions: int,
+    deduplicate: bool,
+    balance: bool,
+):
+    """Prepare and curate training data.
+
+    Analyzes sessions with positive feedback and prepares them
+    for fine-tuning. Shows statistics about available training data.
+
+    Examples:
+
+        sindri finetune prepare
+
+        sindri finetune prepare --min-rating 5
+
+        sindri finetune prepare --balance --max-sessions 200
+    """
+    from sindri.finetuning.curator import DataCurator, CurationConfig
+
+    async def run():
+        curator = DataCurator()
+
+        config = CurationConfig(
+            min_rating=min_rating,
+            deduplicate=deduplicate,
+            balance_categories=balance,
+        )
+
+        # Get curation stats first
+        console.print("[bold]Training Data Analysis[/bold]\n")
+
+        stats = await curator.get_curation_stats()
+        console.print(f"Total rated sessions: {stats['total_rated_sessions']}")
+        console.print(f"Training candidates (4+ stars): {stats['training_candidates']}")
+
+        if stats['category_distribution']:
+            console.print("\n[bold]Task Categories:[/bold]")
+            for cat, count in sorted(
+                stats['category_distribution'].items(), key=lambda x: x[1], reverse=True
+            ):
+                console.print(f"  {cat}: {count}")
+
+        # Curate the dataset
+        console.print("\n[bold]Curating dataset...[/bold]")
+        dataset = await curator.curate(config)
+
+        if not dataset.sessions:
+            console.print("[yellow]No sessions meet the criteria[/yellow]")
+            console.print("Try lowering --min-rating or collecting more feedback")
+            return
+
+        # Limit to max_sessions
+        if len(dataset.sessions) > max_sessions:
+            dataset.sessions = dataset.sessions[:max_sessions]
+
+        console.print(f"\n[green]✓ Curated {len(dataset.sessions)} sessions[/green]")
+        console.print(f"Total turns: {dataset.total_turns}")
+        console.print(f"Avg quality score: {dataset.avg_quality_score:.3f}")
+
+        if dataset.category_distribution:
+            console.print("\n[bold]Curated Categories:[/bold]")
+            for cat, count in sorted(
+                dataset.category_distribution.items(), key=lambda x: x[1], reverse=True
+            ):
+                console.print(f"  {cat}: {count}")
+
+        console.print(
+            "\n[dim]Run 'sindri finetune train' to start training[/dim]"
+        )
+
+    asyncio.run(run())
+
+
+@finetune.command("train")
+@click.option(
+    "--base-model",
+    "-b",
+    default="qwen2.5-coder:7b",
+    help="Base Ollama model for fine-tuning",
+)
+@click.option("--name", "-n", help="Name for the fine-tuned model")
+@click.option("--description", "-d", default="", help="Model description")
+@click.option("--min-rating", default=4, help="Minimum feedback rating (1-5)")
+@click.option("--max-sessions", default=500, help="Maximum sessions to include")
+@click.option("--context-length", default=4096, help="Context window size")
+@click.option("--temperature", default=0.7, help="Default temperature")
+@click.option("--dry-run", is_flag=True, help="Prepare data without training")
+@click.option("--tag", multiple=True, help="Tags for the model")
+def finetune_train(
+    base_model: str,
+    name: str,
+    description: str,
+    min_rating: int,
+    max_sessions: int,
+    context_length: int,
+    temperature: float,
+    dry_run: bool,
+    tag: tuple,
+):
+    """Start fine-tuning a model.
+
+    Curates training data from rated sessions and creates a
+    fine-tuned model via Ollama.
+
+    Examples:
+
+        sindri finetune train --base-model qwen2.5-coder:7b
+
+        sindri finetune train --name my-coder --min-rating 5
+
+        sindri finetune train --dry-run
+    """
+    from datetime import datetime
+    from pathlib import Path
+    from sindri.finetuning.trainer import TrainingOrchestrator, TrainingConfig
+
+    # Generate model name if not provided
+    if not name:
+        base_name = base_model.split(":")[0].replace(".", "-")
+        timestamp = datetime.now().strftime("%Y%m%d")
+        name = f"sindri-{base_name}-{timestamp}"
+
+    config = TrainingConfig(
+        base_model=base_model,
+        model_name=name,
+        description=description,
+        min_rating=min_rating,
+        max_sessions=max_sessions,
+        context_length=context_length,
+        temperature=temperature,
+        tags=list(tag),
+    )
+
+    async def run():
+        orchestrator = TrainingOrchestrator()
+
+        console.print(f"[bold]Fine-tuning Configuration[/bold]")
+        console.print(f"  Base model: {base_model}")
+        console.print(f"  Model name: {name}")
+        console.print(f"  Min rating: {min_rating}")
+        console.print(f"  Max sessions: {max_sessions}")
+
+        if dry_run:
+            console.print("[yellow]  Dry run mode - will not train[/yellow]")
+
+        console.print()
+
+        def on_progress(job):
+            status = job.status.value
+            progress = job.progress
+            console.print(f"[dim]Progress: {status} ({progress:.0f}%)[/dim]")
+
+        orchestrator.on_progress(on_progress)
+
+        with console.status("[bold green]Training..."):
+            job = await orchestrator.start_training(config, dry_run=dry_run)
+
+        if job.status.value == "completed":
+            console.print(f"\n[green]✓ Training completed![/green]")
+            console.print(f"  Model ID: {job.model_id}")
+            console.print(f"  Sessions used: {len(job.dataset.sessions) if job.dataset else 0}")
+            if job.training_data_path:
+                console.print(f"  Training data: {job.training_data_path}")
+            if job.modelfile_path:
+                console.print(f"  Modelfile: {job.modelfile_path}")
+
+            if not dry_run:
+                console.print(f"\n[dim]Run with: ollama run {name}[/dim]")
+                console.print(f"[dim]Or deploy: sindri finetune deploy {job.model_id}[/dim]")
+        else:
+            console.print(f"\n[red]✗ Training failed: {job.error}[/red]")
+
+    asyncio.run(run())
+
+
+@finetune.command("models")
+@click.option(
+    "--status",
+    "-s",
+    type=click.Choice(["training", "ready", "active", "archived", "failed"]),
+    help="Filter by status",
+)
+@click.option("--limit", default=20, help="Maximum number of models to show")
+def finetune_models(status: str, limit: int):
+    """List fine-tuned models.
+
+    Shows all registered fine-tuned models with their status,
+    training metrics, and version information.
+
+    Examples:
+
+        sindri finetune models
+
+        sindri finetune models --status ready
+
+        sindri finetune models --limit 50
+    """
+    from rich.table import Table
+    from sindri.finetuning.registry import ModelRegistry, ModelStatus
+
+    async def run():
+        registry = ModelRegistry()
+
+        status_filter = ModelStatus(status) if status else None
+        models = await registry.list_models(status=status_filter, limit=limit)
+
+        if not models:
+            console.print("[yellow]No fine-tuned models found[/yellow]")
+            console.print("[dim]Run 'sindri finetune train' to create one[/dim]")
+            return
+
+        table = Table(title="Fine-tuned Models")
+        table.add_column("ID", style="dim")
+        table.add_column("Name")
+        table.add_column("Version")
+        table.add_column("Status")
+        table.add_column("Base Model")
+        table.add_column("Sessions")
+        table.add_column("Created")
+
+        for model in models:
+            status_style = {
+                "training": "yellow",
+                "ready": "green",
+                "active": "bold green",
+                "archived": "dim",
+                "failed": "red",
+            }.get(model.status.value, "")
+
+            table.add_row(
+                str(model.id),
+                model.name,
+                f"v{model.version}",
+                f"[{status_style}]{model.status.value}[/{status_style}]",
+                model.params.base_model,
+                str(model.metrics.sessions_used),
+                model.created_at.strftime("%Y-%m-%d"),
+            )
+
+        console.print(table)
+
+        # Show active model
+        active = await registry.get_active()
+        if active:
+            console.print(f"\n[bold]Active model:[/bold] {active.name} (ID: {active.id})")
+
+    asyncio.run(run())
+
+
+@finetune.command("evaluate")
+@click.argument("model_name")
+@click.option("--quick", is_flag=True, help="Quick evaluation with fewer prompts")
+@click.option("--timeout", default=60.0, help="Timeout per prompt in seconds")
+def finetune_evaluate(model_name: str, quick: bool, timeout: float):
+    """Evaluate a model's performance.
+
+    Runs benchmark prompts against the model and measures
+    quality metrics.
+
+    Examples:
+
+        sindri finetune evaluate sindri-coder-v1
+
+        sindri finetune evaluate qwen2.5-coder:7b --quick
+    """
+    from rich.table import Table
+    from sindri.finetuning.evaluator import ModelEvaluator, BenchmarkSuite
+
+    async def run():
+        evaluator = ModelEvaluator()
+
+        console.print(f"[bold]Evaluating model: {model_name}[/bold]\n")
+
+        if quick:
+            with console.status("[bold green]Running quick evaluation..."):
+                result = await evaluator.quick_evaluate(model_name)
+
+            console.print(f"Prompts tested: {result['prompts_tested']}")
+            console.print(f"Average score: {result['avg_score']:.3f}")
+            console.print(f"Average response time: {result['avg_response_time_ms']:.0f}ms")
+            status = "[green]PASSED[/green]" if result['all_passed'] else "[yellow]MIXED[/yellow]"
+            console.print(f"Status: {status}")
+        else:
+            suite = BenchmarkSuite.default_coding_suite()
+
+            with console.status(
+                f"[bold green]Running {len(suite.prompts)} benchmarks..."
+            ):
+                results = await evaluator.evaluate_model(
+                    model_name, suite, timeout=timeout
+                )
+
+            # Show results table
+            table = Table(title="Evaluation Results")
+            table.add_column("Prompt")
+            table.add_column("Category")
+            table.add_column("Score")
+            table.add_column("Patterns")
+            table.add_column("Time")
+
+            for r in results:
+                score_style = "green" if r.score >= 0.7 else "yellow" if r.score >= 0.4 else "red"
+                table.add_row(
+                    r.prompt_id,
+                    suite.prompts[[p.id for p in suite.prompts].index(r.prompt_id)].category
+                    if r.prompt_id in [p.id for p in suite.prompts]
+                    else "-",
+                    f"[{score_style}]{r.score:.2f}[/{score_style}]",
+                    f"{r.passed_patterns}/{r.passed_patterns + r.failed_patterns}",
+                    f"{r.response_time_ms:.0f}ms",
+                )
+
+            console.print(table)
+
+            # Summary
+            avg_score = sum(r.score for r in results) / len(results)
+            avg_time = sum(r.response_time_ms for r in results) / len(results)
+
+            console.print(f"\n[bold]Summary:[/bold]")
+            console.print(f"  Average score: {avg_score:.3f}")
+            console.print(f"  Average time: {avg_time:.0f}ms")
+            console.print(f"  Passed (≥0.5): {sum(1 for r in results if r.score >= 0.5)}/{len(results)}")
+
+    asyncio.run(run())
+
+
+@finetune.command("compare")
+@click.argument("model_a")
+@click.argument("model_b")
+@click.option("--quick", is_flag=True, help="Quick comparison with fewer prompts")
+def finetune_compare(model_a: str, model_b: str, quick: bool):
+    """Compare two models head-to-head.
+
+    Runs the same benchmarks against both models and shows
+    which performs better.
+
+    Examples:
+
+        sindri finetune compare qwen2.5-coder:7b sindri-coder-v1
+
+        sindri finetune compare base-model finetuned-model --quick
+    """
+    from sindri.finetuning.evaluator import ModelEvaluator, BenchmarkSuite
+
+    async def run():
+        evaluator = ModelEvaluator()
+
+        console.print(f"[bold]Comparing models:[/bold]")
+        console.print(f"  Model A: {model_a}")
+        console.print(f"  Model B: {model_b}\n")
+
+        suite = BenchmarkSuite.quick_suite() if quick else BenchmarkSuite.default_coding_suite()
+
+        with console.status(f"[bold green]Running comparison ({len(suite.prompts)} prompts)..."):
+            comparison = await evaluator.compare_models(model_a, model_b, suite)
+
+        # Show results
+        summary = comparison.summary
+
+        console.print(f"\n[bold]Results:[/bold]")
+        console.print(f"\n  {model_a}:")
+        console.print(f"    Score: {summary['model_a']['avg_score']:.3f}")
+        console.print(f"    Response time: {summary['model_a']['avg_response_time_ms']:.0f}ms")
+        console.print(f"    Wins: {summary['model_a']['prompt_wins']}")
+
+        console.print(f"\n  {model_b}:")
+        console.print(f"    Score: {summary['model_b']['avg_score']:.3f}")
+        console.print(f"    Response time: {summary['model_b']['avg_response_time_ms']:.0f}ms")
+        console.print(f"    Wins: {summary['model_b']['prompt_wins']}")
+
+        console.print(f"\n  Ties: {summary['ties']}")
+
+        # Winner
+        if comparison.winner:
+            style = "green" if comparison.winner == model_b else "blue"
+            console.print(f"\n[bold {style}]Winner: {comparison.winner}[/bold {style}]")
+            console.print(f"  Score difference: {abs(summary['score_diff']):.3f}")
+        else:
+            console.print(f"\n[yellow]Result: Too close to call[/yellow]")
+
+    asyncio.run(run())
+
+
+@finetune.command("deploy")
+@click.argument("model_id", type=int)
+def finetune_deploy(model_id: int):
+    """Deploy a fine-tuned model as the active model.
+
+    Sets the specified model as the active/default model for
+    Sindri operations.
+
+    Examples:
+
+        sindri finetune deploy 1
+
+        sindri finetune deploy 5
+    """
+    from sindri.finetuning.registry import ModelRegistry
+
+    async def run():
+        registry = ModelRegistry()
+
+        model = await registry.get_by_id(model_id)
+        if not model:
+            console.print(f"[red]Model ID {model_id} not found[/red]")
+            return
+
+        if model.status.value not in ("ready", "active"):
+            console.print(f"[red]Model is not ready (status: {model.status.value})[/red]")
+            return
+
+        success = await registry.set_active(model_id)
+
+        if success:
+            console.print(f"[green]✓ Model '{model.name}' is now active[/green]")
+            console.print(f"  Ollama name: {model.ollama_name}")
+            console.print(f"\n[dim]Use with: ollama run {model.ollama_name}[/dim]")
+        else:
+            console.print(f"[red]Failed to activate model[/red]")
+
+    asyncio.run(run())
+
+
+@finetune.command("stats")
+def finetune_stats():
+    """Show fine-tuning pipeline statistics.
+
+    Displays information about training data, registered models,
+    and training jobs.
+    """
+    from sindri.finetuning.trainer import TrainingOrchestrator
+
+    async def run():
+        orchestrator = TrainingOrchestrator()
+
+        stats = await orchestrator.get_training_stats()
+
+        console.print("[bold]Fine-tuning Pipeline Statistics[/bold]\n")
+
+        # Curation stats
+        curation = stats['curation']
+        console.print("[bold]Training Data:[/bold]")
+        console.print(f"  Total rated sessions: {curation['total_rated_sessions']}")
+        console.print(f"  Training candidates (4+): {curation['training_candidates']}")
+
+        if curation['rating_distribution']:
+            console.print("  Rating distribution:")
+            for rating, count in sorted(curation['rating_distribution'].items()):
+                console.print(f"    {rating}★: {count}")
+
+        # Registry stats
+        registry = stats['registry']
+        console.print("\n[bold]Model Registry:[/bold]")
+        console.print(f"  Total models: {registry['total_models']}")
+        if registry['active_model']:
+            console.print(f"  Active model: {registry['active_model']}")
+
+        if registry['status_distribution']:
+            console.print("  By status:")
+            for status, count in registry['status_distribution'].items():
+                console.print(f"    {status}: {count}")
+
+        # Jobs stats
+        jobs = stats['jobs']
+        console.print("\n[bold]Training Jobs:[/bold]")
+        console.print(f"  Total jobs: {jobs['total']}")
+        if jobs['by_status']:
+            for status, count in jobs['by_status'].items():
+                console.print(f"    {status}: {count}")
+
+    asyncio.run(run())
+
+
+@finetune.command("info")
+@click.argument("model_id", type=int)
+def finetune_info(model_id: int):
+    """Show detailed information about a fine-tuned model.
+
+    Examples:
+
+        sindri finetune info 1
+    """
+    from rich.panel import Panel
+    from sindri.finetuning.registry import ModelRegistry
+
+    async def run():
+        registry = ModelRegistry()
+
+        model = await registry.get_by_id(model_id)
+        if not model:
+            console.print(f"[red]Model ID {model_id} not found[/red]")
+            return
+
+        console.print(Panel(f"[bold]{model.name}[/bold] v{model.version}", title="Model Info"))
+
+        console.print(f"[bold]General:[/bold]")
+        console.print(f"  ID: {model.id}")
+        console.print(f"  Status: {model.status.value}")
+        console.print(f"  Description: {model.description or '(none)'}")
+        console.print(f"  Created: {model.created_at.strftime('%Y-%m-%d %H:%M')}")
+        console.print(f"  Tags: {', '.join(model.tags) if model.tags else '(none)'}")
+
+        console.print(f"\n[bold]Training Parameters:[/bold]")
+        console.print(f"  Base model: {model.params.base_model}")
+        console.print(f"  Context length: {model.params.context_length}")
+        console.print(f"  Temperature: {model.params.temperature}")
+        if model.params.quantization:
+            console.print(f"  Quantization: {model.params.quantization}")
+
+        console.print(f"\n[bold]Training Metrics:[/bold]")
+        console.print(f"  Sessions used: {model.metrics.sessions_used}")
+        console.print(f"  Tokens trained: {model.metrics.tokens_trained}")
+        if model.metrics.training_time_seconds:
+            console.print(f"  Training time: {model.metrics.training_time_seconds:.1f}s")
+        if model.metrics.training_loss:
+            console.print(f"  Training loss: {model.metrics.training_loss:.4f}")
+
+        console.print(f"\n[bold]Paths:[/bold]")
+        console.print(f"  Ollama name: {model.ollama_name or '(not created)'}")
+        console.print(f"  Training data: {model.training_data_path or '(none)'}")
+        console.print(f"  Modelfile: {model.modelfile_path or '(none)'}")
+
+    asyncio.run(run())
+
+
+@finetune.command("delete")
+@click.argument("model_id", type=int)
+@click.option("--force", "-f", is_flag=True, help="Delete without confirmation")
+def finetune_delete(model_id: int, force: bool):
+    """Delete a fine-tuned model from the registry.
+
+    Note: This removes the registry entry but does not delete
+    the Ollama model. Use 'ollama rm' to remove the actual model.
+
+    Examples:
+
+        sindri finetune delete 1
+
+        sindri finetune delete 1 --force
+    """
+    from sindri.finetuning.registry import ModelRegistry
+
+    async def run():
+        registry = ModelRegistry()
+
+        model = await registry.get_by_id(model_id)
+        if not model:
+            console.print(f"[red]Model ID {model_id} not found[/red]")
+            return
+
+        if not force:
+            console.print(f"Delete model '{model.name}' (ID: {model_id})?")
+            confirm = click.confirm("Are you sure?")
+            if not confirm:
+                console.print("[dim]Cancelled[/dim]")
+                return
+
+        # Archive instead of hard delete
+        success = await registry.archive(model_id)
+
+        if success:
+            console.print(f"[green]✓ Model archived (ID: {model_id})[/green]")
+            if model.ollama_name:
+                console.print(f"[dim]To remove Ollama model: ollama rm {model.ollama_name}[/dim]")
+        else:
+            console.print(f"[red]Failed to archive model[/red]")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()

@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 48 tools, 1799 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 11 agents, 48 tools, 1871 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -10,7 +10,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 1799 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 1871 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -103,8 +103,8 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 |---------|-------------|--------|
 | Infrastructure as Code | Terraform/Pulumi generation for AWS/GCP/Azure | **Complete** |
 | IDE Plugins | Neovim plugin, JSON-RPC server | **Complete** |
+| Fine-Tuning Pipeline | Streamlined feedback → training → deployment | **Complete** |
 | Team Mode | Multi-user sessions, permissions | Idea |
-| Fine-Tuning Pipeline | Streamlined feedback → training → deployment | Idea |
 
 ---
 
@@ -154,6 +154,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Fine-Tuning Pipeline (curation, registry, training, evaluation) | +72 |
 | 2026-01-17 | IDE Integration (JSON-RPC server, Neovim plugin) | +56 |
 | 2026-01-17 | Infrastructure as Code (Terraform AWS/GCP/Azure, Pulumi Python/TS) | +73 |
 | 2026-01-17 | Coverage Visualization (Cobertura XML, LCOV, JSON; Web UI) | +40 |
