@@ -6,9 +6,9 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, Network/HTTP Diagnostic Tools, Database Tools, and Video/Audio Processing Tools
-**Test Status:** 2970+ backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 3 Remaining (Profiling, Browser, Cloud Tools)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, Network/HTTP Diagnostic Tools, Database Tools, Video/Audio Processing Tools, and Profiling Tools
+**Test Status:** 3027 backend tests + 104 frontend tests, all passing (100%)
+**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 3 Remaining (Browser, Cloud Tools)
 
 ### Try It Out
 ```bash
@@ -133,6 +133,40 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Python Profiling Tools (2026-01-18) - Phase 12 Tier 3
+
+Added comprehensive profiling and performance analysis tools for Python code:
+
+**New Tools (7 total):**
+- `profile_python` - CPU profiling with cProfile (optional Scalene for detailed CPU/memory/GPU analysis)
+- `profile_time` - Execution timing with timeit, statistical analysis (mean, std, min, max)
+- `memory_analyze` - Memory usage breakdown using tracemalloc (optional memory_profiler for line-by-line)
+- `detect_memory_leaks` - Memory leak detection via snapshot comparison
+- `benchmark_function` - Function benchmarking with warmup, comparison support, and statistics
+- `flame_graph` - Flame graph generation using py-spy (speedscope format)
+- `complexity_analyze` - Big-O complexity estimation via AST analysis (detects loops, recursion, sorting)
+
+**Agent Assignment:**
+- **Ratatoskr** (fast executor) has access to all 7 profiling tools
+
+**Dependencies:**
+- cProfile, timeit, tracemalloc (stdlib - no installation required)
+- memory-profiler>=0.61.0 (optional, in profiling extras)
+- scalene>=1.5.0 (optional, in profiling extras)
+- py-spy (system binary, requires elevated permissions)
+
+**Files:**
+- `sindri/tools/profiling.py` - All profiling tool implementations
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Added tools to Ratatoskr
+- `sindri/agents/prompts.py` - Updated Ratatoskr prompt
+- `pyproject.toml` - Added profiling optional dependency
+- `tests/test_profiling.py` - Comprehensive test suite
+
+**Tests:** +55 new tests (3027 total)
+
+---
 
 ### Video/Audio Processing Tools (2026-01-18) - Phase 12 Tier 3
 

@@ -40,6 +40,10 @@ ast = [
     "tree-sitter-go>=0.25.0",
 ]
 media = ["ffmpeg-python>=0.2.0"]
+profiling = [
+    "memory-profiler>=0.61.0",
+    "scalene>=1.5.0",
+]
 
 [project.scripts]
 sindri = "sindri.cli:cli"

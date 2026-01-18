@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that serves as a **multi-disciplinary one-stop shop** for creative and technical work. Beyond code, Sindri coordinates specialized agents for 3D modeling, music composition, electronics design, data visualization, game development, scientific documentation, and more — all using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 16 agents, 122 tools, 2894 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 16 agents, 129 tools, 3027 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -664,7 +664,7 @@ Based on research, these specialized models outperform general-purpose models fo
 | Category | Tools | Effort | Status |
 |----------|-------|--------|--------|
 | Video/Audio | audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles | Medium | ✅ Complete |
-| Profiling | profile_python, flame_graph | Medium | |
+| Profiling | profile_python, profile_time, memory_analyze, detect_memory_leaks, benchmark_function, flame_graph, complexity_analyze | Medium | ✅ Complete |
 | Browser | browser_navigate, browser_screenshot | High | |
 | Cloud | aws_s3_*, docker_*, k8s_* | High | |
 
@@ -732,6 +732,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-18 | Python Profiling Tools (profile_python, profile_time, memory_analyze, detect_memory_leaks, benchmark_function, flame_graph, complexity_analyze) | +55 |
 | 2026-01-18 | Video/Audio Processing Tools (audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles) | +50 |
 | 2026-01-18 | Network & HTTP Diagnostic Tools (http_trace, dns_lookup, curl_generate, ssl_analyze, port_check, ping_host) | +53 |
 | 2026-01-18 | Document Processing Tools (pdf_extract_text, pdf_to_markdown, pdf_merge, pdf_split, ocr_image, spreadsheet_read, spreadsheet_write) | +42 |
@@ -790,6 +791,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-18
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio Tools (Tier 3 started) - 1/8 agents, 55/~100 tools
+**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio + Profiling Tools (Tier 3 in progress) - 1/8 agents, 62/~100 tools
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
 **Maintained By:** Project contributors

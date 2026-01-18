@@ -172,6 +172,15 @@ from sindri.tools.media import (
     TtsGenerateTool,
     VideoAddSubtitlesTool,
 )
+from sindri.tools.profiling import (
+    ProfilePythonTool,
+    ProfileTimeTool,
+    MemoryAnalyzeTool,
+    DetectMemoryLeaksTool,
+    BenchmarkFunctionTool,
+    FlameGraphTool,
+    ComplexityAnalyzeTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -538,4 +547,12 @@ class ToolRegistry:
         registry.register(VideoConcatTool(work_dir=work_dir))
         registry.register(TtsGenerateTool(work_dir=work_dir))
         registry.register(VideoAddSubtitlesTool(work_dir=work_dir))
+        # Profiling tools
+        registry.register(ProfilePythonTool(work_dir=work_dir))
+        registry.register(ProfileTimeTool(work_dir=work_dir))
+        registry.register(MemoryAnalyzeTool(work_dir=work_dir))
+        registry.register(DetectMemoryLeaksTool(work_dir=work_dir))
+        registry.register(BenchmarkFunctionTool(work_dir=work_dir))
+        registry.register(FlameGraphTool(work_dir=work_dir))
+        registry.register(ComplexityAnalyzeTool(work_dir=work_dir))
         return registry
