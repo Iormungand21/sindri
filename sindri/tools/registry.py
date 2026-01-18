@@ -102,6 +102,13 @@ from sindri.tools.text_regex import (
     TextTransformTool,
     TextExtractTool,
 )
+from sindri.tools.compression import (
+    ArchiveCreateTool,
+    ArchiveExtractTool,
+    ArchiveListTool,
+    CompressFileTool,
+    DecompressFileTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -409,4 +416,10 @@ class ToolRegistry:
         registry.register(RegexTestTool(work_dir=work_dir))
         registry.register(TextTransformTool(work_dir=work_dir))
         registry.register(TextExtractTool(work_dir=work_dir))
+        # Compression and archive tools
+        registry.register(ArchiveCreateTool(work_dir=work_dir))
+        registry.register(ArchiveExtractTool(work_dir=work_dir))
+        registry.register(ArchiveListTool(work_dir=work_dir))
+        registry.register(CompressFileTool(work_dir=work_dir))
+        registry.register(DecompressFileTool(work_dir=work_dir))
         return registry

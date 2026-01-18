@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, and Text/Regex Processing
-**Test Status:** 2610 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, and Compression Tools
+**Test Status:** 2650 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 12 Features (Universal Tool Platform)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2610 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2650 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 16 agents
@@ -99,6 +99,13 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri viz dashboard data.csv -c config.json -o out.html # Create multi-chart dashboard
 .venv/bin/sindri viz export chart_code.js -o chart.html            # Export standalone HTML
 
+# Compression & Archives
+.venv/bin/sindri archive create backup.zip file1.txt dir/         # Create archive
+.venv/bin/sindri archive extract backup.tar.gz -o ./extracted/    # Extract archive
+.venv/bin/sindri archive list archive.zip -d                      # List contents (detailed)
+.venv/bin/sindri archive compress data.json -f gzip               # Compress file
+.venv/bin/sindri archive decompress data.json.gz                  # Decompress file
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -107,6 +114,58 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Compression & Archive Tools (2026-01-18) - Phase 12 Tier 1
+
+Added comprehensive compression and archive tools for file management:
+
+**New Tools (5 total):**
+- `archive_create` - Create zip/tar/tar.gz/tar.bz2/tar.xz archives from files and directories
+- `archive_extract` - Extract archives with format auto-detection
+- `archive_list` - List archive contents with file sizes and dates
+- `compress_file` - Compress single files (gzip, bz2, xz, brotli)
+- `decompress_file` - Decompress files with format auto-detection
+
+**Archive Formats:**
+- ZIP (standard compression)
+- TAR (uncompressed)
+- TAR.GZ / TGZ (gzip compression)
+- TAR.BZ2 / TBZ2 (bzip2 compression)
+- TAR.XZ / TXZ (xz/lzma compression)
+
+**Single-File Compression:**
+- GZIP (.gz)
+- BZIP2 (.bz2)
+- XZ/LZMA (.xz)
+- Brotli (.br) - optional dependency
+
+**Features:**
+- Exclude patterns for archive creation (e.g., `--exclude '*.pyc'`)
+- Configurable compression levels (1-9)
+- Format auto-detection from file extension or magic bytes
+- No-overwrite mode for extraction
+- Compression ratio reporting
+
+**CLI Commands:**
+- `sindri archive create <output> <paths...>` - Create archive
+- `sindri archive extract <archive>` - Extract archive
+- `sindri archive list <archive>` - List contents
+- `sindri archive compress <file> -f <format>` - Compress file
+- `sindri archive decompress <file>` - Decompress file
+
+**Agent Assignment:**
+- Ratatoskr (fast executor) has access to all compression tools
+
+**Files:**
+- `sindri/tools/compression.py` - Compression tools implementation
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Added tools to Ratatoskr
+- `sindri/cli.py` - CLI commands for archive group
+- `tests/test_compression.py` - Comprehensive test suite
+
+**Tests:** 40 new tests (total: 2650 backend tests)
+
+---
 
 ### Text/Regex Processing Tools (2026-01-18) - Phase 12 Start
 
@@ -1343,9 +1402,10 @@ GitHub Actions workflow generation and validation:
 | Saga | Data Visualization | qwen2.5-coder:7b |
 | Vör | Text/Regex Processing | qwen2.5-coder:7b |
 
-### Tools (83 total)
+### Tools (88 total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
+**Compression:** archive_create, archive_extract, archive_list, compress_file, decompress_file
 **AST:** parse_ast, find_references, symbol_info, ast_rename
 **Search:** search_code, find_symbol
 **Git:** git_status, git_diff, git_log, git_branch

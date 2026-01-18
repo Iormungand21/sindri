@@ -7956,5 +7956,194 @@ def viz_export(input_file: str, output: str, library: str, title: str, responsiv
     asyncio.run(run())
 
 
+# =============================================================================
+# Archive and Compression Commands
+# =============================================================================
+
+
+@cli.group()
+def archive():
+    """Archive and compression commands.
+
+    Create, extract, and manage archives (zip, tar) and compressed files (gzip, bz2, xz).
+    """
+    pass
+
+
+@archive.command("create")
+@click.argument("output", type=click.Path())
+@click.argument("paths", nargs=-1, required=True, type=click.Path(exists=True))
+@click.option("--exclude", "-e", multiple=True, help="Patterns to exclude (e.g., '*.pyc')")
+@click.option("--level", "-l", type=int, default=6, help="Compression level 0-9 (default: 6)")
+def archive_create(output: str, paths: tuple, exclude: tuple, level: int):
+    """Create an archive from files and directories.
+
+    Format is determined by output extension: .zip, .tar, .tar.gz, .tar.bz2, .tar.xz
+
+    Examples:
+
+        sindri archive create backup.zip file1.txt file2.txt dir/
+
+        sindri archive create data.tar.gz src/ -e '*.pyc' -e '__pycache__'
+
+        sindri archive create release.zip dist/ -l 9
+    """
+    from sindri.tools.compression import ArchiveCreateTool
+
+    async def run():
+        tool = ArchiveCreateTool()
+        result = await tool.execute(
+            output=output,
+            paths=list(paths),
+            exclude=list(exclude) if exclude else None,
+            compression_level=level,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@archive.command("extract")
+@click.argument("archive_path", type=click.Path(exists=True))
+@click.option("--output", "-o", type=click.Path(), help="Output directory (default: current)")
+@click.option("--files", "-f", multiple=True, help="Specific files to extract")
+@click.option("--no-overwrite", is_flag=True, help="Don't overwrite existing files")
+def archive_extract(archive_path: str, output: str, files: tuple, no_overwrite: bool):
+    """Extract an archive to a directory.
+
+    Auto-detects format from extension or file magic bytes.
+
+    Examples:
+
+        sindri archive extract backup.zip
+
+        sindri archive extract data.tar.gz -o ./extracted/
+
+        sindri archive extract archive.zip -f config.json -f data/
+    """
+    from sindri.tools.compression import ArchiveExtractTool
+
+    async def run():
+        tool = ArchiveExtractTool()
+        result = await tool.execute(
+            archive=archive_path,
+            output_dir=output,
+            files=list(files) if files else None,
+            overwrite=not no_overwrite,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@archive.command("list")
+@click.argument("archive_path", type=click.Path(exists=True))
+@click.option("--detailed", "-d", is_flag=True, help="Show detailed info (size, date)")
+def archive_list(archive_path: str, detailed: bool):
+    """List contents of an archive.
+
+    Examples:
+
+        sindri archive list backup.zip
+
+        sindri archive list data.tar.gz -d
+    """
+    from sindri.tools.compression import ArchiveListTool
+
+    async def run():
+        tool = ArchiveListTool()
+        result = await tool.execute(
+            archive=archive_path,
+            detailed=detailed,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@archive.command("compress")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--format", "-f", "fmt", type=click.Choice(["gzip", "bz2", "xz", "brotli"]), required=True,
+              help="Compression format")
+@click.option("--output", "-o", type=click.Path(), help="Output path (default: input + extension)")
+@click.option("--level", "-l", type=int, default=6, help="Compression level 1-9 (default: 6)")
+def archive_compress(input_file: str, fmt: str, output: str, level: int):
+    """Compress a single file.
+
+    Examples:
+
+        sindri archive compress data.json -f gzip
+
+        sindri archive compress large.txt -f xz -l 9
+
+        sindri archive compress file.txt -f bz2 -o compressed.bz2
+    """
+    from sindri.tools.compression import CompressFileTool
+
+    async def run():
+        tool = CompressFileTool()
+        result = await tool.execute(
+            input=input_file,
+            format=fmt,
+            output=output,
+            level=level,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@archive.command("decompress")
+@click.argument("input_file", type=click.Path(exists=True))
+@click.option("--output", "-o", type=click.Path(), help="Output path (default: input without extension)")
+@click.option("--format", "-f", "fmt", type=click.Choice(["gzip", "bz2", "xz", "brotli", "auto"]), default="auto",
+              help="Compression format (default: auto-detect)")
+def archive_decompress(input_file: str, output: str, fmt: str):
+    """Decompress a compressed file.
+
+    Auto-detects format from extension or magic bytes.
+
+    Examples:
+
+        sindri archive decompress data.json.gz
+
+        sindri archive decompress file.xz -o restored.txt
+
+        sindri archive decompress file.compressed -f bz2
+    """
+    from sindri.tools.compression import DecompressFileTool
+
+    async def run():
+        tool = DecompressFileTool()
+        result = await tool.execute(
+            input=input_file,
+            output=output,
+            format=fmt,
+        )
+
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()
