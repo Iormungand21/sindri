@@ -6,14 +6,14 @@
 
 ## Quick Start for Next Session
 
-**Current State:** Production Ready with Team Mode, Notifications, and Activity Feed
-**Test Status:** 2067 backend tests + 104 frontend tests, all passing (100%)
+**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, and Webhooks
+**Test Status:** 2124 backend tests + 104 frontend tests, all passing (100%)
 **Next Priority:** Phase 10 Features (Advanced Team Collaboration - continued)
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2067 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2124 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 11 agents
@@ -38,6 +38,11 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri activity-stats            # Activity statistics
 .venv/bin/sindri activity-stats --team team123  # Team-specific stats
 
+# Webhooks
+.venv/bin/sindri webhooks team123          # View team webhooks
+.venv/bin/sindri webhook-create team123 "Alerts" https://hooks.slack.com/...  # Create webhook
+.venv/bin/sindri webhook-test <webhook_id>  # Send test event
+
 # Run a task
 .venv/bin/sindri run "Create hello.py that prints hello"
 .venv/bin/sindri orchestrate "Review this codebase"
@@ -46,6 +51,77 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Webhooks System (2026-01-17)
+
+Added comprehensive webhook system for external integrations:
+
+**Webhook Event Types (`sindri/collaboration/webhooks.py`):**
+- **Session Events**: session.created, session.completed, session.failed, session.resumed
+- **Task Events**: task.started, task.completed, task.delegated
+- **Team Events**: team.member_joined, team.member_left, team.role_changed, team.settings_changed
+- **Comment Events**: comment.added, comment.resolved
+- **Share Events**: session.shared, session.share_revoked
+- **Notification Events**: notification.created
+- **Activity Events**: activity.logged
+- **Wildcard**: `*` - receive all events
+
+**Payload Formats:**
+- **Generic**: Standard JSON with event, timestamp, team_id, and data
+- **Slack**: Slack-compatible blocks format with rich formatting
+- **Discord**: Discord embeds with color coding by event type
+
+**Webhook Features:**
+- HMAC-SHA256 signature verification for security
+- Configurable retry count (default: 3) with exponential backoff
+- Configurable timeout (default: 30s)
+- Custom headers support
+- Event filtering per webhook
+- Enable/disable webhooks without deletion
+- Secret regeneration
+
+**Delivery Features:**
+- Async HTTP delivery with aiohttp
+- Delivery status tracking: pending, success, failed, retrying
+- Retry delays: 1 min, 5 min, 15 min
+- Delivery history with response logging
+- Automatic cleanup of old delivery records
+
+**CLI Commands:**
+- `sindri webhooks <team_id>` - List webhooks for team
+- `sindri webhook-create <team_id> <name> <url>` - Create webhook
+- `sindri webhook-create ... --format slack --event session.completed` - Customize
+- `sindri webhook-info <id>` - View webhook details
+- `sindri webhook-update <id> --enable/--disable` - Enable/disable
+- `sindri webhook-delete <id>` - Delete webhook
+- `sindri webhook-regenerate-secret <id>` - Regenerate secret
+- `sindri webhook-deliveries <id>` - View delivery history
+- `sindri webhook-test <id>` - Send test event
+- `sindri webhook-stats` - View statistics
+- `sindri webhook-cleanup` - Delete old delivery records
+
+**API Endpoints:**
+- `GET /api/teams/{team_id}/webhooks` - List team webhooks
+- `POST /api/webhooks` - Create webhook
+- `GET /api/webhooks/{id}` - Get webhook details
+- `PATCH /api/webhooks/{id}` - Update webhook
+- `DELETE /api/webhooks/{id}` - Delete webhook
+- `POST /api/webhooks/{id}/regenerate-secret` - Regenerate secret
+- `GET /api/webhooks/{id}/deliveries` - List deliveries
+- `POST /api/webhooks/{id}/test` - Send test event
+- `POST /api/webhooks/{id}/trigger` - Manual trigger with custom data
+- `GET /api/webhook/stats` - Get statistics
+- `DELETE /api/webhook/cleanup` - Clean up old deliveries
+
+**Files:**
+- `sindri/collaboration/webhooks.py` - Webhook system
+- Updated `sindri/collaboration/__init__.py` - Module exports
+- Updated `sindri/cli.py` - CLI commands
+- Updated `sindri/web/server.py` - API endpoints
+
+**Tests:** 57 new tests (total: 2124 backend tests)
+
+---
 
 ### Activity Feed System (2026-01-17)
 

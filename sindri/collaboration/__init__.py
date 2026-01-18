@@ -9,6 +9,7 @@ This module provides infrastructure for:
 - Team-based collaboration with roles (Team Mode)
 - Notification system for team collaboration
 - Activity feed for team activity timeline
+- Webhooks for external integrations
 """
 
 from sindri.collaboration.sharing import (
@@ -63,6 +64,17 @@ from sindri.collaboration.activity import (
     log_session_shared,
     log_team_updated,
 )
+from sindri.collaboration.webhooks import (
+    Webhook,
+    WebhookEventType,
+    WebhookFormat,
+    WebhookDelivery,
+    DeliveryStatus,
+    WebhookStore,
+    WebhookDeliveryService,
+    trigger_webhook_event,
+    verify_webhook_signature,
+)
 
 __all__ = [
     # Sharing
@@ -110,4 +122,14 @@ __all__ = [
     "log_comment_added",
     "log_session_shared",
     "log_team_updated",
+    # Webhooks
+    "Webhook",
+    "WebhookEventType",
+    "WebhookFormat",
+    "WebhookDelivery",
+    "DeliveryStatus",
+    "WebhookStore",
+    "WebhookDeliveryService",
+    "trigger_webhook_event",
+    "verify_webhook_signature",
 ]

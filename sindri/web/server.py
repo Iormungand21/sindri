@@ -375,6 +375,85 @@ class ActivityStatsResponse(BaseModel):
     type_breakdown: list = Field(default_factory=list, description="Type breakdown")
 
 
+# ===== Webhook Models =====
+
+
+class WebhookResponse(BaseModel):
+    """Webhook configuration response."""
+
+    id: str = Field(..., description="Webhook ID")
+    team_id: str = Field(..., description="Team ID")
+    name: str = Field(..., description="Webhook name")
+    url: str = Field(..., description="Endpoint URL")
+    events: list[str] = Field(..., description="Subscribed event types")
+    format: str = Field(..., description="Payload format (generic, slack, discord)")
+    enabled: bool = Field(..., description="Whether webhook is enabled")
+    created_at: str = Field(..., description="ISO timestamp")
+    created_by: Optional[str] = Field(default=None, description="Creator user ID")
+    description: str = Field(default="", description="Webhook description")
+    retry_count: int = Field(default=3, description="Retry count on failure")
+    timeout_seconds: int = Field(default=30, description="Request timeout")
+
+
+class WebhookCreateRequest(BaseModel):
+    """Request to create a webhook."""
+
+    team_id: str = Field(..., min_length=1, description="Team ID")
+    name: str = Field(..., min_length=1, max_length=100, description="Webhook name")
+    url: str = Field(..., description="Endpoint URL")
+    events: list[str] = Field(
+        default=["*"], description="Event types to subscribe to"
+    )
+    format: str = Field(default="generic", description="Payload format")
+    description: str = Field(default="", description="Webhook description")
+    headers: dict = Field(default_factory=dict, description="Custom headers")
+    retry_count: int = Field(default=3, ge=0, le=10, description="Retry count")
+    timeout_seconds: int = Field(default=30, ge=5, le=120, description="Timeout")
+    created_by: Optional[str] = Field(default=None, description="Creator user ID")
+
+
+class WebhookUpdateRequest(BaseModel):
+    """Request to update a webhook."""
+
+    name: Optional[str] = Field(default=None, description="New name")
+    url: Optional[str] = Field(default=None, description="New URL")
+    events: Optional[list[str]] = Field(default=None, description="New event list")
+    format: Optional[str] = Field(default=None, description="New format")
+    enabled: Optional[bool] = Field(default=None, description="Enable/disable")
+    description: Optional[str] = Field(default=None, description="New description")
+    headers: Optional[dict] = Field(default=None, description="New headers")
+    retry_count: Optional[int] = Field(default=None, description="New retry count")
+    timeout_seconds: Optional[int] = Field(default=None, description="New timeout")
+
+
+class WebhookDeliveryResponse(BaseModel):
+    """Webhook delivery record response."""
+
+    id: str = Field(..., description="Delivery ID")
+    webhook_id: str = Field(..., description="Webhook ID")
+    event_type: str = Field(..., description="Event type")
+    status: str = Field(..., description="Delivery status")
+    status_code: Optional[int] = Field(default=None, description="HTTP status code")
+    error_message: Optional[str] = Field(default=None, description="Error message")
+    attempt_count: int = Field(..., description="Number of attempts")
+    created_at: str = Field(..., description="ISO timestamp")
+    completed_at: Optional[str] = Field(default=None, description="Completion time")
+
+
+class WebhookStatsResponse(BaseModel):
+    """Webhook statistics response."""
+
+    webhooks: dict = Field(..., description="Webhook counts")
+    deliveries: dict = Field(..., description="Delivery counts")
+
+
+class WebhookTriggerRequest(BaseModel):
+    """Request to manually trigger a webhook event."""
+
+    event_type: str = Field(..., description="Event type to trigger")
+    data: dict = Field(default_factory=dict, description="Event data")
+
+
 class SindriAPI:
     """Sindri API application state."""
 
@@ -392,6 +471,7 @@ class SindriAPI:
         self.comment_store: Optional["CommentStore"] = None
         self.presence_manager: Optional["PresenceManager"] = None
         self.activity_store: Optional["ActivityStore"] = None
+        self.webhook_store: Optional["WebhookStore"] = None
 
     async def initialize(self):
         """Initialize API components."""
@@ -403,10 +483,12 @@ class SindriAPI:
         from sindri.collaboration.comments import CommentStore
         from sindri.collaboration.presence import PresenceManager
         from sindri.collaboration.activity import ActivityStore
+        from sindri.collaboration.webhooks import WebhookStore
 
         self.share_store = ShareStore(self.state.db)
         self.comment_store = CommentStore(self.state.db)
         self.presence_manager = PresenceManager()
+        self.webhook_store = WebhookStore(self.state.db)
         self.activity_store = ActivityStore(self.state.db)
 
         # Start presence cleanup task
@@ -1727,6 +1809,361 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
     ):
         """Delete activities older than specified days."""
         deleted = await api.activity_store.delete_old(days_old=days)
+        return {"deleted": deleted, "days": days}
+
+    # ===== Webhook Endpoints =====
+
+    @app.get(
+        "/api/teams/{team_id}/webhooks",
+        response_model=list[WebhookResponse],
+        tags=["Webhooks"],
+    )
+    async def list_team_webhooks(
+        team_id: str,
+        enabled_only: bool = Query(default=False),
+    ):
+        """List all webhooks for a team."""
+        webhooks = await api.webhook_store.get_team_webhooks(
+            team_id=team_id,
+            enabled_only=enabled_only,
+        )
+
+        return [
+            WebhookResponse(
+                id=w.id,
+                team_id=w.team_id,
+                name=w.name,
+                url=w.url,
+                events=[e.value for e in w.events],
+                format=w.format.value,
+                enabled=w.enabled,
+                created_at=w.created_at.isoformat(),
+                created_by=w.created_by,
+                description=w.description,
+                retry_count=w.retry_count,
+                timeout_seconds=w.timeout_seconds,
+            )
+            for w in webhooks
+        ]
+
+    @app.post(
+        "/api/webhooks",
+        response_model=WebhookResponse,
+        tags=["Webhooks"],
+    )
+    async def create_webhook(request: WebhookCreateRequest):
+        """Create a new webhook."""
+        from sindri.collaboration.webhooks import WebhookEventType, WebhookFormat
+
+        # Parse events
+        events = []
+        for e in request.events:
+            try:
+                events.append(WebhookEventType(e))
+            except ValueError:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid event type: {e}"
+                )
+
+        # Parse format
+        try:
+            fmt = WebhookFormat(request.format)
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid format: {request.format}"
+            )
+
+        webhook = await api.webhook_store.create_webhook(
+            team_id=request.team_id,
+            name=request.name,
+            url=request.url,
+            events=events,
+            format=fmt,
+            description=request.description,
+            headers=request.headers,
+            retry_count=request.retry_count,
+            timeout_seconds=request.timeout_seconds,
+            created_by=request.created_by,
+        )
+
+        return WebhookResponse(
+            id=webhook.id,
+            team_id=webhook.team_id,
+            name=webhook.name,
+            url=webhook.url,
+            events=[e.value for e in webhook.events],
+            format=webhook.format.value,
+            enabled=webhook.enabled,
+            created_at=webhook.created_at.isoformat(),
+            created_by=webhook.created_by,
+            description=webhook.description,
+            retry_count=webhook.retry_count,
+            timeout_seconds=webhook.timeout_seconds,
+        )
+
+    @app.get(
+        "/api/webhooks/{webhook_id}",
+        response_model=WebhookResponse,
+        tags=["Webhooks"],
+    )
+    async def get_webhook(webhook_id: str):
+        """Get a specific webhook by ID."""
+        webhook = await api.webhook_store.get_webhook(webhook_id)
+        if not webhook:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+
+        return WebhookResponse(
+            id=webhook.id,
+            team_id=webhook.team_id,
+            name=webhook.name,
+            url=webhook.url,
+            events=[e.value for e in webhook.events],
+            format=webhook.format.value,
+            enabled=webhook.enabled,
+            created_at=webhook.created_at.isoformat(),
+            created_by=webhook.created_by,
+            description=webhook.description,
+            retry_count=webhook.retry_count,
+            timeout_seconds=webhook.timeout_seconds,
+        )
+
+    @app.patch(
+        "/api/webhooks/{webhook_id}",
+        response_model=WebhookResponse,
+        tags=["Webhooks"],
+    )
+    async def update_webhook(webhook_id: str, request: WebhookUpdateRequest):
+        """Update a webhook configuration."""
+        from sindri.collaboration.webhooks import WebhookEventType, WebhookFormat
+
+        # Parse events if provided
+        events = None
+        if request.events is not None:
+            events = []
+            for e in request.events:
+                try:
+                    events.append(WebhookEventType(e))
+                except ValueError:
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid event type: {e}"
+                    )
+
+        # Parse format if provided
+        fmt = None
+        if request.format is not None:
+            try:
+                fmt = WebhookFormat(request.format)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid format: {request.format}"
+                )
+
+        webhook = await api.webhook_store.update_webhook(
+            webhook_id=webhook_id,
+            name=request.name,
+            url=request.url,
+            events=events,
+            format=fmt,
+            enabled=request.enabled,
+            description=request.description,
+            headers=request.headers,
+            retry_count=request.retry_count,
+            timeout_seconds=request.timeout_seconds,
+        )
+
+        if not webhook:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+
+        return WebhookResponse(
+            id=webhook.id,
+            team_id=webhook.team_id,
+            name=webhook.name,
+            url=webhook.url,
+            events=[e.value for e in webhook.events],
+            format=webhook.format.value,
+            enabled=webhook.enabled,
+            created_at=webhook.created_at.isoformat(),
+            created_by=webhook.created_by,
+            description=webhook.description,
+            retry_count=webhook.retry_count,
+            timeout_seconds=webhook.timeout_seconds,
+        )
+
+    @app.delete(
+        "/api/webhooks/{webhook_id}",
+        tags=["Webhooks"],
+    )
+    async def delete_webhook(webhook_id: str):
+        """Delete a webhook."""
+        deleted = await api.webhook_store.delete_webhook(webhook_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+        return {"deleted": True, "webhook_id": webhook_id}
+
+    @app.post(
+        "/api/webhooks/{webhook_id}/regenerate-secret",
+        tags=["Webhooks"],
+    )
+    async def regenerate_webhook_secret(webhook_id: str):
+        """Regenerate the secret for a webhook."""
+        new_secret = await api.webhook_store.regenerate_secret(webhook_id)
+        if not new_secret:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+        return {"webhook_id": webhook_id, "secret": new_secret}
+
+    @app.get(
+        "/api/webhooks/{webhook_id}/deliveries",
+        response_model=list[WebhookDeliveryResponse],
+        tags=["Webhooks"],
+    )
+    async def list_webhook_deliveries(
+        webhook_id: str,
+        status: Optional[str] = Query(default=None),
+        limit: int = Query(default=50, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ):
+        """List delivery history for a webhook."""
+        from sindri.collaboration.webhooks import DeliveryStatus
+
+        status_filter = None
+        if status:
+            try:
+                status_filter = DeliveryStatus(status)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid status: {status}"
+                )
+
+        deliveries = await api.webhook_store.get_webhook_deliveries(
+            webhook_id=webhook_id,
+            status=status_filter,
+            limit=limit,
+            offset=offset,
+        )
+
+        return [
+            WebhookDeliveryResponse(
+                id=d.id,
+                webhook_id=d.webhook_id,
+                event_type=d.event_type.value,
+                status=d.status.value,
+                status_code=d.status_code,
+                error_message=d.error_message,
+                attempt_count=d.attempt_count,
+                created_at=d.created_at.isoformat(),
+                completed_at=d.completed_at.isoformat() if d.completed_at else None,
+            )
+            for d in deliveries
+        ]
+
+    @app.post(
+        "/api/webhooks/{webhook_id}/test",
+        response_model=WebhookDeliveryResponse,
+        tags=["Webhooks"],
+    )
+    async def test_webhook(webhook_id: str):
+        """Send a test event to a webhook."""
+        from sindri.collaboration.webhooks import (
+            WebhookDeliveryService,
+            WebhookEventType,
+        )
+
+        webhook = await api.webhook_store.get_webhook(webhook_id)
+        if not webhook:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+
+        service = WebhookDeliveryService(api.webhook_store)
+        delivery = await service.deliver(
+            webhook=webhook,
+            event_type=WebhookEventType.SESSION_COMPLETED,
+            data={
+                "title": "Test Webhook",
+                "message": "This is a test delivery from Sindri API",
+                "session_id": "test-session-123",
+                "user": "api-test",
+                "duration": "0s",
+                "test": True,
+            },
+        )
+
+        return WebhookDeliveryResponse(
+            id=delivery.id,
+            webhook_id=delivery.webhook_id,
+            event_type=delivery.event_type.value,
+            status=delivery.status.value,
+            status_code=delivery.status_code,
+            error_message=delivery.error_message,
+            attempt_count=delivery.attempt_count,
+            created_at=delivery.created_at.isoformat(),
+            completed_at=delivery.completed_at.isoformat() if delivery.completed_at else None,
+        )
+
+    @app.post(
+        "/api/webhooks/{webhook_id}/trigger",
+        response_model=WebhookDeliveryResponse,
+        tags=["Webhooks"],
+    )
+    async def trigger_webhook(webhook_id: str, request: WebhookTriggerRequest):
+        """Manually trigger a webhook with custom event data."""
+        from sindri.collaboration.webhooks import (
+            WebhookDeliveryService,
+            WebhookEventType,
+        )
+
+        webhook = await api.webhook_store.get_webhook(webhook_id)
+        if not webhook:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+
+        try:
+            event_type = WebhookEventType(request.event_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid event type: {request.event_type}"
+            )
+
+        service = WebhookDeliveryService(api.webhook_store)
+        delivery = await service.deliver(
+            webhook=webhook,
+            event_type=event_type,
+            data=request.data,
+        )
+
+        return WebhookDeliveryResponse(
+            id=delivery.id,
+            webhook_id=delivery.webhook_id,
+            event_type=delivery.event_type.value,
+            status=delivery.status.value,
+            status_code=delivery.status_code,
+            error_message=delivery.error_message,
+            attempt_count=delivery.attempt_count,
+            created_at=delivery.created_at.isoformat(),
+            completed_at=delivery.completed_at.isoformat() if delivery.completed_at else None,
+        )
+
+    @app.get(
+        "/api/webhook/stats",
+        response_model=WebhookStatsResponse,
+        tags=["Webhooks"],
+    )
+    async def get_webhook_stats(
+        team_id: Optional[str] = Query(default=None),
+    ):
+        """Get webhook statistics."""
+        stats = await api.webhook_store.get_statistics(team_id=team_id)
+        return WebhookStatsResponse(
+            webhooks=stats["webhooks"],
+            deliveries=stats["deliveries"],
+        )
+
+    @app.delete(
+        "/api/webhook/cleanup",
+        tags=["Webhooks"],
+    )
+    async def cleanup_webhook_deliveries(
+        days: int = Query(default=7, ge=1, le=90),
+    ):
+        """Delete old webhook delivery records."""
+        deleted = await api.webhook_store.cleanup_old_deliveries(days=days)
         return {"deleted": deleted, "days": days}
 
     # Helper function for session ID resolution

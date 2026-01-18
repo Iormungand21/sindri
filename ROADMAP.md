@@ -2,7 +2,7 @@
 
 **Vision:** A production-ready, local-first LLM orchestration system that intelligently coordinates specialized agents to build, refactor, and maintain codebases using local inference.
 
-**Current Status:** Production Ready (v0.1.0) - 11 agents, 48 tools, 2011 backend + 104 frontend tests (100% passing)
+**Current Status:** Production Ready (v0.1.0) - 11 agents, 48 tools, 2124 backend + 104 frontend tests (100% passing)
 
 ---
 
@@ -81,8 +81,11 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - CLI commands for notification management
 - Activity Feed: team activity timeline with filtering and statistics
 - Activity Feed API endpoints for web/mobile integration
+- Webhooks: external integrations with Slack, Discord, and generic HTTP
+- HMAC-SHA256 signature verification for webhook security
+- Retry logic with exponential backoff for reliable delivery
 
-**Total:** 2067 backend tests + 104 frontend tests (100% passing)
+**Total:** 2124 backend tests + 104 frontend tests (100% passing)
 
 ---
 
@@ -162,6 +165,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-17 | Webhooks (Slack/Discord/Generic HTTP, HMAC signatures, retry logic) | +57 |
 | 2026-01-17 | Activity Feed (team timeline, filtering, stats, API endpoints) | +56 |
 | 2026-01-17 | Notification System (mentions, comments, team invites, preferences) | +56 |
 | 2026-01-17 | Team Mode (user accounts, teams, role-based permissions) | +84 |

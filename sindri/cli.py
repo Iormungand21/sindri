@@ -3350,6 +3350,566 @@ def activity_cleanup(days: int = 90, dry_run: bool = False):
 
 
 # ============================================
+# Phase 10: Webhook Commands
+# ============================================
+
+
+@cli.command("webhooks")
+@click.argument("team_id")
+@click.option("--enabled-only", "-e", is_flag=True, help="Show only enabled webhooks")
+def webhooks(team_id: str, enabled_only: bool = False):
+    """List webhooks for a team.
+
+    TEAM_ID is the team identifier.
+
+    Examples:
+
+        sindri webhooks team123
+
+        sindri webhooks team123 --enabled-only
+    """
+    from rich.table import Table
+    from sindri.collaboration import WebhookStore
+
+    async def list_webhooks():
+        store = WebhookStore()
+        hooks = await store.get_team_webhooks(team_id, enabled_only=enabled_only)
+
+        if not hooks:
+            console.print(f"[yellow]No webhooks found for team {team_id}[/]")
+            return
+
+        table = Table(title=f"Webhooks for Team {team_id}")
+        table.add_column("ID", width=12)
+        table.add_column("Name", width=20)
+        table.add_column("URL", width=30)
+        table.add_column("Format", width=10)
+        table.add_column("Events", width=20)
+        table.add_column("Status", width=10)
+
+        for hook in hooks:
+            status = "[green]Enabled[/]" if hook.enabled else "[red]Disabled[/]"
+            events = ", ".join(e.value[:15] for e in hook.events[:3])
+            if len(hook.events) > 3:
+                events += f" (+{len(hook.events) - 3})"
+
+            table.add_row(
+                hook.id[:12],
+                hook.name[:20],
+                hook.url[:30],
+                hook.format.value,
+                events,
+                status,
+            )
+
+        console.print(table)
+        console.print(f"\n[dim]Use 'sindri webhook-info <id>' for details[/dim]")
+
+    asyncio.run(list_webhooks())
+
+
+@cli.command("webhook-create")
+@click.argument("team_id")
+@click.argument("name")
+@click.argument("url")
+@click.option(
+    "--event",
+    "-e",
+    "events",
+    multiple=True,
+    help="Event types to subscribe to (can specify multiple)",
+)
+@click.option(
+    "--format",
+    "-f",
+    "fmt",
+    type=click.Choice(["generic", "slack", "discord"]),
+    default="generic",
+    help="Payload format",
+)
+@click.option("--description", "-d", default="", help="Webhook description")
+@click.option("--retry-count", "-r", default=3, help="Number of retries on failure")
+@click.option("--timeout", "-t", default=30, help="Request timeout in seconds")
+@click.option("--created-by", "-u", help="User ID creating the webhook")
+def webhook_create(
+    team_id: str,
+    name: str,
+    url: str,
+    events: tuple,
+    fmt: str,
+    description: str,
+    retry_count: int,
+    timeout: int,
+    created_by: str = None,
+):
+    """Create a new webhook for a team.
+
+    TEAM_ID is the team identifier.
+    NAME is a human-readable name for the webhook.
+    URL is the endpoint to deliver webhooks to.
+
+    Examples:
+
+        sindri webhook-create team123 "Session Alerts" https://example.com/webhook
+
+        sindri webhook-create team123 "Slack Notifier" https://hooks.slack.com/... \\
+            --format slack --event session.completed --event session.failed
+
+        sindri webhook-create team123 "Discord Bot" https://discord.com/api/webhooks/... \\
+            --format discord --event "*"
+    """
+    from sindri.collaboration import WebhookStore, WebhookEventType, WebhookFormat
+
+    async def create():
+        store = WebhookStore()
+
+        # Parse events
+        event_list = []
+        for e in events:
+            if e == "*":
+                event_list.append(WebhookEventType.ALL)
+            else:
+                try:
+                    event_list.append(WebhookEventType(e))
+                except ValueError:
+                    console.print(f"[red]Unknown event type: {e}[/]")
+                    console.print(
+                        f"[dim]Valid events: {', '.join(et.value for et in WebhookEventType)}[/]"
+                    )
+                    return
+
+        # Default to all events if none specified
+        if not event_list:
+            event_list = [WebhookEventType.ALL]
+
+        # Parse format
+        format_map = {
+            "generic": WebhookFormat.GENERIC,
+            "slack": WebhookFormat.SLACK,
+            "discord": WebhookFormat.DISCORD,
+        }
+
+        webhook = await store.create_webhook(
+            team_id=team_id,
+            name=name,
+            url=url,
+            events=event_list,
+            format=format_map[fmt],
+            description=description,
+            retry_count=retry_count,
+            timeout_seconds=timeout,
+            created_by=created_by,
+        )
+
+        console.print(f"[green]\u2713 Webhook created successfully[/green]")
+        console.print(f"\n  [bold]ID:[/bold] {webhook.id}")
+        console.print(f"  [bold]Name:[/bold] {webhook.name}")
+        console.print(f"  [bold]URL:[/bold] {webhook.url}")
+        console.print(f"  [bold]Secret:[/bold] {webhook.secret}")
+        console.print(f"  [bold]Events:[/bold] {', '.join(e.value for e in webhook.events)}")
+        console.print(
+            f"\n[yellow]\u26A0 Save the secret! It won't be shown again.[/]"
+        )
+
+    asyncio.run(create())
+
+
+@cli.command("webhook-info")
+@click.argument("webhook_id")
+@click.option("--show-secret", "-s", is_flag=True, help="Show the webhook secret")
+def webhook_info(webhook_id: str, show_secret: bool = False):
+    """Show detailed information about a webhook.
+
+    WEBHOOK_ID is the webhook identifier.
+
+    Example:
+        sindri webhook-info abc12345
+    """
+    from sindri.collaboration import WebhookStore
+
+    async def show_info():
+        store = WebhookStore()
+        webhook = await store.get_webhook(webhook_id)
+
+        if not webhook:
+            console.print(f"[red]Webhook not found: {webhook_id}[/]")
+            return
+
+        console.print(f"\n[bold]Webhook Details[/bold]")
+        console.print(f"  [bold]ID:[/bold] {webhook.id}")
+        console.print(f"  [bold]Name:[/bold] {webhook.name}")
+        console.print(f"  [bold]Team:[/bold] {webhook.team_id}")
+        console.print(f"  [bold]URL:[/bold] {webhook.url}")
+        console.print(f"  [bold]Format:[/bold] {webhook.format.value}")
+        console.print(f"  [bold]Status:[/bold] {'Enabled' if webhook.enabled else 'Disabled'}")
+        console.print(f"  [bold]Events:[/bold] {', '.join(e.value for e in webhook.events)}")
+        console.print(f"  [bold]Created:[/bold] {webhook.created_at.strftime('%Y-%m-%d %H:%M')}")
+        if webhook.created_by:
+            console.print(f"  [bold]Created By:[/bold] {webhook.created_by}")
+        if webhook.description:
+            console.print(f"  [bold]Description:[/bold] {webhook.description}")
+        console.print(f"  [bold]Retry Count:[/bold] {webhook.retry_count}")
+        console.print(f"  [bold]Timeout:[/bold] {webhook.timeout_seconds}s")
+
+        if show_secret:
+            console.print(f"  [bold]Secret:[/bold] {webhook.secret}")
+
+        # Get delivery stats
+        stats = await store.get_statistics(webhook_id=webhook.id)
+        console.print(f"\n[bold]Delivery Statistics[/bold]")
+        console.print(f"  Total: {stats['deliveries']['total']}")
+        console.print(f"  Success: {stats['deliveries']['success']}")
+        console.print(f"  Failed: {stats['deliveries']['failed']}")
+        console.print(f"  Pending: {stats['deliveries']['pending']}")
+        console.print(f"  Retrying: {stats['deliveries']['retrying']}")
+
+    asyncio.run(show_info())
+
+
+@cli.command("webhook-update")
+@click.argument("webhook_id")
+@click.option("--name", "-n", help="New name")
+@click.option("--url", "-u", help="New URL")
+@click.option("--enable/--disable", default=None, help="Enable or disable webhook")
+@click.option("--description", "-d", help="New description")
+@click.option("--retry-count", "-r", type=int, help="New retry count")
+@click.option("--timeout", "-t", type=int, help="New timeout in seconds")
+def webhook_update(
+    webhook_id: str,
+    name: str = None,
+    url: str = None,
+    enable: bool = None,
+    description: str = None,
+    retry_count: int = None,
+    timeout: int = None,
+):
+    """Update a webhook configuration.
+
+    WEBHOOK_ID is the webhook identifier.
+
+    Examples:
+
+        sindri webhook-update abc12345 --name "New Name"
+
+        sindri webhook-update abc12345 --disable
+
+        sindri webhook-update abc12345 --url https://new-url.com --enable
+    """
+    from sindri.collaboration import WebhookStore
+
+    async def update():
+        store = WebhookStore()
+
+        webhook = await store.update_webhook(
+            webhook_id=webhook_id,
+            name=name,
+            url=url,
+            enabled=enable,
+            description=description,
+            retry_count=retry_count,
+            timeout_seconds=timeout,
+        )
+
+        if not webhook:
+            console.print(f"[red]Webhook not found: {webhook_id}[/]")
+            return
+
+        console.print(f"[green]\u2713 Webhook updated successfully[/green]")
+
+    asyncio.run(update())
+
+
+@cli.command("webhook-delete")
+@click.argument("webhook_id")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
+def webhook_delete(webhook_id: str, yes: bool = False):
+    """Delete a webhook.
+
+    WEBHOOK_ID is the webhook identifier.
+
+    Example:
+        sindri webhook-delete abc12345
+    """
+    from sindri.collaboration import WebhookStore
+
+    async def delete():
+        store = WebhookStore()
+
+        # Get webhook info first
+        webhook = await store.get_webhook(webhook_id)
+        if not webhook:
+            console.print(f"[red]Webhook not found: {webhook_id}[/]")
+            return
+
+        if not yes:
+            console.print(f"[yellow]About to delete webhook:[/]")
+            console.print(f"  Name: {webhook.name}")
+            console.print(f"  URL: {webhook.url}")
+            if not click.confirm("Continue?"):
+                console.print("[dim]Cancelled[/]")
+                return
+
+        deleted = await store.delete_webhook(webhook_id)
+        if deleted:
+            console.print(f"[green]\u2713 Webhook deleted[/green]")
+        else:
+            console.print(f"[red]Failed to delete webhook[/]")
+
+    asyncio.run(delete())
+
+
+@cli.command("webhook-regenerate-secret")
+@click.argument("webhook_id")
+def webhook_regenerate_secret(webhook_id: str):
+    """Regenerate the secret for a webhook.
+
+    WEBHOOK_ID is the webhook identifier.
+
+    Example:
+        sindri webhook-regenerate-secret abc12345
+    """
+    from sindri.collaboration import WebhookStore
+
+    async def regenerate():
+        store = WebhookStore()
+        new_secret = await store.regenerate_secret(webhook_id)
+
+        if not new_secret:
+            console.print(f"[red]Webhook not found: {webhook_id}[/]")
+            return
+
+        console.print(f"[green]\u2713 Secret regenerated[/green]")
+        console.print(f"\n  [bold]New Secret:[/bold] {new_secret}")
+        console.print(f"\n[yellow]\u26A0 Update your webhook endpoint with the new secret![/]")
+
+    asyncio.run(regenerate())
+
+
+@cli.command("webhook-deliveries")
+@click.argument("webhook_id")
+@click.option(
+    "--status",
+    "-s",
+    type=click.Choice(["pending", "success", "failed", "retrying"]),
+    help="Filter by status",
+)
+@click.option("--limit", "-n", default=20, help="Maximum deliveries to show")
+def webhook_deliveries(webhook_id: str, status: str = None, limit: int = 20):
+    """List delivery history for a webhook.
+
+    WEBHOOK_ID is the webhook identifier.
+
+    Examples:
+
+        sindri webhook-deliveries abc12345
+
+        sindri webhook-deliveries abc12345 --status failed
+
+        sindri webhook-deliveries abc12345 --limit 50
+    """
+    from rich.table import Table
+    from sindri.collaboration import WebhookStore, DeliveryStatus
+
+    async def list_deliveries():
+        store = WebhookStore()
+
+        status_filter = None
+        if status:
+            status_filter = DeliveryStatus(status)
+
+        deliveries = await store.get_webhook_deliveries(
+            webhook_id=webhook_id,
+            status=status_filter,
+            limit=limit,
+        )
+
+        if not deliveries:
+            console.print(f"[yellow]No deliveries found[/]")
+            return
+
+        table = Table(title=f"Webhook Deliveries")
+        table.add_column("ID", width=12)
+        table.add_column("Event", width=20)
+        table.add_column("Status", width=10)
+        table.add_column("Code", width=6)
+        table.add_column("Attempts", width=8)
+        table.add_column("Time", width=16)
+
+        status_colors = {
+            "success": "green",
+            "failed": "red",
+            "pending": "yellow",
+            "retrying": "cyan",
+        }
+
+        for d in deliveries:
+            color = status_colors.get(d.status.value, "white")
+            status_str = f"[{color}]{d.status.value}[/]"
+            code = str(d.status_code) if d.status_code else "-"
+            time_str = d.created_at.strftime("%Y-%m-%d %H:%M")
+
+            table.add_row(
+                d.id[:12],
+                d.event_type.value,
+                status_str,
+                code,
+                str(d.attempt_count),
+                time_str,
+            )
+
+        console.print(table)
+
+    asyncio.run(list_deliveries())
+
+
+@cli.command("webhook-test")
+@click.argument("webhook_id")
+def webhook_test(webhook_id: str):
+    """Send a test event to a webhook.
+
+    WEBHOOK_ID is the webhook identifier.
+
+    Example:
+        sindri webhook-test abc12345
+    """
+    from sindri.collaboration import (
+        WebhookStore,
+        WebhookDeliveryService,
+        WebhookEventType,
+    )
+
+    async def test():
+        store = WebhookStore()
+        webhook = await store.get_webhook(webhook_id)
+
+        if not webhook:
+            console.print(f"[red]Webhook not found: {webhook_id}[/]")
+            return
+
+        if not webhook.enabled:
+            console.print(f"[yellow]\u26A0 Webhook is disabled, enabling for test...[/]")
+
+        console.print(f"[cyan]Sending test event to: {webhook.url}[/]")
+
+        service = WebhookDeliveryService(store)
+        delivery = await service.deliver(
+            webhook=webhook,
+            event_type=WebhookEventType.SESSION_COMPLETED,
+            data={
+                "title": "Test Webhook",
+                "message": "This is a test delivery from Sindri",
+                "session_id": "test-session-123",
+                "user": "test-user",
+                "duration": "0s",
+                "test": True,
+            },
+        )
+
+        # Wait a moment for delivery
+        await asyncio.sleep(1)
+
+        # Check result
+        delivery = await store.get_delivery(delivery.id)
+
+        if delivery.status.value == "success":
+            console.print(f"[green]\u2713 Test successful! HTTP {delivery.status_code}[/]")
+        elif delivery.status.value == "retrying":
+            console.print(f"[yellow]\u26A0 Delivery scheduled for retry[/]")
+            if delivery.error_message:
+                console.print(f"  Error: {delivery.error_message}")
+        else:
+            console.print(f"[red]\u2717 Test failed[/]")
+            if delivery.error_message:
+                console.print(f"  Error: {delivery.error_message}")
+            if delivery.status_code:
+                console.print(f"  HTTP Status: {delivery.status_code}")
+
+    asyncio.run(test())
+
+
+@cli.command("webhook-stats")
+@click.option("--team", "-t", "team_id", help="Filter by team ID")
+def webhook_stats(team_id: str = None):
+    """Show webhook statistics.
+
+    Examples:
+
+        sindri webhook-stats
+
+        sindri webhook-stats --team team123
+    """
+    from sindri.collaboration import WebhookStore
+
+    async def show_stats():
+        store = WebhookStore()
+        stats = await store.get_statistics(team_id=team_id)
+
+        if team_id:
+            console.print(f"\n[bold]Webhook Statistics for Team {team_id}[/bold]")
+        else:
+            console.print("\n[bold]Global Webhook Statistics[/bold]")
+
+        console.print(f"\n[bold]Webhooks:[/bold]")
+        console.print(f"  Total: {stats['webhooks']['total']}")
+        console.print(f"  Enabled: {stats['webhooks']['enabled']}")
+
+        console.print(f"\n[bold]Deliveries:[/bold]")
+        console.print(f"  Total: {stats['deliveries']['total']}")
+        console.print(f"  Success: {stats['deliveries']['success']}")
+        console.print(f"  Failed: {stats['deliveries']['failed']}")
+        console.print(f"  Pending: {stats['deliveries']['pending']}")
+        console.print(f"  Retrying: {stats['deliveries']['retrying']}")
+
+        # Calculate success rate
+        total = stats["deliveries"]["total"]
+        if total > 0:
+            success_rate = (stats["deliveries"]["success"] / total) * 100
+            console.print(f"\n  Success Rate: {success_rate:.1f}%")
+
+    asyncio.run(show_stats())
+
+
+@cli.command("webhook-cleanup")
+@click.option(
+    "--days",
+    "-d",
+    default=7,
+    help="Delete deliveries older than this many days (default: 7)",
+)
+@click.option("--dry-run", is_flag=True, help="Show what would be deleted without deleting")
+def webhook_cleanup(days: int = 7, dry_run: bool = False):
+    """Clean up old webhook delivery records.
+
+    Examples:
+
+        sindri webhook-cleanup
+
+        sindri webhook-cleanup --days 3
+
+        sindri webhook-cleanup --dry-run
+    """
+    from sindri.collaboration import WebhookStore
+
+    async def cleanup():
+        store = WebhookStore()
+
+        if dry_run:
+            stats = await store.get_statistics()
+            completed = stats["deliveries"]["success"] + stats["deliveries"]["failed"]
+            console.print(
+                f"[yellow]Dry run: Would delete completed deliveries older than {days} days[/]"
+            )
+            console.print(f"[yellow]Total completed deliveries in database: {completed}[/]")
+        else:
+            deleted = await store.cleanup_old_deliveries(days=days)
+            console.print(
+                f"[green]\u2713 Deleted {deleted} delivery records older than {days} days[/]"
+            )
+
+    asyncio.run(cleanup())
+
+
+# ============================================
 # Phase 9.3: Voice Interface Commands
 # ============================================
 
