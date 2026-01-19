@@ -16,9 +16,9 @@ Sindri is being transformed from a multi-user tool to an **internal-only researc
 
 ### Completed
 - ✅ **Milestone 1:** Removed `sindri/collaboration/` (~16,200 lines, 28+ CLI commands, 50+ API endpoints)
+- ✅ **Milestone 2:** Removed `sindri/ide/` (~2,100 lines, 2 CLI commands)
 
 ### Next
-- **Milestone 2:** Delete `sindri/ide/` and related CLI/tests
 - **Milestone 3:** Simplify marketplace to local-only
 - **Milestone 4-8:** Security relaxation, self-management tools, Web UI cleanup
 
@@ -31,8 +31,8 @@ See `STATUS.md` and `ROADMAP.md` for full details.
 **Sindri** is a local-first, hierarchical LLM orchestration CLI that coordinates specialized agents (Norse-themed) to build, refactor, and maintain code using Ollama. Think of it as a multi-agent coding assistant running entirely on your machine with a 16GB VRAM GPU.
 
 **Key Facts:**
-- **Status:** Architecture Transformation In Progress (Milestone 1 Complete)
-- **Tests:** ~2710 backend + 104 frontend
+- **Status:** Architecture Transformation In Progress (Milestones 1-2 Complete)
+- **Tests:** ~2654 backend + 104 frontend
 - **Agents:** 16+ specialized agents
 - **Tools:** 129+ tools
 - **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
@@ -46,7 +46,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see ~2685 passed)
+# Run tests (should see ~2629 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health
@@ -151,12 +151,11 @@ sindri/
 ├── persistence/   # Database, metrics, feedback
 ├── tui/           # Terminal UI (Textual)
 ├── web/           # FastAPI + React frontend
-├── plugins/       # Plugin system
+├── plugins/       # Plugin system (to be simplified in Milestone 3)
 ├── voice/         # Voice interface (STT/TTS)
-├── ide/           # IDE integration (to be removed in Milestone 2)
 └── analysis/      # Codebase understanding
 
-tests/             # Pytest tests (~2710 tests)
+tests/             # Pytest tests (~2654 tests)
 docs/              # User documentation
 docs/archive/      # Historical documents
 ```

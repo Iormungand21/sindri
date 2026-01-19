@@ -1,6 +1,6 @@
 # Sindri Project Status Report
 **Date:** 2026-01-18
-**Status:** Architecture Transformation IN PROGRESS - Milestone 1 Complete
+**Status:** Architecture Transformation IN PROGRESS - Milestones 1-2 Complete
 
 ---
 
@@ -18,9 +18,14 @@ Sindri is being transformed from a multi-user deployable tool into an **internal
 - **Removed:** Collaboration database tables
 - **Result:** ~16,200 lines removed, tests: 3095 → 2710
 
+#### Milestone 2: Remove IDE Integration (COMPLETE)
+- **Deleted:** `sindri/ide/` directory (3 Python files, 3 Lua files, ~1,295 lines)
+- **Deleted:** `tests/test_ide.py` (818 lines)
+- **Removed:** 2 CLI commands (ide, ide-status)
+- **Result:** ~2,100 lines removed, tests: 2710 → 2654
+
 ### Next Milestones
 
-2. **Milestone 2:** Delete `sindri/ide/` and related CLI/tests
 3. **Milestone 3:** Simplify marketplace to local-only
 4. **Milestone 4:** Relax security restrictions for localhost/private IPs
 5. **Milestone 5:** Add system access configuration
@@ -35,14 +40,14 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 
 ## Current State
 
-**Status:** Internal-only mode (single-user, no collaboration)
-**Test Status:** 2710 tests collected, 2685 passing (20 failing from untracked docker_tools WIP)
+**Status:** Internal-only mode (single-user, no collaboration, no IDE integration)
+**Test Status:** 2654 tests collected, 2629 passing (20 failing from untracked docker_tools WIP)
 **Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2685 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2629 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 17 agents
@@ -51,7 +56,6 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri tui                       # Terminal UI
 .venv/bin/sindri web --port 8000           # Web UI at http://localhost:8000
 .venv/bin/sindri voice                     # Voice interface
-.venv/bin/sindri ide                       # IDE server (to be removed in Milestone 2)
 
 # Fine-tune models
 .venv/bin/sindri finetune stats            # View training data statistics

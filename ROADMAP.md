@@ -2,7 +2,7 @@
 
 **Vision:** An **internal-only**, local-first LLM orchestration system running on a dedicated research machine. Sindri coordinates specialized agents for software development, 3D modeling, data visualization, scientific documentation, and more — with **full system access** for autonomous operation.
 
-**Current Status:** Architecture Transformation In Progress - Milestone 1 Complete
+**Current Status:** Architecture Transformation In Progress - Milestones 1-2 Complete
 
 ---
 
@@ -18,7 +18,7 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 | Milestone | Description | Status | Lines |
 |-----------|-------------|--------|-------|
 | 1. Collaboration | Delete `sindri/collaboration/` module | ✅ **COMPLETE** | -16,200 |
-| 2. IDE Integration | Delete `sindri/ide/` module | ⏳ Pending | -1,500 |
+| 2. IDE Integration | Delete `sindri/ide/` module | ✅ **COMPLETE** | -2,100 |
 | 3. Marketplace | Simplify to local-only | ⏳ Pending | -800 |
 | 4. Security | Relax localhost/private IP restrictions | ⏳ Pending | ~0 |
 | 5. Access Config | Add system access configuration | ⏳ Pending | +200 |
@@ -34,7 +34,15 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 - 50+ API endpoints
 - Collaboration database tables
 
-**Result:** Tests: 3095 → 2710 (2685 passing)
+**Result:** Tests: 3095 → 2710
+
+### Milestone 2 Complete (2026-01-18)
+**Removed:**
+- `sindri/ide/` directory (3 Python files + 3 Lua files, ~1,295 lines)
+- `tests/test_ide.py` (818 lines)
+- 2 CLI commands (ide, ide-status)
+
+**Result:** Tests: 2710 → 2654 (2629 passing)
 
 ### Features Being Kept
 - Core Ralph loop and agent hierarchy
