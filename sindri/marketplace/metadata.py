@@ -40,22 +40,29 @@ class PluginCategory(str, Enum):
 
 
 class SourceType(str, Enum):
-    """Types of plugin sources for installation."""
+    """Types of plugin sources for installation.
 
-    LOCAL = "local"  # Local file path
-    GIT = "git"  # Git repository URL
-    URL = "url"  # Direct download URL
-    MARKETPLACE = "marketplace"  # Community marketplace (future)
+    Note: Only LOCAL is currently supported in internal-only mode.
+    GIT, URL, and MARKETPLACE are kept for backwards compatibility
+    with existing plugin index files.
+    """
+
+    LOCAL = "local"  # Local file path (supported)
+    GIT = "git"  # Git repository URL (legacy, not supported)
+    URL = "url"  # Direct download URL (legacy, not supported)
+    MARKETPLACE = "marketplace"  # Community marketplace (not implemented)
 
 
 @dataclass
 class PluginSource:
     """Information about where a plugin was installed from.
 
+    Note: Only LOCAL source type is currently supported.
+
     Attributes:
-        type: Type of source (local, git, url)
-        location: Source location (path, URL, git repo)
-        ref: Git ref (branch, tag, commit) if applicable
+        type: Type of source (only LOCAL is supported)
+        location: Source location (local file path)
+        ref: Git ref (unused, kept for backwards compatibility)
         installed_at: When the plugin was installed
         updated_at: When the plugin was last updated
     """

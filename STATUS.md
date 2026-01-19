@@ -1,6 +1,6 @@
 # Sindri Project Status Report
 **Date:** 2026-01-18
-**Status:** Architecture Transformation IN PROGRESS - Milestones 1-2 Complete
+**Status:** Architecture Transformation IN PROGRESS - Milestones 1-3 Complete
 
 ---
 
@@ -24,9 +24,14 @@ Sindri is being transformed from a multi-user deployable tool into an **internal
 - **Removed:** 2 CLI commands (ide, ide-status)
 - **Result:** ~2,100 lines removed, tests: 2710 → 2654
 
-### Next Milestones
+#### Milestone 3: Simplify Marketplace to Local-Only (COMPLETE)
+- **Simplified:** `sindri/marketplace/installer.py` - removed git/URL installation methods (~220 lines)
+- **Updated:** CLI commands - removed `--ref` option, updated help text for local-only
+- **Updated:** `sindri/marketplace/metadata.py` - updated docstrings for local-only mode
+- **Removed:** 4 tests for `_detect_source_type()` method
+- **Result:** Marketplace now only supports local path installation, tests: 2654 → 2654 (unchanged)
 
-3. **Milestone 3:** Simplify marketplace to local-only
+### Next Milestones
 4. **Milestone 4:** Relax security restrictions for localhost/private IPs
 5. **Milestone 5:** Add system access configuration
 6. **Milestone 6:** Add self-management tools
@@ -40,7 +45,7 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 
 ## Current State
 
-**Status:** Internal-only mode (single-user, no collaboration, no IDE integration)
+**Status:** Internal-only mode (single-user, no collaboration, no IDE integration, local-only marketplace)
 **Test Status:** 2654 tests collected, 2629 passing (20 failing from untracked docker_tools WIP)
 **Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools
 

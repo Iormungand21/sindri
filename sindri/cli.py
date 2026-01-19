@@ -1285,28 +1285,22 @@ def marketplace_search(
 @marketplace.command("install")
 @click.argument("source")
 @click.option("--name", "-n", help="Override plugin name")
-@click.option("--ref", "-r", help="Git branch/tag/commit (for git sources)")
 @click.option("--no-validate", is_flag=True, help="Skip validation")
 @click.option("--strict", is_flag=True, help="Treat validation warnings as errors")
 def marketplace_install(
     source: str,
     name: str = None,
-    ref: str = None,
     no_validate: bool = False,
     strict: bool = False,
 ):
-    """Install a plugin from a source.
+    """Install a plugin from a local path.
 
-    SOURCE can be:
-    - Local path: /path/to/plugin.py
-    - GitHub shorthand: user/repo
-    - Git URL: https://github.com/user/repo.git
-    - Direct URL: https://example.com/plugin.py
+    SOURCE must be a local path to a plugin file or directory.
 
     Examples:
         sindri marketplace install /path/to/my_tool.py
-        sindri marketplace install user/sindri-plugin-example
-        sindri marketplace install https://github.com/user/repo.git --ref v1.0.0
+        sindri marketplace install ./plugins/my_agent.toml
+        sindri marketplace install /path/to/plugin_directory/
     """
     import asyncio
     from sindri.marketplace import PluginInstaller
@@ -1318,7 +1312,7 @@ def marketplace_install(
 
     console.print(f"[bold]Installing plugin from: {source}[/bold]\n")
 
-    result = asyncio.run(installer.install(source, name=name, ref=ref))
+    result = asyncio.run(installer.install(source, name=name))
 
     if result.success:
         plugin = result.plugin
@@ -1387,7 +1381,10 @@ def marketplace_uninstall(name: str, force: bool = False):
 @click.argument("name", required=False)
 @click.option("--all", "-a", "update_all", is_flag=True, help="Update all plugins")
 def marketplace_update(name: str = None, update_all: bool = False):
-    """Update installed plugins to latest versions.
+    """Re-install plugins from their local source paths.
+
+    This reloads plugins from their original local paths, useful when
+    the source files have been modified.
 
     Examples:
         sindri marketplace update my_tool

@@ -2,7 +2,7 @@
 
 **Vision:** An **internal-only**, local-first LLM orchestration system running on a dedicated research machine. Sindri coordinates specialized agents for software development, 3D modeling, data visualization, scientific documentation, and more — with **full system access** for autonomous operation.
 
-**Current Status:** Architecture Transformation In Progress - Milestones 1-2 Complete
+**Current Status:** Architecture Transformation In Progress - Milestones 1-3 Complete
 
 ---
 
@@ -19,7 +19,7 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 |-----------|-------------|--------|-------|
 | 1. Collaboration | Delete `sindri/collaboration/` module | ✅ **COMPLETE** | -16,200 |
 | 2. IDE Integration | Delete `sindri/ide/` module | ✅ **COMPLETE** | -2,100 |
-| 3. Marketplace | Simplify to local-only | ⏳ Pending | -800 |
+| 3. Marketplace | Simplify to local-only | ✅ **COMPLETE** | -220 |
 | 4. Security | Relax localhost/private IP restrictions | ⏳ Pending | ~0 |
 | 5. Access Config | Add system access configuration | ⏳ Pending | +200 |
 | 6. Self-Management | Add service/cron/update tools | ⏳ Pending | +1,500 |
@@ -43,6 +43,15 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 - 2 CLI commands (ide, ide-status)
 
 **Result:** Tests: 2710 → 2654 (2629 passing)
+
+### Milestone 3 Complete (2026-01-18)
+**Simplified Marketplace to Local-Only:**
+- `sindri/marketplace/installer.py` - removed `_detect_source_type()`, `install_from_git()`, `install_from_url()` (~220 lines)
+- CLI commands - removed `--ref` option, updated help text
+- `sindri/marketplace/metadata.py` - updated docstrings for local-only mode
+- Removed 4 tests for removed `_detect_source_type()` method
+
+**Result:** Marketplace now only supports local path installation. Tests unchanged at 2654 (2625 passing)
 
 ### Features Being Kept
 - Core Ralph loop and agent hierarchy

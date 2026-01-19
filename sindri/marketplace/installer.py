@@ -1,18 +1,14 @@
-"""Plugin installer for the marketplace.
+"""Plugin installer for local plugins.
 
-Handles installing plugins from various sources (git, URL, local path)
-and managing plugin files in the plugin directories.
+Handles installing plugins from local paths and managing plugin files
+in the plugin directories. (Simplified for internal-only mode)
 """
 
 import shutil
-import tempfile
-import zipfile
-import tarfile
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlparse
 import structlog
 
 from sindri.marketplace.metadata import (
@@ -66,28 +62,15 @@ class UninstallResult:
 
 
 class PluginInstaller:
-    """Installs plugins from various sources.
+    """Installs plugins from local paths.
 
-    Supports:
-    - Local file paths
-    - Git repositories (requires git)
-    - Direct URLs (zip/tar archives or single files)
+    Simplified for internal-only mode - only supports local file paths.
 
     Example:
         installer = PluginInstaller()
 
-        # Install from git
-        result = await installer.install_from_git(
-            "https://github.com/user/sindri-plugin-example.git"
-        )
-
         # Install from local path
         result = await installer.install_from_path(Path("/path/to/plugin.py"))
-
-        # Install from URL
-        result = await installer.install_from_url(
-            "https://example.com/plugin.zip"
-        )
 
         # Uninstall
         result = await installer.uninstall("plugin_name")
@@ -121,72 +104,22 @@ class PluginInstaller:
         self.plugin_dir.mkdir(parents=True, exist_ok=True)
         self.agent_dir.mkdir(parents=True, exist_ok=True)
 
-    def _detect_source_type(self, source: str) -> tuple[SourceType, str]:
-        """Detect the source type from a string.
-
-        Args:
-            source: Source string (path, URL, or git URL)
-
-        Returns:
-            Tuple of (SourceType, normalized_location)
-        """
-        # Check if it's a local path
-        path = Path(source)
-        if path.exists():
-            return SourceType.LOCAL, str(path.resolve())
-
-        # Check if it's a git URL
-        if source.endswith(".git") or source.startswith("git@"):
-            return SourceType.GIT, source
-
-        # Check if it's a GitHub/GitLab shorthand
-        if "/" in source and not source.startswith(("http://", "https://")):
-            parts = source.split("/")
-            if len(parts) == 2:
-                # Assume GitHub
-                return SourceType.GIT, f"https://github.com/{source}.git"
-
-        # Parse URL
-        parsed = urlparse(source)
-        if parsed.scheme in ("http", "https"):
-            # Check if it's a git host
-            git_hosts = ["github.com", "gitlab.com", "bitbucket.org"]
-            if any(host in parsed.netloc for host in git_hosts):
-                if not source.endswith(".git"):
-                    source = source.rstrip("/") + ".git"
-                return SourceType.GIT, source
-            return SourceType.URL, source
-
-        # Default to local path
-        return SourceType.LOCAL, source
-
     async def install(
         self,
         source: str,
         name: Optional[str] = None,
-        ref: Optional[str] = None,
     ) -> InstallResult:
-        """Install a plugin from any source.
-
-        Automatically detects the source type and delegates to the
-        appropriate install method.
+        """Install a plugin from a local path.
 
         Args:
-            source: Plugin source (path, URL, or git URL)
+            source: Local path to plugin file or directory
             name: Optional name override
-            ref: Git ref (branch/tag/commit) for git sources
 
         Returns:
             InstallResult with status and details
         """
-        source_type, location = self._detect_source_type(source)
-
-        if source_type == SourceType.LOCAL:
-            return await self.install_from_path(Path(location), name)
-        elif source_type == SourceType.GIT:
-            return await self.install_from_git(location, name, ref)
-        else:
-            return await self.install_from_url(location, name)
+        path = Path(source)
+        return await self.install_from_path(path, name)
 
     async def install_from_path(
         self,
@@ -390,150 +323,6 @@ class PluginInstaller:
 
         return await self._install_single_file(entry_point, metadata.name)
 
-    async def install_from_git(
-        self,
-        url: str,
-        name: Optional[str] = None,
-        ref: Optional[str] = None,
-    ) -> InstallResult:
-        """Install a plugin from a git repository.
-
-        Args:
-            url: Git repository URL
-            name: Optional name override
-            ref: Branch, tag, or commit to checkout
-
-        Returns:
-            InstallResult
-        """
-        import subprocess
-
-        self._ensure_dirs()
-        self.index.load()
-
-        # Check if git is available
-        try:
-            subprocess.run(
-                ["git", "--version"],
-                capture_output=True,
-                check=True,
-            )
-        except (subprocess.CalledProcessError, FileNotFoundError):
-            return InstallResult(
-                success=False, error="Git is not installed or not in PATH"
-            )
-
-        # Clone to temp directory
-        with tempfile.TemporaryDirectory() as tmpdir:
-            clone_path = Path(tmpdir) / "repo"
-
-            try:
-                # Clone repository
-                cmd = ["git", "clone", "--depth", "1"]
-                if ref:
-                    cmd.extend(["--branch", ref])
-                cmd.extend([url, str(clone_path)])
-
-                result = subprocess.run(
-                    cmd,
-                    capture_output=True,
-                    text=True,
-                )
-
-                if result.returncode != 0:
-                    return InstallResult(
-                        success=False, error=f"Git clone failed: {result.stderr}"
-                    )
-
-                # Install from cloned directory
-                install_result = await self._install_from_directory(clone_path, name)
-
-                if install_result.success and install_result.plugin:
-                    # Update source info with git details
-                    install_result.plugin.source = PluginSource(
-                        type=SourceType.GIT,
-                        location=url,
-                        ref=ref,
-                        installed_at=datetime.now(),
-                    )
-                    self.index.add(install_result.plugin)
-                    self.index.save()
-
-                return install_result
-
-            except Exception as e:
-                return InstallResult(success=False, error=f"Git install failed: {e}")
-
-    async def install_from_url(
-        self,
-        url: str,
-        name: Optional[str] = None,
-    ) -> InstallResult:
-        """Install a plugin from a URL.
-
-        Supports single Python/TOML files or zip/tar archives.
-
-        Args:
-            url: URL to download
-            name: Optional name override
-
-        Returns:
-            InstallResult
-        """
-        import urllib.request
-
-        self._ensure_dirs()
-        self.index.load()
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmppath = Path(tmpdir)
-
-            try:
-                # Download file
-                parsed = urlparse(url)
-                filename = Path(parsed.path).name or "plugin"
-
-                download_path = tmppath / filename
-                urllib.request.urlretrieve(url, download_path)
-
-                # Handle archives
-                if download_path.suffix in (".zip", ".gz", ".tar"):
-                    extract_dir = tmppath / "extracted"
-                    extract_dir.mkdir()
-
-                    if download_path.suffix == ".zip":
-                        with zipfile.ZipFile(download_path, "r") as zf:
-                            zf.extractall(extract_dir)
-                    elif download_path.suffix in (".gz", ".tar"):
-                        with tarfile.open(download_path, "r:*") as tf:
-                            tf.extractall(extract_dir)
-
-                    # Find plugin files
-                    install_result = await self._install_from_directory(
-                        extract_dir, name
-                    )
-
-                else:
-                    # Single file
-                    install_result = await self._install_single_file(
-                        download_path, name
-                    )
-
-                if install_result.success and install_result.plugin:
-                    # Update source info
-                    install_result.plugin.source = PluginSource(
-                        type=SourceType.URL,
-                        location=url,
-                        installed_at=datetime.now(),
-                    )
-                    self.index.add(install_result.plugin)
-                    self.index.save()
-
-                return install_result
-
-            except Exception as e:
-                return InstallResult(success=False, error=f"URL install failed: {e}")
-
     async def uninstall(self, name: str) -> UninstallResult:
         """Uninstall a plugin.
 
@@ -572,7 +361,9 @@ class PluginInstaller:
         self,
         name: Optional[str] = None,
     ) -> list[InstallResult]:
-        """Update plugins from their sources.
+        """Update plugins from their local sources.
+
+        Only supports local file paths (internal-only mode).
 
         Args:
             name: Plugin name (or None for all updatable)
@@ -592,29 +383,21 @@ class PluginInstaller:
             if not plugin or plugin.pinned:
                 continue
 
-            # Re-install from source
+            # Re-install from source (local only)
             source = plugin.source
+
+            if source.type != SourceType.LOCAL:
+                # Skip non-local plugins (legacy installs)
+                continue
 
             # First uninstall
             await self.uninstall(plugin.metadata.name)
 
-            # Then reinstall
-            if source.type == SourceType.GIT:
-                result = await self.install_from_git(
-                    source.location,
-                    plugin.metadata.name,
-                    source.ref,
-                )
-            elif source.type == SourceType.URL:
-                result = await self.install_from_url(
-                    source.location,
-                    plugin.metadata.name,
-                )
-            else:
-                result = await self.install_from_path(
-                    Path(source.location),
-                    plugin.metadata.name,
-                )
+            # Reinstall from local path
+            result = await self.install_from_path(
+                Path(source.location),
+                plugin.metadata.name,
+            )
 
             if result.success and result.plugin:
                 result.plugin.source.updated_at = datetime.now()

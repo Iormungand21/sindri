@@ -573,41 +573,6 @@ class SampleTool(Tool):
         )
         return plugin_path
 
-    def test_detect_source_type_local(self, temp_dirs, sample_plugin_file):
-        """Detect local file path source."""
-        plugin_dir, agent_dir, index_dir = temp_dirs
-        installer = PluginInstaller(plugin_dir=plugin_dir, agent_dir=agent_dir)
-
-        source_type, location = installer._detect_source_type(str(sample_plugin_file))
-        assert source_type == SourceType.LOCAL
-
-    def test_detect_source_type_git_url(self, temp_dirs):
-        """Detect git URL source."""
-        plugin_dir, agent_dir, _ = temp_dirs
-        installer = PluginInstaller(plugin_dir=plugin_dir, agent_dir=agent_dir)
-
-        source_type, _ = installer._detect_source_type(
-            "https://github.com/user/repo.git"
-        )
-        assert source_type == SourceType.GIT
-
-    def test_detect_source_type_github_shorthand(self, temp_dirs):
-        """Detect GitHub shorthand source."""
-        plugin_dir, agent_dir, _ = temp_dirs
-        installer = PluginInstaller(plugin_dir=plugin_dir, agent_dir=agent_dir)
-
-        source_type, location = installer._detect_source_type("user/repo")
-        assert source_type == SourceType.GIT
-        assert "github.com" in location
-
-    def test_detect_source_type_url(self, temp_dirs):
-        """Detect direct URL source."""
-        plugin_dir, agent_dir, _ = temp_dirs
-        installer = PluginInstaller(plugin_dir=plugin_dir, agent_dir=agent_dir)
-
-        source_type, _ = installer._detect_source_type("https://example.com/plugin.py")
-        assert source_type == SourceType.URL
-
     @pytest.mark.asyncio
     async def test_install_from_path(self, temp_dirs, sample_plugin_file):
         """Install a plugin from local path."""
