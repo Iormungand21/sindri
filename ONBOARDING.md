@@ -4,15 +4,37 @@ Welcome! This document will help you quickly understand the Sindri project and g
 
 ---
 
+## PRIORITY: Architecture Transformation
+
+**Before starting any other work, read the approved architectural change plan:**
+
+```
+/home/ryan/.claude/plans/silly-kindling-parnas.md
+```
+
+Sindri is being transformed from a multi-user tool to an **internal-only research machine assistant**.
+
+### Completed
+- ✅ **Milestone 1:** Removed `sindri/collaboration/` (~16,200 lines, 28+ CLI commands, 50+ API endpoints)
+
+### Next
+- **Milestone 2:** Delete `sindri/ide/` and related CLI/tests
+- **Milestone 3:** Simplify marketplace to local-only
+- **Milestone 4-8:** Security relaxation, self-management tools, Web UI cleanup
+
+See `STATUS.md` and `ROADMAP.md` for full details.
+
+---
+
 ## What is Sindri?
 
 **Sindri** is a local-first, hierarchical LLM orchestration CLI that coordinates specialized agents (Norse-themed) to build, refactor, and maintain code using Ollama. Think of it as a multi-agent coding assistant running entirely on your machine with a 16GB VRAM GPU.
 
 **Key Facts:**
-- **Status:** Production Ready (v0.1.0)
-- **Tests:** 2751 backend + 104 frontend (100% passing)
-- **Agents:** 16 specialized agents
-- **Tools:** 103 tools
+- **Status:** Architecture Transformation In Progress (Milestone 1 Complete)
+- **Tests:** ~2710 backend + 104 frontend
+- **Agents:** 16+ specialized agents
+- **Tools:** 129+ tools
 - **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
 
 ---
@@ -24,7 +46,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see 2751 passed)
+# Run tests (should see ~2685 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health
@@ -124,17 +146,17 @@ Read these in order for full context:
 sindri/
 ├── core/          # Orchestration, delegation, events
 ├── agents/        # Agent definitions and prompts
-├── tools/         # All 48 tool implementations
+├── tools/         # All 129+ tool implementations
 ├── memory/        # 5-tier memory system
 ├── persistence/   # Database, metrics, feedback
 ├── tui/           # Terminal UI (Textual)
 ├── web/           # FastAPI + React frontend
 ├── plugins/       # Plugin system
-├── collaboration/ # Session sharing, comments
 ├── voice/         # Voice interface (STT/TTS)
+├── ide/           # IDE integration (to be removed in Milestone 2)
 └── analysis/      # Codebase understanding
 
-tests/             # Pytest tests (2647 tests)
+tests/             # Pytest tests (~2710 tests)
 docs/              # User documentation
 docs/archive/      # Historical documents
 ```
@@ -222,4 +244,4 @@ Historical documents are in `docs/archive/`:
 
 ---
 
-**Last Updated:** 2026-01-17
+**Last Updated:** 2026-01-18

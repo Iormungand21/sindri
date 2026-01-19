@@ -10,7 +10,7 @@ log = structlog.get_logger()
 # Current schema version for migration tracking
 # Version 2: Added session_metrics table for performance tracking
 # Version 3: Added session_feedback table for feedback collection and fine-tuning
-# Version 4: Added session_shares and session_comments for remote collaboration
+# Version 4: Removed collaboration tables (internal-only mode)
 SCHEMA_VERSION = 4
 
 
@@ -159,74 +159,6 @@ class Database:
                 """
                 CREATE INDEX IF NOT EXISTS idx_feedback_rating
                 ON session_feedback(rating)
-            """
-            )
-
-            # Phase 9.2: Remote collaboration - Session sharing
-            await db.execute(
-                """
-                CREATE TABLE IF NOT EXISTS session_shares (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT NOT NULL,
-                    share_token TEXT UNIQUE NOT NULL,
-                    created_by TEXT,
-                    permission TEXT NOT NULL DEFAULT 'read',
-                    expires_at TIMESTAMP,
-                    max_uses INTEGER,
-                    use_count INTEGER DEFAULT 0,
-                    is_active INTEGER DEFAULT 1,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (session_id) REFERENCES sessions(id)
-                )
-            """
-            )
-
-            await db.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_shares_token
-                ON session_shares(share_token)
-            """
-            )
-
-            await db.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_shares_session
-                ON session_shares(session_id)
-            """
-            )
-
-            # Phase 9.2: Remote collaboration - Review comments
-            await db.execute(
-                """
-                CREATE TABLE IF NOT EXISTS session_comments (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT NOT NULL,
-                    turn_index INTEGER,
-                    line_number INTEGER,
-                    author TEXT NOT NULL,
-                    content TEXT NOT NULL,
-                    comment_type TEXT DEFAULT 'comment',
-                    status TEXT DEFAULT 'open',
-                    parent_id INTEGER,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (session_id) REFERENCES sessions(id),
-                    FOREIGN KEY (parent_id) REFERENCES session_comments(id)
-                )
-            """
-            )
-
-            await db.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_comments_session
-                ON session_comments(session_id)
-            """
-            )
-
-            await db.execute(
-                """
-                CREATE INDEX IF NOT EXISTS idx_comments_turn
-                ON session_comments(session_id, turn_index)
             """
             )
 

@@ -1,19 +1,48 @@
 # Sindri Project Status Report
 **Date:** 2026-01-18
-**Status:** Production Ready (100%)
+**Status:** Architecture Transformation IN PROGRESS - Milestone 1 Complete
 
 ---
 
-## Quick Start for Next Session
+## Architecture Transformation Progress
 
-**Current State:** Production Ready with Team Mode, Notifications, Activity Feed, Webhooks, Database Migrations, Audit Logging, API Keys, Diagram Generation, LaTeX Generation, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression Tools, Crypto/Encoding Tools, System/Process Tools, Image Manipulation Tools, Document Processing Tools, Network/HTTP Diagnostic Tools, Database Tools, Video/Audio Processing Tools, Profiling Tools, and Browser Automation Tools
-**Test Status:** 3095 backend tests + 104 frontend tests, all passing (100%)
-**Next Priority:** Phase 12 Features (Universal Tool Platform) - Tier 3 Remaining (Cloud Tools)
+Sindri is being transformed from a multi-user deployable tool into an **internal-only research machine assistant**.
+
+### Completed Milestones
+
+#### Milestone 1: Remove Collaboration Module (COMPLETE)
+- **Deleted:** `sindri/collaboration/` directory (11 files, ~8,948 lines)
+- **Deleted:** 7 test files (~7,271 lines)
+- **Removed:** 28+ CLI commands (share, comment, notifications, activity, webhooks, audit, api-keys)
+- **Removed:** 50+ API endpoints from web server
+- **Removed:** Collaboration database tables
+- **Result:** ~16,200 lines removed, tests: 3095 → 2710
+
+### Next Milestones
+
+2. **Milestone 2:** Delete `sindri/ide/` and related CLI/tests
+3. **Milestone 3:** Simplify marketplace to local-only
+4. **Milestone 4:** Relax security restrictions for localhost/private IPs
+5. **Milestone 5:** Add system access configuration
+6. **Milestone 6:** Add self-management tools
+7. **Milestone 7:** Simplify Web UI
+8. **Milestone 8:** Documentation update
+
+### Full Plan
+See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
+
+---
+
+## Current State
+
+**Status:** Internal-only mode (single-user, no collaboration)
+**Test Status:** 2710 tests collected, 2685 passing (20 failing from untracked docker_tools WIP)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2920 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2685 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 17 agents
@@ -22,7 +51,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri tui                       # Terminal UI
 .venv/bin/sindri web --port 8000           # Web UI at http://localhost:8000
 .venv/bin/sindri voice                     # Voice interface
-.venv/bin/sindri ide                       # IDE server (stdio mode)
+.venv/bin/sindri ide                       # IDE server (to be removed in Milestone 2)
 
 # Fine-tune models
 .venv/bin/sindri finetune stats            # View training data statistics
@@ -32,37 +61,8 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 # Database Migrations
 .venv/bin/sindri migrate                   # Apply pending migrations
 .venv/bin/sindri migrate-status            # Check migration status
-.venv/bin/sindri migrate-generate add_users  # Generate new migration
+.venv/bin/sindri migrate-generate name     # Generate new migration
 .venv/bin/sindri migrate-validate          # Validate migrations
-
-# Notifications
-.venv/bin/sindri notifications user123     # View notifications
-.venv/bin/sindri notification-prefs user123  # View/update preferences
-
-# Activity Feed
-.venv/bin/sindri activity team123          # View team activity timeline
-.venv/bin/sindri activity-stats            # Activity statistics
-.venv/bin/sindri activity-stats --team team123  # Team-specific stats
-
-# Webhooks
-.venv/bin/sindri webhooks team123          # View team webhooks
-.venv/bin/sindri webhook-create team123 "Alerts" https://hooks.slack.com/...  # Create webhook
-.venv/bin/sindri webhook-test <webhook_id>  # Send test event
-
-# Audit Logs
-.venv/bin/sindri audit                     # View recent audit events
-.venv/bin/sindri audit --security          # Security-only events
-.venv/bin/sindri audit-stats               # Audit statistics
-.venv/bin/sindri audit-failed-logins       # Failed login attempts
-.venv/bin/sindri audit-export -o audit.json  # Export audit logs
-
-# API Keys
-.venv/bin/sindri api-keys                  # List API keys
-.venv/bin/sindri api-key-create user123 "CI Key" -s read -s write  # Create key
-.venv/bin/sindri api-key-info <key_id>     # View key details
-.venv/bin/sindri api-key-stats <key_id>    # View usage statistics
-.venv/bin/sindri api-key-revoke <key_id>   # Revoke a key
-.venv/bin/sindri api-key-global-stats      # Global statistics
 
 # Diagram Generation
 .venv/bin/sindri diagram mermaid sequence --title "Auth Flow"  # Mermaid sequence diagram

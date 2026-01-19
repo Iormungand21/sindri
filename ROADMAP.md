@@ -1,8 +1,48 @@
 # Sindri Development Roadmap
 
-**Vision:** A production-ready, local-first LLM orchestration system that serves as a **multi-disciplinary one-stop shop** for creative and technical work. Beyond code, Sindri coordinates specialized agents for 3D modeling, music composition, electronics design, data visualization, game development, scientific documentation, and more — all using local inference.
+**Vision:** An **internal-only**, local-first LLM orchestration system running on a dedicated research machine. Sindri coordinates specialized agents for software development, 3D modeling, data visualization, scientific documentation, and more — with **full system access** for autonomous operation.
 
-**Current Status:** Production Ready (v0.1.0) - 16 agents, 129 tools, 3027 backend + 104 frontend tests (100% passing)
+**Current Status:** Architecture Transformation In Progress - Milestone 1 Complete
+
+---
+
+## ACTIVE: Architecture Transformation
+
+**Sindri is being transformed from a multi-user deployable tool to an internal-only research assistant.**
+
+### Approved Plan
+Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
+
+### Execution Progress
+
+| Milestone | Description | Status | Lines |
+|-----------|-------------|--------|-------|
+| 1. Collaboration | Delete `sindri/collaboration/` module | ✅ **COMPLETE** | -16,200 |
+| 2. IDE Integration | Delete `sindri/ide/` module | ⏳ Pending | -1,500 |
+| 3. Marketplace | Simplify to local-only | ⏳ Pending | -800 |
+| 4. Security | Relax localhost/private IP restrictions | ⏳ Pending | ~0 |
+| 5. Access Config | Add system access configuration | ⏳ Pending | +200 |
+| 6. Self-Management | Add service/cron/update tools | ⏳ Pending | +1,500 |
+| 7. Web UI | Remove auth/collaboration UI | ⏳ Pending | -1,500 |
+| 8. Documentation | Update all docs | ⏳ Pending | - |
+
+### Milestone 1 Complete (2026-01-18)
+**Removed:**
+- `sindri/collaboration/` directory (11 files, ~8,948 lines)
+- 7 test files (~7,271 lines)
+- 28+ CLI commands (share, comment, notifications, activity, webhooks, audit, api-keys)
+- 50+ API endpoints
+- Collaboration database tables
+
+**Result:** Tests: 3095 → 2710 (2685 passing)
+
+### Features Being Kept
+- Core Ralph loop and agent hierarchy
+- Memory system (Muninn)
+- Fine-tuning pipeline
+- Full Web UI (minus auth/collaboration)
+- All 129+ tools
+- TUI and Voice interfaces
 
 ---
 
@@ -10,7 +50,7 @@
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 2751 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2685 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
