@@ -46,9 +46,9 @@ class TestNewAgentsExist:
         assert agent.name == "vidar"
 
     def test_total_agent_count(self):
-        """Total agent count is 18 (7 original + 4 Phase 9 + 4 Phase 11 + 2 Phase 12 + 1 sindri_admin)."""
+        """Total agent count is 19 (7 original + 4 Phase 9 + 4 Phase 11 + 3 Phase 12 + 1 sindri_admin)."""
         agents = list_agents()
-        assert len(agents) == 18
+        assert len(agents) == 19
 
 
 class TestHeimdallAgent:
@@ -290,9 +290,9 @@ class TestBrokkrDelegation:
         assert "vidar" in agent.delegate_to
 
     def test_brokkr_delegation_count(self):
-        """Brokkr can delegate to 15 agents (5 original + 4 Phase 9 + 4 Phase 11 + 2 Phase 12)."""
+        """Brokkr can delegate to 16 agents (5 original + 4 Phase 9 + 4 Phase 11 + 3 Phase 12)."""
         agent = get_agent("brokkr")
-        assert len(agent.delegate_to) == 15
+        assert len(agent.delegate_to) == 16
 
 
 class TestPromptQuality:

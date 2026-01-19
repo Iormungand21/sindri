@@ -23,6 +23,8 @@ from sindri.agents.prompts import (
     VOR_PROMPT,
     # Phase 12: Browser automation agent (2026-01-18)
     RAN_PROMPT,
+    # Phase 12: Shell/SysAdmin agent (2026-01-18)
+    SIF_PROMPT,
     # Milestone 6: Self-management agent (2026-01-18)
     SINDRI_ADMIN_PROMPT,
 )
@@ -69,7 +71,7 @@ AGENTS: dict[str, AgentDefinition] = {
         can_delegate=True,
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
         # Phase 11: Added skuld, kvasir, volundr, saga for multi-disciplinary domains
-        # Phase 12: Added vor for text/regex processing, ran for browser automation
+        # Phase 12: Added vor for text/regex processing, ran for browser automation, sif for shell/sysadmin
         delegate_to=[
             "huginn",
             "mimir",
@@ -86,6 +88,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "saga",
             "vor",
             "ran",
+            "sif",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -618,6 +621,46 @@ AGENTS: dict[str, AgentDefinition] = {
         priority=1,
         max_iterations=20,
         temperature=0.3,  # Lower temp for precise system operations
+        # Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
+    ),
+    # Phase 12: Shell/SysAdmin agent (2026-01-18)
+    "sif": AgentDefinition(
+        name="sif",
+        role="Shell scripting and system administration specialist - bash scripts, systemd, automation",
+        model="qwen2.5-coder:7b",
+        system_prompt=SIF_PROMPT,
+        tools=[
+            # Core file operations
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            # Shell execution
+            "shell",
+            # System monitoring (existing tools - read-only)
+            "process_list",
+            "system_info",
+            "disk_usage",
+            "memory_usage",
+            "env_get",
+            # Service monitoring (read-only, no modification)
+            "service_status",
+            "service_logs",
+            "service_list",
+            # NEW specialized bash tools
+            "bash_generate",
+            "bash_explain",
+            "bash_validate",
+            "systemd_generate",
+            "bash_lint",
+        ],
+        can_delegate=False,  # Tier 2 specialist, does not delegate
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=20,
+        temperature=0.3,  # Lower temp for precise script generation
         # Fallback to smaller model when VRAM is insufficient
         fallback_model="qwen2.5:3b-instruct-q8_0",
         fallback_vram_gb=3.0,

@@ -133,7 +133,7 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 2726 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2767 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -801,7 +801,7 @@ Based on research, these specialized models outperform general-purpose models fo
 
 **Tier 2 - New Lightweight Agents**
 - ✅ **Vör** (Regex/Text) - General text processing, pattern generation - COMPLETE (2026-01-18)
-- **Sif** (Shell/SysAdmin) - System automation, scripting
+- ✅ **Sif** (Shell/SysAdmin) - System automation, scripting - COMPLETE (2026-01-18)
 
 **Tier 3 - New Specialized Agents**
 - **Groa** (Documents) - PDF/OCR with vision model
@@ -855,6 +855,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-18 | **Sif (Shell/SysAdmin) Agent** - bash_generate, bash_explain, bash_validate, systemd_generate, bash_lint tools | +36 |
 | 2026-01-18 | **Milestone 5: System Access Configuration** - SystemAccessLevel enum, config fields, CLI commands, access check utility | +37 |
 | 2026-01-18 | Python Profiling Tools (profile_python, profile_time, memory_analyze, detect_memory_leaks, benchmark_function, flame_graph, complexity_analyze) | +55 |
 | 2026-01-18 | Video/Audio Processing Tools (audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles) | +50 |
@@ -915,6 +916,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-18
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio + Profiling + Browser Tools - 2/8 agents (Vör, Ran), 71/~100 tools
+**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio + Profiling + Browser Tools - 3/8 agents (Vör, Ran, Sif), 76/~100 tools
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
 **Maintained By:** Project contributors

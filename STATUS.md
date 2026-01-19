@@ -98,16 +98,16 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 2726 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management
+**Test Status:** 2767 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, **Bash Scripting & Systemd Generation**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2726 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2767 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 18 agents (17 + sindri_admin)
+.venv/bin/sindri agents                    # See all 19 agents (18 + sif)
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -218,6 +218,40 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Sif Shell/SysAdmin Agent (2026-01-18) - Phase 12 Tier 2
+
+Added **Sif** - a specialized shell scripting and system administration agent. Named after the Norse goddess whose golden hair was replaced by dwarf-forged gold, Sif transforms raw commands into polished, reliable scripts.
+
+**New Agent:**
+- **Sif** (Norse goddess) - Shell scripting and sysadmin specialist using qwen2.5-coder:7b
+
+**New Tools (5 total):**
+- `bash_generate` - Generate bash scripts from natural language descriptions (backup, deployment, health check, cleanup patterns)
+- `bash_explain` - Explain complex bash commands and pipelines in plain English
+- `bash_validate` - Validate bash scripts using shellcheck for best practices
+- `systemd_generate` - Generate systemd unit files (service, timer, socket, path) with security hardening
+- `bash_lint` - Lint bash scripts with optional auto-fix
+
+**Agent Assignment:**
+- **Sif** has access to all 5 new bash tools plus system monitoring (read-only) and service status tools
+- **Brokkr** can delegate to Sif for shell scripting and automation tasks
+
+**Key Features:**
+- Script templates for common use cases (backup, log rotation, deployment, health check, cleanup)
+- POSIX-portable mode for cross-platform scripts
+- Security hardening options for systemd units
+- Shellcheck integration for validation and linting
+
+**Files:**
+- `sindri/tools/bash_tools.py` - All bash/systemd tool implementations
+- `sindri/agents/prompts.py` - SIF_PROMPT with bash best practices
+- `sindri/agents/registry.py` - Sif agent definition
+- `tests/test_bash_tools.py` - Comprehensive test suite
+
+**Tests:** +36 new tests (2767 total)
+
+---
 
 ### Architecture Transformation Complete (2026-01-18) - Milestones 7-8
 

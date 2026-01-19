@@ -224,6 +224,13 @@ from sindri.tools.scheduling import (
     AtListTool,
     AtRemoveTool,
 )
+from sindri.tools.bash_tools import (
+    BashGenerateTool,
+    BashExplainTool,
+    BashValidateTool,
+    SystemdGenerateTool,
+    BashLintTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -638,4 +645,10 @@ class ToolRegistry:
         registry.register(AtScheduleTool(work_dir=work_dir))
         registry.register(AtListTool(work_dir=work_dir))
         registry.register(AtRemoveTool(work_dir=work_dir))
+        # Bash scripting tools
+        registry.register(BashGenerateTool(work_dir=work_dir))
+        registry.register(BashExplainTool(work_dir=work_dir))
+        registry.register(BashValidateTool(work_dir=work_dir))
+        registry.register(SystemdGenerateTool(work_dir=work_dir))
+        registry.register(BashLintTool(work_dir=work_dir))
         return registry
