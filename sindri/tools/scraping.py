@@ -27,54 +27,47 @@ except ImportError:
     HTML2TEXT_AVAILABLE = False
 
 
-# Security: Blocked hosts and private IP ranges
+# Security: Only block cloud metadata endpoints (internal-only mode)
+# Localhost and private IPs are allowed for local service integration
 BLOCKED_HOSTS = {
-    "localhost",
-    "127.0.0.1",
-    "0.0.0.0",
-    "::1",
-    "metadata.google.internal",
-    "169.254.169.254",
+    "metadata.google.internal",  # GCP metadata
+    "169.254.169.254",  # AWS/GCP metadata
+    "169.254.170.2",  # ECS metadata
 }
 
 
-def _is_private_ip(ip: str) -> bool:
-    """Check if an IP address is in a private range."""
+def _is_cloud_metadata_ip(ip: str) -> bool:
+    """Check if an IP address is a cloud metadata endpoint."""
     try:
         parts = ip.split(".")
         if len(parts) != 4:
             return False
         octets = [int(p) for p in parts]
-        # 10.0.0.0/8
-        if octets[0] == 10:
-            return True
-        # 172.16.0.0/12
-        if octets[0] == 172 and 16 <= octets[1] <= 31:
-            return True
-        # 192.168.0.0/16
-        if octets[0] == 192 and octets[1] == 168:
-            return True
-        # 127.0.0.0/8 (loopback)
-        if octets[0] == 127:
-            return True
+        # 169.254.169.254 and 169.254.170.2 (cloud metadata)
+        if octets[0] == 169 and octets[1] == 254:
+            if (octets[2] == 169 and octets[3] == 254) or (octets[2] == 170 and octets[3] == 2):
+                return True
         return False
     except (ValueError, IndexError):
         return False
 
 
-def _is_blocked_url(url: str, allow_localhost: bool = False) -> bool:
-    """Check if a URL should be blocked for security."""
-    if allow_localhost:
-        return False
+def _is_blocked_url(url: str, allow_localhost: bool = True) -> bool:
+    """Check if a URL should be blocked for security.
+
+    In internal-only mode, only cloud metadata endpoints are blocked.
+    Localhost and private IPs are allowed for local service integration.
+    """
     try:
         parsed = urlparse(url)
         host = parsed.hostname or ""
         host_lower = host.lower()
+        # Block cloud metadata hosts
         if host_lower in BLOCKED_HOSTS:
             return True
-        if _is_private_ip(host):
+        if _is_cloud_metadata_ip(host):
             return True
-        # Block file:// protocol
+        # Block file:// protocol (security risk)
         if parsed.scheme == "file":
             return True
         return False
@@ -197,7 +190,7 @@ Examples:
             return ToolResult(
                 success=False,
                 output="",
-                error=f"URL blocked for security: {url}. Cannot access localhost, private IPs, or file:// URLs.",
+                error=f"URL blocked for security: {url}. Cannot access cloud metadata endpoints or file:// URLs.",
             )
 
         try:

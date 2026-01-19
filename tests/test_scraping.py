@@ -7,40 +7,45 @@ import pytest
 from sindri.tools.scraping import (
     WebScrapeTool,
     _is_blocked_url,
-    _is_private_ip,
+    _is_cloud_metadata_ip,
     _extract_by_selector,
     _html_to_text,
 )
 
 
 # =============================================================================
-# Security Tests
+# Security Tests (Internal-Only Mode)
 # =============================================================================
 
 
 class TestURLBlocking:
-    """Tests for URL security blocking."""
+    """Tests for URL security blocking in internal-only mode.
 
-    def test_localhost_blocked(self):
-        """Test that localhost is blocked."""
-        assert _is_blocked_url("http://localhost:8080") is True
-        assert _is_blocked_url("https://localhost/path") is True
+    In internal-only mode, localhost and private IPs are ALLOWED.
+    Only cloud metadata endpoints and file:// protocol are blocked.
+    """
 
-    def test_loopback_ip_blocked(self):
-        """Test that 127.0.0.1 is blocked."""
-        assert _is_blocked_url("http://127.0.0.1:3000") is True
-        assert _is_blocked_url("http://127.0.0.1") is True
+    def test_localhost_allowed(self):
+        """Test that localhost is allowed in internal-only mode."""
+        assert _is_blocked_url("http://localhost:8080") is False
+        assert _is_blocked_url("https://localhost/path") is False
 
-    def test_private_ip_blocked(self):
-        """Test that private IPs are blocked."""
-        assert _is_blocked_url("http://192.168.1.1") is True
-        assert _is_blocked_url("http://10.0.0.1") is True
-        assert _is_blocked_url("http://172.16.0.1") is True
+    def test_loopback_ip_allowed(self):
+        """Test that 127.0.0.1 is allowed in internal-only mode."""
+        assert _is_blocked_url("http://127.0.0.1:3000") is False
+        assert _is_blocked_url("http://127.0.0.1") is False
+
+    def test_private_ip_allowed(self):
+        """Test that private IPs are allowed in internal-only mode."""
+        assert _is_blocked_url("http://192.168.1.1") is False
+        assert _is_blocked_url("http://10.0.0.1") is False
+        assert _is_blocked_url("http://172.16.0.1") is False
 
     def test_cloud_metadata_blocked(self):
         """Test that cloud metadata endpoint is blocked."""
         assert _is_blocked_url("http://169.254.169.254/latest/meta-data/") is True
         assert _is_blocked_url("http://metadata.google.internal/") is True
+        assert _is_blocked_url("http://169.254.170.2/") is True
 
     def test_file_protocol_blocked(self):
         """Test that file:// protocol is blocked."""
@@ -52,10 +57,6 @@ class TestURLBlocking:
         assert _is_blocked_url("https://example.com") is False
         assert _is_blocked_url("https://google.com") is False
         assert _is_blocked_url("https://github.com") is False
-
-    def test_localhost_allowed_when_enabled(self):
-        """Test that localhost can be allowed."""
-        assert _is_blocked_url("http://localhost:8080", allow_localhost=True) is False
 
 
 # =============================================================================
@@ -160,16 +161,16 @@ class TestWebScrapeTool:
             assert "httpx not installed" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_blocked_localhost(self, tool):
-        """Test that localhost is blocked."""
-        result = await tool.execute(url="http://localhost:8080")
+    async def test_blocked_cloud_metadata(self, tool):
+        """Test that cloud metadata endpoints are blocked."""
+        result = await tool.execute(url="http://169.254.169.254/latest/meta-data/")
         assert result.success is False
         assert "blocked" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_blocked_private_ip(self, tool):
-        """Test that private IPs are blocked."""
-        result = await tool.execute(url="http://192.168.1.1")
+    async def test_blocked_file_protocol(self, tool):
+        """Test that file:// protocol is blocked."""
+        result = await tool.execute(url="file:///etc/passwd")
         assert result.success is False
         assert "blocked" in result.error.lower()
 

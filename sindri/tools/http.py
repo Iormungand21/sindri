@@ -78,48 +78,45 @@ Examples:
     # Maximum response size to return (to prevent memory issues)
     MAX_RESPONSE_SIZE = 1024 * 1024  # 1MB
 
-    # Blocked hosts for security
+    # Blocked hosts for security (only cloud metadata in internal-only mode)
     BLOCKED_HOSTS = {
-        "localhost",
-        "127.0.0.1",
-        "0.0.0.0",
-        "::1",
         "metadata.google.internal",  # GCP metadata
-        "169.254.169.254",  # AWS/cloud metadata
+        "169.254.169.254",  # AWS/GCP metadata
+        "169.254.170.2",  # ECS metadata
     }
 
-    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = False):
+    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = True):
         """Initialize HTTP request tool.
 
         Args:
             work_dir: Working directory (not used, for API consistency)
-            allow_localhost: Allow requests to localhost (default: False for security)
+            allow_localhost: Allow requests to localhost (default: True in internal-only mode)
         """
         super().__init__(work_dir)
         self.allow_localhost = allow_localhost
 
     def _is_blocked_host(self, url: str) -> bool:
-        """Check if the URL host is blocked for security."""
-        if self.allow_localhost:
-            return False
+        """Check if the URL host is blocked for security.
 
+        In internal-only mode, only cloud metadata endpoints are blocked.
+        Localhost and private IPs are allowed for local service integration.
+        """
         try:
             parsed = urlparse(url)
             host = parsed.hostname or ""
 
-            # Check against blocked hosts
+            # Check against blocked hosts (cloud metadata only)
             if host.lower() in self.BLOCKED_HOSTS:
                 return True
 
-            # Block private IP ranges (basic check)
-            if host.startswith("10.") or host.startswith("192.168."):
-                return True
-            if host.startswith("172."):
+            # Block cloud metadata link-local IPs
+            if host.startswith("169.254."):
                 parts = host.split(".")
-                if len(parts) >= 2:
+                if len(parts) == 4:
                     try:
-                        second_octet = int(parts[1])
-                        if 16 <= second_octet <= 31:
+                        # 169.254.169.254 or 169.254.170.2
+                        if (int(parts[2]) == 169 and int(parts[3]) == 254) or \
+                           (int(parts[2]) == 170 and int(parts[3]) == 2):
                             return True
                     except ValueError:
                         pass

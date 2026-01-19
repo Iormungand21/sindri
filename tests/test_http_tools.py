@@ -274,44 +274,14 @@ async def test_http_request_adds_https_prefix():
 
 
 # =============================================================================
-# HttpRequestTool Tests - Security
+# HttpRequestTool Tests - Security (Internal-Only Mode)
 # =============================================================================
 
 
 @pytest.mark.asyncio
-async def test_http_request_blocks_localhost():
-    """Test that localhost requests are blocked by default."""
-    tool = HttpRequestTool(allow_localhost=False)
-    result = await tool.execute(url="http://localhost:8080/api")
-
-    assert result.success is False
-    assert "blocked" in result.error.lower()
-
-
-@pytest.mark.asyncio
-async def test_http_request_blocks_127001():
-    """Test that 127.0.0.1 requests are blocked."""
-    tool = HttpRequestTool(allow_localhost=False)
-    result = await tool.execute(url="http://127.0.0.1:8080/api")
-
-    assert result.success is False
-    assert "blocked" in result.error.lower()
-
-
-@pytest.mark.asyncio
-async def test_http_request_blocks_metadata_ip():
-    """Test that cloud metadata IP is blocked."""
-    tool = HttpRequestTool(allow_localhost=False)
-    result = await tool.execute(url="http://169.254.169.254/latest/meta-data")
-
-    assert result.success is False
-    assert "blocked" in result.error.lower()
-
-
-@pytest.mark.asyncio
-async def test_http_request_allows_localhost_when_enabled(mock_response):
-    """Test that localhost is allowed when allow_localhost=True."""
-    tool = HttpRequestTool(allow_localhost=True)
+async def test_http_request_allows_localhost_by_default(mock_response):
+    """Test that localhost is allowed by default in internal-only mode."""
+    tool = HttpRequestTool()  # Default is allow_localhost=True
 
     with patch("sindri.tools.http.httpx.AsyncClient") as mock_client:
         mock_client_instance = AsyncMock()
@@ -321,6 +291,51 @@ async def test_http_request_allows_localhost_when_enabled(mock_response):
         result = await tool.execute(url="http://localhost:8080/api")
 
         assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_http_request_allows_private_ip_by_default(mock_response):
+    """Test that private IPs are allowed by default in internal-only mode."""
+    tool = HttpRequestTool()  # Default is allow_localhost=True
+
+    with patch("sindri.tools.http.httpx.AsyncClient") as mock_client:
+        mock_client_instance = AsyncMock()
+        mock_client_instance.request.return_value = mock_response
+        mock_client.return_value.__aenter__.return_value = mock_client_instance
+
+        result = await tool.execute(url="http://192.168.1.1:8080/api")
+
+        assert result.success is True
+
+
+@pytest.mark.asyncio
+async def test_http_request_blocks_cloud_metadata():
+    """Test that cloud metadata IP is always blocked."""
+    tool = HttpRequestTool()
+    result = await tool.execute(url="http://169.254.169.254/latest/meta-data")
+
+    assert result.success is False
+    assert "blocked" in result.error.lower()
+
+
+@pytest.mark.asyncio
+async def test_http_request_blocks_gcp_metadata():
+    """Test that GCP metadata hostname is always blocked."""
+    tool = HttpRequestTool()
+    result = await tool.execute(url="http://metadata.google.internal/")
+
+    assert result.success is False
+    assert "blocked" in result.error.lower()
+
+
+@pytest.mark.asyncio
+async def test_http_request_blocks_ecs_metadata():
+    """Test that ECS metadata IP is always blocked."""
+    tool = HttpRequestTool()
+    result = await tool.execute(url="http://169.254.170.2/")
+
+    assert result.success is False
+    assert "blocked" in result.error.lower()
 
 
 # =============================================================================

@@ -1,6 +1,6 @@
 # Sindri Project Status Report
 **Date:** 2026-01-18
-**Status:** Architecture Transformation IN PROGRESS - Milestones 1-3 Complete
+**Status:** Architecture Transformation IN PROGRESS - Milestones 1-4 Complete
 
 ---
 
@@ -31,12 +31,20 @@ Sindri is being transformed from a multi-user deployable tool into an **internal
 - **Removed:** 4 tests for `_detect_source_type()` method
 - **Result:** Marketplace now only supports local path installation, tests: 2654 → 2654 (unchanged)
 
+#### Milestone 4: Relax Security Restrictions (COMPLETE)
+- **Updated:** `sindri/tools/browser.py` - allow localhost/private IPs, only block cloud metadata
+- **Updated:** `sindri/tools/http.py` - same changes, default `allow_localhost=True`
+- **Updated:** `sindri/tools/network.py` - same changes for PortCheckTool, PingHostTool, SslAnalyzeTool, HttpTraceTool
+- **Updated:** `sindri/tools/scraping.py` - same changes
+- **Blocked:** Only cloud metadata endpoints (169.254.169.254, 169.254.170.2, metadata.google.internal) and file:// protocol
+- **Allowed:** localhost, 127.0.0.1, private IP ranges (10.x.x.x, 172.16-31.x.x, 192.168.x.x)
+- **Result:** Enables local service integration for internal-only mode, tests: 2654 → 2654 (unchanged)
+
 ### Next Milestones
-4. **Milestone 4:** Relax security restrictions for localhost/private IPs
 5. **Milestone 5:** Add system access configuration
 6. **Milestone 6:** Add self-management tools
 7. **Milestone 7:** Simplify Web UI
-8. **Milestone 8:** Documentation update
+8. **Milestone 8:** Documentation update (internal-only focus)
 
 ### Full Plan
 See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
@@ -45,8 +53,8 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 
 ## Current State
 
-**Status:** Internal-only mode (single-user, no collaboration, no IDE integration, local-only marketplace)
-**Test Status:** 2654 tests collected, 2629 passing (20 failing from untracked docker_tools WIP)
+**Status:** Internal-only mode (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost)
+**Test Status:** 2654 tests collected, 2624 passing (20 failing from untracked docker_tools WIP)
 **Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools
 
 ### Try It Out

@@ -44,49 +44,42 @@ except ImportError:
     CRYPTOGRAPHY_AVAILABLE = False
 
 
-# Security: Blocked hosts and private IP ranges (shared with http.py)
+# Security: Only block cloud metadata endpoints (internal-only mode)
+# Localhost and private IPs are allowed for local service integration
 BLOCKED_HOSTS = {
-    "localhost",
-    "127.0.0.1",
-    "0.0.0.0",
-    "::1",
-    "metadata.google.internal",
-    "169.254.169.254",
+    "metadata.google.internal",  # GCP metadata
+    "169.254.169.254",  # AWS/GCP metadata
+    "169.254.170.2",  # ECS metadata
 }
 
 
-def _is_private_ip(ip: str) -> bool:
-    """Check if an IP address is in a private range."""
+def _is_cloud_metadata_ip(ip: str) -> bool:
+    """Check if an IP address is a cloud metadata endpoint."""
     try:
         parts = ip.split(".")
         if len(parts) != 4:
             return False
         octets = [int(p) for p in parts]
-        # 10.0.0.0/8
-        if octets[0] == 10:
-            return True
-        # 172.16.0.0/12
-        if octets[0] == 172 and 16 <= octets[1] <= 31:
-            return True
-        # 192.168.0.0/16
-        if octets[0] == 192 and octets[1] == 168:
-            return True
-        # 127.0.0.0/8 (loopback)
-        if octets[0] == 127:
-            return True
+        # 169.254.169.254 and 169.254.170.2 (cloud metadata)
+        if octets[0] == 169 and octets[1] == 254:
+            if (octets[2] == 169 and octets[3] == 254) or (octets[2] == 170 and octets[3] == 2):
+                return True
         return False
     except (ValueError, IndexError):
         return False
 
 
-def _is_blocked_host(host: str, allow_localhost: bool = False) -> bool:
-    """Check if a host should be blocked for security."""
-    if allow_localhost:
-        return False
+def _is_blocked_host(host: str, allow_localhost: bool = True) -> bool:
+    """Check if a host should be blocked for security.
+
+    In internal-only mode, only cloud metadata endpoints are blocked.
+    Localhost and private IPs are allowed for local service integration.
+    """
     host_lower = host.lower()
+    # Block cloud metadata hosts
     if host_lower in BLOCKED_HOSTS:
         return True
-    if _is_private_ip(host):
+    if _is_cloud_metadata_ip(host):
         return True
     return False
 
@@ -461,8 +454,8 @@ Examples:
         27017: "MongoDB",
     }
 
-    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = False):
-        """Initialize port check tool."""
+    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = True):
+        """Initialize port check tool (localhost allowed in internal-only mode)."""
         super().__init__(work_dir)
         self.allow_localhost = allow_localhost
 
@@ -610,8 +603,8 @@ Examples:
         "required": ["host"],
     }
 
-    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = False):
-        """Initialize ping tool."""
+    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = True):
+        """Initialize ping tool (localhost allowed in internal-only mode)."""
         super().__init__(work_dir)
         self.allow_localhost = allow_localhost
 
@@ -625,7 +618,7 @@ Examples:
         """Ping a host."""
         log.info("ping_host_start", host=host, count=count)
 
-        # Security check
+        # Security check (only blocks cloud metadata)
         if _is_blocked_host(host, self.allow_localhost):
             return ToolResult(
                 success=False,
@@ -807,8 +800,8 @@ Examples:
         "required": ["hostname"],
     }
 
-    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = False):
-        """Initialize SSL analyzer."""
+    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = True):
+        """Initialize SSL analyzer (localhost allowed in internal-only mode)."""
         super().__init__(work_dir)
         self.allow_localhost = allow_localhost
 
@@ -823,7 +816,7 @@ Examples:
         """Analyze SSL/TLS certificate."""
         log.info("ssl_analyze_start", hostname=hostname, port=port)
 
-        # Security check
+        # Security check (only blocks cloud metadata)
         if _is_blocked_host(hostname, self.allow_localhost):
             return ToolResult(
                 success=False,
@@ -1033,17 +1026,8 @@ Examples:
         "required": ["url"],
     }
 
-    BLOCKED_HOSTS = {
-        "localhost",
-        "127.0.0.1",
-        "0.0.0.0",
-        "::1",
-        "metadata.google.internal",
-        "169.254.169.254",
-    }
-
-    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = False):
-        """Initialize HTTP trace tool."""
+    def __init__(self, work_dir: Optional[Path] = None, allow_localhost: bool = True):
+        """Initialize HTTP trace tool (localhost allowed in internal-only mode)."""
         super().__init__(work_dir)
         self.allow_localhost = allow_localhost
 

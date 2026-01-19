@@ -21,38 +21,43 @@ from sindri.tools.browser import (
     BrowserCloseTool,
     BrowserSession,
     _is_blocked_url,
-    _is_private_ip,
+    _is_cloud_metadata_ip,
 )
 
 
 # =============================================================================
-# Security Tests
+# Security Tests (Internal-Only Mode)
 # =============================================================================
 
 
 class TestURLBlocking:
-    """Tests for URL security blocking."""
+    """Tests for URL security blocking in internal-only mode.
 
-    def test_localhost_blocked(self):
-        """Test that localhost is blocked."""
-        assert _is_blocked_url("http://localhost:8080") is True
-        assert _is_blocked_url("https://localhost/path") is True
+    In internal-only mode, localhost and private IPs are ALLOWED.
+    Only cloud metadata endpoints and file:// protocol are blocked.
+    """
 
-    def test_loopback_ip_blocked(self):
-        """Test that 127.0.0.1 is blocked."""
-        assert _is_blocked_url("http://127.0.0.1:3000") is True
-        assert _is_blocked_url("http://127.0.0.1") is True
+    def test_localhost_allowed(self):
+        """Test that localhost is allowed in internal-only mode."""
+        assert _is_blocked_url("http://localhost:8080") is False
+        assert _is_blocked_url("https://localhost/path") is False
 
-    def test_private_ip_blocked(self):
-        """Test that private IPs are blocked."""
-        assert _is_blocked_url("http://192.168.1.1") is True
-        assert _is_blocked_url("http://10.0.0.1") is True
-        assert _is_blocked_url("http://172.16.0.1") is True
+    def test_loopback_ip_allowed(self):
+        """Test that 127.0.0.1 is allowed in internal-only mode."""
+        assert _is_blocked_url("http://127.0.0.1:3000") is False
+        assert _is_blocked_url("http://127.0.0.1") is False
+
+    def test_private_ip_allowed(self):
+        """Test that private IPs are allowed in internal-only mode."""
+        assert _is_blocked_url("http://192.168.1.1") is False
+        assert _is_blocked_url("http://10.0.0.1") is False
+        assert _is_blocked_url("http://172.16.0.1") is False
 
     def test_cloud_metadata_blocked(self):
         """Test that cloud metadata endpoint is blocked."""
         assert _is_blocked_url("http://169.254.169.254/latest/meta-data/") is True
         assert _is_blocked_url("http://metadata.google.internal/") is True
+        assert _is_blocked_url("http://169.254.170.2/") is True
 
     def test_file_protocol_blocked(self):
         """Test that file:// protocol is blocked."""
@@ -65,47 +70,40 @@ class TestURLBlocking:
         assert _is_blocked_url("https://google.com") is False
         assert _is_blocked_url("https://github.com") is False
 
-    def test_localhost_allowed_when_enabled(self):
-        """Test that localhost can be allowed."""
-        assert _is_blocked_url("http://localhost:8080", allow_localhost=True) is False
 
+class TestCloudMetadataIP:
+    """Tests for cloud metadata IP detection."""
 
-class TestPrivateIP:
-    """Tests for private IP detection."""
+    def test_aws_metadata_ip(self):
+        """Test AWS/GCP metadata IP is detected."""
+        assert _is_cloud_metadata_ip("169.254.169.254") is True
 
-    def test_10_x_x_x_range(self):
-        """Test 10.0.0.0/8 range."""
-        assert _is_private_ip("10.0.0.1") is True
-        assert _is_private_ip("10.255.255.255") is True
+    def test_ecs_metadata_ip(self):
+        """Test ECS metadata IP is detected."""
+        assert _is_cloud_metadata_ip("169.254.170.2") is True
 
-    def test_172_16_range(self):
-        """Test 172.16.0.0/12 range."""
-        assert _is_private_ip("172.16.0.1") is True
-        assert _is_private_ip("172.31.255.255") is True
-        assert _is_private_ip("172.15.0.1") is False
-        assert _is_private_ip("172.32.0.1") is False
+    def test_other_link_local_not_blocked(self):
+        """Test other link-local IPs are not blocked."""
+        assert _is_cloud_metadata_ip("169.254.1.1") is False
+        assert _is_cloud_metadata_ip("169.254.0.1") is False
 
-    def test_192_168_range(self):
-        """Test 192.168.0.0/16 range."""
-        assert _is_private_ip("192.168.0.1") is True
-        assert _is_private_ip("192.168.255.255") is True
+    def test_private_ips_not_blocked(self):
+        """Test private IPs are not blocked as metadata."""
+        assert _is_cloud_metadata_ip("10.0.0.1") is False
+        assert _is_cloud_metadata_ip("192.168.1.1") is False
+        assert _is_cloud_metadata_ip("172.16.0.1") is False
+        assert _is_cloud_metadata_ip("127.0.0.1") is False
 
-    def test_loopback(self):
-        """Test loopback addresses."""
-        assert _is_private_ip("127.0.0.1") is True
-        assert _is_private_ip("127.255.255.255") is True
-
-    def test_public_ips(self):
-        """Test public IPs."""
-        assert _is_private_ip("8.8.8.8") is False
-        assert _is_private_ip("1.1.1.1") is False
-        assert _is_private_ip("142.250.185.46") is False
+    def test_public_ips_not_blocked(self):
+        """Test public IPs are not blocked."""
+        assert _is_cloud_metadata_ip("8.8.8.8") is False
+        assert _is_cloud_metadata_ip("1.1.1.1") is False
 
     def test_invalid_ip(self):
         """Test invalid IP addresses."""
-        assert _is_private_ip("not.an.ip") is False
-        assert _is_private_ip("192.168.1") is False
-        assert _is_private_ip("") is False
+        assert _is_cloud_metadata_ip("not.an.ip") is False
+        assert _is_cloud_metadata_ip("169.254.169") is False
+        assert _is_cloud_metadata_ip("") is False
 
 
 # =============================================================================
@@ -130,18 +128,18 @@ class TestBrowserNavigateTool:
             assert "playwright not installed" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_blocked_localhost(self, tool):
-        """Test that localhost is blocked."""
+    async def test_blocked_cloud_metadata(self, tool):
+        """Test that cloud metadata endpoints are blocked."""
         with patch("sindri.tools.browser.PLAYWRIGHT_AVAILABLE", True):
-            result = await tool.execute(url="http://localhost:8080")
+            result = await tool.execute(url="http://169.254.169.254/latest/meta-data/")
         assert result.success is False
         assert "blocked" in result.error.lower()
 
     @pytest.mark.asyncio
-    async def test_blocked_private_ip(self, tool):
-        """Test that private IPs are blocked."""
+    async def test_blocked_file_protocol(self, tool):
+        """Test that file:// protocol is blocked."""
         with patch("sindri.tools.browser.PLAYWRIGHT_AVAILABLE", True):
-            result = await tool.execute(url="http://192.168.1.1")
+            result = await tool.execute(url="file:///etc/passwd")
         assert result.success is False
         assert "blocked" in result.error.lower()
 

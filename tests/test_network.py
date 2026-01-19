@@ -366,22 +366,21 @@ class TestPortCheckTool:
             assert result.metadata["total_count"] == 3
 
     @pytest.mark.asyncio
-    async def test_blocked_host(self, tool):
-        """Test that localhost is blocked by default."""
-        result = await tool.execute(host="127.0.0.1", port=80)
-        assert result.success is False
-        assert "blocked" in result.error.lower()
-
-    @pytest.mark.asyncio
-    async def test_allow_localhost(self):
-        """Test allowing localhost when explicitly permitted."""
-        tool = PortCheckTool(allow_localhost=True)
+    async def test_localhost_allowed_by_default(self, tool):
+        """Test that localhost is allowed by default in internal-only mode."""
         with patch("sindri.tools.network.asyncio.open_connection") as mock_conn:
             mock_writer = AsyncMock()
             mock_conn.return_value = (MagicMock(), mock_writer)
 
             result = await tool.execute(host="127.0.0.1", port=80)
             assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_cloud_metadata_blocked(self, tool):
+        """Test that cloud metadata endpoints are blocked."""
+        result = await tool.execute(host="169.254.169.254", port=80)
+        assert result.success is False
+        assert "blocked" in result.error.lower()
 
     @pytest.mark.asyncio
     async def test_no_ports_specified(self, tool):
@@ -482,9 +481,9 @@ class TestPingHostTool:
         assert result.metadata["packet_loss_percent"] == 100
 
     @pytest.mark.asyncio
-    async def test_blocked_host(self, tool):
-        """Test that localhost is blocked by default."""
-        result = await tool.execute(host="127.0.0.1")
+    async def test_cloud_metadata_blocked(self, tool):
+        """Test that cloud metadata endpoints are blocked."""
+        result = await tool.execute(host="169.254.169.254")
         assert result.success is False
         assert "blocked" in result.error.lower()
 
@@ -579,9 +578,9 @@ class TestSslAnalyzeTool:
             yield mock_conn
 
     @pytest.mark.asyncio
-    async def test_blocked_host(self, tool):
-        """Test that localhost is blocked."""
-        result = await tool.execute(hostname="127.0.0.1")
+    async def test_cloud_metadata_blocked(self, tool):
+        """Test that cloud metadata endpoints are blocked."""
+        result = await tool.execute(hostname="169.254.169.254")
         assert result.success is False
         assert "blocked" in result.error.lower()
 
@@ -714,9 +713,9 @@ class TestHttpTraceTool:
         assert "Invalid URL" in result.error
 
     @pytest.mark.asyncio
-    async def test_blocked_host(self, tool):
-        """Test that localhost is blocked."""
-        result = await tool.execute(url="http://localhost:8080/api")
+    async def test_cloud_metadata_blocked(self, tool):
+        """Test that cloud metadata endpoints are blocked."""
+        result = await tool.execute(url="http://169.254.169.254/latest/meta-data/")
         assert result.success is False
         assert "blocked" in result.error.lower()
 
@@ -904,7 +903,7 @@ class TestNetworkToolsIntegration:
 
     @pytest.mark.asyncio
     async def test_security_blocking_consistency(self):
-        """Test that all relevant tools block localhost consistently."""
+        """Test that all relevant tools block cloud metadata consistently (internal-only mode)."""
         tools_with_security = [
             PortCheckTool(),
             PingHostTool(),
@@ -912,11 +911,12 @@ class TestNetworkToolsIntegration:
             HttpTraceTool(),
         ]
 
+        # In internal-only mode, only cloud metadata should be blocked
+        cloud_metadata_hosts = ["169.254.169.254", "metadata.google.internal"]
+
         for tool in tools_with_security:
-            # Each tool should block localhost
             if hasattr(tool, "execute"):
-                # Test with various localhost variants
-                for host in ["127.0.0.1", "localhost"]:
+                for host in cloud_metadata_hosts:
                     if tool.name == "http_trace":
                         result = await tool.execute(url=f"http://{host}/")
                     elif tool.name == "port_check":

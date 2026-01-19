@@ -18,9 +18,10 @@ Sindri is being transformed from a multi-user tool to an **internal-only researc
 - ✅ **Milestone 1:** Removed `sindri/collaboration/` (~16,200 lines, 28+ CLI commands, 50+ API endpoints)
 - ✅ **Milestone 2:** Removed `sindri/ide/` (~2,100 lines, 2 CLI commands)
 - ✅ **Milestone 3:** Simplified marketplace to local-only (~220 lines removed)
+- ✅ **Milestone 4:** Relaxed security restrictions (localhost/private IPs now allowed)
 
 ### Next
-- **Milestone 4-8:** Security relaxation, self-management tools, Web UI cleanup
+- **Milestone 5-8:** System access config, self-management tools, Web UI cleanup, documentation
 
 See `STATUS.md` and `ROADMAP.md` for full details.
 
@@ -31,7 +32,7 @@ See `STATUS.md` and `ROADMAP.md` for full details.
 **Sindri** is a local-first, hierarchical LLM orchestration CLI that coordinates specialized agents (Norse-themed) to build, refactor, and maintain code using Ollama. Think of it as a multi-agent coding assistant running entirely on your machine with a 16GB VRAM GPU.
 
 **Key Facts:**
-- **Status:** Architecture Transformation In Progress (Milestones 1-3 Complete)
+- **Status:** Architecture Transformation In Progress (Milestones 1-4 Complete)
 - **Tests:** ~2654 backend + 104 frontend
 - **Agents:** 16+ specialized agents
 - **Tools:** 129+ tools
