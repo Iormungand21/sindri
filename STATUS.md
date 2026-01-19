@@ -1,6 +1,6 @@
 # Sindri Project Status Report
 **Date:** 2026-01-18
-**Status:** Architecture Transformation IN PROGRESS - Milestones 1-4 Complete
+**Status:** Architecture Transformation IN PROGRESS - Milestones 1-5 Complete
 
 ---
 
@@ -40,8 +40,18 @@ Sindri is being transformed from a multi-user deployable tool into an **internal
 - **Allowed:** localhost, 127.0.0.1, private IP ranges (10.x.x.x, 172.16-31.x.x, 192.168.x.x)
 - **Result:** Enables local service integration for internal-only mode, tests: 2654 → 2654 (unchanged)
 
+#### Milestone 5: Add System Access Configuration (COMPLETE)
+- **Added:** `SystemAccessLevel` enum (RESTRICTED, SUPERVISED, FULL) to `sindri/config.py`
+- **Added:** Config fields: `system_access`, `allowed_services`, `allow_self_modification`
+- **Created:** `sindri/core/access.py` - Access check utility with confirmation mechanism
+- **Added:** CLI commands: `sindri access show`, `sindri access set`, `sindri access services`, `sindri access self-modify`
+- **Access Levels:**
+  - RESTRICTED: Read-only system info, no modifications
+  - SUPERVISED: Modifications require user confirmation (default)
+  - FULL: Full autonomous access (for dedicated machine)
+- **Result:** Configurable system access for graduated trust, tests: 2654 → 2691 (+37 new tests)
+
 ### Next Milestones
-5. **Milestone 5:** Add system access configuration
 6. **Milestone 6:** Add self-management tools
 7. **Milestone 7:** Simplify Web UI
 8. **Milestone 8:** Documentation update (internal-only focus)
@@ -53,17 +63,24 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 
 ## Current State
 
-**Status:** Internal-only mode (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost)
-**Test Status:** 2654 tests collected, 2624 passing (20 failing from untracked docker_tools WIP)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools
+**Status:** Internal-only mode (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access)
+**Test Status:** 2691 tests collected, 2661 passing (20 failing from untracked docker_tools WIP)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2629 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2691 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 17 agents
+
+# System Access Configuration
+.venv/bin/sindri access show               # View current access settings
+.venv/bin/sindri access set supervised     # Set access level (restricted/supervised/full)
+.venv/bin/sindri access services --list    # List allowed services
+.venv/bin/sindri access services --add docker  # Add service to allowlist
+.venv/bin/sindri access self-modify        # Check self-modification status
 
 # Launch interfaces
 .venv/bin/sindri tui                       # Terminal UI

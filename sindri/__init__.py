@@ -8,7 +8,7 @@ __version__ = "1.0.0"
 __author__ = "Ryan"
 
 from sindri.core.loop import AgentLoop, LoopConfig, LoopResult
-from sindri.config import SindriConfig
+from sindri.config import SindriConfig, SystemAccessLevel
 
 __all__ = [
     "__version__",
@@ -16,4 +16,5 @@ __all__ = [
     "LoopConfig",
     "LoopResult",
     "SindriConfig",
+    "SystemAccessLevel",
 ]

@@ -2,7 +2,7 @@
 
 **Vision:** An **internal-only**, local-first LLM orchestration system running on a dedicated research machine. Sindri coordinates specialized agents for software development, 3D modeling, data visualization, scientific documentation, and more — with **full system access** for autonomous operation.
 
-**Current Status:** Architecture Transformation In Progress - Milestones 1-4 Complete
+**Current Status:** Architecture Transformation In Progress - Milestones 1-5 Complete
 
 ---
 
@@ -21,7 +21,7 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 | 2. IDE Integration | Delete `sindri/ide/` module | ✅ **COMPLETE** | -2,100 |
 | 3. Marketplace | Simplify to local-only | ✅ **COMPLETE** | -220 |
 | 4. Security | Relax localhost/private IP restrictions | ✅ **COMPLETE** | ~0 |
-| 5. Access Config | Add system access configuration | ⏳ Pending | +200 |
+| 5. Access Config | Add system access configuration | ✅ **COMPLETE** | +300 |
 | 6. Self-Management | Add service/cron/update tools | ⏳ Pending | +1,500 |
 | 7. Web UI | Remove auth/collaboration UI | ⏳ Pending | -1,500 |
 | 8. Documentation | Update all docs | ⏳ Pending | - |
@@ -62,6 +62,20 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 - Updated tests to verify new behavior
 
 **Result:** Enables local service integration for internal-only mode. Tests unchanged at 2654 (2624 passing)
+
+### Milestone 5 Complete (2026-01-18)
+**Added System Access Configuration:**
+- Added `SystemAccessLevel` enum (RESTRICTED, SUPERVISED, FULL) to `sindri/config.py`
+- Added config fields: `system_access`, `allowed_services`, `allow_self_modification`
+- Created `sindri/core/access.py` with access checking and confirmation utilities
+- Added CLI commands: `sindri access show`, `sindri access set`, `sindri access services`, `sindri access self-modify`
+- **Access Levels:**
+  - RESTRICTED: Read-only system info, no modifications
+  - SUPERVISED: Modifications require user confirmation (default)
+  - FULL: Full autonomous access (for dedicated machine)
+- Services whitelist allows granular control over which services can be managed
+
+**Result:** Configurable system access for graduated trust levels. Tests: 2654 → 2691 (+37 new tests)
 
 ### Features Being Kept
 - Core Ralph loop and agent hierarchy
@@ -799,6 +813,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-18 | **Milestone 5: System Access Configuration** - SystemAccessLevel enum, config fields, CLI commands, access check utility | +37 |
 | 2026-01-18 | Python Profiling Tools (profile_python, profile_time, memory_analyze, detect_memory_leaks, benchmark_function, flame_graph, complexity_analyze) | +55 |
 | 2026-01-18 | Video/Audio Processing Tools (audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles) | +50 |
 | 2026-01-18 | Network & HTTP Diagnostic Tools (http_trace, dns_lookup, curl_generate, ssl_analyze, port_check, ping_host) | +53 |

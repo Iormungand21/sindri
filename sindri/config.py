@@ -1,9 +1,22 @@
 """Configuration for Sindri with validation."""
 
+from enum import Enum
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import structlog
+
+
+class SystemAccessLevel(str, Enum):
+    """Control how much autonomous system access Sindri has.
+
+    This is part of Milestone 5 of the architecture transformation,
+    preparing Sindri for autonomous operation on a dedicated research machine.
+    """
+
+    RESTRICTED = "restricted"  # Read-only system info, no modifications
+    SUPERVISED = "supervised"  # Can modify with confirmation prompts
+    FULL = "full"  # Full autonomous access (for dedicated machine)
 
 try:
     import toml
@@ -83,6 +96,33 @@ class SindriConfig(BaseModel):
     # Logging
     log_level: str = Field(default="INFO", pattern="^(DEBUG|INFO|WARNING|ERROR)$")
     log_file: Optional[Path] = None
+
+    # System Access Configuration (Milestone 5)
+    system_access: SystemAccessLevel = Field(
+        default=SystemAccessLevel.SUPERVISED,
+        description="System access level: restricted, supervised, or full",
+    )
+    allowed_services: List[str] = Field(
+        default_factory=lambda: ["ollama", "litellm", "sindri"],
+        description="Services Sindri can manage (when supervised/full)",
+    )
+    allow_self_modification: bool = Field(
+        default=False,
+        description="Whether Sindri can modify its own config",
+    )
+
+    @field_validator("allowed_services")
+    @classmethod
+    def validate_allowed_services(cls, v):
+        """Ensure allowed_services contains only valid service names."""
+        if not isinstance(v, list):
+            raise ValueError("allowed_services must be a list")
+        result = []
+        for service in v:
+            if not isinstance(service, str) or not service.strip():
+                raise ValueError("Each service must be a non-empty string")
+            result.append(service.strip())
+        return result
 
     @field_validator("reserve_vram_gb")
     @classmethod

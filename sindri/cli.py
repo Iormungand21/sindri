@@ -6059,5 +6059,206 @@ def doc_write(output_file: str, data: str, sheet: str, index: bool):
     asyncio.run(run())
 
 
+# =============================================================================
+# System Access Configuration (Milestone 5)
+# =============================================================================
+
+
+@cli.group()
+def access():
+    """Manage system access level and permissions.
+
+    Sindri supports three access levels:
+
+    \b
+    - RESTRICTED: Read-only system info, no modifications
+    - SUPERVISED: Modifications require user confirmation
+    - FULL: Full autonomous access (for dedicated research machines)
+    """
+    pass
+
+
+@access.command("show")
+def access_show():
+    """Show current system access configuration."""
+    from rich.panel import Panel
+
+    from sindri.config import SindriConfig, SystemAccessLevel
+
+    config = SindriConfig.load()
+
+    console.print(Panel("[bold]System Access Configuration[/bold]", expand=False))
+    console.print()
+
+    # Access level with color coding
+    level_colors = {
+        "restricted": "red",
+        "supervised": "yellow",
+        "full": "green",
+    }
+    level = config.system_access.value
+    color = level_colors.get(level, "white")
+    console.print(f"  [bold]Access Level:[/bold] [{color}]{level.upper()}[/{color}]")
+
+    # Allowed services
+    services_str = ", ".join(config.allowed_services) if config.allowed_services else "(none)"
+    console.print(f"  [bold]Allowed Services:[/bold] {services_str}")
+
+    # Self-modification
+    self_mod = "[green]Yes[/green]" if config.allow_self_modification else "[red]No[/red]"
+    console.print(f"  [bold]Self-Modification:[/bold] {self_mod}")
+
+    # Level descriptions
+    console.print()
+    console.print("[dim]Access Level Descriptions:[/dim]")
+    console.print("  [red]RESTRICTED[/red] - Read-only system info, no modifications")
+    console.print("  [yellow]SUPERVISED[/yellow] - Modifications require confirmation prompts")
+    console.print("  [green]FULL[/green] - Full autonomous access (dedicated machine only)")
+
+
+@access.command("set")
+@click.argument("level", type=click.Choice(["restricted", "supervised", "full"]))
+@click.option("--force", "-f", is_flag=True, help="Skip confirmation for FULL access")
+def access_set(level: str, force: bool = False):
+    """Set the system access level.
+
+    \b
+    Examples:
+        sindri access set restricted
+        sindri access set supervised
+        sindri access set full --force
+    """
+    from pathlib import Path
+
+    from sindri.config import SindriConfig, SystemAccessLevel
+
+    config = SindriConfig.load()
+    old_level = config.system_access.value
+
+    if old_level == level:
+        console.print(f"[dim]Access level already set to {level.upper()}[/dim]")
+        return
+
+    # Warn about FULL access
+    if level == "full" and not force:
+        console.print()
+        console.print("[yellow]Warning:[/yellow] FULL access grants autonomous system control.")
+        console.print("This should only be used on a dedicated research machine.")
+        console.print()
+        if not click.confirm("Set access level to FULL?", default=False):
+            console.print("[dim]Cancelled[/dim]")
+            return
+
+    config.system_access = SystemAccessLevel(level)
+
+    # Save to default config location
+    config_path = Path.home() / ".sindri" / "config.toml"
+    config.save(str(config_path))
+
+    console.print(f"[green]Access level changed: {old_level.upper()} -> {level.upper()}[/green]")
+    console.print(f"[dim]Saved to: {config_path}[/dim]")
+
+
+@access.command("services")
+@click.option("--add", "-a", multiple=True, help="Add service to allowed list")
+@click.option("--remove", "-r", multiple=True, help="Remove service from allowed list")
+@click.option("--list", "-l", "list_only", is_flag=True, help="List allowed services only")
+def access_services(add: tuple, remove: tuple, list_only: bool = False):
+    """Manage the list of allowed services.
+
+    Services in this list can be managed (started, stopped, restarted) when
+    access level is SUPERVISED or FULL.
+
+    \b
+    Examples:
+        sindri access services --list
+        sindri access services --add docker --add nginx
+        sindri access services --remove nginx
+    """
+    from pathlib import Path
+
+    from sindri.config import SindriConfig
+
+    config = SindriConfig.load()
+
+    if list_only or (not add and not remove):
+        console.print("[bold]Allowed Services:[/bold]")
+        if config.allowed_services:
+            for service in sorted(config.allowed_services):
+                console.print(f"  - {service}")
+        else:
+            console.print("  [dim](none)[/dim]")
+        return
+
+    services = set(config.allowed_services)
+    modified = False
+
+    for service in add:
+        if service not in services:
+            services.add(service)
+            console.print(f"[green]+ Added: {service}[/green]")
+            modified = True
+        else:
+            console.print(f"[dim]Already present: {service}[/dim]")
+
+    for service in remove:
+        if service in services:
+            services.remove(service)
+            console.print(f"[red]- Removed: {service}[/red]")
+            modified = True
+        else:
+            console.print(f"[yellow]Not found: {service}[/yellow]")
+
+    if modified:
+        config.allowed_services = sorted(services)
+        config_path = Path.home() / ".sindri" / "config.toml"
+        config.save(str(config_path))
+        console.print(f"\n[dim]Saved to: {config_path}[/dim]")
+
+
+@access.command("self-modify")
+@click.option("--enable", is_flag=True, help="Enable self-modification")
+@click.option("--disable", is_flag=True, help="Disable self-modification")
+def access_self_modify(enable: bool = False, disable: bool = False):
+    """Enable or disable self-modification capability.
+
+    When enabled, Sindri can modify its own configuration file.
+    This is useful for autonomous operation on a dedicated machine.
+
+    \b
+    Examples:
+        sindri access self-modify --enable
+        sindri access self-modify --disable
+    """
+    from pathlib import Path
+
+    from sindri.config import SindriConfig
+
+    config = SindriConfig.load()
+
+    if not enable and not disable:
+        status = "[green]Enabled[/green]" if config.allow_self_modification else "[red]Disabled[/red]"
+        console.print(f"[bold]Self-Modification:[/bold] {status}")
+        return
+
+    if enable and disable:
+        console.print("[red]Cannot use both --enable and --disable[/red]")
+        return
+
+    new_value = enable
+    if config.allow_self_modification == new_value:
+        status = "enabled" if new_value else "disabled"
+        console.print(f"[dim]Self-modification already {status}[/dim]")
+        return
+
+    config.allow_self_modification = new_value
+    config_path = Path.home() / ".sindri" / "config.toml"
+    config.save(str(config_path))
+
+    status = "[green]enabled[/green]" if new_value else "[red]disabled[/red]"
+    console.print(f"Self-modification {status}")
+    console.print(f"[dim]Saved to: {config_path}[/dim]")
+
+
 if __name__ == "__main__":
     cli()
