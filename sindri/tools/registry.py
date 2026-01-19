@@ -241,6 +241,14 @@ from sindri.tools.bash_tools import (
     SystemdGenerateTool,
     BashLintTool,
 )
+from sindri.tools.math import (
+    MathEvaluateTool,
+    MathSolveTool,
+    StatsAnalyzeTool,
+    PlotGenerateTool,
+    UnitConvertTool,
+    MatrixOperationsTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -671,4 +679,11 @@ class ToolRegistry:
         registry.register(BashValidateTool(work_dir=work_dir))
         registry.register(SystemdGenerateTool(work_dir=work_dir))
         registry.register(BashLintTool(work_dir=work_dir))
+        # Math and scientific tools (Phase 12)
+        registry.register(MathEvaluateTool(work_dir=work_dir))
+        registry.register(MathSolveTool(work_dir=work_dir))
+        registry.register(StatsAnalyzeTool(work_dir=work_dir))
+        registry.register(PlotGenerateTool(work_dir=work_dir))
+        registry.register(UnitConvertTool(work_dir=work_dir))
+        registry.register(MatrixOperationsTool(work_dir=work_dir))
         return registry

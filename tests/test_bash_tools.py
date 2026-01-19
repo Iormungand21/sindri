@@ -647,7 +647,7 @@ class TestSifAgent:
         brokkr = get_agent("brokkr")
         assert "sif" in brokkr.delegate_to
 
-    def test_agent_count_is_19(self):
-        """Test that total agent count is now 19."""
-        # After adding Sif: 18 (previous) + 1 = 19
-        assert len(AGENTS) == 19
+    def test_agent_count_is_20(self):
+        """Test that total agent count is now 20."""
+        # After adding Nidhogg: 19 (previous) + 1 = 20
+        assert len(AGENTS) == 20

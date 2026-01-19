@@ -712,16 +712,18 @@ Expand Sindri's core capabilities with universal tools that benefit all agents a
 
 ---
 
-#### 13. Math & Scientific Tools
+#### 13. Math & Scientific Tools ✅ COMPLETE (2026-01-19)
 
-| Tool | Description | Backend |
-|------|-------------|---------|
-| `math_evaluate` | Evaluate math expressions | SymPy |
-| `math_solve` | Solve equations symbolically | SymPy |
-| `stats_analyze` | Statistical analysis | SciPy, pandas |
-| `plot_generate` | Generate plots/charts | matplotlib |
-| `unit_convert` | Convert between units | pint |
-| `matrix_operations` | Matrix math | NumPy |
+| Tool | Description | Backend | Status |
+|------|-------------|---------|--------|
+| `math_evaluate` | Evaluate math expressions | SymPy | ✅ Done |
+| `math_solve` | Solve equations symbolically | SymPy | ✅ Done |
+| `stats_analyze` | Statistical analysis | SciPy, pandas | ✅ Done |
+| `plot_generate` | Generate plots/charts | matplotlib | ✅ Done |
+| `unit_convert` | Convert between units | pint | ✅ Done |
+| `matrix_operations` | Matrix math | NumPy | ✅ Done |
+
+**Agent:** Nidhogg (mathstral:7b) - Math and scientific computing specialist
 
 ---
 
@@ -808,10 +810,11 @@ Based on research, these specialized models outperform general-purpose models fo
 **Tier 2 - New Lightweight Agents**
 - ✅ **Vör** (Regex/Text) - General text processing, pattern generation - COMPLETE (2026-01-18)
 - ✅ **Sif** (Shell/SysAdmin) - System automation, scripting - COMPLETE (2026-01-18)
+- ✅ **Nidhogg** (Math/Scientific) - Symbolic math, statistics, plotting, linear algebra - COMPLETE (2026-01-19)
 
 **Tier 3 - New Specialized Agents**
 - **Groa** (Documents) - PDF/OCR with vision model
-- **Nidhogg** (Advanced SQL) - Complex query optimization
+- **Fafnir** (Advanced SQL) - Complex query optimization
 
 ---
 

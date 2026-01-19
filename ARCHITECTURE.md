@@ -209,7 +209,7 @@ sindri/
 │
 ├── agents/                   # Agent definitions and prompts
 │   ├── definitions.py        # AgentDefinition dataclass (with fallback models)
-│   ├── registry.py           # AGENTS dict (18 agents)
+│   ├── registry.py           # AGENTS dict (20 agents)
 │   └── prompts.py            # System prompts for each agent (~2500 lines)
 │
 ├── llm/                      # LLM interface layer
@@ -218,7 +218,7 @@ sindri/
 │   ├── tool_parser.py        # Parse JSON tool calls from text
 │   └── streaming.py          # StreamingBuffer for tool detection
 │
-├── tools/                    # Tool implementations (155+ tools)
+├── tools/                    # Tool implementations (161+ tools)
 │   ├── base.py               # Tool ABC, ToolResult dataclass
 │   ├── registry.py           # ToolRegistry, schema generation
 │   ├── filesystem.py         # read_file, write_file, edit_file, list_directory, read_tree
@@ -504,7 +504,7 @@ Users can add custom tools and agents without modifying Sindri:
 
 ## Testing
 
-**Test Count:** 2726 backend tests + 104 frontend tests (100% passing)
+**Test Count:** 2887 backend tests + 104 frontend tests (100% passing)
 
 ```bash
 # Run all tests

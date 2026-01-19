@@ -37,9 +37,9 @@ See `STATUS.md` and `ROADMAP.md` for full details.
 
 **Key Facts:**
 - **Status:** Architecture Transformation COMPLETE (Internal-Only Mode)
-- **Tests:** 2726 backend + 104 frontend
-- **Agents:** 18 specialized agents (including sindri_admin)
-- **Tools:** 155+ tools (26 new in Milestone 6)
+- **Tests:** 2887 backend + 104 frontend
+- **Agents:** 20 specialized agents (including sindri_admin)
+- **Tools:** 161+ tools (6 new math/scientific tools)
 - **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
 
 ---
@@ -51,7 +51,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see 2726 passed)
+# Run tests (should see 2887 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health
@@ -160,7 +160,7 @@ sindri/
 ├── voice/         # Voice interface (STT/TTS)
 └── analysis/      # Codebase understanding
 
-tests/             # Pytest tests (~2726 tests)
+tests/             # Pytest tests (~2887 tests)
 docs/              # User documentation
 docs/archive/      # Historical documents
 ```

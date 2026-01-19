@@ -4,11 +4,11 @@
 
 Forge code with local LLMs via Ollama, using a hierarchical multi-agent system inspired by Norse mythology. Like the legendary dwarf smith who forged Mjolnir, Sindri crafts your code through iterative refinement.
 
-> **Status:** Production Ready (v0.1.0) - 18 agents, 155+ tools, 2726 tests passing. See [STATUS.md](STATUS.md) for details.
+> **Status:** Production Ready (v0.1.0) - 20 agents, 161+ tools, 2887 tests passing. See [STATUS.md](STATUS.md) for details.
 
 ## Features
 
-- 🏛️ **Hierarchical Multi-Agent System** - 18 specialized agents delegate tasks to experts
+- 🏛️ **Hierarchical Multi-Agent System** - 20 specialized agents delegate tasks to experts
 - 🧠 **Five-Tier Memory System** - Working, episodic, semantic, pattern, and analysis memory
 - 🎨 **Rich Terminal UI** - Monitor agent activity, task trees, and VRAM usage in real-time
 - 🌐 **Web UI** - React dashboard with agent graph, session replay, and code diff viewer
@@ -245,7 +245,7 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full options.
 # Install dev dependencies
 pip install -e ".[dev,tui,web]"
 
-# Run tests (2726 backend + 104 frontend)
+# Run tests (2887 backend + 104 frontend)
 pytest tests/ -v
 cd sindri/web/static && npm test -- --run
 

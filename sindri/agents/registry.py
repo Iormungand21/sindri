@@ -25,6 +25,8 @@ from sindri.agents.prompts import (
     RAN_PROMPT,
     # Phase 12: Shell/SysAdmin agent (2026-01-18)
     SIF_PROMPT,
+    # Phase 12: Math/Scientific agent (2026-01-19)
+    NIDHOGG_PROMPT,
     # Milestone 6: Self-management agent (2026-01-18)
     SINDRI_ADMIN_PROMPT,
 )
@@ -81,7 +83,7 @@ AGENTS: dict[str, AgentDefinition] = {
         can_delegate=True,
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
         # Phase 11: Added skuld, kvasir, volundr, saga for multi-disciplinary domains
-        # Phase 12: Added vor for text/regex processing, ran for browser automation, sif for shell/sysadmin
+        # Phase 12: Added vor for text/regex, ran for browser, sif for shell, nidhogg for math/scientific
         delegate_to=[
             "huginn",
             "mimir",
@@ -99,6 +101,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "vor",
             "ran",
             "sif",
+            "nidhogg",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -678,6 +681,35 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to smaller model when VRAM is insufficient
         fallback_model="qwen2.5:3b-instruct-q8_0",
         fallback_vram_gb=3.0,
+    ),
+    # Phase 12: Math/Scientific agent (2026-01-19)
+    "nidhogg": AgentDefinition(
+        name="nidhogg",
+        role="Math and scientific computing specialist - symbolic math, statistics, plotting, linear algebra",
+        model="mathstral:7b",  # Math-specialized model
+        system_prompt=NIDHOGG_PROMPT,
+        tools=[
+            # Core file operations
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            # Math and scientific tools
+            "math_evaluate",
+            "math_solve",
+            "stats_analyze",
+            "plot_generate",
+            "unit_convert",
+            "matrix_operations",
+        ],
+        can_delegate=False,  # Tier 2 specialist, does not delegate
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=15,
+        temperature=0.2,  # Lower temp for precise calculations
+        # Fallback to smaller coder model
+        fallback_model="qwen2.5-coder:3b",
+        fallback_vram_gb=2.5,
     ),
 }
 

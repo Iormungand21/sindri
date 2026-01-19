@@ -219,6 +219,49 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 
 ## Recent Changes
 
+### Math & Scientific Tools (2026-01-19) - Phase 12 Category 13
+
+Added **Nidhogg** - a specialized math and scientific computing agent. Named after the Norse dragon that gnaws at the roots of Yggdrasil, Nidhogg delves deep into mathematical foundations to extract computational insights.
+
+**New Agent:**
+- **Nidhogg** (Norse dragon) - Math and scientific computing specialist using mathstral:7b
+
+**New Tools (6 total):**
+- `math_evaluate` - Evaluate mathematical expressions (arithmetic, trig, symbolic) with optional variable substitution
+- `math_solve` - Solve single equations or systems of equations (linear, quadratic, polynomial) with domain support
+- `stats_analyze` - Statistical analysis: descriptive stats, correlation, t-test, ANOVA, regression
+- `plot_generate` - Generate plots (function, scatter, histogram, heatmap) with fit lines and export to PNG/SVG/PDF
+- `unit_convert` - Physical unit conversion using pint (length, mass, time, temperature, energy, etc.)
+- `matrix_operations` - Linear algebra: multiply, inverse, transpose, determinant, eigenvalues, SVD, solve Ax=b
+
+**Agent Assignment:**
+- **Nidhogg** has access to all 6 math tools plus core file operations (read_file, write_file, list_directory, read_tree)
+- **Brokkr** can delegate to Nidhogg for mathematical and scientific computing tasks
+
+**Key Features:**
+- Symbolic math via SymPy (exact fractions, symbolic simplification)
+- Numeric mode for floating-point results
+- Statistical tests with p-values and confidence intervals
+- Multi-format plot export (PNG, SVG, PDF, base64)
+- Unit arithmetic (e.g., "5 kg * 9.8 m/s**2" → force in newtons)
+- Matrix decompositions (eigenvalues, SVD, LU, QR)
+
+**Files:**
+- `sindri/tools/math.py` - All math/scientific tool implementations (~1200 lines)
+- `sindri/agents/prompts.py` - NIDHOGG_PROMPT with mathematical best practices
+- `sindri/agents/registry.py` - Nidhogg agent definition
+- `tests/test_math.py` - Comprehensive test suite
+
+**Dependencies Added:**
+- sympy>=1.13.0 (symbolic mathematics)
+- scipy>=1.11.0 (statistical analysis)
+- matplotlib>=3.8.0 (plotting)
+- pint>=0.23.0 (unit conversion)
+
+**Tests:** +70 new tests (2887 total)
+
+---
+
 ### Sif Shell/SysAdmin Agent (2026-01-18) - Phase 12 Tier 2
 
 Added **Sif** - a specialized shell scripting and system administration agent. Named after the Norse goddess whose golden hair was replaced by dwarf-forged gold, Sif transforms raw commands into polished, reliable scripts.

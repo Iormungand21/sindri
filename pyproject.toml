@@ -24,6 +24,11 @@ dependencies = [
     "openpyxl>=3.1.0",
     "dnspython>=2.6.0",
     "faker>=24.0.0",
+    # Math & Scientific (Phase 12)
+    "sympy>=1.13.0",
+    "scipy>=1.11.0",
+    "matplotlib>=3.8.0",
+    "pint>=0.23.0",
 ]
 
 [project.optional-dependencies]
