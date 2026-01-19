@@ -164,10 +164,10 @@ Five-tier memory architecture:
                         |
     +--------+----------+----------+-----------+
     |        |          |          |           |
-+---v----+ +-v------+ +-v-------+ +v--------+ +v----------+
-|TaskSch | |HierLoop| |DelegMgr | | Memory  | | Collab    |
-|eduler  | |        | |         | |(Muninn) | | Manager   |
-+---+----+ +---+----+ +---+-----+ +----+----+ +-----------+
++---v----+ +-v------+ +-v-------+ +v--------+
+|TaskSch | |HierLoop| |DelegMgr | | Memory  |
+|eduler  | |        | |         | |(Muninn) |
++---+----+ +---+----+ +---+-----+ +----+----+
     |          |           |           |
     |      +---v-----------v----+      |
     |      |   SessionState     |      |
@@ -209,7 +209,7 @@ sindri/
 │
 ├── agents/                   # Agent definitions and prompts
 │   ├── definitions.py        # AgentDefinition dataclass (with fallback models)
-│   ├── registry.py           # AGENTS dict (11 agents)
+│   ├── registry.py           # AGENTS dict (18 agents)
 │   └── prompts.py            # System prompts for each agent (~2500 lines)
 │
 ├── llm/                      # LLM interface layer
@@ -218,7 +218,7 @@ sindri/
 │   ├── tool_parser.py        # Parse JSON tool calls from text
 │   └── streaming.py          # StreamingBuffer for tool detection
 │
-├── tools/                    # Tool implementations (32 tools)
+├── tools/                    # Tool implementations (155+ tools)
 │   ├── base.py               # Tool ABC, ToolResult dataclass
 │   ├── registry.py           # ToolRegistry, schema generation
 │   ├── filesystem.py         # read_file, write_file, edit_file, list_directory, read_tree
@@ -267,11 +267,6 @@ sindri/
 │   ├── loader.py             # Plugin discovery (*.py tools, *.toml agents)
 │   ├── validator.py          # Safety validation
 │   └── manager.py            # PluginManager lifecycle
-│
-├── collaboration/            # Remote collaboration
-│   ├── sharing.py            # SessionShare, ShareStore
-│   ├── comments.py           # SessionComment, CommentStore
-│   └── presence.py           # Participant, PresenceManager
 │
 ├── tui/                      # Terminal UI (Textual)
 │   ├── app.py                # SindriApp (main Textual app)
@@ -395,7 +390,7 @@ class EventType(Enum):
 
 ## Key Components
 
-### Agents (11 total)
+### Agents (18 total)
 
 | Agent | Role | Model | VRAM | Delegates To |
 |-------|------|-------|------|--------------|
@@ -411,7 +406,7 @@ class EventType(Enum):
 | **Idunn** | Documentation | llama3.1:8b | ~5GB | - |
 | **Vidar** | Multi-lang | codestral:22b | ~14GB | ratatoskr |
 
-### Tools (32 total)
+### Tools (155+ total)
 
 **Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
 **Search:** search_code, find_symbol
@@ -501,8 +496,6 @@ Users can add custom tools and agents without modifying Sindri:
 ### Extended Tables
 - **session_metrics** - Performance metrics JSON
 - **session_feedback** - User ratings and quality tags
-- **session_shares** - Share links with permissions
-- **session_comments** - Review comments with threading
 - **patterns** - Learned successful patterns
 - **codebase_analysis** - Cached analysis results
 - **projects** - Multi-project registry
@@ -511,7 +504,7 @@ Users can add custom tools and agents without modifying Sindri:
 
 ## Testing
 
-**Test Count:** 1284 backend tests + 104 frontend tests (100% passing)
+**Test Count:** 2726 backend tests + 104 frontend tests (100% passing)
 
 ```bash
 # Run all tests
@@ -526,5 +519,5 @@ cd sindri/web/static && npm test -- --run
 
 ---
 
-**Last Updated:** 2026-01-17
+**Last Updated:** 2026-01-18
 **Maintained By:** Project contributors

@@ -4,11 +4,11 @@
 
 Forge code with local LLMs via Ollama, using a hierarchical multi-agent system inspired by Norse mythology. Like the legendary dwarf smith who forged Mjolnir, Sindri crafts your code through iterative refinement.
 
-> **Status:** Production Ready (v0.1.0) - 11 agents, 32 tools, 1284 tests passing. See [STATUS.md](STATUS.md) for details.
+> **Status:** Production Ready (v0.1.0) - 18 agents, 155+ tools, 2726 tests passing. See [STATUS.md](STATUS.md) for details.
 
 ## Features
 
-- 🏛️ **Hierarchical Multi-Agent System** - 11 specialized agents delegate tasks to experts
+- 🏛️ **Hierarchical Multi-Agent System** - 18 specialized agents delegate tasks to experts
 - 🧠 **Five-Tier Memory System** - Working, episodic, semantic, pattern, and analysis memory
 - 🎨 **Rich Terminal UI** - Monitor agent activity, task trees, and VRAM usage in real-time
 - 🌐 **Web UI** - React dashboard with agent graph, session replay, and code diff viewer
@@ -18,7 +18,6 @@ Forge code with local LLMs via Ollama, using a hierarchical multi-agent system i
 - 📊 **VRAM Management** - Intelligent model loading with LRU eviction and pre-warming
 - 🗄️ **Vector Search** - Semantic codebase search with sqlite-vec and local embeddings
 - 🔌 **Plugin System** - Custom tools and agents without modifying Sindri
-- 🤝 **Collaboration** - Session sharing, comments, and real-time presence
 
 ## Installation
 
@@ -105,7 +104,7 @@ sindri metrics
 
 ## Agent Hierarchy
 
-Sindri uses 11 Norse mythology-themed specialized agents:
+Sindri uses 18 Norse mythology-themed specialized agents. Core agents:
 
 | Agent | Role | Model | VRAM |
 |-------|------|-------|------|
@@ -192,7 +191,6 @@ sindri orchestrate "Simple task" --no-memory
 | `sindri doctor` | System health check |
 | `sindri plugins list` | List installed plugins |
 | `sindri projects add <path>` | Register project for cross-project search |
-| `sindri share <session>` | Share session with others |
 | `sindri feedback <session> <rating>` | Rate session for fine-tuning |
 
 ### Options
@@ -247,7 +245,7 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full options.
 # Install dev dependencies
 pip install -e ".[dev,tui,web]"
 
-# Run tests (1284 backend + 104 frontend)
+# Run tests (2726 backend + 104 frontend)
 pytest tests/ -v
 cd sindri/web/static && npm test -- --run
 

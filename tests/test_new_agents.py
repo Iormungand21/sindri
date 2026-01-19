@@ -46,9 +46,9 @@ class TestNewAgentsExist:
         assert agent.name == "vidar"
 
     def test_total_agent_count(self):
-        """Total agent count is 17 (7 original + 4 Phase 9 + 4 Phase 11 + 2 Phase 12)."""
+        """Total agent count is 18 (7 original + 4 Phase 9 + 4 Phase 11 + 2 Phase 12 + 1 sindri_admin)."""
         agents = list_agents()
-        assert len(agents) == 17
+        assert len(agents) == 18
 
 
 class TestHeimdallAgent:

@@ -2,7 +2,7 @@
 
 **Vision:** An **internal-only**, local-first LLM orchestration system running on a dedicated research machine. Sindri coordinates specialized agents for software development, 3D modeling, data visualization, scientific documentation, and more — with **full system access** for autonomous operation.
 
-**Current Status:** Architecture Transformation In Progress - Milestones 1-6 Complete
+**Current Status:** Architecture Transformation COMPLETE - All Milestones Complete
 
 ---
 
@@ -23,8 +23,8 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 | 4. Security | Relax localhost/private IP restrictions | ✅ **COMPLETE** | ~0 |
 | 5. Access Config | Add system access configuration | ✅ **COMPLETE** | +300 |
 | 6. Self-Management | Add service/cron/update tools | ✅ **COMPLETE** | +2,500 |
-| 7. Web UI | Remove auth/collaboration UI | ⏳ Pending | -1,500 |
-| 8. Documentation | Update all docs | ⏳ Pending | - |
+| 7. Web UI | Remove auth/collaboration UI | ✅ **COMPLETE** | 0 (already clean) |
+| 8. Documentation | Update all docs | ✅ **COMPLETE** | ~200 |
 
 ### Milestone 1 Complete (2026-01-18)
 **Removed:**
@@ -97,6 +97,28 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 
 **Result:** Full self-management capability for autonomous operation. Tests: 2691 → 2778 (+87 new tests)
 
+### Milestone 7 Complete (2026-01-18)
+**Finding:** No auth/collaboration UI exists in React frontend
+- Verified 23 React components - no authentication, team, or multi-user features
+- Verified FastAPI server has no auth middleware or team/user context
+- Frontend already single-user ready - no changes needed
+- Updated agent count test (17 → 18 to include sindri_admin)
+
+**Result:** Web UI was already clean. No code changes needed.
+
+### Milestone 8 Complete (2026-01-18)
+**Updated Documentation for Internal-Only Mode:**
+- `README.md` - Removed collaboration feature, updated counts (18 agents, 155+ tools, 2726 tests)
+- `ARCHITECTURE.md` - Removed collaboration references, updated counts
+- `STATUS.md` - Marked all milestones complete, added recent changes
+- `ROADMAP.md` - Marked milestones 7-8 complete
+- `ONBOARDING.md` - Updated milestone status
+
+**Cleanup:**
+- Deleted untracked WIP files: `sindri/tools/docker_tools.py`, `tests/test_docker_tools.py`
+
+**Result:** Architecture transformation complete. All tests passing (2726).
+
 ### Features Being Kept
 - Core Ralph loop and agent hierarchy
 - Memory system (Muninn)
@@ -111,7 +133,7 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 
 ```bash
 # Verify installation
-.venv/bin/pytest tests/ -v --tb=no -q    # 2685 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2726 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose
 
@@ -195,7 +217,7 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 - Rate limiting and usage tracking
 - Key expiration and revocation
 
-**Total:** 2475 backend tests + 104 frontend tests (100% passing)
+**Total:** 2726 backend tests + 104 frontend tests (100% passing)
 
 ---
 

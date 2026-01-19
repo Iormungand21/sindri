@@ -14,16 +14,18 @@ Welcome! This document will help you quickly understand the Sindri project and g
 
 Sindri is being transformed from a multi-user tool to an **internal-only research machine assistant**.
 
-### Completed
+### Completed (All Milestones)
 - ✅ **Milestone 1:** Removed `sindri/collaboration/` (~16,200 lines, 28+ CLI commands, 50+ API endpoints)
 - ✅ **Milestone 2:** Removed `sindri/ide/` (~2,100 lines, 2 CLI commands)
 - ✅ **Milestone 3:** Simplified marketplace to local-only (~220 lines removed)
 - ✅ **Milestone 4:** Relaxed security restrictions (localhost/private IPs now allowed)
 - ✅ **Milestone 5:** Added system access configuration (SystemAccessLevel enum, CLI commands, +37 tests)
 - ✅ **Milestone 6:** Added self-management tools (26 tools, sindri_admin agent, service/schedule/self CLI commands, +87 tests)
+- ✅ **Milestone 7:** Web UI cleanup (verified - no auth/collab UI existed)
+- ✅ **Milestone 8:** Documentation update (README, ARCHITECTURE, STATUS, ROADMAP updated)
 
-### Next
-- **Milestone 7-8:** Web UI cleanup, documentation
+### Architecture Transformation Complete
+Sindri is now fully configured as an **internal-only research machine assistant**.
 
 See `STATUS.md` and `ROADMAP.md` for full details.
 
@@ -34,8 +36,8 @@ See `STATUS.md` and `ROADMAP.md` for full details.
 **Sindri** is a local-first, hierarchical LLM orchestration CLI that coordinates specialized agents (Norse-themed) to build, refactor, and maintain code using Ollama. Think of it as a multi-agent coding assistant running entirely on your machine with a 16GB VRAM GPU.
 
 **Key Facts:**
-- **Status:** Architecture Transformation In Progress (Milestones 1-6 Complete)
-- **Tests:** ~2778 backend + 104 frontend
+- **Status:** Architecture Transformation COMPLETE (Internal-Only Mode)
+- **Tests:** 2726 backend + 104 frontend
 - **Agents:** 18 specialized agents (including sindri_admin)
 - **Tools:** 155+ tools (26 new in Milestone 6)
 - **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
@@ -49,7 +51,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see ~2748 passed)
+# Run tests (should see 2726 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health
@@ -149,7 +151,7 @@ Read these in order for full context:
 sindri/
 ├── core/          # Orchestration, delegation, events
 ├── agents/        # Agent definitions and prompts
-├── tools/         # All 129+ tool implementations
+├── tools/         # All 155+ tool implementations
 ├── memory/        # 5-tier memory system
 ├── persistence/   # Database, metrics, feedback
 ├── tui/           # Terminal UI (Textual)
@@ -158,7 +160,7 @@ sindri/
 ├── voice/         # Voice interface (STT/TTS)
 └── analysis/      # Codebase understanding
 
-tests/             # Pytest tests (~2654 tests)
+tests/             # Pytest tests (~2726 tests)
 docs/              # User documentation
 docs/archive/      # Historical documents
 ```
@@ -246,4 +248,4 @@ Historical documents are in `docs/archive/`:
 
 ---
 
-**Last Updated:** 2026-01-18 (Milestone 6 Complete)
+**Last Updated:** 2026-01-18 (Architecture Transformation Complete)
