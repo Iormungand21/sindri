@@ -1,6 +1,6 @@
 # Sindri Project Status Report
 **Date:** 2026-01-18
-**Status:** Architecture Transformation IN PROGRESS - Milestones 1-5 Complete
+**Status:** Architecture Transformation IN PROGRESS - Milestones 1-6 Complete
 
 ---
 
@@ -51,8 +51,31 @@ Sindri is being transformed from a multi-user deployable tool into an **internal
   - FULL: Full autonomous access (for dedicated machine)
 - **Result:** Configurable system access for graduated trust, tests: 2654 → 2691 (+37 new tests)
 
+#### Milestone 6: Add Self-Management Tools (COMPLETE)
+- **Created:** `sindri/tools/services.py` - 8 service management tools (status, start, stop, restart, enable, disable, logs, list)
+- **Created:** `sindri/tools/self_management.py` - 9 self-management tools (sindri_version, sindri_update, sindri_config_get/set, ollama_list/pull/remove/status, vram_status)
+- **Created:** `sindri/tools/scheduling.py` - 9 scheduling tools (cron_list/add/remove, timer_list/create/remove, at_schedule/list/remove)
+- **Added:** `sindri_admin` agent with all 26 new tools
+- **Added:** CLI commands: `sindri service`, `sindri schedule`, `sindri self`
+- **Service Management:**
+  - `sindri service status <name>` - Check service status
+  - `sindri service start/stop/restart <name>` - Control services
+  - `sindri service logs <name>` - View service logs
+  - `sindri service list` - List services
+- **Scheduling:**
+  - `sindri schedule list` - List cron jobs, timers, at jobs
+  - `sindri schedule cron-add/remove` - Manage cron jobs
+  - `sindri schedule timer-create/remove` - Manage systemd user timers
+  - `sindri schedule at` - Schedule one-time tasks
+- **Self-Management:**
+  - `sindri self version` - Show Sindri version
+  - `sindri self update` - Update Sindri
+  - `sindri self models` - List Ollama models
+  - `sindri self pull/remove <model>` - Manage models
+  - `sindri self vram` - Show GPU VRAM usage
+- **Result:** Full self-management capability for autonomous operation, tests: 2691 → 2778 (+87 new tests)
+
 ### Next Milestones
-6. **Milestone 6:** Add self-management tools
 7. **Milestone 7:** Simplify Web UI
 8. **Milestone 8:** Documentation update (internal-only focus)
 
@@ -63,17 +86,17 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 
 ## Current State
 
-**Status:** Internal-only mode (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access)
-**Test Status:** 2691 tests collected, 2661 passing (20 failing from untracked docker_tools WIP)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration
+**Status:** Internal-only mode (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
+**Test Status:** 2778 tests collected, 2748 passing (20 failing from untracked docker_tools WIP)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2691 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2778 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 17 agents
+.venv/bin/sindri agents                    # See all 18 agents (17 + sindri_admin)
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -81,6 +104,23 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri access services --list    # List allowed services
 .venv/bin/sindri access services --add docker  # Add service to allowlist
 .venv/bin/sindri access self-modify        # Check self-modification status
+
+# Service Management (Milestone 6)
+.venv/bin/sindri service status ollama     # Check service status
+.venv/bin/sindri service logs ollama       # View service logs
+.venv/bin/sindri service list              # List running services
+.venv/bin/sindri service restart ollama    # Restart a service
+
+# Scheduling (Milestone 6)
+.venv/bin/sindri schedule list             # List all scheduled tasks
+.venv/bin/sindri schedule cron-add "0 2 * * *" "sindri doctor" -c "Daily health"
+.venv/bin/sindri schedule timer-create health "sindri doctor" --calendar daily
+
+# Self-Management (Milestone 6)
+.venv/bin/sindri self version              # Show version info
+.venv/bin/sindri self models               # List Ollama models
+.venv/bin/sindri self vram                 # Show GPU VRAM usage
+.venv/bin/sindri self ollama-status        # Check Ollama server
 
 # Launch interfaces
 .venv/bin/sindri tui                       # Terminal UI

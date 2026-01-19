@@ -23,6 +23,8 @@ from sindri.agents.prompts import (
     VOR_PROMPT,
     # Phase 12: Browser automation agent (2026-01-18)
     RAN_PROMPT,
+    # Milestone 6: Self-management agent (2026-01-18)
+    SINDRI_ADMIN_PROMPT,
 )
 
 # Agent Registry
@@ -561,6 +563,64 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to smaller model when VRAM is insufficient
         fallback_model="qwen2.5-coder:3b",
         fallback_vram_gb=2.0,
+    ),
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Milestone 6: Self-Management Agent (2026-01-18)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    "sindri_admin": AgentDefinition(
+        name="sindri_admin",
+        role="System self-management and service orchestration",
+        model="qwen2.5-coder:7b",  # Good balance of capability and VRAM
+        system_prompt=SINDRI_ADMIN_PROMPT,
+        tools=[
+            # File operations
+            "read_file",
+            "write_file",
+            "shell",
+            # Service management tools
+            "service_status",
+            "service_start",
+            "service_stop",
+            "service_restart",
+            "service_enable",
+            "service_disable",
+            "service_logs",
+            "service_list",
+            # Scheduling tools
+            "cron_list",
+            "cron_add",
+            "cron_remove",
+            "timer_list",
+            "timer_create",
+            "timer_remove",
+            "at_schedule",
+            "at_list",
+            "at_remove",
+            # Self-management tools
+            "sindri_version",
+            "sindri_update",
+            "sindri_config_get",
+            "sindri_config_set",
+            "ollama_list",
+            "ollama_pull",
+            "ollama_remove",
+            "ollama_status",
+            "vram_status",
+            # System tools (existing)
+            "process_list",
+            "process_kill",
+            "system_info",
+            "disk_usage",
+            "memory_usage",
+        ],
+        can_delegate=False,
+        estimated_vram_gb=5.0,
+        priority=1,
+        max_iterations=20,
+        temperature=0.3,  # Lower temp for precise system operations
+        # Fallback to smaller model when VRAM is insufficient
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
     ),
 }
 

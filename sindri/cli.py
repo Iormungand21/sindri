@@ -6260,5 +6260,525 @@ def access_self_modify(enable: bool = False, disable: bool = False):
     console.print(f"[dim]Saved to: {config_path}[/dim]")
 
 
+# =============================================================================
+# Service Management (Milestone 6)
+# =============================================================================
+
+
+@cli.group()
+def service():
+    """Manage systemd services.
+
+    Check status, start/stop, view logs, and manage services.
+    Operations are gated by your access level configuration.
+    """
+    pass
+
+
+@service.command("status")
+@click.argument("name")
+@click.option("--user", "-u", is_flag=True, help="User service (systemctl --user)")
+def service_status_cmd(name: str, user: bool = False):
+    """Check status of a service.
+
+    \b
+    Examples:
+        sindri service status ollama
+        sindri service status syncthing --user
+    """
+    from sindri.tools.services import ServiceStatusTool
+
+    async def run():
+        tool = ServiceStatusTool()
+        result = await tool.execute(service=name, user=user)
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@service.command("start")
+@click.argument("name")
+@click.option("--user", "-u", is_flag=True, help="User service (systemctl --user)")
+def service_start_cmd(name: str, user: bool = False):
+    """Start a service.
+
+    \b
+    Examples:
+        sindri service start ollama
+    """
+    from sindri.tools.services import ServiceStartTool
+
+    async def run():
+        tool = ServiceStartTool()
+        result = await tool.execute(service=name, user=user)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@service.command("stop")
+@click.argument("name")
+@click.option("--user", "-u", is_flag=True, help="User service (systemctl --user)")
+def service_stop_cmd(name: str, user: bool = False):
+    """Stop a service.
+
+    \b
+    Examples:
+        sindri service stop ollama
+    """
+    from sindri.tools.services import ServiceStopTool
+
+    async def run():
+        tool = ServiceStopTool()
+        result = await tool.execute(service=name, user=user)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@service.command("restart")
+@click.argument("name")
+@click.option("--user", "-u", is_flag=True, help="User service (systemctl --user)")
+def service_restart_cmd(name: str, user: bool = False):
+    """Restart a service.
+
+    \b
+    Examples:
+        sindri service restart ollama
+    """
+    from sindri.tools.services import ServiceRestartTool
+
+    async def run():
+        tool = ServiceRestartTool()
+        result = await tool.execute(service=name, user=user)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@service.command("logs")
+@click.argument("name")
+@click.option("--lines", "-n", default=50, help="Number of log lines to show")
+@click.option("--user", "-u", is_flag=True, help="User service (journalctl --user)")
+def service_logs_cmd(name: str, lines: int = 50, user: bool = False):
+    """View service logs.
+
+    \b
+    Examples:
+        sindri service logs ollama
+        sindri service logs ollama -n 100
+    """
+    from sindri.tools.services import ServiceLogsTool
+
+    async def run():
+        tool = ServiceLogsTool()
+        result = await tool.execute(service=name, lines=lines, user=user)
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@service.command("list")
+@click.option("--state", "-s", default="running", help="Filter by state (running, failed, all)")
+@click.option("--user", "-u", is_flag=True, help="User services only")
+def service_list_cmd(state: str = "running", user: bool = False):
+    """List services.
+
+    \b
+    Examples:
+        sindri service list
+        sindri service list --state failed
+        sindri service list --user
+    """
+    from sindri.tools.services import ServiceListTool
+
+    async def run():
+        tool = ServiceListTool()
+        result = await tool.execute(state=state, user=user)
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+# =============================================================================
+# Scheduling (Milestone 6)
+# =============================================================================
+
+
+@cli.group()
+def schedule():
+    """Manage scheduled tasks (cron, systemd timers, at).
+
+    List, add, and remove scheduled tasks.
+    Operations are gated by your access level configuration.
+    """
+    pass
+
+
+@schedule.command("list")
+@click.option("--type", "-t", "sched_type", type=click.Choice(["cron", "timer", "at", "all"]),
+              default="all", help="Type of schedules to list")
+def schedule_list_cmd(sched_type: str = "all"):
+    """List scheduled tasks.
+
+    \b
+    Examples:
+        sindri schedule list
+        sindri schedule list --type cron
+        sindri schedule list --type timer
+    """
+    from sindri.tools.scheduling import CronListTool, TimerListTool, AtListTool
+
+    async def run():
+        if sched_type in ("cron", "all"):
+            console.print("[bold]Cron Jobs:[/bold]")
+            tool = CronListTool()
+            result = await tool.execute()
+            if result.success:
+                console.print(result.output)
+            else:
+                console.print(f"[red]Error: {result.error}[/red]")
+            console.print()
+
+        if sched_type in ("timer", "all"):
+            console.print("[bold]Systemd User Timers:[/bold]")
+            tool = TimerListTool()
+            result = await tool.execute(all=True)
+            if result.success:
+                console.print(result.output)
+            else:
+                console.print(f"[red]Error: {result.error}[/red]")
+            console.print()
+
+        if sched_type in ("at", "all"):
+            console.print("[bold]At Jobs:[/bold]")
+            tool = AtListTool()
+            result = await tool.execute()
+            if result.success:
+                console.print(result.output)
+            else:
+                console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@schedule.command("cron-add")
+@click.argument("schedule")
+@click.argument("command")
+@click.option("--comment", "-c", help="Comment to identify this job")
+def schedule_cron_add(schedule: str, command: str, comment: str = None):
+    """Add a cron job.
+
+    \b
+    Examples:
+        sindri schedule cron-add "0 * * * *" "/usr/bin/backup.sh"
+        sindri schedule cron-add "0 2 * * *" "sindri doctor --fix" -c "Daily health"
+    """
+    from sindri.tools.scheduling import CronAddTool
+
+    async def run():
+        tool = CronAddTool()
+        result = await tool.execute(schedule=schedule, command=command, comment=comment)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@schedule.command("cron-remove")
+@click.option("--line", "-l", type=int, help="Line number to remove")
+@click.option("--pattern", "-p", help="Pattern to match and remove")
+def schedule_cron_remove(line: int = None, pattern: str = None):
+    """Remove a cron job by line number or pattern.
+
+    \b
+    Examples:
+        sindri schedule cron-remove --line 3
+        sindri schedule cron-remove --pattern "backup.sh"
+    """
+    from sindri.tools.scheduling import CronRemoveTool
+
+    if line is None and pattern is None:
+        console.print("[red]Must specify --line or --pattern[/red]")
+        return
+
+    async def run():
+        tool = CronRemoveTool()
+        result = await tool.execute(line_number=line, pattern=pattern)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@schedule.command("timer-create")
+@click.argument("name")
+@click.argument("command")
+@click.option("--calendar", "-c", help="OnCalendar schedule (e.g., 'daily', '*:0/15')")
+@click.option("--on-boot", "-b", help="OnBootSec time (e.g., '5min')")
+@click.option("--description", "-d", help="Timer description")
+def schedule_timer_create(name: str, command: str, calendar: str = None,
+                          on_boot: str = None, description: str = None):
+    """Create a systemd user timer.
+
+    \b
+    Examples:
+        sindri schedule timer-create health "sindri doctor" --calendar daily
+        sindri schedule timer-create startup "notify-send 'Ready'" --on-boot 30s
+    """
+    from sindri.tools.scheduling import TimerCreateTool
+
+    if calendar is None and on_boot is None:
+        console.print("[red]Must specify --calendar or --on-boot[/red]")
+        return
+
+    async def run():
+        tool = TimerCreateTool()
+        result = await tool.execute(
+            name=name,
+            command=command,
+            on_calendar=calendar,
+            on_boot_sec=on_boot,
+            description=description or f"Timer for {name}",
+        )
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@schedule.command("timer-remove")
+@click.argument("name")
+def schedule_timer_remove(name: str):
+    """Remove a systemd user timer.
+
+    \b
+    Examples:
+        sindri schedule timer-remove health
+    """
+    from sindri.tools.scheduling import TimerRemoveTool
+
+    async def run():
+        tool = TimerRemoveTool()
+        result = await tool.execute(name=name)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@schedule.command("at")
+@click.argument("time")
+@click.argument("command")
+def schedule_at_cmd(time: str, command: str):
+    """Schedule a one-time task with at.
+
+    \b
+    Examples:
+        sindri schedule at "now + 1 hour" "echo hello"
+        sindri schedule at "10:30" "/usr/bin/task.sh"
+        sindri schedule at "tomorrow" "sindri doctor"
+    """
+    from sindri.tools.scheduling import AtScheduleTool
+
+    async def run():
+        tool = AtScheduleTool()
+        result = await tool.execute(time=time, command=command)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@schedule.command("at-remove")
+@click.argument("job_id", type=int)
+def schedule_at_remove(job_id: int):
+    """Remove a scheduled at job.
+
+    \b
+    Examples:
+        sindri schedule at-remove 42
+    """
+    from sindri.tools.scheduling import AtRemoveTool
+
+    async def run():
+        tool = AtRemoveTool()
+        result = await tool.execute(job_id=job_id)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+# =============================================================================
+# Self-Management (Milestone 6)
+# =============================================================================
+
+
+@cli.group("self")
+def self_mgmt():
+    """Self-management commands for Sindri.
+
+    Version info, updates, model management, and VRAM status.
+    """
+    pass
+
+
+@self_mgmt.command("version")
+def self_version_cmd():
+    """Show Sindri version and status."""
+    from sindri.tools.self_management import SindriVersionTool
+
+    async def run():
+        tool = SindriVersionTool()
+        result = await tool.execute()
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@self_mgmt.command("update")
+def self_update_cmd():
+    """Update Sindri from the local repository."""
+    from sindri.tools.self_management import SindriUpdateTool
+
+    async def run():
+        tool = SindriUpdateTool()
+        result = await tool.execute()
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@self_mgmt.command("models")
+def self_models_cmd():
+    """List installed Ollama models."""
+    from sindri.tools.self_management import OllamaListTool
+
+    async def run():
+        tool = OllamaListTool()
+        result = await tool.execute()
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@self_mgmt.command("pull")
+@click.argument("model")
+def self_pull_cmd(model: str):
+    """Pull (download) an Ollama model.
+
+    \b
+    Examples:
+        sindri self pull qwen2.5-coder:7b
+        sindri self pull llama3.1:8b
+    """
+    from sindri.tools.self_management import OllamaPullTool
+
+    async def run():
+        console.print(f"[dim]Pulling {model}... (this may take a while)[/dim]")
+        tool = OllamaPullTool()
+        result = await tool.execute(model=model)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@self_mgmt.command("remove")
+@click.argument("model")
+def self_remove_cmd(model: str):
+    """Remove an Ollama model.
+
+    \b
+    Examples:
+        sindri self remove old-model:latest
+    """
+    from sindri.tools.self_management import OllamaRemoveTool
+
+    async def run():
+        tool = OllamaRemoveTool()
+        result = await tool.execute(model=model)
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@self_mgmt.command("vram")
+def self_vram_cmd():
+    """Show GPU VRAM usage."""
+    from sindri.tools.self_management import VramStatusTool
+
+    async def run():
+        tool = VramStatusTool()
+        result = await tool.execute()
+        if result.success:
+            console.print(result.output)
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
+@self_mgmt.command("ollama-status")
+def self_ollama_status_cmd():
+    """Check Ollama server status."""
+    from sindri.tools.self_management import OllamaStatusTool
+
+    async def run():
+        tool = OllamaStatusTool()
+        result = await tool.execute()
+        if result.success:
+            console.print(f"[green]{result.output}[/green]")
+        else:
+            console.print(f"[red]Error: {result.error}[/red]")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()

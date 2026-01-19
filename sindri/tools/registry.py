@@ -192,6 +192,38 @@ from sindri.tools.browser import (
     BrowserCloseTool,
 )
 from sindri.tools.scraping import WebScrapeTool
+from sindri.tools.services import (
+    ServiceStatusTool,
+    ServiceStartTool,
+    ServiceStopTool,
+    ServiceRestartTool,
+    ServiceEnableTool,
+    ServiceDisableTool,
+    ServiceLogsTool,
+    ServiceListTool,
+)
+from sindri.tools.self_management import (
+    SindriVersionTool,
+    SindriUpdateTool,
+    SindriConfigGetTool,
+    SindriConfigSetTool,
+    OllamaListTool,
+    OllamaPullTool,
+    OllamaRemoveTool,
+    OllamaStatusTool,
+    VramStatusTool,
+)
+from sindri.tools.scheduling import (
+    CronListTool,
+    CronAddTool,
+    CronRemoveTool,
+    TimerListTool,
+    TimerCreateTool,
+    TimerRemoveTool,
+    AtScheduleTool,
+    AtListTool,
+    AtRemoveTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -577,4 +609,33 @@ class ToolRegistry:
         registry.register(BrowserCloseTool(work_dir=work_dir))
         # Web scraping tool
         registry.register(WebScrapeTool(work_dir=work_dir))
+        # Service management tools
+        registry.register(ServiceStatusTool(work_dir=work_dir))
+        registry.register(ServiceStartTool(work_dir=work_dir))
+        registry.register(ServiceStopTool(work_dir=work_dir))
+        registry.register(ServiceRestartTool(work_dir=work_dir))
+        registry.register(ServiceEnableTool(work_dir=work_dir))
+        registry.register(ServiceDisableTool(work_dir=work_dir))
+        registry.register(ServiceLogsTool(work_dir=work_dir))
+        registry.register(ServiceListTool(work_dir=work_dir))
+        # Self-management tools
+        registry.register(SindriVersionTool(work_dir=work_dir))
+        registry.register(SindriUpdateTool(work_dir=work_dir))
+        registry.register(SindriConfigGetTool(work_dir=work_dir))
+        registry.register(SindriConfigSetTool(work_dir=work_dir))
+        registry.register(OllamaListTool(work_dir=work_dir))
+        registry.register(OllamaPullTool(work_dir=work_dir))
+        registry.register(OllamaRemoveTool(work_dir=work_dir))
+        registry.register(OllamaStatusTool(work_dir=work_dir))
+        registry.register(VramStatusTool(work_dir=work_dir))
+        # Scheduling tools
+        registry.register(CronListTool(work_dir=work_dir))
+        registry.register(CronAddTool(work_dir=work_dir))
+        registry.register(CronRemoveTool(work_dir=work_dir))
+        registry.register(TimerListTool(work_dir=work_dir))
+        registry.register(TimerCreateTool(work_dir=work_dir))
+        registry.register(TimerRemoveTool(work_dir=work_dir))
+        registry.register(AtScheduleTool(work_dir=work_dir))
+        registry.register(AtListTool(work_dir=work_dir))
+        registry.register(AtRemoveTool(work_dir=work_dir))
         return registry

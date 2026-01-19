@@ -2,7 +2,7 @@
 
 **Vision:** An **internal-only**, local-first LLM orchestration system running on a dedicated research machine. Sindri coordinates specialized agents for software development, 3D modeling, data visualization, scientific documentation, and more — with **full system access** for autonomous operation.
 
-**Current Status:** Architecture Transformation In Progress - Milestones 1-5 Complete
+**Current Status:** Architecture Transformation In Progress - Milestones 1-6 Complete
 
 ---
 
@@ -22,7 +22,7 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 | 3. Marketplace | Simplify to local-only | ✅ **COMPLETE** | -220 |
 | 4. Security | Relax localhost/private IP restrictions | ✅ **COMPLETE** | ~0 |
 | 5. Access Config | Add system access configuration | ✅ **COMPLETE** | +300 |
-| 6. Self-Management | Add service/cron/update tools | ⏳ Pending | +1,500 |
+| 6. Self-Management | Add service/cron/update tools | ✅ **COMPLETE** | +2,500 |
 | 7. Web UI | Remove auth/collaboration UI | ⏳ Pending | -1,500 |
 | 8. Documentation | Update all docs | ⏳ Pending | - |
 
@@ -76,6 +76,26 @@ Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 - Services whitelist allows granular control over which services can be managed
 
 **Result:** Configurable system access for graduated trust levels. Tests: 2654 → 2691 (+37 new tests)
+
+### Milestone 6 Complete (2026-01-18)
+**Added Self-Management Tools:**
+- Created `sindri/tools/services.py` - 8 service management tools
+- Created `sindri/tools/self_management.py` - 9 self-management tools
+- Created `sindri/tools/scheduling.py` - 9 scheduling tools
+- Added `sindri_admin` agent with all 26 new tools
+- Added CLI command groups: `service`, `schedule`, `self`
+
+**New Tools (26 total):**
+- **Service:** service_status, service_start, service_stop, service_restart, service_enable, service_disable, service_logs, service_list
+- **Self-Management:** sindri_version, sindri_update, sindri_config_get, sindri_config_set, ollama_list, ollama_pull, ollama_remove, ollama_status, vram_status
+- **Scheduling:** cron_list, cron_add, cron_remove, timer_list, timer_create, timer_remove, at_schedule, at_list, at_remove
+
+**New CLI Commands:**
+- `sindri service status/start/stop/restart/logs/list` - systemd service management
+- `sindri schedule list/cron-add/cron-remove/timer-create/timer-remove/at` - task scheduling
+- `sindri self version/update/models/pull/remove/vram/ollama-status` - self-management
+
+**Result:** Full self-management capability for autonomous operation. Tests: 2691 → 2778 (+87 new tests)
 
 ### Features Being Kept
 - Core Ralph loop and agent hierarchy

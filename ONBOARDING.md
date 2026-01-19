@@ -20,9 +20,10 @@ Sindri is being transformed from a multi-user tool to an **internal-only researc
 - ✅ **Milestone 3:** Simplified marketplace to local-only (~220 lines removed)
 - ✅ **Milestone 4:** Relaxed security restrictions (localhost/private IPs now allowed)
 - ✅ **Milestone 5:** Added system access configuration (SystemAccessLevel enum, CLI commands, +37 tests)
+- ✅ **Milestone 6:** Added self-management tools (26 tools, sindri_admin agent, service/schedule/self CLI commands, +87 tests)
 
 ### Next
-- **Milestone 6-8:** Self-management tools, Web UI cleanup, documentation
+- **Milestone 7-8:** Web UI cleanup, documentation
 
 See `STATUS.md` and `ROADMAP.md` for full details.
 
@@ -33,10 +34,10 @@ See `STATUS.md` and `ROADMAP.md` for full details.
 **Sindri** is a local-first, hierarchical LLM orchestration CLI that coordinates specialized agents (Norse-themed) to build, refactor, and maintain code using Ollama. Think of it as a multi-agent coding assistant running entirely on your machine with a 16GB VRAM GPU.
 
 **Key Facts:**
-- **Status:** Architecture Transformation In Progress (Milestones 1-5 Complete)
-- **Tests:** ~2691 backend + 104 frontend
-- **Agents:** 16+ specialized agents
-- **Tools:** 129+ tools
+- **Status:** Architecture Transformation In Progress (Milestones 1-6 Complete)
+- **Tests:** ~2778 backend + 104 frontend
+- **Agents:** 18 specialized agents (including sindri_admin)
+- **Tools:** 155+ tools (26 new in Milestone 6)
 - **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
 
 ---
@@ -48,7 +49,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see ~2661 passed)
+# Run tests (should see ~2748 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health
@@ -245,4 +246,4 @@ Historical documents are in `docs/archive/`:
 
 ---
 
-**Last Updated:** 2026-01-18 (Milestone 5 Complete)
+**Last Updated:** 2026-01-18 (Milestone 6 Complete)
