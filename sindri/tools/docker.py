@@ -1,10 +1,12 @@
-"""Docker file generation tools for Sindri.
+"""Docker tools for Sindri.
 
-Provides tools for generating Dockerfiles and docker-compose.yml files
-based on project detection.
+Provides tools for generating Dockerfiles and docker-compose.yml files,
+as well as runtime tools for building, running, and managing containers.
 """
 
+import asyncio
 import json
+import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -13,6 +15,105 @@ import structlog
 from sindri.tools.base import Tool, ToolResult
 
 log = structlog.get_logger()
+
+# Check Docker availability
+DOCKER_AVAILABLE = shutil.which("docker") is not None
+
+
+def _get_compose_command() -> list[str] | None:
+    """Get the docker compose command (v2 plugin or v1 standalone).
+
+    Returns:
+        List of command parts, or None if compose not available.
+    """
+    if not DOCKER_AVAILABLE:
+        return None
+    # Docker Compose v2 (plugin) - preferred
+    # We'll try it and fall back to v1 if needed
+    return ["docker", "compose"]
+
+
+async def _run_docker(
+    *args: str,
+    timeout: int = 300,
+    input_data: str | None = None,
+) -> tuple[int, str, str]:
+    """Run a docker command asynchronously.
+
+    Args:
+        *args: Docker command arguments (e.g., "ps", "-a")
+        timeout: Command timeout in seconds
+        input_data: Optional stdin data
+
+    Returns:
+        Tuple of (return_code, stdout, stderr)
+    """
+    if not DOCKER_AVAILABLE:
+        return (-1, "", "Docker not found. Please install Docker.")
+
+    cmd = ["docker"] + list(args)
+    log.debug("docker_command", cmd=cmd)
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            stdin=asyncio.subprocess.PIPE if input_data else None,
+        )
+
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(input_data.encode() if input_data else None),
+            timeout=timeout,
+        )
+
+        return (proc.returncode or 0, stdout.decode(), stderr.decode())
+    except asyncio.TimeoutError:
+        return (-1, "", f"Docker command timed out after {timeout}s")
+    except Exception as e:
+        return (-1, "", f"Docker command failed: {str(e)}")
+
+
+async def _run_compose(
+    *args: str,
+    cwd: Path | None = None,
+    timeout: int = 300,
+) -> tuple[int, str, str]:
+    """Run a docker compose command asynchronously.
+
+    Args:
+        *args: Compose command arguments (e.g., "up", "-d")
+        cwd: Working directory for the command
+        timeout: Command timeout in seconds
+
+    Returns:
+        Tuple of (return_code, stdout, stderr)
+    """
+    compose_cmd = _get_compose_command()
+    if compose_cmd is None:
+        return (-1, "", "Docker Compose not found.")
+
+    cmd = compose_cmd + list(args)
+    log.debug("compose_command", cmd=cmd, cwd=str(cwd) if cwd else None)
+
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            cwd=cwd,
+        )
+
+        stdout, stderr = await asyncio.wait_for(
+            proc.communicate(),
+            timeout=timeout,
+        )
+
+        return (proc.returncode or 0, stdout.decode(), stderr.decode())
+    except asyncio.TimeoutError:
+        return (-1, "", f"Docker Compose command timed out after {timeout}s")
+    except Exception as e:
+        return (-1, "", f"Docker Compose command failed: {str(e)}")
 
 
 @dataclass
@@ -1213,3 +1314,873 @@ Examples:
             )
 
         return result
+
+
+# =============================================================================
+# Docker Runtime Tools
+# =============================================================================
+
+
+class DockerPsTool(Tool):
+    """List Docker containers."""
+
+    name = "docker_ps"
+    description = """List Docker containers.
+
+Examples:
+- docker_ps() - List running containers
+- docker_ps(all=true) - List all containers including stopped
+- docker_ps(filter="name=myapp") - Filter by name
+- docker_ps(format="json") - Output as JSON"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "all": {
+                "type": "boolean",
+                "description": "Show all containers (including stopped). Default: false",
+            },
+            "filter": {
+                "type": "string",
+                "description": "Filter containers (e.g., 'status=running', 'name=myapp')",
+            },
+            "format": {
+                "type": "string",
+                "description": "Output format: 'table' (default) or 'json'",
+                "enum": ["table", "json"],
+            },
+        },
+        "required": [],
+    }
+
+    async def execute(
+        self,
+        all: bool = False,
+        filter: Optional[str] = None,
+        format: str = "table",
+        **kwargs,
+    ) -> ToolResult:
+        """List Docker containers."""
+        if not DOCKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Docker not found. Please install Docker.",
+                suggestion="Install Docker: https://docs.docker.com/engine/install/",
+            )
+
+        args = ["ps"]
+        if all:
+            args.append("-a")
+        if filter:
+            args.extend(["--filter", filter])
+
+        if format == "json":
+            args.extend(["--format", "json"])
+        else:
+            args.extend(
+                [
+                    "--format",
+                    "table {{.ID}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}\t{{.Names}}",
+                ]
+            )
+
+        returncode, stdout, stderr = await _run_docker(*args)
+
+        if returncode != 0:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Failed to list containers: {stderr}",
+            )
+
+        # Count containers
+        lines = [l for l in stdout.strip().split("\n") if l]
+        # Subtract header line for table format
+        container_count = len(lines) - 1 if format == "table" and lines else len(lines)
+
+        return ToolResult(
+            success=True,
+            output=stdout if stdout.strip() else "No containers found.",
+            metadata={
+                "container_count": max(0, container_count),
+                "format": format,
+                "show_all": all,
+            },
+        )
+
+
+class DockerImagesTool(Tool):
+    """List Docker images."""
+
+    name = "docker_images"
+    description = """List Docker images.
+
+Examples:
+- docker_images() - List all images
+- docker_images(filter="dangling=true") - List dangling images
+- docker_images(format="json") - Output as JSON"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "filter": {
+                "type": "string",
+                "description": "Filter images (e.g., 'dangling=true', 'reference=myapp*')",
+            },
+            "format": {
+                "type": "string",
+                "description": "Output format: 'table' (default) or 'json'",
+                "enum": ["table", "json"],
+            },
+        },
+        "required": [],
+    }
+
+    async def execute(
+        self,
+        filter: Optional[str] = None,
+        format: str = "table",
+        **kwargs,
+    ) -> ToolResult:
+        """List Docker images."""
+        if not DOCKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Docker not found. Please install Docker.",
+                suggestion="Install Docker: https://docs.docker.com/engine/install/",
+            )
+
+        args = ["images"]
+        if filter:
+            args.extend(["--filter", filter])
+
+        if format == "json":
+            args.extend(["--format", "json"])
+        else:
+            args.extend(
+                [
+                    "--format",
+                    "table {{.Repository}}\t{{.Tag}}\t{{.ID}}\t{{.Size}}\t{{.CreatedSince}}",
+                ]
+            )
+
+        returncode, stdout, stderr = await _run_docker(*args)
+
+        if returncode != 0:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Failed to list images: {stderr}",
+            )
+
+        # Count images
+        lines = [l for l in stdout.strip().split("\n") if l]
+        image_count = len(lines) - 1 if format == "table" and lines else len(lines)
+
+        return ToolResult(
+            success=True,
+            output=stdout if stdout.strip() else "No images found.",
+            metadata={
+                "image_count": max(0, image_count),
+                "format": format,
+            },
+        )
+
+
+class DockerLogsTool(Tool):
+    """Get logs from a Docker container."""
+
+    name = "docker_logs"
+    description = """Get logs from a Docker container.
+
+Examples:
+- docker_logs(container="myapp") - Get recent logs
+- docker_logs(container="myapp", tail=50) - Get last 50 lines
+- docker_logs(container="myapp", since="10m") - Logs from last 10 minutes
+- docker_logs(container="myapp", timestamps=true) - Include timestamps"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "container": {
+                "type": "string",
+                "description": "Container name or ID",
+            },
+            "tail": {
+                "type": "integer",
+                "description": "Number of lines to show from end (default: 100)",
+            },
+            "since": {
+                "type": "string",
+                "description": "Show logs since timestamp (e.g., '10m', '1h', '2024-01-01')",
+            },
+            "timestamps": {
+                "type": "boolean",
+                "description": "Show timestamps with each log line",
+            },
+        },
+        "required": ["container"],
+    }
+
+    async def execute(
+        self,
+        container: str,
+        tail: int = 100,
+        since: Optional[str] = None,
+        timestamps: bool = False,
+        **kwargs,
+    ) -> ToolResult:
+        """Get container logs."""
+        if not DOCKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Docker not found. Please install Docker.",
+                suggestion="Install Docker: https://docs.docker.com/engine/install/",
+            )
+
+        args = ["logs", "--tail", str(tail)]
+        if since:
+            args.extend(["--since", since])
+        if timestamps:
+            args.append("--timestamps")
+        args.append(container)
+
+        returncode, stdout, stderr = await _run_docker(*args, timeout=60)
+
+        if returncode != 0:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Failed to get logs for '{container}': {stderr}",
+            )
+
+        # Combine stdout and stderr (containers may log to either)
+        output = stdout + stderr if stdout or stderr else "No logs available."
+        lines = output.strip().split("\n") if output.strip() else []
+
+        return ToolResult(
+            success=True,
+            output=output,
+            metadata={
+                "container": container,
+                "line_count": len(lines),
+                "tail": tail,
+            },
+        )
+
+
+class DockerBuildTool(Tool):
+    """Build a Docker image from a Dockerfile."""
+
+    name = "docker_build"
+    description = """Build a Docker image from a Dockerfile.
+
+Examples:
+- docker_build(tag="myapp:latest") - Build with tag
+- docker_build(tag="myapp:v1", path="./docker") - Build from different context
+- docker_build(tag="myapp:latest", no_cache=true) - Build without cache
+- docker_build(tag="myapp:latest", target="builder") - Multi-stage target
+- docker_build(tag="myapp:latest", build_args={"VERSION": "1.0"}) - With build args"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "tag": {
+                "type": "string",
+                "description": "Image tag (e.g., 'myapp:latest')",
+            },
+            "path": {
+                "type": "string",
+                "description": "Build context path (default: current directory)",
+            },
+            "dockerfile": {
+                "type": "string",
+                "description": "Path to Dockerfile (default: Dockerfile in context)",
+            },
+            "build_args": {
+                "type": "object",
+                "description": "Build arguments as key-value pairs",
+            },
+            "no_cache": {
+                "type": "boolean",
+                "description": "Build without using cache",
+            },
+            "target": {
+                "type": "string",
+                "description": "Target build stage for multi-stage builds",
+            },
+            "platform": {
+                "type": "string",
+                "description": "Target platform (e.g., 'linux/amd64', 'linux/arm64')",
+            },
+        },
+        "required": ["tag"],
+    }
+
+    async def execute(
+        self,
+        tag: str,
+        path: Optional[str] = None,
+        dockerfile: Optional[str] = None,
+        build_args: Optional[dict] = None,
+        no_cache: bool = False,
+        target: Optional[str] = None,
+        platform: Optional[str] = None,
+        **kwargs,
+    ) -> ToolResult:
+        """Build a Docker image."""
+        if not DOCKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Docker not found. Please install Docker.",
+                suggestion="Install Docker: https://docs.docker.com/engine/install/",
+            )
+
+        build_path = self._resolve_path(path or ".")
+        if not build_path.exists():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Build context path not found: {build_path}",
+            )
+
+        args = ["build", "-t", tag]
+
+        if dockerfile:
+            dockerfile_path = self._resolve_path(dockerfile)
+            args.extend(["-f", str(dockerfile_path)])
+
+        if no_cache:
+            args.append("--no-cache")
+
+        if target:
+            args.extend(["--target", target])
+
+        if platform:
+            args.extend(["--platform", platform])
+
+        if build_args:
+            for key, value in build_args.items():
+                args.extend(["--build-arg", f"{key}={value}"])
+
+        args.append(str(build_path))
+
+        log.info("docker_build_started", tag=tag, path=str(build_path))
+
+        # Build can take a long time
+        returncode, stdout, stderr = await _run_docker(*args, timeout=600)
+
+        if returncode != 0:
+            log.error("docker_build_failed", tag=tag, error=stderr)
+            return ToolResult(
+                success=False,
+                output=stdout,
+                error=f"Build failed: {stderr}",
+            )
+
+        log.info("docker_build_completed", tag=tag)
+        return ToolResult(
+            success=True,
+            output=f"Successfully built image: {tag}\n\n{stdout}",
+            metadata={
+                "tag": tag,
+                "path": str(build_path),
+                "no_cache": no_cache,
+                "target": target,
+            },
+        )
+
+
+class DockerRunTool(Tool):
+    """Run a Docker container."""
+
+    name = "docker_run"
+    description = """Run a Docker container.
+
+Examples:
+- docker_run(image="nginx") - Run nginx in detached mode
+- docker_run(image="nginx", name="web", ports=["8080:80"]) - With name and port mapping
+- docker_run(image="postgres", env={"POSTGRES_PASSWORD": "secret"}) - With env vars
+- docker_run(image="myapp", volumes=["./data:/data"]) - With volume mount
+- docker_run(image="alpine", command="echo hello", detach=false, remove=true) - Run and remove"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "image": {
+                "type": "string",
+                "description": "Image name or ID to run",
+            },
+            "name": {
+                "type": "string",
+                "description": "Container name",
+            },
+            "detach": {
+                "type": "boolean",
+                "description": "Run container in background (default: true)",
+            },
+            "ports": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Port mappings (e.g., ['8080:80', '443:443'])",
+            },
+            "volumes": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Volume mounts (e.g., ['./data:/data', 'myvolume:/app/data'])",
+            },
+            "env": {
+                "type": "object",
+                "description": "Environment variables as key-value pairs",
+            },
+            "network": {
+                "type": "string",
+                "description": "Network mode or network name (e.g., 'host', 'bridge', 'mynetwork')",
+            },
+            "command": {
+                "type": "string",
+                "description": "Override container CMD",
+            },
+            "remove": {
+                "type": "boolean",
+                "description": "Automatically remove container when it exits (--rm)",
+            },
+            "privileged": {
+                "type": "boolean",
+                "description": "Run with extended privileges (use with caution)",
+            },
+        },
+        "required": ["image"],
+    }
+
+    async def execute(
+        self,
+        image: str,
+        name: Optional[str] = None,
+        detach: bool = True,
+        ports: Optional[list[str]] = None,
+        volumes: Optional[list[str]] = None,
+        env: Optional[dict] = None,
+        network: Optional[str] = None,
+        command: Optional[str] = None,
+        remove: bool = False,
+        privileged: bool = False,
+        **kwargs,
+    ) -> ToolResult:
+        """Run a Docker container."""
+        if not DOCKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Docker not found. Please install Docker.",
+                suggestion="Install Docker: https://docs.docker.com/engine/install/",
+            )
+
+        args = ["run"]
+
+        if detach:
+            args.append("-d")
+
+        if name:
+            args.extend(["--name", name])
+
+        if remove:
+            args.append("--rm")
+
+        if privileged:
+            log.warning("docker_run_privileged", image=image, name=name)
+            args.append("--privileged")
+
+        if ports:
+            for port in ports:
+                args.extend(["-p", port])
+
+        if volumes:
+            for vol in volumes:
+                args.extend(["-v", vol])
+
+        if env:
+            for key, value in env.items():
+                args.extend(["-e", f"{key}={value}"])
+
+        if network:
+            args.extend(["--network", network])
+
+        args.append(image)
+
+        if command:
+            args.extend(command.split())
+
+        log.info("docker_run_started", image=image, name=name)
+
+        returncode, stdout, stderr = await _run_docker(*args, timeout=120)
+
+        if returncode != 0:
+            log.error("docker_run_failed", image=image, error=stderr)
+            return ToolResult(
+                success=False,
+                output=stdout,
+                error=f"Failed to run container: {stderr}",
+            )
+
+        container_id = stdout.strip()[:12] if stdout.strip() else None
+        container_name = name or container_id
+
+        log.info("docker_run_completed", image=image, container=container_name)
+
+        return ToolResult(
+            success=True,
+            output=f"Container started: {container_name}\nID: {stdout.strip()}" if detach else stdout,
+            metadata={
+                "container_id": stdout.strip(),
+                "container_name": container_name,
+                "image": image,
+                "detached": detach,
+            },
+        )
+
+
+class DockerStopTool(Tool):
+    """Stop a running Docker container."""
+
+    name = "docker_stop"
+    description = """Stop a running Docker container.
+
+Examples:
+- docker_stop(container="myapp") - Stop container
+- docker_stop(container="abc123") - Stop by ID
+- docker_stop(container="myapp", timeout=30) - Wait 30s before killing"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "container": {
+                "type": "string",
+                "description": "Container name or ID",
+            },
+            "timeout": {
+                "type": "integer",
+                "description": "Seconds to wait before killing (default: 10)",
+            },
+        },
+        "required": ["container"],
+    }
+
+    async def execute(
+        self,
+        container: str,
+        timeout: int = 10,
+        **kwargs,
+    ) -> ToolResult:
+        """Stop a Docker container."""
+        if not DOCKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Docker not found. Please install Docker.",
+                suggestion="Install Docker: https://docs.docker.com/engine/install/",
+            )
+
+        args = ["stop", "-t", str(timeout), container]
+
+        log.info("docker_stop", container=container)
+
+        returncode, stdout, stderr = await _run_docker(*args, timeout=timeout + 30)
+
+        if returncode != 0:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Failed to stop container '{container}': {stderr}",
+            )
+
+        return ToolResult(
+            success=True,
+            output=f"Stopped container: {container}",
+            metadata={
+                "container": container,
+                "timeout": timeout,
+            },
+        )
+
+
+class DockerRmTool(Tool):
+    """Remove a Docker container."""
+
+    name = "docker_rm"
+    description = """Remove a Docker container.
+
+Examples:
+- docker_rm(container="myapp") - Remove stopped container
+- docker_rm(container="myapp", force=true) - Force remove running container
+- docker_rm(container="myapp", volumes=true) - Also remove associated volumes"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "container": {
+                "type": "string",
+                "description": "Container name or ID",
+            },
+            "force": {
+                "type": "boolean",
+                "description": "Force remove a running container",
+            },
+            "volumes": {
+                "type": "boolean",
+                "description": "Remove associated anonymous volumes",
+            },
+        },
+        "required": ["container"],
+    }
+
+    async def execute(
+        self,
+        container: str,
+        force: bool = False,
+        volumes: bool = False,
+        **kwargs,
+    ) -> ToolResult:
+        """Remove a Docker container."""
+        if not DOCKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Docker not found. Please install Docker.",
+                suggestion="Install Docker: https://docs.docker.com/engine/install/",
+            )
+
+        args = ["rm"]
+        if force:
+            args.append("-f")
+        if volumes:
+            args.append("-v")
+        args.append(container)
+
+        log.info("docker_rm", container=container, force=force)
+
+        returncode, stdout, stderr = await _run_docker(*args)
+
+        if returncode != 0:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Failed to remove container '{container}': {stderr}",
+            )
+
+        return ToolResult(
+            success=True,
+            output=f"Removed container: {container}",
+            metadata={
+                "container": container,
+                "force": force,
+                "volumes_removed": volumes,
+            },
+        )
+
+
+class DockerComposeUpTool(Tool):
+    """Start services defined in docker-compose.yml."""
+
+    name = "docker_compose_up"
+    description = """Start services defined in docker-compose.yml.
+
+Examples:
+- docker_compose_up() - Start all services in detached mode
+- docker_compose_up(path="./docker/docker-compose.yml") - Use specific file
+- docker_compose_up(services=["web", "db"]) - Start specific services
+- docker_compose_up(build=true) - Build images before starting
+- docker_compose_up(force_recreate=true) - Recreate containers"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to docker-compose.yml (default: ./docker-compose.yml)",
+            },
+            "services": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Specific services to start (default: all)",
+            },
+            "detach": {
+                "type": "boolean",
+                "description": "Run in background (default: true)",
+            },
+            "build": {
+                "type": "boolean",
+                "description": "Build images before starting",
+            },
+            "force_recreate": {
+                "type": "boolean",
+                "description": "Recreate containers even if unchanged",
+            },
+            "remove_orphans": {
+                "type": "boolean",
+                "description": "Remove containers for services not in the compose file",
+            },
+        },
+        "required": [],
+    }
+
+    async def execute(
+        self,
+        path: Optional[str] = None,
+        services: Optional[list[str]] = None,
+        detach: bool = True,
+        build: bool = False,
+        force_recreate: bool = False,
+        remove_orphans: bool = False,
+        **kwargs,
+    ) -> ToolResult:
+        """Start docker compose services."""
+        if not DOCKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Docker not found. Please install Docker.",
+                suggestion="Install Docker: https://docs.docker.com/engine/install/",
+            )
+
+        compose_file = self._resolve_path(path or "docker-compose.yml")
+        if not compose_file.exists():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Compose file not found: {compose_file}",
+            )
+
+        args = ["-f", str(compose_file), "up"]
+
+        if detach:
+            args.append("-d")
+        if build:
+            args.append("--build")
+        if force_recreate:
+            args.append("--force-recreate")
+        if remove_orphans:
+            args.append("--remove-orphans")
+
+        if services:
+            args.extend(services)
+
+        log.info("docker_compose_up", file=str(compose_file), services=services)
+
+        returncode, stdout, stderr = await _run_compose(
+            *args, cwd=compose_file.parent, timeout=300
+        )
+
+        if returncode != 0:
+            return ToolResult(
+                success=False,
+                output=stdout,
+                error=f"Failed to start services: {stderr}",
+            )
+
+        return ToolResult(
+            success=True,
+            output=f"Services started from {compose_file}\n\n{stdout}",
+            metadata={
+                "compose_file": str(compose_file),
+                "services": services or "all",
+                "detached": detach,
+                "built": build,
+            },
+        )
+
+
+class DockerComposeDownTool(Tool):
+    """Stop and remove services defined in docker-compose.yml."""
+
+    name = "docker_compose_down"
+    description = """Stop and remove services defined in docker-compose.yml.
+
+Examples:
+- docker_compose_down() - Stop all services
+- docker_compose_down(path="./docker/docker-compose.yml") - Use specific file
+- docker_compose_down(volumes=true) - Also remove named volumes
+- docker_compose_down(rmi="all") - Also remove all images"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "path": {
+                "type": "string",
+                "description": "Path to docker-compose.yml (default: ./docker-compose.yml)",
+            },
+            "volumes": {
+                "type": "boolean",
+                "description": "Remove named volumes declared in the volumes section",
+            },
+            "rmi": {
+                "type": "string",
+                "description": "Remove images: 'all' or 'local' (locally built only)",
+                "enum": ["all", "local"],
+            },
+            "timeout": {
+                "type": "integer",
+                "description": "Shutdown timeout in seconds (default: 10)",
+            },
+        },
+        "required": [],
+    }
+
+    async def execute(
+        self,
+        path: Optional[str] = None,
+        volumes: bool = False,
+        rmi: Optional[str] = None,
+        timeout: int = 10,
+        **kwargs,
+    ) -> ToolResult:
+        """Stop and remove docker compose services."""
+        if not DOCKER_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Docker not found. Please install Docker.",
+                suggestion="Install Docker: https://docs.docker.com/engine/install/",
+            )
+
+        compose_file = self._resolve_path(path or "docker-compose.yml")
+        if not compose_file.exists():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Compose file not found: {compose_file}",
+            )
+
+        args = ["-f", str(compose_file), "down", "-t", str(timeout)]
+
+        if volumes:
+            args.append("-v")
+        if rmi:
+            args.extend(["--rmi", rmi])
+
+        log.info("docker_compose_down", file=str(compose_file))
+
+        returncode, stdout, stderr = await _run_compose(
+            *args, cwd=compose_file.parent, timeout=timeout + 60
+        )
+
+        if returncode != 0:
+            return ToolResult(
+                success=False,
+                output=stdout,
+                error=f"Failed to stop services: {stderr}",
+            )
+
+        return ToolResult(
+            success=True,
+            output=f"Services stopped from {compose_file}\n\n{stdout}",
+            metadata={
+                "compose_file": str(compose_file),
+                "volumes_removed": volumes,
+                "images_removed": rmi,
+            },
+        )

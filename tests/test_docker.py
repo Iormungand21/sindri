@@ -852,3 +852,685 @@ class TestDockerProjectInfo:
         assert info.port == 3000
         assert info.package_manager == "yarn"
         assert info.services == ["postgres", "redis"]
+
+
+# =============================================================================
+# Docker Runtime Tools Tests
+# =============================================================================
+
+import shutil
+from unittest.mock import AsyncMock, patch, MagicMock
+
+from sindri.tools.docker import (
+    DockerPsTool,
+    DockerImagesTool,
+    DockerLogsTool,
+    DockerBuildTool,
+    DockerRunTool,
+    DockerStopTool,
+    DockerRmTool,
+    DockerComposeUpTool,
+    DockerComposeDownTool,
+    DOCKER_AVAILABLE,
+    _run_docker,
+    _run_compose,
+)
+
+
+# Skip marker for when Docker is not available
+DOCKER_INSTALLED = shutil.which("docker") is not None
+skip_no_docker = pytest.mark.skipif(
+    not DOCKER_INSTALLED,
+    reason="Docker not installed"
+)
+
+
+class TestDockerAvailability:
+    """Tests for Docker availability detection."""
+
+    def test_docker_available_detection(self):
+        """Test that DOCKER_AVAILABLE is correctly detected."""
+        # This just tests that the constant is a boolean
+        assert isinstance(DOCKER_AVAILABLE, bool)
+
+    @pytest.mark.asyncio
+    async def test_run_docker_not_available(self):
+        """Test _run_docker when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            returncode, stdout, stderr = await _run_docker("ps")
+            assert returncode == -1
+            assert "Docker not found" in stderr
+
+
+class TestDockerPsTool:
+    """Tests for DockerPsTool."""
+
+    @pytest.fixture
+    def tool(self, tmp_path):
+        return DockerPsTool(work_dir=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_docker_not_available(self, tool):
+        """Test behavior when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            result = await tool.execute()
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_list_containers_success(self, tool):
+        """Test listing containers with mocked Docker."""
+        mock_output = """CONTAINER ID   IMAGE   STATUS   PORTS   NAMES
+abc123   nginx   Up 2 hours   80/tcp   web
+def456   postgres   Up 2 hours   5432/tcp   db"""
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, mock_output, ""))):
+                result = await tool.execute()
+
+        assert result.success is True
+        assert "nginx" in result.output
+        assert result.metadata["container_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_list_containers_with_all_flag(self, tool):
+        """Test listing all containers including stopped."""
+        mock_output = """CONTAINER ID   IMAGE   STATUS   PORTS   NAMES
+abc123   nginx   Up 2 hours   80/tcp   web
+xyz789   alpine   Exited (0) 1 day ago      old"""
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, mock_output, ""))) as mock:
+                result = await tool.execute(all=True)
+
+        assert result.success is True
+        assert result.metadata["show_all"] is True
+        mock.assert_called_once()
+        # Verify -a flag was passed
+        call_args = mock.call_args[0]
+        assert "-a" in call_args
+
+    @pytest.mark.asyncio
+    async def test_list_containers_with_filter(self, tool):
+        """Test filtering containers."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(filter="name=web")
+
+        call_args = mock.call_args[0]
+        assert "--filter" in call_args
+        assert "name=web" in call_args
+
+    @pytest.mark.asyncio
+    async def test_list_containers_json_format(self, tool):
+        """Test JSON output format."""
+        mock_json = '{"ID":"abc123","Image":"nginx","Names":"web"}\n'
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, mock_json, ""))):
+                result = await tool.execute(format="json")
+
+        assert result.success is True
+        assert result.metadata["format"] == "json"
+
+
+class TestDockerImagesTool:
+    """Tests for DockerImagesTool."""
+
+    @pytest.fixture
+    def tool(self, tmp_path):
+        return DockerImagesTool(work_dir=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_docker_not_available(self, tool):
+        """Test behavior when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            result = await tool.execute()
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_list_images_success(self, tool):
+        """Test listing images with mocked Docker."""
+        mock_output = """REPOSITORY   TAG   IMAGE ID   SIZE   CREATED
+nginx   latest   abc123   50MB   2 weeks ago
+postgres   15   def456   100MB   1 month ago"""
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, mock_output, ""))):
+                result = await tool.execute()
+
+        assert result.success is True
+        assert "nginx" in result.output
+        assert result.metadata["image_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_list_images_with_filter(self, tool):
+        """Test filtering images."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(filter="dangling=true")
+
+        call_args = mock.call_args[0]
+        assert "--filter" in call_args
+        assert "dangling=true" in call_args
+
+
+class TestDockerLogsTool:
+    """Tests for DockerLogsTool."""
+
+    @pytest.fixture
+    def tool(self, tmp_path):
+        return DockerLogsTool(work_dir=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_docker_not_available(self, tool):
+        """Test behavior when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            result = await tool.execute(container="myapp")
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_get_logs_success(self, tool):
+        """Test getting container logs."""
+        mock_logs = "2024-01-01 Starting app...\n2024-01-01 Ready on port 8000\n"
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, mock_logs, ""))):
+                result = await tool.execute(container="myapp")
+
+        assert result.success is True
+        assert "Starting app" in result.output
+        assert result.metadata["container"] == "myapp"
+        assert result.metadata["line_count"] == 2
+
+    @pytest.mark.asyncio
+    async def test_get_logs_with_tail(self, tool):
+        """Test getting logs with tail option."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(container="myapp", tail=50)
+
+        call_args = mock.call_args[0]
+        assert "--tail" in call_args
+        assert "50" in call_args
+
+    @pytest.mark.asyncio
+    async def test_get_logs_with_since(self, tool):
+        """Test getting logs with since option."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(container="myapp", since="10m")
+
+        call_args = mock.call_args[0]
+        assert "--since" in call_args
+        assert "10m" in call_args
+
+    @pytest.mark.asyncio
+    async def test_get_logs_container_not_found(self, tool):
+        """Test getting logs for non-existent container."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(1, "", "No such container"))):
+                result = await tool.execute(container="nonexistent")
+
+        assert result.success is False
+        assert "nonexistent" in result.error
+
+
+class TestDockerBuildTool:
+    """Tests for DockerBuildTool."""
+
+    @pytest.fixture
+    def tool(self, tmp_path):
+        return DockerBuildTool(work_dir=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_docker_not_available(self, tool):
+        """Test behavior when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            result = await tool.execute(tag="test:latest")
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_build_success(self, tool, tmp_path):
+        """Test successful build."""
+        (tmp_path / "Dockerfile").write_text("FROM alpine:latest\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "Successfully built abc123", ""))):
+                result = await tool.execute(tag="myapp:latest", path=str(tmp_path))
+
+        assert result.success is True
+        assert "myapp:latest" in result.output
+        assert result.metadata["tag"] == "myapp:latest"
+
+    @pytest.mark.asyncio
+    async def test_build_with_no_cache(self, tool, tmp_path):
+        """Test build with no-cache flag."""
+        (tmp_path / "Dockerfile").write_text("FROM alpine\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(tag="myapp:latest", path=str(tmp_path), no_cache=True)
+
+        call_args = mock.call_args[0]
+        assert "--no-cache" in call_args
+
+    @pytest.mark.asyncio
+    async def test_build_with_target(self, tool, tmp_path):
+        """Test build with multi-stage target."""
+        (tmp_path / "Dockerfile").write_text("FROM alpine AS builder\nFROM alpine\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(tag="myapp:latest", path=str(tmp_path), target="builder")
+
+        call_args = mock.call_args[0]
+        assert "--target" in call_args
+        assert "builder" in call_args
+
+    @pytest.mark.asyncio
+    async def test_build_with_build_args(self, tool, tmp_path):
+        """Test build with build arguments."""
+        (tmp_path / "Dockerfile").write_text("FROM alpine\nARG VERSION\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(
+                    tag="myapp:latest",
+                    path=str(tmp_path),
+                    build_args={"VERSION": "1.0"}
+                )
+
+        call_args = mock.call_args[0]
+        assert "--build-arg" in call_args
+        assert "VERSION=1.0" in call_args
+
+    @pytest.mark.asyncio
+    async def test_build_path_not_found(self, tool):
+        """Test build with non-existent path."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            result = await tool.execute(tag="test:latest", path="/nonexistent/path")
+
+        assert result.success is False
+        assert "not found" in result.error.lower()
+
+
+class TestDockerRunTool:
+    """Tests for DockerRunTool."""
+
+    @pytest.fixture
+    def tool(self, tmp_path):
+        return DockerRunTool(work_dir=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_docker_not_available(self, tool):
+        """Test behavior when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            result = await tool.execute(image="nginx")
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_run_success(self, tool):
+        """Test successful container run."""
+        container_id = "abc123def456"
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, container_id, ""))):
+                result = await tool.execute(image="nginx")
+
+        assert result.success is True
+        assert container_id[:12] in result.metadata["container_id"]
+
+    @pytest.mark.asyncio
+    async def test_run_with_name(self, tool):
+        """Test run with container name."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "abc123", ""))) as mock:
+                result = await tool.execute(image="nginx", name="web")
+
+        assert result.success is True
+        assert result.metadata["container_name"] == "web"
+        call_args = mock.call_args[0]
+        assert "--name" in call_args
+        assert "web" in call_args
+
+    @pytest.mark.asyncio
+    async def test_run_with_ports(self, tool):
+        """Test run with port mappings."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "abc123", ""))) as mock:
+                await tool.execute(image="nginx", ports=["8080:80", "443:443"])
+
+        call_args = mock.call_args[0]
+        assert "-p" in call_args
+        assert "8080:80" in call_args
+        assert "443:443" in call_args
+
+    @pytest.mark.asyncio
+    async def test_run_with_volumes(self, tool):
+        """Test run with volume mounts."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "abc123", ""))) as mock:
+                await tool.execute(image="postgres", volumes=["./data:/var/lib/postgresql/data"])
+
+        call_args = mock.call_args[0]
+        assert "-v" in call_args
+        assert "./data:/var/lib/postgresql/data" in call_args
+
+    @pytest.mark.asyncio
+    async def test_run_with_env(self, tool):
+        """Test run with environment variables."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "abc123", ""))) as mock:
+                await tool.execute(image="postgres", env={"POSTGRES_PASSWORD": "secret"})
+
+        call_args = mock.call_args[0]
+        assert "-e" in call_args
+        assert "POSTGRES_PASSWORD=secret" in call_args
+
+    @pytest.mark.asyncio
+    async def test_run_with_remove_flag(self, tool):
+        """Test run with --rm flag."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "abc123", ""))) as mock:
+                await tool.execute(image="alpine", command="echo hello", remove=True)
+
+        call_args = mock.call_args[0]
+        assert "--rm" in call_args
+
+
+class TestDockerStopTool:
+    """Tests for DockerStopTool."""
+
+    @pytest.fixture
+    def tool(self, tmp_path):
+        return DockerStopTool(work_dir=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_docker_not_available(self, tool):
+        """Test behavior when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            result = await tool.execute(container="myapp")
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_stop_success(self, tool):
+        """Test successful container stop."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "myapp", ""))):
+                result = await tool.execute(container="myapp")
+
+        assert result.success is True
+        assert "Stopped" in result.output
+        assert result.metadata["container"] == "myapp"
+
+    @pytest.mark.asyncio
+    async def test_stop_with_timeout(self, tool):
+        """Test stop with custom timeout."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(container="myapp", timeout=30)
+
+        call_args = mock.call_args[0]
+        assert "-t" in call_args
+        assert "30" in call_args
+
+    @pytest.mark.asyncio
+    async def test_stop_container_not_found(self, tool):
+        """Test stopping non-existent container."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(1, "", "No such container"))):
+                result = await tool.execute(container="nonexistent")
+
+        assert result.success is False
+
+
+class TestDockerRmTool:
+    """Tests for DockerRmTool."""
+
+    @pytest.fixture
+    def tool(self, tmp_path):
+        return DockerRmTool(work_dir=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_docker_not_available(self, tool):
+        """Test behavior when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            result = await tool.execute(container="myapp")
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_rm_success(self, tool):
+        """Test successful container removal."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "myapp", ""))):
+                result = await tool.execute(container="myapp")
+
+        assert result.success is True
+        assert "Removed" in result.output
+
+    @pytest.mark.asyncio
+    async def test_rm_with_force(self, tool):
+        """Test force removal."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(container="myapp", force=True)
+
+        call_args = mock.call_args[0]
+        assert "-f" in call_args
+
+    @pytest.mark.asyncio
+    async def test_rm_with_volumes(self, tool):
+        """Test removal with associated volumes."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_docker", AsyncMock(return_value=(0, "", ""))) as mock:
+                result = await tool.execute(container="myapp", volumes=True)
+
+        call_args = mock.call_args[0]
+        assert "-v" in call_args
+        assert result.metadata["volumes_removed"] is True
+
+
+class TestDockerComposeUpTool:
+    """Tests for DockerComposeUpTool."""
+
+    @pytest.fixture
+    def tool(self, tmp_path):
+        return DockerComposeUpTool(work_dir=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_docker_not_available(self, tool):
+        """Test behavior when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            result = await tool.execute()
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_compose_file_not_found(self, tool, tmp_path):
+        """Test when compose file doesn't exist."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            result = await tool.execute(path=str(tmp_path / "nonexistent.yml"))
+        assert result.success is False
+        assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_compose_up_success(self, tool, tmp_path):
+        """Test successful compose up."""
+        compose_file = tmp_path / "docker-compose.yml"
+        compose_file.write_text("version: '3'\nservices:\n  web:\n    image: nginx\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_compose", AsyncMock(return_value=(0, "Started", ""))):
+                result = await tool.execute(path=str(compose_file))
+
+        assert result.success is True
+        assert result.metadata["detached"] is True
+
+    @pytest.mark.asyncio
+    async def test_compose_up_with_build(self, tool, tmp_path):
+        """Test compose up with build flag."""
+        compose_file = tmp_path / "docker-compose.yml"
+        compose_file.write_text("version: '3'\nservices:\n  web:\n    build: .\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_compose", AsyncMock(return_value=(0, "", ""))) as mock:
+                result = await tool.execute(path=str(compose_file), build=True)
+
+        call_args = mock.call_args[0]
+        assert "--build" in call_args
+        assert result.metadata["built"] is True
+
+    @pytest.mark.asyncio
+    async def test_compose_up_specific_services(self, tool, tmp_path):
+        """Test compose up with specific services."""
+        compose_file = tmp_path / "docker-compose.yml"
+        compose_file.write_text("version: '3'\nservices:\n  web:\n    image: nginx\n  db:\n    image: postgres\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_compose", AsyncMock(return_value=(0, "", ""))) as mock:
+                await tool.execute(path=str(compose_file), services=["web"])
+
+        call_args = mock.call_args[0]
+        assert "web" in call_args
+
+
+class TestDockerComposeDownTool:
+    """Tests for DockerComposeDownTool."""
+
+    @pytest.fixture
+    def tool(self, tmp_path):
+        return DockerComposeDownTool(work_dir=tmp_path)
+
+    @pytest.mark.asyncio
+    async def test_docker_not_available(self, tool):
+        """Test behavior when Docker is not installed."""
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", False):
+            result = await tool.execute()
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_compose_down_success(self, tool, tmp_path):
+        """Test successful compose down."""
+        compose_file = tmp_path / "docker-compose.yml"
+        compose_file.write_text("version: '3'\nservices:\n  web:\n    image: nginx\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_compose", AsyncMock(return_value=(0, "Stopped", ""))):
+                result = await tool.execute(path=str(compose_file))
+
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_compose_down_with_volumes(self, tool, tmp_path):
+        """Test compose down with volume removal."""
+        compose_file = tmp_path / "docker-compose.yml"
+        compose_file.write_text("version: '3'\nservices:\n  db:\n    image: postgres\nvolumes:\n  data:\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_compose", AsyncMock(return_value=(0, "", ""))) as mock:
+                result = await tool.execute(path=str(compose_file), volumes=True)
+
+        call_args = mock.call_args[0]
+        assert "-v" in call_args
+        assert result.metadata["volumes_removed"] is True
+
+    @pytest.mark.asyncio
+    async def test_compose_down_with_rmi(self, tool, tmp_path):
+        """Test compose down with image removal."""
+        compose_file = tmp_path / "docker-compose.yml"
+        compose_file.write_text("version: '3'\nservices:\n  web:\n    build: .\n")
+
+        with patch("sindri.tools.docker.DOCKER_AVAILABLE", True):
+            with patch("sindri.tools.docker._run_compose", AsyncMock(return_value=(0, "", ""))) as mock:
+                result = await tool.execute(path=str(compose_file), rmi="local")
+
+        call_args = mock.call_args[0]
+        assert "--rmi" in call_args
+        assert "local" in call_args
+
+
+class TestDockerRuntimeToolsRegistry:
+    """Tests for Docker runtime tools in registry."""
+
+    def test_runtime_tools_registered(self, tmp_path):
+        """Test that Docker runtime tools are registered in default registry."""
+        from sindri.tools.registry import ToolRegistry
+
+        registry = ToolRegistry.default(work_dir=tmp_path)
+
+        # Check all 9 runtime tools
+        assert registry.get_tool("docker_ps") is not None
+        assert registry.get_tool("docker_images") is not None
+        assert registry.get_tool("docker_logs") is not None
+        assert registry.get_tool("docker_build") is not None
+        assert registry.get_tool("docker_run") is not None
+        assert registry.get_tool("docker_stop") is not None
+        assert registry.get_tool("docker_rm") is not None
+        assert registry.get_tool("docker_compose_up") is not None
+        assert registry.get_tool("docker_compose_down") is not None
+
+    def test_runtime_tool_schemas(self, tmp_path):
+        """Test that Docker runtime tools have valid schemas."""
+        from sindri.tools.registry import ToolRegistry
+
+        registry = ToolRegistry.default(work_dir=tmp_path)
+        schemas = registry.get_schemas()
+
+        tool_names = [s["function"]["name"] for s in schemas]
+        runtime_tools = [
+            "docker_ps", "docker_images", "docker_logs",
+            "docker_build", "docker_run", "docker_stop", "docker_rm",
+            "docker_compose_up", "docker_compose_down"
+        ]
+
+        for tool_name in runtime_tools:
+            assert tool_name in tool_names, f"Tool {tool_name} not in schemas"
+
+
+class TestDockerAgentAssignments:
+    """Tests for Docker tool assignments to agents."""
+
+    def test_brokkr_has_docker_tools(self):
+        """Test that Brokkr has all Docker runtime tools."""
+        from sindri.agents.registry import get_agent
+
+        agent = get_agent("brokkr")
+        docker_tools = [
+            "docker_ps", "docker_images", "docker_logs",
+            "docker_build", "docker_run", "docker_stop", "docker_rm",
+            "docker_compose_up", "docker_compose_down"
+        ]
+
+        for tool in docker_tools:
+            assert tool in agent.tools, f"Brokkr missing tool: {tool}"
+
+    def test_ratatoskr_has_readonly_docker_tools(self):
+        """Test that Ratatoskr has read-only Docker tools."""
+        from sindri.agents.registry import get_agent
+
+        agent = get_agent("ratatoskr")
+        readonly_tools = ["docker_ps", "docker_images", "docker_logs"]
+
+        for tool in readonly_tools:
+            assert tool in agent.tools, f"Ratatoskr missing tool: {tool}"
+
+    def test_ratatoskr_no_destructive_docker_tools(self):
+        """Test that Ratatoskr does NOT have destructive Docker tools."""
+        from sindri.agents.registry import get_agent
+
+        agent = get_agent("ratatoskr")
+        destructive_tools = [
+            "docker_build", "docker_run", "docker_stop", "docker_rm",
+            "docker_compose_up", "docker_compose_down"
+        ]
+
+        for tool in destructive_tools:
+            assert tool not in agent.tools, f"Ratatoskr should not have: {tool}"

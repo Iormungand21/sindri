@@ -48,6 +48,16 @@ from sindri.tools.docker import (
     GenerateDockerfileTool,
     GenerateDockerComposeTool,
     ValidateDockerfileTool,
+    # Docker runtime tools
+    DockerPsTool,
+    DockerImagesTool,
+    DockerLogsTool,
+    DockerBuildTool,
+    DockerRunTool,
+    DockerStopTool,
+    DockerRmTool,
+    DockerComposeUpTool,
+    DockerComposeDownTool,
 )
 from sindri.tools.api_spec import GenerateApiSpecTool, ValidateApiSpecTool
 from sindri.tools.ast_refactoring import (
@@ -488,6 +498,16 @@ class ToolRegistry:
         registry.register(GenerateDockerfileTool(work_dir=work_dir))
         registry.register(GenerateDockerComposeTool(work_dir=work_dir))
         registry.register(ValidateDockerfileTool(work_dir=work_dir))
+        # Docker runtime tools
+        registry.register(DockerPsTool(work_dir=work_dir))
+        registry.register(DockerImagesTool(work_dir=work_dir))
+        registry.register(DockerLogsTool(work_dir=work_dir))
+        registry.register(DockerBuildTool(work_dir=work_dir))
+        registry.register(DockerRunTool(work_dir=work_dir))
+        registry.register(DockerStopTool(work_dir=work_dir))
+        registry.register(DockerRmTool(work_dir=work_dir))
+        registry.register(DockerComposeUpTool(work_dir=work_dir))
+        registry.register(DockerComposeDownTool(work_dir=work_dir))
         registry.register(GenerateApiSpecTool(work_dir=work_dir))
         registry.register(ValidateApiSpecTool(work_dir=work_dir))
         # AST-based refactoring tools (requires tree-sitter)

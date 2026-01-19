@@ -248,4 +248,4 @@ Historical documents are in `docs/archive/`:
 
 ---
 
-**Last Updated:** 2026-01-18 (Architecture Transformation Complete)
+**Last Updated:** 2026-01-19 (Docker Runtime Tools Added)

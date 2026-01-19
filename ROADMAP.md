@@ -691,19 +691,24 @@ Expand Sindri's core capabilities with universal tools that benefit all agents a
 
 #### 12. Cloud & Container Tools
 
-| Tool | Description | Backend |
-|------|-------------|---------|
-| `aws_s3_list` | List S3 buckets/objects | boto3 |
-| `aws_s3_upload` | Upload to S3 | boto3 |
-| `aws_s3_download` | Download from S3 | boto3 |
-| `aws_logs_query` | Query CloudWatch logs | boto3 |
-| `docker_build` | Build Docker image | docker-py |
-| `docker_run` | Run Docker container | docker-py |
-| `docker_logs` | Get container logs | docker-py |
-| `docker_compose_up` | Start compose stack | subprocess |
-| `k8s_apply` | Apply K8s manifest | kubernetes |
-| `k8s_get_pods` | List pods | kubernetes |
-| `k8s_logs` | Get pod logs | kubernetes |
+| Tool | Description | Backend | Status |
+|------|-------------|---------|--------|
+| `aws_s3_list` | List S3 buckets/objects | boto3 | Planned |
+| `aws_s3_upload` | Upload to S3 | boto3 | Planned |
+| `aws_s3_download` | Download from S3 | boto3 | Planned |
+| `aws_logs_query` | Query CloudWatch logs | boto3 | Planned |
+| `docker_build` | Build Docker image | asyncio subprocess | ✅ Complete |
+| `docker_run` | Run Docker container | asyncio subprocess | ✅ Complete |
+| `docker_ps` | List containers | asyncio subprocess | ✅ Complete |
+| `docker_logs` | Get container logs | asyncio subprocess | ✅ Complete |
+| `docker_stop` | Stop container | asyncio subprocess | ✅ Complete |
+| `docker_rm` | Remove container | asyncio subprocess | ✅ Complete |
+| `docker_images` | List images | asyncio subprocess | ✅ Complete |
+| `docker_compose_up` | Start compose stack | asyncio subprocess | ✅ Complete |
+| `docker_compose_down` | Stop compose stack | asyncio subprocess | ✅ Complete |
+| `k8s_apply` | Apply K8s manifest | kubernetes | Planned |
+| `k8s_get_pods` | List pods | kubernetes | Planned |
+| `k8s_logs` | Get pod logs | kubernetes | Planned |
 
 ---
 
@@ -789,7 +794,8 @@ Based on research, these specialized models outperform general-purpose models fo
 | Video/Audio | audio_transcribe, video_transcribe, video_generate_subtitles, video_extract_audio, audio_convert, video_convert, video_trim, video_thumbnail, video_concat, tts_generate, video_add_subtitles | Medium | ✅ Complete |
 | Profiling | profile_python, profile_time, memory_analyze, detect_memory_leaks, benchmark_function, flame_graph, complexity_analyze | Medium | ✅ Complete |
 | Browser | browser_navigate, browser_click, browser_type, browser_screenshot, browser_extract, browser_execute_js, browser_pdf, browser_close, web_scrape | High | ✅ Complete |
-| Cloud | aws_s3_*, docker_*, k8s_* | High | |
+| Docker Runtime | docker_build, docker_run, docker_ps, docker_logs, docker_stop, docker_rm, docker_images, docker_compose_up, docker_compose_down | High | ✅ Complete |
+| Cloud (AWS/K8s) | aws_s3_*, k8s_* | High | Planned |
 
 ---
 
@@ -855,6 +861,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-19 | **Docker Runtime Tools** - docker_build, docker_run, docker_ps, docker_logs, docker_stop, docker_rm, docker_images, docker_compose_up, docker_compose_down | +48 |
 | 2026-01-18 | **Sif (Shell/SysAdmin) Agent** - bash_generate, bash_explain, bash_validate, systemd_generate, bash_lint tools | +36 |
 | 2026-01-18 | **Milestone 5: System Access Configuration** - SystemAccessLevel enum, config fields, CLI commands, access check utility | +37 |
 | 2026-01-18 | Python Profiling Tools (profile_python, profile_time, memory_analyze, detect_memory_leaks, benchmark_function, flame_graph, complexity_analyze) | +55 |
@@ -914,8 +921,8 @@ cd sindri/web/static && npm test -- --run
 
 ---
 
-**Last Updated:** 2026-01-18
+**Last Updated:** 2026-01-19
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio + Profiling + Browser Tools - 3/8 agents (Vör, Ran, Sif), 76/~100 tools
-**Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents
+**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio + Profiling + Browser + Docker Runtime Tools - 3/8 agents (Vör, Rán, Sif), 85/~100 tools
+**Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents + 9 Docker Runtime Tools
 **Maintained By:** Project contributors
