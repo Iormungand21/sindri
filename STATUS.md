@@ -219,6 +219,31 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 
 ## Recent Changes
 
+### Heimdall Network Security Enhancement (2026-01-20) - Phase 12 Tier 1 Complete
+
+Extended **Heimdall** with advanced network security testing tools. The guardian of Bifrost now has enhanced capabilities for security testing with HTTP mocking, WebSocket protocol testing, and packet capture analysis.
+
+**Agent Enhancement:**
+- **Heimdall** (Norse guardian) - Extended from 8 to 11 tools
+
+**New Tools (3 total):**
+
+*Network Security Testing Tools:*
+- `http_mock` - Create mock HTTP endpoints for testing (create, record, replay, list, clear actions)
+- `websocket_test` - WebSocket protocol security testing (connect, send, receive, ping, lifecycle actions)
+- `pcap_analyze` - Network packet capture analysis (summary, filter, extract_dns, extract_http, timing, conversations)
+
+**Key Features:**
+- HTTP mocking for security scenario testing without real endpoints
+- WebSocket security testing with auth token support and lifecycle validation
+- PCAP file analysis with scapy for network forensics and traffic inspection
+- Cloud metadata blocking for security (169.254.169.254, metadata.google.internal)
+- Resource limits (100MB max pcap, 10000 max packets) for safety
+
+**Tests:** +40 new tests for network security tools (3405 total)
+
+---
+
 ### KiCad Electronics Design (2026-01-20) - Phase 11 Tier 3 Regin Agent (PHASE 11 COMPLETE)
 
 Added **Regin** - a specialized KiCad electronics design agent. Named after the legendary Norse blacksmith who forged the sword Gram, Regin forges electronic circuits through schematic capture, PCB layout, and manufacturing file generation.

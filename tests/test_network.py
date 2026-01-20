@@ -14,6 +14,9 @@ from sindri.tools.network import (
     PingHostTool,
     PortCheckTool,
     SslAnalyzeTool,
+    WebSocketTestTool,
+    HttpMockTool,
+    PcapAnalyzeTool,
 )
 
 
@@ -928,3 +931,660 @@ class TestNetworkToolsIntegration:
 
                     assert result.success is False, f"{tool.name} should block {host}"
                     assert "blocked" in result.error.lower(), f"{tool.name} error should mention blocked"
+
+
+# =============================================================================
+# WebSocketTestTool Tests
+# =============================================================================
+
+
+class TestWebSocketTestTool:
+    """Tests for WebSocket testing functionality."""
+
+    @pytest.fixture
+    def tool(self):
+        return WebSocketTestTool()
+
+    @pytest.mark.asyncio
+    async def test_websockets_not_available(self):
+        """Test behavior when websockets is not installed."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", False):
+            tool = WebSocketTestTool()
+            result = await tool.execute(url="wss://example.com/ws", action="connect")
+            assert result.success is False
+            assert "websockets not installed" in result.error
+
+    @pytest.mark.asyncio
+    async def test_invalid_url_scheme(self, tool):
+        """Test rejection of non-WebSocket URLs."""
+        result = await tool.execute(url="https://example.com", action="connect")
+        assert result.success is False
+        assert "ws://" in result.error or "wss://" in result.error
+
+    @pytest.mark.asyncio
+    async def test_cloud_metadata_blocked(self, tool):
+        """Test cloud metadata endpoints are blocked."""
+        result = await tool.execute(url="ws://169.254.169.254/ws", action="connect")
+        assert result.success is False
+        assert "blocked" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_send_requires_message(self, tool):
+        """Test send action requires message parameter."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            result = await tool.execute(url="wss://example.com/ws", action="send")
+            assert result.success is False
+            assert "message required" in result.error
+
+    @pytest.mark.asyncio
+    async def test_unknown_action(self, tool):
+        """Test unknown action is handled."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            result = await tool.execute(url="wss://example.com/ws", action="unknown_action")
+            assert result.success is False
+            assert "Unknown action" in result.error
+
+    @pytest.mark.asyncio
+    async def test_connect_action(self, tool):
+        """Test WebSocket connection test."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            with patch("sindri.tools.network.websockets.connect") as mock_connect:
+                mock_ws = AsyncMock()
+                mock_ws.subprotocol = None
+                mock_context = AsyncMock()
+                mock_context.__aenter__.return_value = mock_ws
+                mock_context.__aexit__.return_value = None
+                mock_connect.return_value = mock_context
+
+                result = await tool.execute(url="wss://example.com/ws", action="connect")
+                assert result.success is True
+                assert "successful" in result.output.lower()
+
+    @pytest.mark.asyncio
+    async def test_send_message(self, tool):
+        """Test sending a message."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            with patch("sindri.tools.network.websockets.connect") as mock_connect:
+                mock_ws = AsyncMock()
+                mock_ws.send = AsyncMock()
+                mock_ws.recv = AsyncMock(return_value="pong")
+                mock_context = AsyncMock()
+                mock_context.__aenter__.return_value = mock_ws
+                mock_context.__aexit__.return_value = None
+                mock_connect.return_value = mock_context
+
+                result = await tool.execute(
+                    url="wss://example.com/ws",
+                    action="send",
+                    message="ping",
+                )
+                assert result.success is True
+                assert "Sent" in result.output
+
+    @pytest.mark.asyncio
+    async def test_ping_action(self, tool):
+        """Test WebSocket ping/pong."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            with patch("sindri.tools.network.websockets.connect") as mock_connect:
+                mock_ws = AsyncMock()
+                # Create a proper future for pong_waiter
+                pong_future = asyncio.Future()
+                pong_future.set_result(None)
+                mock_ws.ping = AsyncMock(return_value=pong_future)
+                mock_context = AsyncMock()
+                mock_context.__aenter__.return_value = mock_ws
+                mock_context.__aexit__.return_value = None
+                mock_connect.return_value = mock_context
+
+                result = await tool.execute(url="wss://example.com/ws", action="ping")
+                assert result.success is True
+                assert "ping" in result.output.lower() or "pong" in result.output.lower()
+
+    @pytest.mark.asyncio
+    async def test_lifecycle_action(self, tool):
+        """Test full WebSocket lifecycle."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            with patch("sindri.tools.network.websockets.connect") as mock_connect:
+                mock_ws = AsyncMock()
+                mock_ws.send = AsyncMock()
+                mock_ws.recv = AsyncMock(return_value="response")
+                mock_ws.close = AsyncMock()
+                mock_context = AsyncMock()
+                mock_context.__aenter__.return_value = mock_ws
+                mock_context.__aexit__.return_value = None
+                mock_connect.return_value = mock_context
+
+                result = await tool.execute(url="wss://example.com/ws", action="lifecycle")
+                assert result.success is True
+                assert "lifecycle" in result.output.lower()
+
+    @pytest.mark.asyncio
+    async def test_connection_refused(self, tool):
+        """Test handling connection refused."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            with patch("sindri.tools.network.websockets.connect") as mock_connect:
+                mock_connect.side_effect = ConnectionRefusedError()
+
+                result = await tool.execute(url="wss://example.com/ws", action="connect")
+                assert result.success is False
+                assert "refused" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_connection_timeout(self, tool):
+        """Test handling connection timeout."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            with patch("sindri.tools.network.websockets.connect") as mock_connect:
+                mock_connect.side_effect = asyncio.TimeoutError()
+
+                result = await tool.execute(url="wss://example.com/ws", action="connect", timeout=1)
+                assert result.success is False
+                assert "timed out" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_auth_token_header(self, tool):
+        """Test connection with bearer auth token adds header."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            with patch("sindri.tools.network.websockets.connect") as mock_connect:
+                mock_ws = AsyncMock()
+                mock_ws.subprotocol = None
+                mock_context = AsyncMock()
+                mock_context.__aenter__.return_value = mock_ws
+                mock_context.__aexit__.return_value = None
+                mock_connect.return_value = mock_context
+
+                result = await tool.execute(
+                    url="wss://example.com/ws",
+                    action="connect",
+                    auth_token="my-secret-token",
+                )
+
+                # Verify connect was called with auth header
+                mock_connect.assert_called_once()
+                call_kwargs = mock_connect.call_args[1]
+                assert "extra_headers" in call_kwargs
+                assert call_kwargs["extra_headers"]["Authorization"] == "Bearer my-secret-token"
+
+
+# =============================================================================
+# HttpMockTool Tests
+# =============================================================================
+
+
+class TestHttpMockTool:
+    """Tests for HTTP mock functionality."""
+
+    @pytest.fixture
+    def tool(self):
+        # Clear mocks between tests
+        HttpMockTool._mocks.clear()
+        HttpMockTool._recordings.clear()
+        HttpMockTool._mock_counter = 0
+        return HttpMockTool()
+
+    @pytest.mark.asyncio
+    async def test_httpx_not_available(self):
+        """Test behavior when httpx is not installed."""
+        with patch("sindri.tools.network.HTTPX_AVAILABLE", False):
+            tool = HttpMockTool()
+            result = await tool.execute(action="create", path="/test")
+            assert result.success is False
+            assert "httpx not installed" in result.error
+
+    @pytest.mark.asyncio
+    async def test_create_mock_endpoint(self, tool):
+        """Test creating a mock endpoint."""
+        result = await tool.execute(
+            action="create",
+            path="/api/users",
+            method="GET",
+            response={"users": []},
+            status=200,
+        )
+        assert result.success is True
+        assert "mock_id" in result.metadata
+        assert result.metadata["path"] == "/api/users"
+        assert result.metadata["method"] == "GET"
+
+    @pytest.mark.asyncio
+    async def test_create_requires_path(self, tool):
+        """Test create action requires path parameter."""
+        result = await tool.execute(action="create")
+        assert result.success is False
+        assert "path required" in result.error
+
+    @pytest.mark.asyncio
+    async def test_create_mock_with_headers(self, tool):
+        """Test creating mock with custom headers."""
+        result = await tool.execute(
+            action="create",
+            path="/api/auth",
+            response={"token": "abc"},
+            headers={"X-Custom-Header": "value"},
+        )
+        assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_create_mock_post_endpoint(self, tool):
+        """Test creating POST mock endpoint."""
+        result = await tool.execute(
+            action="create",
+            path="/api/submit",
+            method="POST",
+            response={"id": 123},
+            status=201,
+        )
+        assert result.success is True
+        assert result.metadata["method"] == "POST"
+
+    @pytest.mark.asyncio
+    async def test_list_mocks_empty(self, tool):
+        """Test listing mocks when none exist."""
+        result = await tool.execute(action="list")
+        assert result.success is True
+        assert result.metadata["mocks"] == []
+
+    @pytest.mark.asyncio
+    async def test_list_mocks_with_entries(self, tool):
+        """Test listing after creating mocks."""
+        await tool.execute(action="create", path="/test1")
+        await tool.execute(action="create", path="/test2")
+        result = await tool.execute(action="list")
+        assert result.success is True
+        assert len(result.metadata["mocks"]) == 2
+
+    @pytest.mark.asyncio
+    async def test_clear_mocks(self, tool):
+        """Test clearing all mocks."""
+        await tool.execute(action="create", path="/test")
+        result = await tool.execute(action="clear")
+        assert result.success is True
+        assert result.metadata["cleared_mocks"] >= 1
+
+    @pytest.mark.asyncio
+    async def test_record_requests(self, tool):
+        """Test starting request recording."""
+        result = await tool.execute(action="record", path="/api/capture")
+        assert result.success is True
+        assert "recorder_id" in result.metadata
+
+    @pytest.mark.asyncio
+    async def test_record_requires_path(self, tool):
+        """Test record action requires path parameter."""
+        result = await tool.execute(action="record")
+        assert result.success is False
+        assert "path required" in result.error
+
+    @pytest.mark.asyncio
+    async def test_replay_requires_request_id(self, tool):
+        """Test replay fails without request_id."""
+        result = await tool.execute(action="replay")
+        assert result.success is False
+        assert "request_id required" in result.error
+
+    @pytest.mark.asyncio
+    async def test_replay_not_found(self, tool):
+        """Test replay with non-existent request_id."""
+        result = await tool.execute(action="replay", request_id="nonexistent")
+        assert result.success is False
+        assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_unknown_action(self, tool):
+        """Test unknown action is handled."""
+        result = await tool.execute(action="unknown_action")
+        assert result.success is False
+        assert "Unknown action" in result.error
+
+
+# =============================================================================
+# PcapAnalyzeTool Tests
+# =============================================================================
+
+
+class TestPcapAnalyzeTool:
+    """Tests for PCAP analysis functionality."""
+
+    @pytest.fixture
+    def tool(self):
+        return PcapAnalyzeTool()
+
+    @pytest.mark.asyncio
+    async def test_scapy_not_available(self):
+        """Test behavior when scapy is not installed."""
+        with patch("sindri.tools.network.SCAPY_AVAILABLE", False):
+            tool = PcapAnalyzeTool()
+            result = await tool.execute(file="capture.pcap")
+            assert result.success is False
+            assert "scapy not installed" in result.error
+
+    @pytest.mark.asyncio
+    async def test_file_not_found(self, tool):
+        """Test handling missing file."""
+        with patch("sindri.tools.network.SCAPY_AVAILABLE", True):
+            result = await tool.execute(file="/nonexistent/capture.pcap")
+            assert result.success is False
+            assert "not found" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_invalid_file_extension(self, tool):
+        """Test rejection of non-pcap files."""
+        with patch("sindri.tools.network.SCAPY_AVAILABLE", True):
+            with patch("pathlib.Path.exists", return_value=True):
+                result = await tool.execute(file="/tmp/data.txt")
+                assert result.success is False
+                assert ".pcap" in result.error
+
+    @pytest.mark.asyncio
+    async def test_summary_action(self, tool):
+        """Test basic summary analysis."""
+        # Create mock scapy classes
+        MockIP = MagicMock()
+        MockTCP = MagicMock()
+        MockUDP = MagicMock()
+        MockDNS = MagicMock()
+        MockICMP = MagicMock()
+        MockRaw = MagicMock()
+
+        # Create mock packet
+        mock_packet = MagicMock()
+        mock_ip = MagicMock()
+        mock_ip.src = "192.168.1.1"
+        mock_ip.dst = "10.0.0.1"
+        mock_tcp = MagicMock()
+        mock_tcp.sport = 12345
+        mock_tcp.dport = 443
+        mock_packet.__getitem__ = MagicMock(side_effect=lambda k: mock_ip if k == MockIP else mock_tcp)
+
+        # Make haslayer return True for IP and TCP
+        def haslayer_side_effect(layer):
+            return layer in [MockIP, MockTCP]
+
+        mock_packet.haslayer = MagicMock(side_effect=haslayer_side_effect)
+
+        patches = {
+            "sindri.tools.network.SCAPY_AVAILABLE": True,
+            "sindri.tools.network.rdpcap": MagicMock(return_value=[mock_packet]),
+            "sindri.tools.network.IP": MockIP,
+            "sindri.tools.network.TCP": MockTCP,
+            "sindri.tools.network.UDP": MockUDP,
+            "sindri.tools.network.DNS": MockDNS,
+            "sindri.tools.network.ICMP": MockICMP,
+            "sindri.tools.network.Raw": MockRaw,
+        }
+
+        with patch.multiple("sindri.tools.network", create=True, **{
+            "SCAPY_AVAILABLE": True,
+            "rdpcap": MagicMock(return_value=[mock_packet]),
+            "IP": MockIP,
+            "TCP": MockTCP,
+            "UDP": MockUDP,
+            "DNS": MockDNS,
+            "ICMP": MockICMP,
+            "Raw": MockRaw,
+        }):
+            with patch.object(tool, "_resolve_path") as mock_resolve:
+                mock_path = MagicMock()
+                mock_path.exists.return_value = True
+                mock_path.suffix = ".pcap"
+                mock_path.stat.return_value.st_size = 1000
+                mock_path.name = "capture.pcap"
+                mock_resolve.return_value = mock_path
+
+                result = await tool.execute(file="capture.pcap", action="summary")
+                assert result.success is True
+                assert "PCAP Analysis" in result.output
+
+    @pytest.mark.asyncio
+    async def test_filter_by_protocol(self, tool):
+        """Test filtering by protocol."""
+        MockIP = MagicMock()
+        MockTCP = MagicMock()
+        MockUDP = MagicMock()
+        MockDNS = MagicMock()
+        MockICMP = MagicMock()
+        MockRaw = MagicMock()
+
+        mock_packet = MagicMock()
+        mock_packet.haslayer = MagicMock(return_value=True)
+
+        with patch.multiple("sindri.tools.network", create=True, **{
+            "SCAPY_AVAILABLE": True,
+            "rdpcap": MagicMock(return_value=[mock_packet]),
+            "IP": MockIP,
+            "TCP": MockTCP,
+            "UDP": MockUDP,
+            "DNS": MockDNS,
+            "ICMP": MockICMP,
+            "Raw": MockRaw,
+        }):
+            with patch.object(tool, "_resolve_path") as mock_resolve:
+                mock_path = MagicMock()
+                mock_path.exists.return_value = True
+                mock_path.suffix = ".pcap"
+                mock_path.stat.return_value.st_size = 1000
+                mock_path.name = "capture.pcap"
+                mock_resolve.return_value = mock_path
+
+                result = await tool.execute(
+                    file="capture.pcap",
+                    action="filter",
+                    protocol="TCP",
+                )
+                assert result.success is True
+
+    @pytest.mark.asyncio
+    async def test_extract_dns(self, tool):
+        """Test DNS query extraction."""
+        MockIP = MagicMock()
+        MockTCP = MagicMock()
+        MockUDP = MagicMock()
+        MockDNS = MagicMock()
+        MockICMP = MagicMock()
+        MockRaw = MagicMock()
+
+        mock_packet = MagicMock()
+        mock_packet.haslayer = MagicMock(return_value=False)
+
+        with patch.multiple("sindri.tools.network", create=True, **{
+            "SCAPY_AVAILABLE": True,
+            "rdpcap": MagicMock(return_value=[mock_packet]),
+            "IP": MockIP,
+            "TCP": MockTCP,
+            "UDP": MockUDP,
+            "DNS": MockDNS,
+            "ICMP": MockICMP,
+            "Raw": MockRaw,
+        }):
+            with patch.object(tool, "_resolve_path") as mock_resolve:
+                mock_path = MagicMock()
+                mock_path.exists.return_value = True
+                mock_path.suffix = ".pcap"
+                mock_path.stat.return_value.st_size = 1000
+                mock_resolve.return_value = mock_path
+
+                result = await tool.execute(file="capture.pcap", action="extract_dns")
+                assert result.success is True
+                assert "DNS" in result.output
+
+    @pytest.mark.asyncio
+    async def test_timing_analysis(self, tool):
+        """Test packet timing analysis."""
+        mock_packet1 = MagicMock()
+        mock_packet1.time = 1234567890.0
+        mock_packet1.haslayer = MagicMock(return_value=False)
+
+        mock_packet2 = MagicMock()
+        mock_packet2.time = 1234567891.0
+        mock_packet2.haslayer = MagicMock(return_value=False)
+
+        with patch("sindri.tools.network.SCAPY_AVAILABLE", True):
+            with patch.object(tool, "_resolve_path") as mock_resolve:
+                mock_path = MagicMock()
+                mock_path.exists.return_value = True
+                mock_path.suffix = ".pcap"
+                mock_path.stat.return_value.st_size = 1000
+                mock_resolve.return_value = mock_path
+
+                with patch("sindri.tools.network.rdpcap", return_value=[mock_packet1, mock_packet2], create=True):
+                    result = await tool.execute(file="capture.pcap", action="timing")
+                    assert result.success is True
+                    assert "Timing" in result.output or "timing" in result.output.lower()
+
+    @pytest.mark.asyncio
+    async def test_conversations_analysis(self, tool):
+        """Test conversation analysis."""
+        MockIP = MagicMock()
+        MockTCP = MagicMock()
+        MockUDP = MagicMock()
+        MockDNS = MagicMock()
+        MockICMP = MagicMock()
+        MockRaw = MagicMock()
+
+        mock_packet = MagicMock()
+        mock_packet.haslayer = MagicMock(return_value=False)
+
+        with patch.multiple("sindri.tools.network", create=True, **{
+            "SCAPY_AVAILABLE": True,
+            "rdpcap": MagicMock(return_value=[mock_packet]),
+            "IP": MockIP,
+            "TCP": MockTCP,
+            "UDP": MockUDP,
+            "DNS": MockDNS,
+            "ICMP": MockICMP,
+            "Raw": MockRaw,
+        }):
+            with patch.object(tool, "_resolve_path") as mock_resolve:
+                mock_path = MagicMock()
+                mock_path.exists.return_value = True
+                mock_path.suffix = ".pcap"
+                mock_path.stat.return_value.st_size = 1000
+                mock_resolve.return_value = mock_path
+
+                result = await tool.execute(file="capture.pcap", action="conversations")
+                assert result.success is True
+                assert "Conversation" in result.output or "conversation" in result.output.lower()
+
+    @pytest.mark.asyncio
+    async def test_unknown_action(self, tool):
+        """Test unknown action is handled."""
+        with patch("sindri.tools.network.SCAPY_AVAILABLE", True):
+            with patch.object(tool, "_resolve_path") as mock_resolve:
+                mock_path = MagicMock()
+                mock_path.exists.return_value = True
+                mock_path.suffix = ".pcap"
+                mock_path.stat.return_value.st_size = 1000
+                mock_resolve.return_value = mock_path
+
+                with patch("sindri.tools.network.rdpcap", return_value=[], create=True):
+                    result = await tool.execute(file="capture.pcap", action="unknown_action")
+                    assert result.success is False
+                    assert "Unknown action" in result.error
+
+    @pytest.mark.asyncio
+    async def test_file_too_large(self, tool):
+        """Test rejection of files that are too large."""
+        with patch("sindri.tools.network.SCAPY_AVAILABLE", True):
+            with patch.object(tool, "_resolve_path") as mock_resolve:
+                mock_path = MagicMock()
+                mock_path.exists.return_value = True
+                mock_path.suffix = ".pcap"
+                # 200MB - larger than 100MB limit
+                mock_path.stat.return_value.st_size = 200 * 1024 * 1024
+                mock_resolve.return_value = mock_path
+
+                result = await tool.execute(file="large.pcap")
+                assert result.success is False
+                assert "too large" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_pcapng_extension_accepted(self, tool):
+        """Test .pcapng file extension is accepted."""
+        MockIP = MagicMock()
+        MockTCP = MagicMock()
+        MockUDP = MagicMock()
+        MockDNS = MagicMock()
+        MockICMP = MagicMock()
+        MockRaw = MagicMock()
+
+        mock_packet = MagicMock()
+        mock_packet.haslayer = MagicMock(return_value=False)
+
+        with patch.multiple("sindri.tools.network", create=True, **{
+            "SCAPY_AVAILABLE": True,
+            "rdpcap": MagicMock(return_value=[mock_packet]),
+            "IP": MockIP,
+            "TCP": MockTCP,
+            "UDP": MockUDP,
+            "DNS": MockDNS,
+            "ICMP": MockICMP,
+            "Raw": MockRaw,
+        }):
+            with patch.object(tool, "_resolve_path") as mock_resolve:
+                mock_path = MagicMock()
+                mock_path.exists.return_value = True
+                mock_path.suffix = ".pcapng"
+                mock_path.stat.return_value.st_size = 1000
+                mock_path.name = "capture.pcapng"
+                mock_resolve.return_value = mock_path
+
+                result = await tool.execute(file="capture.pcapng")
+                assert result.success is True
+
+
+# =============================================================================
+# New Network Security Tools Integration Tests
+# =============================================================================
+
+
+class TestNetworkSecurityToolsIntegration:
+    """Integration tests for new network security tools."""
+
+    @pytest.mark.asyncio
+    async def test_all_new_tools_instantiate(self):
+        """Test that all new network tools can be instantiated."""
+        tools = [
+            WebSocketTestTool(),
+            HttpMockTool(),
+            PcapAnalyzeTool(),
+        ]
+
+        for tool in tools:
+            assert tool.name is not None
+            assert tool.description is not None
+            assert tool.parameters is not None
+
+    @pytest.mark.asyncio
+    async def test_new_tools_have_required_schema(self):
+        """Test all new tools have valid JSON Schema."""
+        tools = [
+            WebSocketTestTool(),
+            HttpMockTool(),
+            PcapAnalyzeTool(),
+        ]
+
+        for tool in tools:
+            schema = tool.get_schema()
+            func_schema = schema.get("function", schema)
+            assert "name" in func_schema
+            assert "description" in func_schema
+            assert "parameters" in func_schema
+            assert "type" in func_schema["parameters"]
+            assert "properties" in func_schema["parameters"]
+
+    @pytest.mark.asyncio
+    async def test_websocket_security_blocking(self):
+        """Test WebSocket tool blocks cloud metadata."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            tool = WebSocketTestTool()
+            result = await tool.execute(url="ws://169.254.169.254/ws", action="connect")
+            assert result.success is False
+            assert "blocked" in result.error.lower()
+
+    @pytest.mark.asyncio
+    async def test_websocket_blocks_metadata_google(self):
+        """Test WebSocket tool blocks Google metadata endpoint."""
+        with patch("sindri.tools.network.WEBSOCKETS_AVAILABLE", True):
+            tool = WebSocketTestTool()
+            result = await tool.execute(url="ws://metadata.google.internal/ws", action="connect")
+            assert result.success is False
+            assert "blocked" in result.error.lower()

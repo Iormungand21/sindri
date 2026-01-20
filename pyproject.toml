@@ -55,6 +55,10 @@ browser = [
     "playwright>=1.40.0",
     "html2text>=2024.0.0",
 ]
+network = [
+    "websockets>=12.0",
+    "scapy>=2.5.0",
+]
 
 [project.scripts]
 sindri = "sindri.cli:cli"

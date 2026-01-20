@@ -355,6 +355,9 @@ AGENTS: dict[str, AgentDefinition] = {
             # Network security tools
             "ssl_analyze",
             "port_check",
+            "websocket_test",
+            "http_mock",
+            "pcap_analyze",
         ],
         can_delegate=True,
         delegate_to=["mimir"],  # Can escalate to code reviewer

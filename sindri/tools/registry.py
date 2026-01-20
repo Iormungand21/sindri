@@ -196,6 +196,9 @@ from sindri.tools.network import (
     SslAnalyzeTool,
     PortCheckTool,
     PingHostTool,
+    WebSocketTestTool,
+    HttpMockTool,
+    PcapAnalyzeTool,
 )
 from sindri.tools.media import (
     AudioTranscribeTool,
@@ -685,6 +688,9 @@ class ToolRegistry:
         registry.register(SslAnalyzeTool(work_dir=work_dir))
         registry.register(PortCheckTool(work_dir=work_dir))
         registry.register(PingHostTool(work_dir=work_dir))
+        registry.register(WebSocketTestTool(work_dir=work_dir))
+        registry.register(HttpMockTool(work_dir=work_dir))
+        registry.register(PcapAnalyzeTool(work_dir=work_dir))
         # Video and audio processing tools
         registry.register(AudioTranscribeTool(work_dir=work_dir))
         registry.register(VideoExtractAudioTool(work_dir=work_dir))

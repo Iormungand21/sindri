@@ -810,9 +810,9 @@ Based on research, these specialized models outperform general-purpose models fo
 
 ### Agent Implementation Priority
 
-**Tier 1 - Extend Existing Agents**
-- Extend **Fenrir** (SQL) with specialized sqlcoder model + new DB tools
-- Extend **Heimdall** (Security) with network analysis tools
+**Tier 1 - Extend Existing Agents** (COMPLETE)
+- ✅ Extend **Fenrir** (SQL) with specialized sqlcoder model + new DB tools - COMPLETE (Fafnir)
+- ✅ Extend **Heimdall** (Security) with network analysis tools - COMPLETE (http_mock, websocket_test, pcap_analyze)
 
 **Tier 2 - New Lightweight Agents**
 - ✅ **Vör** (Regex/Text) - General text processing, pattern generation - COMPLETE (2026-01-18)
@@ -940,6 +940,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-20
 **Phase 11 Progress:** 8/8 agents COMPLETE (Skuld, Kvasir, Völundr, Saga, Bragi, Nidhogr, Dvalin, Regin)
-**Phase 12 Progress:** Tier 1-3 Complete - 7/8 agents (Vör, Rán, Sif, Nidhogg, Tyr, Groa, Fafnir), 105/~105 tools
-**Phase 12 Added:** Universal Tool Expansion (105+ tools across 13 categories) + 8 New Specialized Agents + 9 Docker Runtime Tools + 3 Vision Document Tools + 5 Advanced SQL Tools + 6 Blender Python Tools + 7 KiCad Electronics Tools
+**Phase 12 Progress:** Tier 1-3 Complete - 8/8 agents (Vör, Rán, Sif, Nidhogg, Tyr, Groa, Fafnir) + Heimdall extended, 108 tools
+**Phase 12 Added:** Universal Tool Expansion (105+ tools across 13 categories) + 8 New Specialized Agents + 9 Docker Runtime Tools + 3 Vision Document Tools + 5 Advanced SQL Tools + 3 Network Security Tools (Heimdall)
 **Maintained By:** Project contributors

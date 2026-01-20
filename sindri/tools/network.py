@@ -1186,3 +1186,1074 @@ Examples:
                 output="",
                 error=f"HTTP trace failed: {e}",
             )
+
+
+# =============================================================================
+# WebSocket Testing Tools
+# =============================================================================
+
+# Try to import websockets
+try:
+    import websockets
+    import websockets.exceptions
+
+    WEBSOCKETS_AVAILABLE = True
+except ImportError:
+    WEBSOCKETS_AVAILABLE = False
+
+
+class WebSocketTestTool(Tool):
+    """Test WebSocket connections and protocol behavior."""
+
+    name = "websocket_test"
+    description = """Test WebSocket endpoints for connectivity and security.
+
+Examples:
+- websocket_test(url="wss://api.example.com/ws", action="connect") - Test connection
+- websocket_test(url="wss://...", action="send", message="ping") - Send message
+- websocket_test(url="wss://...", action="ping") - Test ping/pong
+- websocket_test(url="wss://...", action="lifecycle", timeout=5) - Full lifecycle test"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "url": {
+                "type": "string",
+                "description": "WebSocket URL (ws:// or wss://)",
+            },
+            "action": {
+                "type": "string",
+                "enum": ["connect", "send", "receive", "ping", "lifecycle", "close"],
+                "description": "Test action to perform",
+            },
+            "message": {
+                "type": "string",
+                "description": "Message to send (for send action)",
+            },
+            "headers": {
+                "type": "object",
+                "description": "Custom headers for connection",
+            },
+            "timeout": {
+                "type": "number",
+                "description": "Timeout in seconds (default: 10)",
+            },
+            "subprotocol": {
+                "type": "string",
+                "description": "WebSocket subprotocol to request",
+            },
+            "auth_token": {
+                "type": "string",
+                "description": "Bearer token for authentication",
+            },
+        },
+        "required": ["url", "action"],
+    }
+
+    async def execute(
+        self,
+        url: str,
+        action: str,
+        message: Optional[str] = None,
+        headers: Optional[dict[str, str]] = None,
+        timeout: float = 10.0,
+        subprotocol: Optional[str] = None,
+        auth_token: Optional[str] = None,
+        **kwargs,
+    ) -> ToolResult:
+        """Test WebSocket connections."""
+        if not WEBSOCKETS_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="websockets not installed. Install with: pip install websockets",
+            )
+
+        log.info("websocket_test_start", url=url, action=action)
+
+        # Parse and validate URL
+        try:
+            parsed = urlparse(url)
+            if parsed.scheme not in ("ws", "wss"):
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error="URL must use ws:// or wss:// scheme",
+                )
+
+            host = parsed.hostname or ""
+            if _is_blocked_host(host):
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error=f"Host blocked for security: {host}",
+                )
+        except Exception as e:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Invalid URL: {e}",
+            )
+
+        # Build connection headers
+        extra_headers = headers.copy() if headers else {}
+        if auth_token:
+            extra_headers["Authorization"] = f"Bearer {auth_token}"
+
+        # Build connection kwargs
+        connect_kwargs: dict[str, Any] = {
+            "extra_headers": extra_headers if extra_headers else None,
+        }
+        if subprotocol:
+            connect_kwargs["subprotocols"] = [subprotocol]
+
+        try:
+            if action == "connect":
+                return await self._test_connection(url, connect_kwargs, timeout)
+            elif action == "send":
+                if not message:
+                    return ToolResult(
+                        success=False,
+                        output="",
+                        error="message required for send action",
+                    )
+                return await self._send_message(url, message, connect_kwargs, timeout)
+            elif action == "receive":
+                return await self._receive_message(url, connect_kwargs, timeout)
+            elif action == "ping":
+                return await self._test_ping(url, connect_kwargs, timeout)
+            elif action == "lifecycle":
+                return await self._test_lifecycle(url, connect_kwargs, timeout)
+            else:
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error=f"Unknown action: {action}",
+                )
+
+        except websockets.exceptions.InvalidStatusCode as e:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Connection rejected with status: {e.status_code}",
+            )
+        except asyncio.TimeoutError:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Connection timed out after {timeout}s",
+            )
+        except ConnectionRefusedError:
+            return ToolResult(
+                success=False,
+                output="",
+                error="Connection refused by server",
+            )
+        except Exception as e:
+            log.error("websocket_test_error", error=str(e))
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"WebSocket test failed: {e}",
+            )
+
+    async def _test_connection(
+        self, url: str, connect_kwargs: dict, timeout: float
+    ) -> ToolResult:
+        """Test basic WebSocket connection."""
+        start_time = asyncio.get_event_loop().time()
+
+        async with asyncio.timeout(timeout):
+            async with websockets.connect(url, **connect_kwargs) as ws:
+                connect_time = (asyncio.get_event_loop().time() - start_time) * 1000
+
+                return ToolResult(
+                    success=True,
+                    output=f"WebSocket connection successful to {url}\n"
+                    f"Connect time: {connect_time:.2f}ms\n"
+                    f"Subprotocol: {ws.subprotocol or 'none'}",
+                    metadata={
+                        "url": url,
+                        "connect_time_ms": round(connect_time, 2),
+                        "subprotocol": ws.subprotocol,
+                        "open": True,
+                    },
+                )
+
+    async def _send_message(
+        self, url: str, message: str, connect_kwargs: dict, timeout: float
+    ) -> ToolResult:
+        """Send a message and receive response."""
+        async with asyncio.timeout(timeout):
+            async with websockets.connect(url, **connect_kwargs) as ws:
+                await ws.send(message)
+
+                try:
+                    response = await asyncio.wait_for(ws.recv(), timeout=timeout / 2)
+                    return ToolResult(
+                        success=True,
+                        output=f"Sent: {message}\nReceived: {response}",
+                        metadata={
+                            "sent": message,
+                            "received": response,
+                            "response_type": type(response).__name__,
+                        },
+                    )
+                except asyncio.TimeoutError:
+                    return ToolResult(
+                        success=True,
+                        output=f"Sent: {message}\nNo response received within timeout",
+                        metadata={
+                            "sent": message,
+                            "received": None,
+                        },
+                    )
+
+    async def _receive_message(
+        self, url: str, connect_kwargs: dict, timeout: float
+    ) -> ToolResult:
+        """Wait to receive a message from server."""
+        async with asyncio.timeout(timeout):
+            async with websockets.connect(url, **connect_kwargs) as ws:
+                try:
+                    message = await asyncio.wait_for(ws.recv(), timeout=timeout / 2)
+                    return ToolResult(
+                        success=True,
+                        output=f"Received: {message}",
+                        metadata={
+                            "received": message,
+                            "message_type": type(message).__name__,
+                        },
+                    )
+                except asyncio.TimeoutError:
+                    return ToolResult(
+                        success=True,
+                        output="No message received within timeout",
+                        metadata={"received": None},
+                    )
+
+    async def _test_ping(
+        self, url: str, connect_kwargs: dict, timeout: float
+    ) -> ToolResult:
+        """Test WebSocket ping/pong."""
+        start_time = asyncio.get_event_loop().time()
+
+        async with asyncio.timeout(timeout):
+            async with websockets.connect(url, **connect_kwargs) as ws:
+                # Send ping and wait for pong
+                pong_waiter = await ws.ping()
+                await pong_waiter
+                ping_time = (asyncio.get_event_loop().time() - start_time) * 1000
+
+                return ToolResult(
+                    success=True,
+                    output=f"Ping/pong successful\nRound-trip time: {ping_time:.2f}ms",
+                    metadata={
+                        "ping_time_ms": round(ping_time, 2),
+                        "pong_received": True,
+                    },
+                )
+
+    async def _test_lifecycle(
+        self, url: str, connect_kwargs: dict, timeout: float
+    ) -> ToolResult:
+        """Test full WebSocket lifecycle: connect, send, receive, close."""
+        results = {
+            "connect": False,
+            "send": False,
+            "receive": False,
+            "close": False,
+        }
+        messages = []
+
+        async with asyncio.timeout(timeout):
+            async with websockets.connect(url, **connect_kwargs) as ws:
+                results["connect"] = True
+                messages.append("1. Connected successfully")
+
+                # Try to send a test message
+                try:
+                    await ws.send("lifecycle_test")
+                    results["send"] = True
+                    messages.append("2. Sent test message")
+                except Exception as e:
+                    messages.append(f"2. Send failed: {e}")
+
+                # Try to receive (with short timeout)
+                try:
+                    response = await asyncio.wait_for(ws.recv(), timeout=2.0)
+                    results["receive"] = True
+                    messages.append(f"3. Received: {response[:100] if len(str(response)) > 100 else response}")
+                except asyncio.TimeoutError:
+                    messages.append("3. No response (timeout)")
+                except Exception as e:
+                    messages.append(f"3. Receive error: {e}")
+
+                # Close is implicit with context manager
+                results["close"] = True
+                messages.append("4. Connection closed cleanly")
+
+        return ToolResult(
+            success=True,
+            output="WebSocket Lifecycle Test\n" + "-" * 30 + "\n" + "\n".join(messages),
+            metadata={
+                "lifecycle_results": results,
+                "all_passed": all(results.values()),
+            },
+        )
+
+
+# =============================================================================
+# HTTP Mock Tool
+# =============================================================================
+
+
+class HttpMockTool(Tool):
+    """Create mock HTTP endpoints for testing."""
+
+    name = "http_mock"
+    description = """Create mock HTTP endpoints for testing security scenarios.
+
+Examples:
+- http_mock(action="create", path="/api/login", response={"token": "..."}, status=200)
+- http_mock(action="record", path="/api/test") - Start recording requests
+- http_mock(action="list") - List active mocks
+- http_mock(action="clear") - Clear all mocks"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "action": {
+                "type": "string",
+                "enum": ["create", "record", "replay", "list", "clear"],
+                "description": "Action to perform",
+            },
+            "path": {
+                "type": "string",
+                "description": "URL path for the mock endpoint",
+            },
+            "method": {
+                "type": "string",
+                "enum": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+                "description": "HTTP method (default: GET)",
+            },
+            "response": {
+                "type": "object",
+                "description": "JSON response body",
+            },
+            "status": {
+                "type": "integer",
+                "description": "HTTP status code (default: 200)",
+            },
+            "headers": {
+                "type": "object",
+                "description": "Response headers",
+            },
+            "delay_ms": {
+                "type": "integer",
+                "description": "Response delay in milliseconds for latency testing",
+            },
+            "request_id": {
+                "type": "string",
+                "description": "Request ID for replay action",
+            },
+        },
+        "required": ["action"],
+    }
+
+    # Class-level storage for mocks (shared across instances)
+    _mocks: dict[str, dict[str, Any]] = {}
+    _recordings: dict[str, list[dict[str, Any]]] = {}
+    _mock_counter: int = 0
+
+    async def execute(
+        self,
+        action: str,
+        path: Optional[str] = None,
+        method: str = "GET",
+        response: Optional[dict[str, Any]] = None,
+        status: int = 200,
+        headers: Optional[dict[str, str]] = None,
+        delay_ms: int = 0,
+        request_id: Optional[str] = None,
+        **kwargs,
+    ) -> ToolResult:
+        """Execute mock HTTP operations."""
+        if not HTTPX_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="httpx not installed. Install with: pip install httpx",
+            )
+
+        log.info("http_mock_start", action=action, path=path)
+
+        try:
+            if action == "create":
+                if not path:
+                    return ToolResult(
+                        success=False,
+                        output="",
+                        error="path required for create action",
+                    )
+                return self._create_mock(path, method, response, status, headers, delay_ms)
+
+            elif action == "record":
+                if not path:
+                    return ToolResult(
+                        success=False,
+                        output="",
+                        error="path required for record action",
+                    )
+                return self._start_recording(path)
+
+            elif action == "replay":
+                if not request_id:
+                    return ToolResult(
+                        success=False,
+                        output="",
+                        error="request_id required for replay action",
+                    )
+                return self._replay_request(request_id)
+
+            elif action == "list":
+                return self._list_mocks()
+
+            elif action == "clear":
+                return self._clear_mocks()
+
+            else:
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error=f"Unknown action: {action}",
+                )
+
+        except Exception as e:
+            log.error("http_mock_error", error=str(e))
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"Mock operation failed: {e}",
+            )
+
+    def _create_mock(
+        self,
+        path: str,
+        method: str,
+        response: Optional[dict[str, Any]],
+        status: int,
+        headers: Optional[dict[str, str]],
+        delay_ms: int,
+    ) -> ToolResult:
+        """Create a mock endpoint."""
+        HttpMockTool._mock_counter += 1
+        mock_id = f"mock_{HttpMockTool._mock_counter}"
+
+        mock_config = {
+            "id": mock_id,
+            "path": path,
+            "method": method.upper(),
+            "response": response or {},
+            "status": status,
+            "headers": headers or {"Content-Type": "application/json"},
+            "delay_ms": delay_ms,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "hit_count": 0,
+        }
+
+        key = f"{method.upper()}:{path}"
+        HttpMockTool._mocks[key] = mock_config
+
+        return ToolResult(
+            success=True,
+            output=f"Created mock endpoint: {method.upper()} {path} -> {status}\n"
+            f"Mock ID: {mock_id}\n"
+            f"Response: {json.dumps(response or {}, indent=2)[:200]}",
+            metadata={
+                "mock_id": mock_id,
+                "path": path,
+                "method": method.upper(),
+                "status": status,
+            },
+        )
+
+    def _start_recording(self, path: str) -> ToolResult:
+        """Start recording requests to a path."""
+        HttpMockTool._mock_counter += 1
+        recorder_id = f"rec_{HttpMockTool._mock_counter}"
+
+        HttpMockTool._recordings[recorder_id] = {
+            "path": path,
+            "requests": [],
+            "created_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        return ToolResult(
+            success=True,
+            output=f"Recording requests to {path}\nRecorder ID: {recorder_id}",
+            metadata={
+                "recorder_id": recorder_id,
+                "path": path,
+            },
+        )
+
+    def _replay_request(self, request_id: str) -> ToolResult:
+        """Replay a recorded request."""
+        # Find the request in recordings
+        for recorder_id, recording in HttpMockTool._recordings.items():
+            for req in recording.get("requests", []):
+                if req.get("id") == request_id:
+                    return ToolResult(
+                        success=True,
+                        output=f"Replayed request: {req.get('method')} {req.get('path')}\n"
+                        f"Original time: {req.get('timestamp')}",
+                        metadata={"request": req},
+                    )
+
+        return ToolResult(
+            success=False,
+            output="",
+            error=f"Request not found: {request_id}",
+        )
+
+    def _list_mocks(self) -> ToolResult:
+        """List all active mocks."""
+        mocks = list(HttpMockTool._mocks.values())
+        recordings = list(HttpMockTool._recordings.keys())
+
+        if not mocks and not recordings:
+            return ToolResult(
+                success=True,
+                output="No active mocks or recordings",
+                metadata={"mocks": [], "recordings": []},
+            )
+
+        output_lines = ["Active Mocks:", "-" * 40]
+        for mock in mocks:
+            output_lines.append(
+                f"  {mock['method']} {mock['path']} -> {mock['status']} (hits: {mock['hit_count']})"
+            )
+
+        if recordings:
+            output_lines.extend(["", "Active Recordings:", "-" * 40])
+            for rec_id in recordings:
+                rec = HttpMockTool._recordings[rec_id]
+                output_lines.append(f"  {rec_id}: {rec['path']} ({len(rec.get('requests', []))} requests)")
+
+        return ToolResult(
+            success=True,
+            output="\n".join(output_lines),
+            metadata={"mocks": mocks, "recordings": recordings},
+        )
+
+    def _clear_mocks(self) -> ToolResult:
+        """Clear all mocks and recordings."""
+        mock_count = len(HttpMockTool._mocks)
+        recording_count = len(HttpMockTool._recordings)
+
+        HttpMockTool._mocks.clear()
+        HttpMockTool._recordings.clear()
+
+        return ToolResult(
+            success=True,
+            output=f"Cleared {mock_count} mocks and {recording_count} recordings",
+            metadata={
+                "cleared_mocks": mock_count,
+                "cleared_recordings": recording_count,
+            },
+        )
+
+
+# =============================================================================
+# PCAP Analysis Tool
+# =============================================================================
+
+# Try to import scapy
+try:
+    from scapy.all import rdpcap, IP, TCP, UDP, DNS, ICMP, Raw
+
+    SCAPY_AVAILABLE = True
+except ImportError:
+    SCAPY_AVAILABLE = False
+
+
+class PcapAnalyzeTool(Tool):
+    """Analyze network packet capture files."""
+
+    name = "pcap_analyze"
+    description = """Parse and analyze .pcap/.pcapng files for network security analysis.
+
+Examples:
+- pcap_analyze(file="capture.pcap") - Basic analysis with statistics
+- pcap_analyze(file="capture.pcap", filter_host="192.168.1.1") - Filter by IP
+- pcap_analyze(file="capture.pcap", filter_port=443, protocol="TCP") - Filter HTTPS
+- pcap_analyze(file="capture.pcap", action="extract_dns") - Extract DNS queries"""
+
+    parameters = {
+        "type": "object",
+        "properties": {
+            "file": {
+                "type": "string",
+                "description": "Path to .pcap or .pcapng file",
+            },
+            "action": {
+                "type": "string",
+                "enum": ["summary", "filter", "extract_dns", "extract_http", "timing", "conversations"],
+                "description": "Analysis action (default: summary)",
+            },
+            "filter_host": {
+                "type": "string",
+                "description": "Filter packets by IP address",
+            },
+            "filter_port": {
+                "type": "integer",
+                "description": "Filter packets by port number",
+            },
+            "protocol": {
+                "type": "string",
+                "enum": ["TCP", "UDP", "ICMP", "DNS", "ALL"],
+                "description": "Filter by protocol (default: ALL)",
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum packets to analyze (default: 1000)",
+            },
+            "extract_payloads": {
+                "type": "boolean",
+                "description": "Extract and decode payload data (default: false)",
+            },
+        },
+        "required": ["file"],
+    }
+
+    # Maximum file size (100MB)
+    MAX_FILE_SIZE = 100 * 1024 * 1024
+    # Maximum packets to analyze
+    MAX_PACKETS = 10000
+
+    async def execute(
+        self,
+        file: str,
+        action: str = "summary",
+        filter_host: Optional[str] = None,
+        filter_port: Optional[int] = None,
+        protocol: str = "ALL",
+        limit: int = 1000,
+        extract_payloads: bool = False,
+        **kwargs,
+    ) -> ToolResult:
+        """Analyze pcap files."""
+        if not SCAPY_AVAILABLE:
+            return ToolResult(
+                success=False,
+                output="",
+                error="scapy not installed. Install with: pip install scapy",
+            )
+
+        log.info("pcap_analyze_start", file=file, action=action)
+
+        # Resolve and validate file path
+        file_path = self._resolve_path(file)
+        if not file_path.exists():
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"File not found: {file}",
+            )
+
+        if file_path.suffix.lower() not in (".pcap", ".pcapng", ".cap"):
+            return ToolResult(
+                success=False,
+                output="",
+                error="File must be .pcap, .pcapng, or .cap",
+            )
+
+        # Check file size
+        file_size = file_path.stat().st_size
+        if file_size > self.MAX_FILE_SIZE:
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"File too large: {file_size / (1024*1024):.1f}MB (max: {self.MAX_FILE_SIZE / (1024*1024):.0f}MB)",
+            )
+
+        # Cap limit
+        limit = min(limit, self.MAX_PACKETS)
+
+        try:
+            # Load packets (run in executor to avoid blocking)
+            loop = asyncio.get_event_loop()
+            packets = await loop.run_in_executor(None, lambda: rdpcap(str(file_path)))
+
+            # Apply filters
+            filtered = self._filter_packets(packets, filter_host, filter_port, protocol, limit)
+
+            if action == "summary":
+                return self._generate_summary(filtered, file_path, len(packets))
+            elif action == "filter":
+                return self._format_filtered(filtered)
+            elif action == "extract_dns":
+                return self._extract_dns(filtered)
+            elif action == "extract_http":
+                return self._extract_http(filtered, extract_payloads)
+            elif action == "timing":
+                return self._analyze_timing(filtered)
+            elif action == "conversations":
+                return self._analyze_conversations(filtered)
+            else:
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error=f"Unknown action: {action}",
+                )
+
+        except Exception as e:
+            log.error("pcap_analyze_error", error=str(e))
+            return ToolResult(
+                success=False,
+                output="",
+                error=f"PCAP analysis failed: {e}",
+            )
+
+    def _resolve_path(self, file: str) -> Path:
+        """Resolve file path relative to work_dir if set."""
+        path = Path(file)
+        if not path.is_absolute() and self.work_dir:
+            path = self.work_dir / path
+        return path.resolve()
+
+    def _filter_packets(
+        self,
+        packets: list,
+        filter_host: Optional[str],
+        filter_port: Optional[int],
+        protocol: str,
+        limit: int,
+    ) -> list:
+        """Filter packets by criteria."""
+        filtered = []
+
+        for pkt in packets:
+            if len(filtered) >= limit:
+                break
+
+            # Protocol filter
+            if protocol != "ALL":
+                if protocol == "TCP" and not pkt.haslayer(TCP):
+                    continue
+                elif protocol == "UDP" and not pkt.haslayer(UDP):
+                    continue
+                elif protocol == "ICMP" and not pkt.haslayer(ICMP):
+                    continue
+                elif protocol == "DNS" and not pkt.haslayer(DNS):
+                    continue
+
+            # Host filter
+            if filter_host and pkt.haslayer(IP):
+                ip_layer = pkt[IP]
+                if ip_layer.src != filter_host and ip_layer.dst != filter_host:
+                    continue
+
+            # Port filter
+            if filter_port:
+                if pkt.haslayer(TCP):
+                    tcp = pkt[TCP]
+                    if tcp.sport != filter_port and tcp.dport != filter_port:
+                        continue
+                elif pkt.haslayer(UDP):
+                    udp = pkt[UDP]
+                    if udp.sport != filter_port and udp.dport != filter_port:
+                        continue
+                else:
+                    continue
+
+            filtered.append(pkt)
+
+        return filtered
+
+    def _generate_summary(self, packets: list, file_path: Path, total_count: int) -> ToolResult:
+        """Generate summary statistics."""
+        stats = {
+            "total_packets": total_count,
+            "analyzed_packets": len(packets),
+            "tcp": 0,
+            "udp": 0,
+            "icmp": 0,
+            "dns": 0,
+            "other": 0,
+            "unique_src_ips": set(),
+            "unique_dst_ips": set(),
+            "unique_ports": set(),
+        }
+
+        for pkt in packets:
+            if pkt.haslayer(TCP):
+                stats["tcp"] += 1
+                tcp = pkt[TCP]
+                stats["unique_ports"].add(tcp.sport)
+                stats["unique_ports"].add(tcp.dport)
+            elif pkt.haslayer(UDP):
+                stats["udp"] += 1
+                udp = pkt[UDP]
+                stats["unique_ports"].add(udp.sport)
+                stats["unique_ports"].add(udp.dport)
+            elif pkt.haslayer(ICMP):
+                stats["icmp"] += 1
+            else:
+                stats["other"] += 1
+
+            if pkt.haslayer(DNS):
+                stats["dns"] += 1
+
+            if pkt.haslayer(IP):
+                ip = pkt[IP]
+                stats["unique_src_ips"].add(ip.src)
+                stats["unique_dst_ips"].add(ip.dst)
+
+        output_lines = [
+            f"PCAP Analysis: {file_path.name}",
+            "=" * 50,
+            f"Total packets: {stats['total_packets']}",
+            f"Analyzed: {stats['analyzed_packets']}",
+            "",
+            "Protocol Distribution:",
+            f"  TCP: {stats['tcp']}",
+            f"  UDP: {stats['udp']}",
+            f"  ICMP: {stats['icmp']}",
+            f"  DNS queries: {stats['dns']}",
+            f"  Other: {stats['other']}",
+            "",
+            f"Unique source IPs: {len(stats['unique_src_ips'])}",
+            f"Unique destination IPs: {len(stats['unique_dst_ips'])}",
+            f"Unique ports: {len(stats['unique_ports'])}",
+        ]
+
+        # Convert sets to lists for JSON serialization
+        metadata = {
+            "file": str(file_path),
+            "total_packets": stats["total_packets"],
+            "analyzed_packets": stats["analyzed_packets"],
+            "tcp": stats["tcp"],
+            "udp": stats["udp"],
+            "icmp": stats["icmp"],
+            "dns": stats["dns"],
+            "unique_src_ips": list(stats["unique_src_ips"])[:20],
+            "unique_dst_ips": list(stats["unique_dst_ips"])[:20],
+            "unique_ports": sorted(list(stats["unique_ports"]))[:50],
+        }
+
+        return ToolResult(
+            success=True,
+            output="\n".join(output_lines),
+            metadata=metadata,
+        )
+
+    def _format_filtered(self, packets: list) -> ToolResult:
+        """Format filtered packets for display."""
+        output_lines = [f"Filtered Packets: {len(packets)}", "=" * 50]
+
+        for i, pkt in enumerate(packets[:50]):  # Limit display
+            line_parts = [f"{i+1}."]
+
+            if pkt.haslayer(IP):
+                ip = pkt[IP]
+                line_parts.append(f"{ip.src} -> {ip.dst}")
+
+            if pkt.haslayer(TCP):
+                tcp = pkt[TCP]
+                line_parts.append(f"TCP {tcp.sport}->{tcp.dport}")
+            elif pkt.haslayer(UDP):
+                udp = pkt[UDP]
+                line_parts.append(f"UDP {udp.sport}->{udp.dport}")
+            elif pkt.haslayer(ICMP):
+                line_parts.append("ICMP")
+
+            output_lines.append(" ".join(line_parts))
+
+        if len(packets) > 50:
+            output_lines.append(f"... and {len(packets) - 50} more packets")
+
+        return ToolResult(
+            success=True,
+            output="\n".join(output_lines),
+            metadata={"packet_count": len(packets)},
+        )
+
+    def _extract_dns(self, packets: list) -> ToolResult:
+        """Extract DNS queries from packets."""
+        dns_queries = []
+
+        for pkt in packets:
+            if pkt.haslayer(DNS):
+                dns_layer = pkt[DNS]
+                if dns_layer.qr == 0:  # Query
+                    if dns_layer.qd:
+                        query_name = dns_layer.qd.qname.decode() if isinstance(dns_layer.qd.qname, bytes) else str(dns_layer.qd.qname)
+                        dns_queries.append({
+                            "query": query_name.rstrip("."),
+                            "type": dns_layer.qd.qtype,
+                            "src": pkt[IP].src if pkt.haslayer(IP) else "unknown",
+                        })
+
+        output_lines = [f"DNS Queries: {len(dns_queries)}", "=" * 50]
+        for q in dns_queries[:100]:
+            output_lines.append(f"  {q['src']} -> {q['query']}")
+
+        return ToolResult(
+            success=True,
+            output="\n".join(output_lines),
+            metadata={"dns_queries": dns_queries[:100]},
+        )
+
+    def _extract_http(self, packets: list, extract_payloads: bool) -> ToolResult:
+        """Extract HTTP requests from packets."""
+        http_requests = []
+
+        for pkt in packets:
+            if pkt.haslayer(TCP) and pkt.haslayer(Raw):
+                payload = pkt[Raw].load
+                try:
+                    payload_str = payload.decode("utf-8", errors="ignore")
+                    # Check for HTTP request patterns
+                    if payload_str.startswith(("GET ", "POST ", "PUT ", "DELETE ", "HEAD ", "OPTIONS ", "PATCH ")):
+                        lines = payload_str.split("\r\n")
+                        request_line = lines[0] if lines else ""
+
+                        req_info = {
+                            "request": request_line[:200],
+                            "src": pkt[IP].src if pkt.haslayer(IP) else "unknown",
+                            "dst": pkt[IP].dst if pkt.haslayer(IP) else "unknown",
+                            "port": pkt[TCP].dport,
+                        }
+
+                        if extract_payloads:
+                            req_info["payload"] = payload_str[:500]
+
+                        http_requests.append(req_info)
+                except Exception:
+                    pass
+
+        output_lines = [f"HTTP Requests: {len(http_requests)}", "=" * 50]
+        for req in http_requests[:50]:
+            output_lines.append(f"  {req['src']} -> {req['dst']}:{req['port']}")
+            output_lines.append(f"    {req['request']}")
+
+        return ToolResult(
+            success=True,
+            output="\n".join(output_lines),
+            metadata={"http_requests": http_requests[:50]},
+        )
+
+    def _analyze_timing(self, packets: list) -> ToolResult:
+        """Analyze packet timing."""
+        if len(packets) < 2:
+            return ToolResult(
+                success=True,
+                output="Not enough packets for timing analysis",
+                metadata={"packet_count": len(packets)},
+            )
+
+        times = [float(pkt.time) for pkt in packets if hasattr(pkt, "time")]
+        if len(times) < 2:
+            return ToolResult(
+                success=True,
+                output="No timing information available",
+                metadata={},
+            )
+
+        duration = times[-1] - times[0]
+        intervals = [times[i+1] - times[i] for i in range(len(times)-1)]
+        avg_interval = sum(intervals) / len(intervals) if intervals else 0
+        min_interval = min(intervals) if intervals else 0
+        max_interval = max(intervals) if intervals else 0
+
+        output_lines = [
+            "Packet Timing Analysis",
+            "=" * 50,
+            f"Duration: {duration:.3f}s",
+            f"Packet count: {len(packets)}",
+            f"Packets/sec: {len(packets) / duration:.2f}" if duration > 0 else "N/A",
+            "",
+            "Interval Statistics:",
+            f"  Average: {avg_interval*1000:.3f}ms",
+            f"  Min: {min_interval*1000:.3f}ms",
+            f"  Max: {max_interval*1000:.3f}ms",
+        ]
+
+        return ToolResult(
+            success=True,
+            output="\n".join(output_lines),
+            metadata={
+                "duration_sec": round(duration, 3),
+                "packet_count": len(packets),
+                "avg_interval_ms": round(avg_interval * 1000, 3),
+                "min_interval_ms": round(min_interval * 1000, 3),
+                "max_interval_ms": round(max_interval * 1000, 3),
+            },
+        )
+
+    def _analyze_conversations(self, packets: list) -> ToolResult:
+        """Analyze network conversations (IP pairs)."""
+        conversations: dict[str, dict[str, Any]] = {}
+
+        for pkt in packets:
+            if not pkt.haslayer(IP):
+                continue
+
+            ip = pkt[IP]
+            # Create sorted key for bidirectional conversations
+            key = tuple(sorted([ip.src, ip.dst]))
+            key_str = f"{key[0]} <-> {key[1]}"
+
+            if key_str not in conversations:
+                conversations[key_str] = {
+                    "endpoints": list(key),
+                    "packet_count": 0,
+                    "bytes": 0,
+                    "protocols": set(),
+                }
+
+            conversations[key_str]["packet_count"] += 1
+            conversations[key_str]["bytes"] += len(pkt)
+
+            if pkt.haslayer(TCP):
+                conversations[key_str]["protocols"].add("TCP")
+            elif pkt.haslayer(UDP):
+                conversations[key_str]["protocols"].add("UDP")
+            elif pkt.haslayer(ICMP):
+                conversations[key_str]["protocols"].add("ICMP")
+
+        # Sort by packet count
+        sorted_convs = sorted(
+            conversations.items(),
+            key=lambda x: x[1]["packet_count"],
+            reverse=True,
+        )
+
+        output_lines = [f"Network Conversations: {len(conversations)}", "=" * 50]
+        for conv_key, conv_data in sorted_convs[:20]:
+            protocols = ", ".join(conv_data["protocols"])
+            output_lines.append(
+                f"  {conv_key}: {conv_data['packet_count']} pkts, "
+                f"{conv_data['bytes']} bytes ({protocols})"
+            )
+
+        # Convert sets to lists for JSON
+        metadata_convs = []
+        for conv_key, conv_data in sorted_convs[:20]:
+            metadata_convs.append({
+                "endpoints": conv_data["endpoints"],
+                "packet_count": conv_data["packet_count"],
+                "bytes": conv_data["bytes"],
+                "protocols": list(conv_data["protocols"]),
+            })
+
+        return ToolResult(
+            success=True,
+            output="\n".join(output_lines),
+            metadata={
+                "conversation_count": len(conversations),
+                "conversations": metadata_convs,
+            },
+        )

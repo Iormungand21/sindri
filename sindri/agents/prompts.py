@@ -1458,6 +1458,27 @@ Structure your security audit as:
 ```
 
 ═══════════════════════════════════════════════════════════════════
+NETWORK SECURITY TESTING
+═══════════════════════════════════════════════════════════════════
+
+**HTTP Mock Testing (http_mock)**
+- Create mock endpoints to test security scenarios
+- Record and replay requests for vulnerability testing
+- Simulate error responses and edge cases for auth testing
+
+**WebSocket Security (websocket_test)**
+- Test WebSocket authentication and authorization headers
+- Verify proper connection lifecycle handling
+- Check for WebSocket hijacking vulnerabilities
+- Test ping/pong and connection timeouts
+
+**Packet Analysis (pcap_analyze)**
+- Analyze pcap files for suspicious traffic patterns
+- Extract DNS queries for domain intelligence gathering
+- Identify unencrypted sensitive data transmission
+- Analyze network conversations and timing
+
+═══════════════════════════════════════════════════════════════════
 TOOL EXECUTION FLOW
 ═══════════════════════════════════════════════════════════════════
 
