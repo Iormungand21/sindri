@@ -821,7 +821,7 @@ Based on research, these specialized models outperform general-purpose models fo
 
 **Tier 3 - New Specialized Agents**
 - ✅ **Groa** (Documents) - PDF/OCR with vision model - COMPLETE (2026-01-20)
-- **Fafnir** (Advanced SQL) - Complex query optimization
+- ✅ **Fafnir** (Advanced SQL) - Complex query optimization - COMPLETE (2026-01-20)
 
 ---
 
@@ -871,6 +871,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-20 | **Advanced SQL Optimization + Fafnir Agent** - sql_optimize, db_schema_diff, db_analyze_indexes, db_backup, db_visualize_schema + Fafnir agent using sqlcoder:7b | +48 |
 | 2026-01-20 | **Vision-Based Document Processing + Groa Agent** - document_describe, document_extract_structured, document_summarize + Groa (Document/Vision) agent using granite3.2-vision:2b | +63 |
 | 2026-01-19 | **AWS & Kubernetes Tools + Tyr Agent** - aws_s3_list, aws_s3_upload, aws_s3_download, aws_logs_query, aws_ec2_list, aws_lambda_invoke, k8s_apply, k8s_get_pods, k8s_logs, k8s_get_services, k8s_describe, k8s_delete + Tyr (Cloud Ops) agent | +72 |
 | 2026-01-19 | **Docker Runtime Tools** - docker_build, docker_run, docker_ps, docker_logs, docker_stop, docker_rm, docker_images, docker_compose_up, docker_compose_down | +48 |
@@ -935,6 +936,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-20
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Tier 1-3 Complete - 6/8 agents (Vör, Rán, Sif, Nidhogg, Tyr, Groa), 100/~100 tools
-**Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents + 9 Docker Runtime Tools + 3 Vision Document Tools
+**Phase 12 Progress:** Tier 1-3 Complete - 7/8 agents (Vör, Rán, Sif, Nidhogg, Tyr, Groa, Fafnir), 105/~105 tools
+**Phase 12 Added:** Universal Tool Expansion (105+ tools across 13 categories) + 8 New Specialized Agents + 9 Docker Runtime Tools + 3 Vision Document Tools + 5 Advanced SQL Tools
 **Maintained By:** Project contributors

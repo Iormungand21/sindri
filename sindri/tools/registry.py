@@ -38,6 +38,13 @@ from sindri.tools.sql import (
     SqlGenerateTool,
     DbSeedTool,
 )
+from sindri.tools.sql_advanced import (
+    SqlOptimizeTool,
+    DbSchemaDiffTool,
+    DbAnalyzeIndexesTool,
+    DbBackupTool,
+    DbVisualizeSchemaTool,
+)
 from sindri.tools.cicd import GenerateWorkflowTool, ValidateWorkflowTool
 from sindri.tools.dependency_scanner import (
     ScanDependenciesTool,
@@ -519,6 +526,12 @@ class ToolRegistry:
         registry.register(ExplainQueryTool(work_dir=work_dir))
         registry.register(SqlGenerateTool(work_dir=work_dir))
         registry.register(DbSeedTool(work_dir=work_dir))
+        # Advanced SQL tools (Fafnir agent)
+        registry.register(SqlOptimizeTool(work_dir=work_dir))
+        registry.register(DbSchemaDiffTool(work_dir=work_dir))
+        registry.register(DbAnalyzeIndexesTool(work_dir=work_dir))
+        registry.register(DbBackupTool(work_dir=work_dir))
+        registry.register(DbVisualizeSchemaTool(work_dir=work_dir))
         registry.register(GenerateWorkflowTool(work_dir=work_dir))
         registry.register(ValidateWorkflowTool(work_dir=work_dir))
         registry.register(ScanDependenciesTool(work_dir=work_dir))

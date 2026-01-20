@@ -98,16 +98,16 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3022 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, **Vision-Based Document Processing (Groa Agent)**
+**Test Status:** 3070 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), **Advanced SQL Optimization (Fafnir Agent)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3022 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3070 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 22 agents (including groa)
+.venv/bin/sindri agents                    # See all 23 agents (including fafnir)
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -218,6 +218,48 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Advanced SQL Optimization (2026-01-20) - Phase 12 Tier 3 Fafnir Agent
+
+Added **Fafnir** - an advanced SQL optimization specialist agent. Named after the Norse dragon who guarded a hoard of golden treasure, Fafnir guards the integrity and performance of your databases through query optimization, schema analysis, and maintenance operations.
+
+**New Agent:**
+- **Fafnir** (Norse dragon) - Advanced SQL optimization specialist using sqlcoder:7b
+
+**New Tools (5 total):**
+
+*Advanced SQL Tools:*
+- `sql_optimize` - Analyze query execution plans and suggest optimizations (index recommendations, query rewrites, covering indexes)
+- `db_schema_diff` - Compare schemas between two databases (added/removed/modified tables, columns, indexes, foreign keys)
+- `db_analyze_indexes` - Analyze existing indexes and suggest improvements (unused detection, composite recommendations, query log analysis)
+- `db_backup` - Create database backups (SQLite direct, PostgreSQL via pg_dump, MySQL via mysqldump, gzip compression)
+- `db_visualize_schema` - Generate ER diagrams in Mermaid, PlantUML, or D2 format with relationships
+
+**Key Features:**
+- SQLite direct support with PostgreSQL/MySQL via subprocess (pg_dump/mysqldump)
+- Automatic alias-to-table resolution for accurate EXPLAIN QUERY PLAN analysis
+- Schema comparison with column type/nullability/default changes
+- Query log analysis for index recommendations
+- Multi-format ER diagram generation with title and type annotation options
+
+**Agent Assignment:**
+- **Fafnir** has 12 tools: 5 advanced SQL + 3 basic SQL (execute_query, describe_schema, explain_query) + 4 file operations
+- **Brokkr** can delegate to Fafnir for database optimization and maintenance tasks
+
+**Differentiation from Fenrir:**
+- **Fenrir** (Basic SQL): Data access, schema inspection, query execution, test data generation
+- **Fafnir** (Advanced SQL): Performance optimization, schema comparison, index analysis, backups, ER diagrams
+
+**Files:**
+- `sindri/tools/sql_advanced.py` - All 5 advanced SQL tool implementations (~1200 lines)
+- `sindri/agents/prompts.py` - FAFNIR_PROMPT with optimization best practices
+- `sindri/agents/registry.py` - Fafnir agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `tests/test_sql_advanced.py` - Comprehensive test suite
+
+**Tests:** +48 new tests (3070 total)
+
+---
 
 ### Vision-Based Document Processing (2026-01-20) - Phase 12 Tier 3 Groa Agent
 

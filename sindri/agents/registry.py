@@ -31,6 +31,8 @@ from sindri.agents.prompts import (
     TYR_PROMPT,
     # Phase 12: Document/Vision agent (2026-01-20)
     GROA_PROMPT,
+    # Phase 12: Advanced SQL agent (2026-01-20)
+    FAFNIR_PROMPT,
     # Milestone 6: Self-management agent (2026-01-18)
     SINDRI_ADMIN_PROMPT,
 )
@@ -87,7 +89,7 @@ AGENTS: dict[str, AgentDefinition] = {
         can_delegate=True,
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
         # Phase 11: Added skuld, kvasir, volundr, saga for multi-disciplinary domains
-        # Phase 12: Added vor for text/regex, ran for browser, sif for shell, nidhogg for math/scientific, tyr for cloud, groa for documents
+        # Phase 12: Added vor for text/regex, ran for browser, sif for shell, nidhogg for math/scientific, tyr for cloud, groa for documents, fafnir for advanced SQL
         delegate_to=[
             "huginn",
             "mimir",
@@ -108,6 +110,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "nidhogg",
             "tyr",
             "groa",
+            "fafnir",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -786,6 +789,38 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to smaller model (no vision, traditional tools only)
         fallback_model="qwen2.5-coder:1.5b",
         fallback_vram_gb=1.0,
+    ),
+    # Phase 12: Advanced SQL agent (2026-01-20)
+    "fafnir": AgentDefinition(
+        name="fafnir",
+        role="Advanced SQL optimization specialist - query tuning, schema analysis, database maintenance",
+        model="sqlcoder:7b",  # Specialized SQL model (same as Fenrir)
+        system_prompt=FAFNIR_PROMPT,
+        tools=[
+            # Core file operations
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            # Basic SQL tools (for context)
+            "execute_query",
+            "describe_schema",
+            "explain_query",
+            # Advanced SQL tools (Fafnir-specific)
+            "sql_optimize",
+            "db_schema_diff",
+            "db_analyze_indexes",
+            "db_backup",
+            "db_visualize_schema",
+        ],
+        can_delegate=False,  # Tier 3 specialist, does not delegate
+        estimated_vram_gb=5.0,  # sqlcoder:7b is ~5GB
+        priority=2,
+        max_iterations=20,
+        temperature=0.2,  # Low temp for SQL precision
+        # Fallback to general coder model
+        fallback_model="qwen2.5-coder:3b",
+        fallback_vram_gb=2.5,
     ),
 }
 

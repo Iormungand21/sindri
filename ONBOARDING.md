@@ -37,9 +37,9 @@ See `STATUS.md` and `ROADMAP.md` for full details.
 
 **Key Facts:**
 - **Status:** Architecture Transformation COMPLETE (Internal-Only Mode)
-- **Tests:** 3022 backend + 104 frontend
-- **Agents:** 22 specialized agents (including groa, sindri_admin)
-- **Tools:** 164+ tools (3 new vision document tools)
+- **Tests:** 3070 backend + 104 frontend
+- **Agents:** 23 specialized agents (including fafnir, groa, sindri_admin)
+- **Tools:** 169+ tools (5 new advanced SQL tools)
 - **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
 
 ---
@@ -51,7 +51,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see 3022 passed)
+# Run tests (should see 3070 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health
@@ -248,4 +248,4 @@ Historical documents are in `docs/archive/`:
 
 ---
 
-**Last Updated:** 2026-01-20 (Groa Vision Document Agent Added)
+**Last Updated:** 2026-01-20 (Fafnir Advanced SQL Agent Added)
