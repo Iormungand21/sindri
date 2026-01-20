@@ -98,16 +98,16 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3138 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), **Music Composition (Bragi Agent)**
+**Test Status:** 3218 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), **Game Level Design (Nidhogr Game Agent)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3138 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3218 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 24 agents (including bragi)
+.venv/bin/sindri agents                    # See all 25 agents (including nidhogr_game)
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -218,6 +218,47 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Game Level Design (2026-01-20) - Phase 11 Tier 3 Nidhogr Game Agent
+
+Added **Nidhogr Game** - a specialized game level design agent. Named after the dragon that gnaws at Yggdrasil's roots, Nidhogr Game builds the foundations of game worlds through procedural generation, difficulty balancing, dialogue trees, and game script generation.
+
+**New Agent:**
+- **Nidhogr Game** (nidhogr_game) - Game level design specialist using qwen2.5-coder:7b
+
+**New Tools (7 total):**
+
+*Game Level Design Tools:*
+- `generate_tilemap` - Create 2D level layouts in JSON, TMX (Tiled), CSV, or ASCII formats
+- `generate_dungeon` - Procedural dungeon generation with BSP, cellular automata, or room placement algorithms
+- `balance_difficulty` - Analyze and adjust difficulty curves with DPS ratios, TTK calculations, and recommendations
+- `generate_dialogue` - Create NPC dialogue trees in Yarn Spinner, Ink, or JSON formats
+- `generate_item_stats` - Generate balanced item/weapon stats with rarity scaling and affix systems
+- `generate_gdscript` - Generate Godot GDScript for players, enemies, items, UI, projectiles, platforms
+- `generate_unity_script` - Generate Unity C# scripts with proper namespaces and XML documentation
+
+**Key Features:**
+- Pure Python implementation with no external game engine dependencies
+- Seed-based reproducibility for all procedural generation
+- Multiple dungeon algorithms: BSP (rectangular rooms), cellular automata (caves), room placement
+- Dialogue format support: Yarn Spinner, Ink, JSON with conditional logic
+- Item scaling formulas: linear, exponential, Diablo-style with affixes
+- Game script templates: Godot 3.x/4.x and Unity with signals/events
+
+**Agent Assignment:**
+- **Nidhogr Game** has 11 tools: 7 game level tools + 4 file operations
+- **Brokkr** can delegate to Nidhogr Game for game development tasks
+
+**Files:**
+- `sindri/tools/game_level.py` - All 7 game level tool implementations (~1850 lines)
+- `sindri/agents/prompts.py` - NIDHOGR_GAME_PROMPT with game design reference
+- `sindri/agents/registry.py` - Nidhogr Game agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `tests/test_game_level.py` - Comprehensive test suite (~80 tests)
+
+**Tests:** +80 new tests (3218 total)
+
+---
 
 ### Music Composition (2026-01-20) - Phase 11 Tier 3 Bragi Agent
 

@@ -431,7 +431,7 @@ Procedural game content and level generation.
 - "Generate a balanced loot table for an RPG"
 - "Design a puzzle level with increasing difficulty"
 
-**Status:** Planned
+**Status:** ✅ Complete (2026-01-20)
 
 ---
 
@@ -889,6 +889,7 @@ cd sindri/web/static && npm test -- --run
 | 2026-01-18 | Data Visualization Agent - Saga (D3.js, matplotlib, Plotly, dashboards) | +60 |
 | 2026-01-18 | OpenSCAD 3D Modeling Agent - Völundr (parametric models, STL export) | +55 |
 | 2026-01-18 | LaTeX Generation Agent - Kvasir (documents, TikZ, Beamer, BibTeX) | +64 |
+| 2026-01-20 | Game Level Agent - Nidhogr (tilemap, dungeon, difficulty, dialogue, items, scripts) | +80 |
 | 2026-01-20 | Music Composition Agent - Bragi (MIDI, ABC notation, harmonize, arrange) | +68 |
 | 2026-01-18 | Diagram Generation Agent - Skuld (Mermaid, PlantUML, D2) | +53 |
 | 2026-01-17 | API Keys (programmatic access, scopes, rate limiting, usage tracking) | +62 |
@@ -936,7 +937,7 @@ cd sindri/web/static && npm test -- --run
 ---
 
 **Last Updated:** 2026-01-20
-**Phase 11 Progress:** 5/8 agents complete (Skuld, Kvasir, Völundr, Saga, Bragi) - Remaining: Blender, KiCad, Game Level
+**Phase 11 Progress:** 6/8 agents complete (Skuld, Kvasir, Völundr, Saga, Bragi, Nidhogr) - Remaining: Blender, KiCad
 **Phase 12 Progress:** Tier 1-3 Complete - 7/8 agents (Vör, Rán, Sif, Nidhogg, Tyr, Groa, Fafnir), 105/~105 tools
 **Phase 12 Added:** Universal Tool Expansion (105+ tools across 13 categories) + 8 New Specialized Agents + 9 Docker Runtime Tools + 3 Vision Document Tools + 5 Advanced SQL Tools
 **Maintained By:** Project contributors

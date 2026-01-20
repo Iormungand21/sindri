@@ -285,6 +285,15 @@ from sindri.tools.music import (
     AnalyzeMusicTool,
     ExportAudioTool,
 )
+from sindri.tools.game_level import (
+    GenerateTilemapTool,
+    GenerateDungeonTool,
+    BalanceDifficultyTool,
+    GenerateDialogueTool,
+    GenerateItemStatsTool,
+    GenerateGDScriptTool,
+    GenerateUnityScriptTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -753,4 +762,12 @@ class ToolRegistry:
         registry.register(ArrangeTool(work_dir=work_dir))
         registry.register(AnalyzeMusicTool(work_dir=work_dir))
         registry.register(ExportAudioTool(work_dir=work_dir))
+        # Game level design tools (Phase 11 - Nidhogr Game agent)
+        registry.register(GenerateTilemapTool(work_dir=work_dir))
+        registry.register(GenerateDungeonTool(work_dir=work_dir))
+        registry.register(BalanceDifficultyTool(work_dir=work_dir))
+        registry.register(GenerateDialogueTool(work_dir=work_dir))
+        registry.register(GenerateItemStatsTool(work_dir=work_dir))
+        registry.register(GenerateGDScriptTool(work_dir=work_dir))
+        registry.register(GenerateUnityScriptTool(work_dir=work_dir))
         return registry

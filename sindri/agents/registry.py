@@ -35,6 +35,8 @@ from sindri.agents.prompts import (
     FAFNIR_PROMPT,
     # Phase 11: Music composition agent (2026-01-20)
     BRAGI_PROMPT,
+    # Phase 11: Game level design agent (2026-01-20)
+    NIDHOGR_GAME_PROMPT,
     # Milestone 6: Self-management agent (2026-01-18)
     SINDRI_ADMIN_PROMPT,
 )
@@ -115,6 +117,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "groa",
             "fafnir",
             "bragi",
+            "nidhogr_game",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -854,6 +857,36 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to smaller model
         fallback_model="qwen2.5:3b-instruct-q8_0",
         fallback_vram_gb=3.0,
+    ),
+    # Phase 11: Game Level Design Agent (2026-01-20)
+    "nidhogr_game": AgentDefinition(
+        name="nidhogr_game",
+        role="Game level designer - procedural generation, difficulty balancing, dialogue trees, item stats",
+        model="qwen2.5-coder:7b",  # Good for procedural/structured code generation
+        system_prompt=NIDHOGR_GAME_PROMPT,
+        tools=[
+            # Core file operations
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            # Game level generation tools
+            "generate_tilemap",
+            "generate_dungeon",
+            "balance_difficulty",
+            "generate_dialogue",
+            "generate_item_stats",
+            "generate_gdscript",
+            "generate_unity_script",
+        ],
+        can_delegate=False,  # Tier 3 specialist, does not delegate
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=20,
+        temperature=0.4,  # Balanced - creative for procedural but consistent for game logic
+        # Fallback to smaller model
+        fallback_model="qwen2.5-coder:3b",
+        fallback_vram_gb=2.5,
     ),
 }
 

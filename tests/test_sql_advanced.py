@@ -805,16 +805,16 @@ class TestFafnirAgentIntegration:
         from sindri.agents.registry import list_agents
 
         agents = list_agents()
-        # Was 23 with Fafnir, now 24 with Bragi
-        assert len(agents) == 24
+        # Was 24 with Bragi, now 25 with Nidhogr Game
+        assert len(agents) == 25
 
     def test_brokkr_delegation_count(self):
         """Verify Brokkr's delegation list size."""
         from sindri.agents.registry import get_agent
 
         brokkr = get_agent("brokkr")
-        # Was 20 with Fafnir, now 21 with Bragi
-        assert len(brokkr.delegate_to) == 21
+        # Was 21 with Bragi, now 22 with Nidhogr Game
+        assert len(brokkr.delegate_to) == 22
 
 
 # =============================================================================
