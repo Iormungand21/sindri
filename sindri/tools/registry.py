@@ -327,6 +327,13 @@ from sindri.tools.kicad import (
     ExportGerberTool,
     SimulateCircuitTool,
 )
+from sindri.tools.code_review import (
+    AnalyzeCodeQualityTool,
+    DetectCodeSmellsTool,
+    SecurityAuditTool,
+    DetectDeadCodeTool,
+    GenerateReviewReportTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -832,4 +839,10 @@ class ToolRegistry:
         registry.register(GenerateBOMTool(work_dir=work_dir))
         registry.register(ExportGerberTool(work_dir=work_dir))
         registry.register(SimulateCircuitTool(work_dir=work_dir))
+        # Code Review tools (Phase 13 Tier 3 - Mimir agent)
+        registry.register(AnalyzeCodeQualityTool(work_dir=work_dir))
+        registry.register(DetectCodeSmellsTool(work_dir=work_dir))
+        registry.register(SecurityAuditTool(work_dir=work_dir))
+        registry.register(DetectDeadCodeTool(work_dir=work_dir))
+        registry.register(GenerateReviewReportTool(work_dir=work_dir))
         return registry

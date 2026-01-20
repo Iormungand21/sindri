@@ -188,6 +188,12 @@ AGENTS: dict[str, AgentDefinition] = {
             "check_syntax",
             "lint_code",
             "shell",
+            # Phase 13 Tier 3: Code Review Tools
+            "analyze_code_quality",
+            "detect_code_smells",
+            "security_audit",
+            "detect_dead_code",
+            "generate_review_report",
         ],
         can_delegate=False,
         estimated_vram_gb=5.0,

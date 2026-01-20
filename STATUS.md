@@ -98,13 +98,13 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3528 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), AI-Powered Test Generation (Skald Enhancement), **AI-Powered Code Documentation (Idunn Enhancement)**
+**Test Status:** 3603 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), AI-Powered Test Generation (Skald Enhancement), AI-Powered Code Documentation (Idunn Enhancement), **AI-Powered Code Review & Quality Analysis (Mimir Enhancement)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3528 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3603 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 27 agents
@@ -218,6 +218,43 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### AI-Powered Code Review & Quality Analysis (2026-01-20) - Phase 13 Tier 3 Complete
+
+Added **5 code review tools** to enhance the **Mimir** agent's capabilities. The code reviewer now has AI-powered tools for quality metrics, code smell detection, security auditing, dead code detection, and comprehensive review report generation.
+
+**Agent Enhancement:**
+- **Mimir** (Norse god of wisdom) - Extended from 8 to 13 tools
+
+**New Tools (5 total):**
+
+*Code Review & Quality Analysis Tools:*
+- `analyze_code_quality` - Calculate metrics: cyclomatic complexity, cognitive complexity, maintainability index, Halstead metrics, LOC
+- `detect_code_smells` - Identify anti-patterns: long methods, large classes, deep nesting, magic numbers, duplicate code, god classes
+- `security_audit` - Static security analysis: hardcoded secrets, SQL injection, command injection, insecure deserialization, weak crypto (with CWE mapping and SARIF output)
+- `detect_dead_code` - Find unused imports, functions, variables, classes, and unreachable code
+- `generate_review_report` - Comprehensive report combining all analyses with A-F grade and prioritized recommendations
+
+**Key Features:**
+- AST-based analysis using Python's ast module with tree-sitter fallback
+- Multiple output formats: text, markdown, JSON, SARIF (for GitHub Security integration)
+- Configurable thresholds for all metrics and smells
+- CWE mapping for security findings (CWE-89, CWE-78, CWE-798, etc.)
+- Maintainability Index calculation (Microsoft formula, normalized 0-100)
+- Letter grades (A-F) based on combined quality/security/smell scores
+- Dry-run mode for previewing reports before writing
+
+**Agent Assignment:**
+- **Mimir** now has 13 tools: 5 new code review + 8 original (read_file, search_code, git_diff, git_log, run_tests, check_syntax, lint_code, shell)
+
+**Files:**
+- `sindri/tools/code_review.py` - All 5 code review tool implementations (~2200 lines)
+- `sindri/agents/prompts.py` - Enhanced MIMIR_PROMPT with code review workflow guidance
+- `tests/test_code_review.py` - Comprehensive test suite (75 tests)
+
+**Tests:** +75 new tests (3603 total)
+
+---
 
 ### AI-Powered Code Documentation (2026-01-20) - Phase 13 Tier 2 Complete
 
