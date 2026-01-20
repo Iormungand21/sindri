@@ -302,6 +302,15 @@ from sindri.tools.blender import (
     SetupAnimationTool,
     RenderSceneTool,
 )
+from sindri.tools.kicad import (
+    CreateSchematicTool,
+    AddComponentTool,
+    RoutePCBTool,
+    DesignRuleCheckTool,
+    GenerateBOMTool,
+    ExportGerberTool,
+    SimulateCircuitTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -785,4 +794,12 @@ class ToolRegistry:
         registry.register(CreateMaterialTool(work_dir=work_dir))
         registry.register(SetupAnimationTool(work_dir=work_dir))
         registry.register(RenderSceneTool(work_dir=work_dir))
+        # KiCad electronics design tools (Phase 11 - Regin agent)
+        registry.register(CreateSchematicTool(work_dir=work_dir))
+        registry.register(AddComponentTool(work_dir=work_dir))
+        registry.register(RoutePCBTool(work_dir=work_dir))
+        registry.register(DesignRuleCheckTool(work_dir=work_dir))
+        registry.register(GenerateBOMTool(work_dir=work_dir))
+        registry.register(ExportGerberTool(work_dir=work_dir))
+        registry.register(SimulateCircuitTool(work_dir=work_dir))
         return registry

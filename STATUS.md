@@ -98,16 +98,16 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3288 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), **Blender Python 3D Modeling (Dvalin Agent)**
+**Test Status:** 3365 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), **KiCad Electronics Design (Regin Agent)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3288 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3365 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 26 agents (including dvalin)
+.venv/bin/sindri agents                    # See all 27 agents (including regin)
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -218,6 +218,52 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### KiCad Electronics Design (2026-01-20) - Phase 11 Tier 3 Regin Agent (PHASE 11 COMPLETE)
+
+Added **Regin** - a specialized KiCad electronics design agent. Named after the legendary Norse blacksmith who forged the sword Gram, Regin forges electronic circuits through schematic capture, PCB layout, and manufacturing file generation.
+
+**New Agent:**
+- **Regin** (Norse blacksmith) - KiCad electronics specialist using qwen2.5-coder:7b
+
+**New Tools (7 total):**
+
+*KiCad Electronics Tools:*
+- `create_schematic` - Generate KiCad S-expression schematic files from text descriptions with templates (ESP32, Arduino, 555 timer, power supply, H-bridge, sensor module)
+- `add_component` - Place components with symbol/footprint from KiCad libraries (Device, Connector, power, Regulator_Linear)
+- `route_pcb` - Auto-route PCB traces between pads (freerouting integration optional)
+- `design_rule_check` - Validate against DRC rules (clearance, trace width, via size, min ring)
+- `generate_bom` - Create Bill of Materials in CSV, JSON, or HTML formats with grouped components
+- `export_gerber` - Export manufacturing files with manufacturer presets (JLCPCB, PCBWay, OSHPark)
+- `simulate_circuit` - SPICE simulation (operating point, DC sweep, AC analysis, transient) via ngspice
+
+**Key Features:**
+- Pure S-expression generation - works without KiCad installed
+- Circuit templates: ESP32 dev board, Arduino shield, 555 timer, power supply, H-bridge motor driver, sensor module
+- Component library mappings: Device (R, C, LED), Connector (USB-C, JST), power symbols
+- Manufacturer presets: JLCPCB (6-layer, ENIG), PCBWay (4-layer), OSHPark (2-layer)
+- DRC checks: clearance (0.15mm), trace width (0.2mm), via diameter (0.4mm), annular ring (0.15mm)
+- SPICE simulation: ngspice integration for .OP, .DC, .AC, .TRAN analyses
+
+**Agent Assignment:**
+- **Regin** has 12 tools: 7 KiCad tools + 5 file operations
+- **Brokkr** can delegate to Regin for electronics design tasks
+
+**Files:**
+- `sindri/tools/kicad.py` - All 7 KiCad tool implementations (~1200 lines)
+- `sindri/agents/prompts.py` - REGIN_PROMPT with KiCad reference
+- `sindri/agents/registry.py` - Regin agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `tests/test_kicad_tools.py` - Comprehensive test suite (77 tests)
+
+**Tests:** +77 new tests (3365 total)
+
+**Phase 11 Completion:** With Regin, Phase 11 (Multi-Disciplinary Domain Agents) is now COMPLETE:
+- Tier 1: Skuld (Diagrams), Kvasir (LaTeX) ✅
+- Tier 2: Völundr (OpenSCAD), Saga (Data Viz) ✅
+- Tier 3: Bragi (Music), Nidhogr (Game Levels), Dvalin (Blender), Regin (KiCad) ✅
+
+---
 
 ### Blender Python 3D Modeling (2026-01-20) - Phase 11 Tier 3 Dvalin Agent
 

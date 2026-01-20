@@ -39,6 +39,8 @@ from sindri.agents.prompts import (
     NIDHOGR_GAME_PROMPT,
     # Phase 11: Blender Python agent (2026-01-20)
     DVALIN_PROMPT,
+    # Phase 11: KiCad electronics design agent (2026-01-20)
+    REGIN_PROMPT,
     # Milestone 6: Self-management agent (2026-01-18)
     SINDRI_ADMIN_PROMPT,
 )
@@ -121,6 +123,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "bragi",
             "nidhogr_game",
             "dvalin",
+            "regin",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -920,6 +923,39 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to smaller model
         fallback_model="qwen2.5:3b-instruct-q8_0",
         fallback_vram_gb=3.0,
+    ),
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Phase 11: KiCad Electronics Design Agent (2026-01-20)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    "regin": AgentDefinition(
+        name="regin",
+        role="KiCad electronics design specialist - schematics, PCB layout, manufacturing files",
+        model="qwen2.5-coder:7b",  # Good for code/script generation
+        system_prompt=REGIN_PROMPT,
+        tools=[
+            # Core file operations
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            "search_code",
+            # KiCad electronics design tools
+            "create_schematic",
+            "add_component",
+            "route_pcb",
+            "design_rule_check",
+            "generate_bom",
+            "export_gerber",
+            "simulate_circuit",
+        ],
+        can_delegate=False,  # Tier 3 specialist, does not delegate
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=20,
+        temperature=0.3,  # Lower temp for precise electronics design
+        # Fallback to smaller model
+        fallback_model="qwen2.5-coder:3b",
+        fallback_vram_gb=2.5,
     ),
 }
 
