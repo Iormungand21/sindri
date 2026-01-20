@@ -410,6 +410,12 @@ AGENTS: dict[str, AgentDefinition] = {
             "read_tree",
             "search_code",
             "edit_file",
+            # Phase 13 Tier 2: Documentation Generation Tools
+            "generate_docstrings",
+            "generate_readme",
+            "generate_api_docs",
+            "explain_code",
+            "generate_changelog",
         ],
         can_delegate=False,
         estimated_vram_gb=5.0,

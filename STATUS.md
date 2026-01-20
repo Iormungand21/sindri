@@ -98,13 +98,13 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3460 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), **AI-Powered Test Generation (Skald Enhancement)**
+**Test Status:** 3528 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), AI-Powered Test Generation (Skald Enhancement), **AI-Powered Code Documentation (Idunn Enhancement)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3460 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3528 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 27 agents
@@ -218,6 +218,43 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### AI-Powered Code Documentation (2026-01-20) - Phase 13 Tier 2 Complete
+
+Added **5 documentation generation tools** to enhance the **Idunn** agent's capabilities. The documentation specialist now has AI-powered tools for generating docstrings, README files, API documentation, code explanations, and changelogs.
+
+**Agent Enhancement:**
+- **Idunn** (Norse goddess of immortality) - Extended from 6 to 11 tools
+
+**New Tools (5 total):**
+
+*Documentation Generation Tools:*
+- `generate_docstrings` - Generate/update docstrings for functions/classes in Google, NumPy, or Sphinx style
+- `generate_readme` - Create README.md from project analysis (pyproject.toml, package.json, Cargo.toml, go.mod)
+- `generate_api_docs` - Generate API documentation from source code in Markdown, reStructuredText, or HTML format
+- `explain_code` - Generate natural language explanations of code with complexity analysis
+- `generate_changelog` - Generate changelog from git commits in Keep a Changelog format
+
+**Key Features:**
+- AST-based code analysis using tree-sitter for Python, JavaScript, TypeScript
+- Multiple docstring styles: Google, NumPy, Sphinx/reStructuredText
+- Auto-detect existing docstring style or use project default
+- Project type detection: Python, Node.js, Rust, Go
+- Conventional commits parsing for changelog generation
+- Dry-run mode for previewing generated documentation
+- Multiple output formats (Markdown, RST, HTML)
+
+**Agent Assignment:**
+- **Idunn** now has 11 tools: 5 new documentation generation + 6 original (read_file, write_file, list_directory, read_tree, search_code, edit_file)
+
+**Files:**
+- `sindri/tools/documentation.py` - All 5 documentation tool implementations (~1200 lines)
+- `sindri/agents/prompts.py` - Enhanced IDUNN_PROMPT with documentation generation workflow
+- `tests/test_documentation.py` - Comprehensive test suite (68 tests)
+
+**Tests:** +68 new tests (3528 total)
+
+---
 
 ### AI-Powered Test Generation (2026-01-20) - Phase 13 Tier 1 Complete
 

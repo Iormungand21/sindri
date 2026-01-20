@@ -27,6 +27,13 @@ from sindri.tools.test_generation import (
     GenerateTestFixturesTool,
     GeneratePropertyTestsTool,
 )
+from sindri.tools.documentation import (
+    GenerateDocstringsTool,
+    GenerateReadmeTool,
+    GenerateApiDocsTool,
+    ExplainCodeTool,
+    GenerateChangelogTool,
+)
 from sindri.tools.formatting import FormatCodeTool, LintCodeTool
 from sindri.tools.refactoring import (
     RenameSymbolTool,
@@ -555,11 +562,17 @@ class ToolRegistry:
         registry.register(HttpPostTool(work_dir=work_dir))
         registry.register(RunTestsTool(work_dir=work_dir))
         registry.register(CheckSyntaxTool(work_dir=work_dir))
-        # Test Generation Tools (Phase 13)
+        # Test Generation Tools (Phase 13 Tier 1)
         registry.register(SuggestTestCasesTool(work_dir=work_dir))
         registry.register(GenerateUnitTestsTool(work_dir=work_dir))
         registry.register(GenerateTestFixturesTool(work_dir=work_dir))
         registry.register(GeneratePropertyTestsTool(work_dir=work_dir))
+        # Documentation Generation Tools (Phase 13 Tier 2)
+        registry.register(GenerateDocstringsTool(work_dir=work_dir))
+        registry.register(GenerateReadmeTool(work_dir=work_dir))
+        registry.register(GenerateApiDocsTool(work_dir=work_dir))
+        registry.register(ExplainCodeTool(work_dir=work_dir))
+        registry.register(GenerateChangelogTool(work_dir=work_dir))
         registry.register(FormatCodeTool(work_dir=work_dir))
         registry.register(LintCodeTool(work_dir=work_dir))
         registry.register(RenameSymbolTool(work_dir=work_dir))

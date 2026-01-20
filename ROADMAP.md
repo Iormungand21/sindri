@@ -871,6 +871,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-20 | **AI-Powered Code Documentation (Phase 13 Tier 2)** - generate_docstrings, generate_readme, generate_api_docs, explain_code, generate_changelog + Idunn agent enhanced | +68 |
 | 2026-01-20 | **AI-Powered Test Generation (Phase 13 Tier 1)** - suggest_test_cases, generate_unit_tests, generate_test_fixtures, generate_property_tests + Skald agent enhanced (Phase 13 START) | +55 |
 | 2026-01-20 | **KiCad Electronics Design + Regin Agent** - create_schematic, add_component, route_pcb, design_rule_check, generate_bom, export_gerber, simulate_circuit + Regin agent using qwen2.5-coder:7b (Phase 11 COMPLETE) | +77 |
 | 2026-01-20 | **Blender Python 3D Modeling + Dvalin Agent** - blender_script, create_mesh, apply_modifier, create_material, setup_animation, render_scene + Dvalin agent using qwen2.5-coder:7b | +70 |
@@ -942,6 +943,6 @@ cd sindri/web/static && npm test -- --run
 **Last Updated:** 2026-01-20
 **Phase 11 Progress:** 8/8 agents COMPLETE (Skuld, Kvasir, Völundr, Saga, Bragi, Nidhogr, Dvalin, Regin)
 **Phase 12 Progress:** Tier 1-3 Complete - 8/8 agents (Vör, Rán, Sif, Nidhogg, Tyr, Groa, Fafnir) + Heimdall extended, 108 tools
-**Phase 13 Progress:** Tier 1 Complete - AI-Powered Test Generation (Skald enhanced with 4 tools)
-**Phase 13 Added:** Test Generation Tools (suggest_test_cases, generate_unit_tests, generate_test_fixtures, generate_property_tests) for Skald agent
+**Phase 13 Progress:** Tier 1-2 Complete - AI-Powered Test Generation (Skald +4 tools), AI-Powered Code Documentation (Idunn +5 tools)
+**Phase 13 Added:** Test Generation (suggest_test_cases, generate_unit_tests, generate_test_fixtures, generate_property_tests) for Skald, Documentation Generation (generate_docstrings, generate_readme, generate_api_docs, explain_code, generate_changelog) for Idunn
 **Maintained By:** Project contributors

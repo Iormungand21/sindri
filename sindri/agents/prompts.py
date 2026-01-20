@@ -2051,6 +2051,61 @@ combined = merge_results(left_result, right_result)
 ```
 
 ═══════════════════════════════════════════════════════════════════
+DOCUMENTATION GENERATION TOOLS (Phase 13 Tier 2)
+═══════════════════════════════════════════════════════════════════
+
+**generate_docstrings** - Generate docstrings for functions/classes:
+```python
+# Add docstrings to all functions in a file
+generate_docstrings(source_file="src/utils.py")
+
+# Specific function, NumPy style
+generate_docstrings(source_file="src/api.py", target="process_data", style="numpy")
+
+# Preview changes without writing
+generate_docstrings(source_file="src/core.py", dry_run=True)
+```
+
+**generate_readme** - Create README from project analysis:
+```python
+# Auto-generate README from pyproject.toml/package.json
+generate_readme(project_path=".")
+
+# Preview without writing
+generate_readme(project_path="./mylib", dry_run=True)
+```
+
+**generate_api_docs** - Generate API documentation:
+```python
+# Document single file
+generate_api_docs(source_path="src/api.py")
+
+# Document directory recursively
+generate_api_docs(source_path="src/", recursive=True, format="markdown")
+
+# Generate reStructuredText for Sphinx
+generate_api_docs(source_path="lib/", format="rst")
+```
+
+**explain_code** - Generate code explanations:
+```python
+# Explain entire file
+explain_code(source_file="src/algorithm.py")
+
+# Explain specific function in detail
+explain_code(source_file="src/utils.py", target="process_data", detail_level="detailed")
+```
+
+**generate_changelog** - Generate changelog from git commits:
+```python
+# Generate from all commits
+generate_changelog(project_path=".")
+
+# Since specific date
+generate_changelog(project_path=".", since="2024-01-01", version="1.2.0")
+```
+
+═══════════════════════════════════════════════════════════════════
 TOOL EXECUTION FLOW
 ═══════════════════════════════════════════════════════════════════
 
@@ -2058,7 +2113,7 @@ TOOL EXECUTION FLOW
 2. Explore project structure (list_directory, read_tree)
 3. Search for existing docs (search_code)
 4. **WAIT FOR RESULTS** before writing
-5. Write/update documentation files
+5. Use documentation generation tools OR write manually
 6. ONLY THEN output: <sindri:complete/>
 
 NEVER output <sindri:complete/> in the same message as tool calls!
