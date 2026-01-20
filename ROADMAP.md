@@ -871,6 +871,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-20 | **Git Automation Tools (Phase 14)** - git_auto_commit, git_branch_compare, git_conflict_assist, git_release_notes + Huginn/Brokkr agents enhanced | +47 |
 | 2026-01-20 | **AI-Powered Code Improvement (Phase 13 Tier 4)** - suggest_refactoring, optimize_performance, detect_antipatterns, suggest_design_patterns, generate_type_hints + Huginn agent enhanced | +63 |
 | 2026-01-20 | **AI-Powered Code Review & Quality Analysis (Phase 13 Tier 3)** - analyze_code_quality, detect_code_smells, security_audit, detect_dead_code, generate_review_report + Mimir agent enhanced | +75 |
 | 2026-01-20 | **AI-Powered Code Documentation (Phase 13 Tier 2)** - generate_docstrings, generate_readme, generate_api_docs, explain_code, generate_changelog + Idunn agent enhanced | +68 |
@@ -946,5 +947,5 @@ cd sindri/web/static && npm test -- --run
 **Phase 11 Progress:** 8/8 agents COMPLETE (Skuld, Kvasir, Völundr, Saga, Bragi, Nidhogr, Dvalin, Regin)
 **Phase 12 Progress:** Tier 1-3 Complete - 8/8 agents (Vör, Rán, Sif, Nidhogg, Tyr, Groa, Fafnir) + Heimdall extended, 108 tools
 **Phase 13 Progress:** Tier 1-4 Complete - AI-Powered Test Generation (Skald +4 tools), AI-Powered Code Documentation (Idunn +5 tools), AI-Powered Code Review & Quality Analysis (Mimir +5 tools), AI-Powered Code Improvement (Huginn +5 tools)
-**Phase 13 Added:** Test Generation (suggest_test_cases, generate_unit_tests, generate_test_fixtures, generate_property_tests) for Skald, Documentation Generation (generate_docstrings, generate_readme, generate_api_docs, explain_code, generate_changelog) for Idunn, Code Review (analyze_code_quality, detect_code_smells, security_audit, detect_dead_code, generate_review_report) for Mimir, Code Improvement (suggest_refactoring, optimize_performance, detect_antipatterns, suggest_design_patterns, generate_type_hints) for Huginn
+**Phase 14 Progress:** COMPLETE - Git Automation Tools (git_auto_commit, git_branch_compare, git_conflict_assist, git_release_notes) + Huginn/Brokkr agents enhanced (+4/+3 tools)
 **Maintained By:** Project contributors

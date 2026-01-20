@@ -98,13 +98,13 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3679 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), AI-Powered Test Generation (Skald Enhancement), AI-Powered Code Documentation (Idunn Enhancement), AI-Powered Code Review & Quality Analysis (Mimir Enhancement), **AI-Powered Code Improvement (Huginn Enhancement)**
+**Test Status:** 3713 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), AI-Powered Test Generation (Skald Enhancement), AI-Powered Code Documentation (Idunn Enhancement), AI-Powered Code Review & Quality Analysis (Mimir Enhancement), AI-Powered Code Improvement (Huginn Enhancement), **Git Automation Tools (Phase 14)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3679 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3713 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 27 agents
@@ -218,6 +218,45 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Git Automation Tools (2026-01-20) - Phase 14 Complete
+
+Added **4 git automation tools** to enhance the **Huginn** and **Brokkr** agents' git workflow capabilities. These tools provide AI-powered commit message generation, branch comparison, conflict resolution assistance, and release notes generation.
+
+**Agent Enhancements:**
+- **Huginn** (Odin's raven of thought) - Extended from 32 to 36 tools
+- **Brokkr** (Master orchestrator) - Extended with 3 new git tools
+
+**New Tools (4 total):**
+
+*Git Automation Tools:*
+- `git_auto_commit` - Generate conventional commit messages from staged changes with type detection (feat/fix/docs/test), scope detection, and multiple output formats
+- `git_branch_compare` - Compare branches and suggest merge strategy (merge/rebase/squash) with conflict detection and complexity assessment
+- `git_conflict_assist` - Help resolve merge conflicts with smart resolution suggestions, confidence levels, and support for import combining
+- `git_release_notes` - Generate release notes from commit history with conventional commit parsing, categorization (features/fixes/breaking), and Keep a Changelog format support
+
+**Key Features:**
+- Conventional commit format detection and generation
+- Multiple output formats: text, JSON, markdown, Keep a Changelog
+- Smart commit type detection from file patterns and diff content
+- Branch merge strategy recommendation based on divergence and conflicts
+- Conflict marker parsing with smart resolution suggestions
+- Release notes categorization with breaking change highlighting
+- Contributor extraction for release notes
+
+**Agent Assignment:**
+- **Huginn** now has 36 tools: 4 new git automation + 32 previous (including Phase 13 code improvement tools)
+- **Brokkr** now has 3 additional git tools: git_auto_commit, git_branch_compare, git_release_notes
+
+**Files:**
+- `sindri/tools/git_automation.py` - All 4 git automation tool implementations (~1100 lines)
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/registry.py` - Agent tool assignment updates
+- `tests/test_git_automation.py` - Comprehensive test suite (47 tests)
+
+**Tests:** +47 new tests (3713 total)
+
+---
 
 ### AI-Powered Code Improvement (2026-01-20) - Phase 13 Tier 4 Complete
 

@@ -66,6 +66,10 @@ AGENTS: dict[str, AgentDefinition] = {
             "git_diff",
             "git_log",
             "git_branch",
+            # Phase 14: Git Automation Tools
+            "git_auto_commit",
+            "git_branch_compare",
+            "git_release_notes",
             "http_request",
             "run_tests",
             "check_syntax",
@@ -170,6 +174,11 @@ AGENTS: dict[str, AgentDefinition] = {
             "detect_antipatterns",
             "suggest_design_patterns",
             "generate_type_hints",
+            # Phase 14: Git Automation Tools
+            "git_auto_commit",
+            "git_branch_compare",
+            "git_conflict_assist",
+            "git_release_notes",
         ],
         can_delegate=True,
         delegate_to=["ratatoskr", "skald"],

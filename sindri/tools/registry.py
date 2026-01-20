@@ -19,6 +19,12 @@ from sindri.tools.shell import ShellTool
 from sindri.tools.planning import ProposePlanTool
 from sindri.tools.search import SearchCodeTool, FindSymbolTool
 from sindri.tools.git import GitStatusTool, GitDiffTool, GitLogTool, GitBranchTool
+from sindri.tools.git_automation import (
+    GitAutoCommitTool,
+    GitBranchCompareTool,
+    GitConflictAssistTool,
+    GitReleaseNotesTool,
+)
 from sindri.tools.http import HttpRequestTool, HttpGetTool, HttpPostTool
 from sindri.tools.testing import RunTestsTool, CheckSyntaxTool
 from sindri.tools.test_generation import (
@@ -571,6 +577,11 @@ class ToolRegistry:
         registry.register(GitDiffTool(work_dir=work_dir))
         registry.register(GitLogTool(work_dir=work_dir))
         registry.register(GitBranchTool(work_dir=work_dir))
+        # Phase 14: Git automation tools
+        registry.register(GitAutoCommitTool(work_dir=work_dir))
+        registry.register(GitBranchCompareTool(work_dir=work_dir))
+        registry.register(GitConflictAssistTool(work_dir=work_dir))
+        registry.register(GitReleaseNotesTool(work_dir=work_dir))
         registry.register(HttpRequestTool(work_dir=work_dir))
         registry.register(HttpGetTool(work_dir=work_dir))
         registry.register(HttpPostTool(work_dir=work_dir))

@@ -37,9 +37,9 @@ See `STATUS.md` and `ROADMAP.md` for full details.
 
 **Key Facts:**
 - **Status:** Architecture Transformation COMPLETE (Internal-Only Mode)
-- **Tests:** 3288 backend + 104 frontend
-- **Agents:** 26 specialized agents (including dvalin, bragi, nidhogr_game, fafnir, groa, sindri_admin)
-- **Tools:** 182+ tools (6 new Blender Python tools)
+- **Tests:** 3713 backend + 104 frontend
+- **Agents:** 27 specialized agents (including dvalin, bragi, nidhogr_game, fafnir, groa, sindri_admin)
+- **Tools:** 186+ tools (4 new Git Automation tools in Phase 14)
 - **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
 
 ---
@@ -51,7 +51,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see 3288 passed)
+# Run tests (should see 3713 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health
@@ -248,4 +248,4 @@ Historical documents are in `docs/archive/`:
 
 ---
 
-**Last Updated:** 2026-01-20 (Dvalin Blender Agent Added)
+**Last Updated:** 2026-01-20 (Phase 14 Git Automation Tools Added)
