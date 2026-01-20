@@ -98,16 +98,16 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3365 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), **KiCad Electronics Design (Regin Agent)**
+**Test Status:** 3460 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), **AI-Powered Test Generation (Skald Enhancement)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3365 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3460 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 27 agents (including regin)
+.venv/bin/sindri agents                    # See all 27 agents
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -218,6 +218,41 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### AI-Powered Test Generation (2026-01-20) - Phase 13 Tier 1 Complete
+
+Added **4 test generation tools** to enhance the **Skald** agent's capabilities. The test writer and quality guardian now has AI-powered tools for generating test scaffolding, suggesting test cases, creating fixtures, and generating property-based tests.
+
+**Agent Enhancement:**
+- **Skald** (Norse poet) - Extended from 6 to 10 tools
+
+**New Tools (4 total):**
+
+*Test Generation Tools:*
+- `suggest_test_cases` - Analyze code and suggest test scenarios (basic, edge cases, error cases) with markdown/JSON output
+- `generate_unit_tests` - Generate pytest/jest test scaffolding from source code analysis
+- `generate_test_fixtures` - Generate conftest.py with mocks for detected dependencies (requests, httpx, sqlalchemy, etc.)
+- `generate_property_tests` - Generate hypothesis property-based tests with automatic strategy selection
+
+**Key Features:**
+- AST-based code analysis using tree-sitter for Python, JavaScript, TypeScript
+- Template-based test generation for pytest/jest frameworks
+- Automatic dependency detection for mock generation
+- Property test generation with hypothesis strategies (roundtrip, idempotent, invariant)
+- Dry-run mode for previewing generated tests
+- Framework auto-detection from project files
+
+**Agent Assignment:**
+- **Skald** now has 10 tools: 4 new test generation + 6 original (read_file, write_file, http_request, run_tests, check_syntax, shell)
+
+**Files:**
+- `sindri/tools/test_generation.py` - All 4 test generation tool implementations (~1100 lines)
+- `sindri/agents/prompts.py` - Enhanced SKALD_PROMPT with test generation workflow
+- `tests/test_test_generation.py` - Comprehensive test suite (55 tests)
+
+**Tests:** +55 new tests (3460 total)
+
+---
 
 ### Heimdall Network Security Enhancement (2026-01-20) - Phase 12 Tier 1 Complete
 

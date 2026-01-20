@@ -290,6 +290,11 @@ AGENTS: dict[str, AgentDefinition] = {
             "run_tests",
             "check_syntax",
             "shell",
+            # Phase 13: Test Generation Tools
+            "suggest_test_cases",
+            "generate_unit_tests",
+            "generate_test_fixtures",
+            "generate_property_tests",
         ],
         can_delegate=False,
         estimated_vram_gb=5.0,

@@ -21,6 +21,12 @@ from sindri.tools.search import SearchCodeTool, FindSymbolTool
 from sindri.tools.git import GitStatusTool, GitDiffTool, GitLogTool, GitBranchTool
 from sindri.tools.http import HttpRequestTool, HttpGetTool, HttpPostTool
 from sindri.tools.testing import RunTestsTool, CheckSyntaxTool
+from sindri.tools.test_generation import (
+    SuggestTestCasesTool,
+    GenerateUnitTestsTool,
+    GenerateTestFixturesTool,
+    GeneratePropertyTestsTool,
+)
 from sindri.tools.formatting import FormatCodeTool, LintCodeTool
 from sindri.tools.refactoring import (
     RenameSymbolTool,
@@ -549,6 +555,11 @@ class ToolRegistry:
         registry.register(HttpPostTool(work_dir=work_dir))
         registry.register(RunTestsTool(work_dir=work_dir))
         registry.register(CheckSyntaxTool(work_dir=work_dir))
+        # Test Generation Tools (Phase 13)
+        registry.register(SuggestTestCasesTool(work_dir=work_dir))
+        registry.register(GenerateUnitTestsTool(work_dir=work_dir))
+        registry.register(GenerateTestFixturesTool(work_dir=work_dir))
+        registry.register(GeneratePropertyTestsTool(work_dir=work_dir))
         registry.register(FormatCodeTool(work_dir=work_dir))
         registry.register(LintCodeTool(work_dir=work_dir))
         registry.register(RenameSymbolTool(work_dir=work_dir))

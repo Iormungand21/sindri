@@ -734,16 +734,49 @@ TEST QUALITY CHECKLIST
 □ Setup is minimal and clear
 
 ═══════════════════════════════════════════════════════════════════
-TOOL EXECUTION FLOW
+TEST GENERATION TOOLS (Phase 13)
 ═══════════════════════════════════════════════════════════════════
 
-1. Read the code to be tested (read_file)
-2. Identify functions/classes that need tests
-3. Write test file with comprehensive coverage
-4. Run tests (shell: pytest -v)
-5. **WAIT FOR RESULTS** before marking complete
-6. Fix any failing tests
-7. ONLY THEN output: <sindri:complete/>
+**suggest_test_cases** - Analyze code and get test ideas:
+```
+suggest_test_cases(source_file="src/auth.py")
+suggest_test_cases(source_file="src/utils.py", target="validate_email")
+```
+Returns markdown checklist of basic tests, edge cases, and error cases.
+
+**generate_unit_tests** - Generate test scaffolding:
+```
+generate_unit_tests(source_file="src/api.py")
+generate_unit_tests(source_file="src/utils.py", target="parse_date", dry_run=true)
+```
+Creates test file with pytest/jest tests based on function signatures.
+
+**generate_test_fixtures** - Generate conftest.py with mocks:
+```
+generate_test_fixtures(source_file="src/service.py")
+generate_test_fixtures(source_file="src/db.py", dependencies_to_mock=["sqlalchemy"])
+```
+Auto-detects dependencies and generates appropriate mock fixtures.
+
+**generate_property_tests** - Generate hypothesis tests:
+```
+generate_property_tests(source_file="src/parser.py", target="parse")
+generate_property_tests(source_file="src/codec.py", target="encode", properties_to_test=["roundtrip"])
+```
+Creates property-based tests with hypothesis strategies.
+
+═══════════════════════════════════════════════════════════════════
+RECOMMENDED WORKFLOW
+═══════════════════════════════════════════════════════════════════
+
+1. Read the code to understand it (read_file)
+2. Suggest test cases to plan coverage (suggest_test_cases)
+3. Generate initial test scaffolding (generate_unit_tests)
+4. Generate fixtures for dependencies (generate_test_fixtures)
+5. Run tests to verify (run_tests or shell: pytest -v)
+6. **WAIT FOR RESULTS** before marking complete
+7. Fix any failing tests and iterate
+8. ONLY THEN output: <sindri:complete/>
 
 NEVER output <sindri:complete/> in the same message as tool calls!
 
