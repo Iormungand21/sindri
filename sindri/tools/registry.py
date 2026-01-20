@@ -277,6 +277,14 @@ from sindri.tools.math import (
     UnitConvertTool,
     MatrixOperationsTool,
 )
+from sindri.tools.music import (
+    GenerateMIDITool,
+    GenerateABCTool,
+    HarmonizeTool,
+    ArrangeTool,
+    AnalyzeMusicTool,
+    ExportAudioTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -738,4 +746,11 @@ class ToolRegistry:
         registry.register(K8sGetServicesTool(work_dir=work_dir))
         registry.register(K8sDescribeTool(work_dir=work_dir))
         registry.register(K8sDeleteTool(work_dir=work_dir))
+        # Music composition tools (Phase 11 - Bragi agent)
+        registry.register(GenerateMIDITool(work_dir=work_dir))
+        registry.register(GenerateABCTool(work_dir=work_dir))
+        registry.register(HarmonizeTool(work_dir=work_dir))
+        registry.register(ArrangeTool(work_dir=work_dir))
+        registry.register(AnalyzeMusicTool(work_dir=work_dir))
+        registry.register(ExportAudioTool(work_dir=work_dir))
         return registry

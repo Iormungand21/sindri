@@ -33,6 +33,8 @@ from sindri.agents.prompts import (
     GROA_PROMPT,
     # Phase 12: Advanced SQL agent (2026-01-20)
     FAFNIR_PROMPT,
+    # Phase 11: Music composition agent (2026-01-20)
+    BRAGI_PROMPT,
     # Milestone 6: Self-management agent (2026-01-18)
     SINDRI_ADMIN_PROMPT,
 )
@@ -90,6 +92,7 @@ AGENTS: dict[str, AgentDefinition] = {
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
         # Phase 11: Added skuld, kvasir, volundr, saga for multi-disciplinary domains
         # Phase 12: Added vor for text/regex, ran for browser, sif for shell, nidhogg for math/scientific, tyr for cloud, groa for documents, fafnir for advanced SQL
+        # Phase 11: Added bragi for music composition
         delegate_to=[
             "huginn",
             "mimir",
@@ -111,6 +114,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "tyr",
             "groa",
             "fafnir",
+            "bragi",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -821,6 +825,35 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to general coder model
         fallback_model="qwen2.5-coder:3b",
         fallback_vram_gb=2.5,
+    ),
+    # Phase 11: Music Composition Agent (2026-01-20)
+    "bragi": AgentDefinition(
+        name="bragi",
+        role="Music composition specialist - MIDI generation, ABC notation, harmony and arrangement",
+        model="qwen2.5-coder:7b",  # Good for structured output like music notation
+        system_prompt=BRAGI_PROMPT,
+        tools=[
+            # Core file operations
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            # Music generation tools
+            "generate_midi",
+            "generate_abc",
+            "harmonize",
+            "arrange",
+            "analyze_music",
+            "export_audio",
+        ],
+        can_delegate=False,  # Tier 3 specialist, does not delegate
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=15,
+        temperature=0.5,  # Balanced - creative but structured
+        # Fallback to smaller model
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
     ),
 }
 

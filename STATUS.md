@@ -98,16 +98,16 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3070 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), **Advanced SQL Optimization (Fafnir Agent)**
+**Test Status:** 3138 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), **Music Composition (Bragi Agent)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3070 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3138 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 23 agents (including fafnir)
+.venv/bin/sindri agents                    # See all 24 agents (including bragi)
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -218,6 +218,49 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Music Composition (2026-01-20) - Phase 11 Tier 3 Bragi Agent
+
+Added **Bragi** - a specialized music composition agent. Named after the Norse god of poetry and eloquence, Bragi transforms musical ideas into notated compositions, MIDI files, and arrangements.
+
+**New Agent:**
+- **Bragi** (Norse god of poetry) - Music composition specialist using qwen2.5-coder:7b
+
+**New Tools (6 total):**
+
+*Music Composition Tools:*
+- `generate_midi` - Create MIDI files from text descriptions or musical parameters (tempo, key, scale, instruments, chord progressions)
+- `generate_abc` - Generate ABC notation (text-based sheet music format) with title, composer, meter, key
+- `harmonize` - Add harmony voices to melodies in various styles (classical, jazz, pop, folk)
+- `arrange` - Create multi-instrument arrangements (orchestral, band, quartet, solo, piano)
+- `analyze_music` - Extract musical properties (key, tempo, time signature, statistics, structure) from MIDI or ABC files
+- `export_audio` - Convert MIDI to WAV/MP3 audio (requires FluidSynth, optional)
+
+**Key Features:**
+- Pure Python MIDI generation via mido library
+- ABC notation generation (no external dependencies)
+- Music theory templates: scales (major, minor, pentatonic, blues, dorian, etc.)
+- Chord progression presets: pop, jazz_251, blues_12bar, classical, pachelbel, etc.
+- Multi-style harmonization and arrangement
+- MIDI/ABC analysis with key detection
+
+**Agent Assignment:**
+- **Bragi** has 10 tools: 6 music tools + 4 file operations
+- **Brokkr** can delegate to Bragi for music composition tasks
+
+**Files:**
+- `sindri/tools/music.py` - All 6 music tool implementations (~1200 lines)
+- `sindri/agents/prompts.py` - BRAGI_PROMPT with music theory reference
+- `sindri/agents/registry.py` - Bragi agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `tests/test_music.py` - Comprehensive test suite (~68 tests)
+
+**Dependencies Added:**
+- mido>=1.3.0 (pure Python MIDI library)
+
+**Tests:** +68 new tests (3138 total)
+
+---
 
 ### Advanced SQL Optimization (2026-01-20) - Phase 12 Tier 3 Fafnir Agent
 
