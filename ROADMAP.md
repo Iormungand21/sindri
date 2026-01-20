@@ -689,14 +689,16 @@ Expand Sindri's core capabilities with universal tools that benefit all agents a
 
 ---
 
-#### 12. Cloud & Container Tools
+#### 12. Cloud & Container Tools ✅ COMPLETE (2026-01-19)
 
 | Tool | Description | Backend | Status |
 |------|-------------|---------|--------|
-| `aws_s3_list` | List S3 buckets/objects | boto3 | Planned |
-| `aws_s3_upload` | Upload to S3 | boto3 | Planned |
-| `aws_s3_download` | Download from S3 | boto3 | Planned |
-| `aws_logs_query` | Query CloudWatch logs | boto3 | Planned |
+| `aws_s3_list` | List S3 buckets/objects | aws cli | ✅ Complete |
+| `aws_s3_upload` | Upload to S3 | aws cli | ✅ Complete |
+| `aws_s3_download` | Download from S3 | aws cli | ✅ Complete |
+| `aws_logs_query` | Query CloudWatch logs | aws cli | ✅ Complete |
+| `aws_ec2_list` | List EC2 instances | aws cli | ✅ Complete |
+| `aws_lambda_invoke` | Invoke Lambda function | aws cli | ✅ Complete |
 | `docker_build` | Build Docker image | asyncio subprocess | ✅ Complete |
 | `docker_run` | Run Docker container | asyncio subprocess | ✅ Complete |
 | `docker_ps` | List containers | asyncio subprocess | ✅ Complete |
@@ -706,9 +708,14 @@ Expand Sindri's core capabilities with universal tools that benefit all agents a
 | `docker_images` | List images | asyncio subprocess | ✅ Complete |
 | `docker_compose_up` | Start compose stack | asyncio subprocess | ✅ Complete |
 | `docker_compose_down` | Stop compose stack | asyncio subprocess | ✅ Complete |
-| `k8s_apply` | Apply K8s manifest | kubernetes | Planned |
-| `k8s_get_pods` | List pods | kubernetes | Planned |
-| `k8s_logs` | Get pod logs | kubernetes | Planned |
+| `k8s_apply` | Apply K8s manifest | kubectl | ✅ Complete |
+| `k8s_get_pods` | List pods | kubectl | ✅ Complete |
+| `k8s_logs` | Get pod logs | kubectl | ✅ Complete |
+| `k8s_get_services` | List services | kubectl | ✅ Complete |
+| `k8s_describe` | Describe resource | kubectl | ✅ Complete |
+| `k8s_delete` | Delete resource | kubectl | ✅ Complete |
+
+**Agent:** Tyr (qwen2.5-coder:7b) - Cloud infrastructure operations specialist
 
 ---
 
@@ -797,7 +804,7 @@ Based on research, these specialized models outperform general-purpose models fo
 | Profiling | profile_python, profile_time, memory_analyze, detect_memory_leaks, benchmark_function, flame_graph, complexity_analyze | Medium | ✅ Complete |
 | Browser | browser_navigate, browser_click, browser_type, browser_screenshot, browser_extract, browser_execute_js, browser_pdf, browser_close, web_scrape | High | ✅ Complete |
 | Docker Runtime | docker_build, docker_run, docker_ps, docker_logs, docker_stop, docker_rm, docker_images, docker_compose_up, docker_compose_down | High | ✅ Complete |
-| Cloud (AWS/K8s) | aws_s3_*, k8s_* | High | Planned |
+| Cloud (AWS/K8s) | aws_s3_*, k8s_* (12 tools) | High | ✅ Complete |
 
 ---
 
@@ -864,6 +871,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-19 | **AWS & Kubernetes Tools + Tyr Agent** - aws_s3_list, aws_s3_upload, aws_s3_download, aws_logs_query, aws_ec2_list, aws_lambda_invoke, k8s_apply, k8s_get_pods, k8s_logs, k8s_get_services, k8s_describe, k8s_delete + Tyr (Cloud Ops) agent | +72 |
 | 2026-01-19 | **Docker Runtime Tools** - docker_build, docker_run, docker_ps, docker_logs, docker_stop, docker_rm, docker_images, docker_compose_up, docker_compose_down | +48 |
 | 2026-01-18 | **Sif (Shell/SysAdmin) Agent** - bash_generate, bash_explain, bash_validate, systemd_generate, bash_lint tools | +36 |
 | 2026-01-18 | **Milestone 5: System Access Configuration** - SystemAccessLevel enum, config fields, CLI commands, access check utility | +37 |
@@ -926,6 +934,6 @@ cd sindri/web/static && npm test -- --run
 
 **Last Updated:** 2026-01-19
 **Phase 11 Progress:** 4/8 agents complete (Skuld, Kvasir, Völundr, Saga) - Remaining: Blender, KiCad, Music, Game Level
-**Phase 12 Progress:** Tier 1-2 Complete + Video/Audio + Profiling + Browser + Docker Runtime Tools - 3/8 agents (Vör, Rán, Sif), 85/~100 tools
+**Phase 12 Progress:** Tier 1-3 Complete - 5/8 agents (Vör, Rán, Sif, Nidhogg, Tyr), 97/~100 tools
 **Phase 12 Added:** Universal Tool Expansion (100+ tools across 13 categories) + 8 New Specialized Agents + 9 Docker Runtime Tools
 **Maintained By:** Project contributors

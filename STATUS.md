@@ -98,16 +98,16 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 2830 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, **Docker Runtime Tools**
+**Test Status:** 2959 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, **AWS & Kubernetes Tools**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2767 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 2959 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 19 agents (18 + sif)
+.venv/bin/sindri agents                    # See all 21 agents (including tyr)
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -218,6 +218,60 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### AWS & Kubernetes Tools (2026-01-19) - Phase 12 Category 12 Complete
+
+Added **Tyr** - a specialized cloud infrastructure operations agent. Named after the Norse god of law and heroic glory who sacrificed his hand to bind Fenrir, Tyr brings order to cloud chaos and executes infrastructure operations with precision.
+
+**New Agent:**
+- **Tyr** (Norse god) - Cloud infrastructure operations specialist using qwen2.5-coder:7b
+
+**New Tools (12 total):**
+
+*AWS Tools (6):*
+- `aws_s3_list` - List S3 buckets or objects in a bucket
+- `aws_s3_upload` - Upload files or directories to S3
+- `aws_s3_download` - Download files or directories from S3
+- `aws_logs_query` - Query CloudWatch Logs with filter patterns
+- `aws_ec2_list` - List EC2 instances with state/tag filtering
+- `aws_lambda_invoke` - Invoke Lambda functions (sync/async)
+
+*Kubernetes Tools (6):*
+- `k8s_apply` - Apply manifests from file or inline YAML
+- `k8s_get_pods` - List pods with namespace/selector filtering
+- `k8s_logs` - Get pod logs with tail/since/container options
+- `k8s_get_services` - List services with filtering
+- `k8s_describe` - Describe any resource in detail
+- `k8s_delete` - Delete resources with force/grace-period options
+
+**Agent Assignment:**
+- **Tyr** has access to all 12 cloud tools plus core file operations
+- **Brokkr** can delegate to Tyr for AWS and Kubernetes operations
+
+**Key Features:**
+- AWS CLI wrapper with async subprocess execution
+- kubectl wrapper with full command support
+- Automatic s3:// prefix handling
+- Relative time parsing for CloudWatch queries (1h, 30m, 1d)
+- JSON/table output format options
+- Dry-run mode for k8s_apply
+
+**Files:**
+- `sindri/tools/aws.py` - AWS tool implementations (~500 lines)
+- `sindri/tools/kubernetes.py` - Kubernetes tool implementations (~450 lines)
+- `sindri/tools/registry.py` - Tool registration
+- `sindri/agents/prompts.py` - TYR_PROMPT with cloud best practices
+- `sindri/agents/registry.py` - Tyr agent definition
+- `tests/test_aws.py` - AWS tool tests (~400 lines)
+- `tests/test_kubernetes.py` - K8s tool tests (~350 lines)
+
+**Requirements:**
+- AWS CLI (`aws`) - User must have installed and configured
+- kubectl - User must have installed and configured
+
+**Tests:** +72 new tests (2959 total)
+
+---
 
 ### Math & Scientific Tools (2026-01-19) - Phase 12 Category 13
 

@@ -27,6 +27,8 @@ from sindri.agents.prompts import (
     SIF_PROMPT,
     # Phase 12: Math/Scientific agent (2026-01-19)
     NIDHOGG_PROMPT,
+    # Phase 12: Cloud operations agent (2026-01-19)
+    TYR_PROMPT,
     # Milestone 6: Self-management agent (2026-01-18)
     SINDRI_ADMIN_PROMPT,
 )
@@ -83,7 +85,7 @@ AGENTS: dict[str, AgentDefinition] = {
         can_delegate=True,
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
         # Phase 11: Added skuld, kvasir, volundr, saga for multi-disciplinary domains
-        # Phase 12: Added vor for text/regex, ran for browser, sif for shell, nidhogg for math/scientific
+        # Phase 12: Added vor for text/regex, ran for browser, sif for shell, nidhogg for math/scientific, tyr for cloud
         delegate_to=[
             "huginn",
             "mimir",
@@ -102,6 +104,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "ran",
             "sif",
             "nidhogg",
+            "tyr",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -707,6 +710,42 @@ AGENTS: dict[str, AgentDefinition] = {
         priority=2,
         max_iterations=15,
         temperature=0.2,  # Lower temp for precise calculations
+        # Fallback to smaller coder model
+        fallback_model="qwen2.5-coder:3b",
+        fallback_vram_gb=2.5,
+    ),
+    # Phase 12: Cloud operations agent (2026-01-19)
+    "tyr": AgentDefinition(
+        name="tyr",
+        role="Cloud infrastructure operations specialist - AWS, Kubernetes management",
+        model="qwen2.5-coder:7b",
+        system_prompt=TYR_PROMPT,
+        tools=[
+            # Core file operations
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            # AWS tools
+            "aws_s3_list",
+            "aws_s3_upload",
+            "aws_s3_download",
+            "aws_logs_query",
+            "aws_ec2_list",
+            "aws_lambda_invoke",
+            # Kubernetes tools
+            "k8s_apply",
+            "k8s_get_pods",
+            "k8s_logs",
+            "k8s_get_services",
+            "k8s_describe",
+            "k8s_delete",
+        ],
+        can_delegate=False,  # Tier 2 specialist, does not delegate
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=20,
+        temperature=0.3,  # Lower temp for precise cloud operations
         # Fallback to smaller coder model
         fallback_model="qwen2.5-coder:3b",
         fallback_vram_gb=2.5,

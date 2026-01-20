@@ -59,6 +59,22 @@ from sindri.tools.docker import (
     DockerComposeUpTool,
     DockerComposeDownTool,
 )
+from sindri.tools.aws import (
+    AwsS3ListTool,
+    AwsS3UploadTool,
+    AwsS3DownloadTool,
+    AwsLogsQueryTool,
+    AwsEc2ListTool,
+    AwsLambdaInvokeTool,
+)
+from sindri.tools.kubernetes import (
+    K8sApplyTool,
+    K8sGetPodsTool,
+    K8sLogsTool,
+    K8sGetServicesTool,
+    K8sDescribeTool,
+    K8sDeleteTool,
+)
 from sindri.tools.api_spec import GenerateApiSpecTool, ValidateApiSpecTool
 from sindri.tools.ast_refactoring import (
     ASTParserTool,
@@ -686,4 +702,18 @@ class ToolRegistry:
         registry.register(PlotGenerateTool(work_dir=work_dir))
         registry.register(UnitConvertTool(work_dir=work_dir))
         registry.register(MatrixOperationsTool(work_dir=work_dir))
+        # AWS tools (Phase 12)
+        registry.register(AwsS3ListTool(work_dir=work_dir))
+        registry.register(AwsS3UploadTool(work_dir=work_dir))
+        registry.register(AwsS3DownloadTool(work_dir=work_dir))
+        registry.register(AwsLogsQueryTool(work_dir=work_dir))
+        registry.register(AwsEc2ListTool(work_dir=work_dir))
+        registry.register(AwsLambdaInvokeTool(work_dir=work_dir))
+        # Kubernetes tools (Phase 12)
+        registry.register(K8sApplyTool(work_dir=work_dir))
+        registry.register(K8sGetPodsTool(work_dir=work_dir))
+        registry.register(K8sLogsTool(work_dir=work_dir))
+        registry.register(K8sGetServicesTool(work_dir=work_dir))
+        registry.register(K8sDescribeTool(work_dir=work_dir))
+        registry.register(K8sDeleteTool(work_dir=work_dir))
         return registry
