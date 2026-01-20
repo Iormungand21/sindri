@@ -29,6 +29,8 @@ from sindri.agents.prompts import (
     NIDHOGG_PROMPT,
     # Phase 12: Cloud operations agent (2026-01-19)
     TYR_PROMPT,
+    # Phase 12: Document/Vision agent (2026-01-20)
+    GROA_PROMPT,
     # Milestone 6: Self-management agent (2026-01-18)
     SINDRI_ADMIN_PROMPT,
 )
@@ -85,7 +87,7 @@ AGENTS: dict[str, AgentDefinition] = {
         can_delegate=True,
         # Phase 9: Added heimdall, baldr, idunn, vidar to delegation targets
         # Phase 11: Added skuld, kvasir, volundr, saga for multi-disciplinary domains
-        # Phase 12: Added vor for text/regex, ran for browser, sif for shell, nidhogg for math/scientific, tyr for cloud
+        # Phase 12: Added vor for text/regex, ran for browser, sif for shell, nidhogg for math/scientific, tyr for cloud, groa for documents
         delegate_to=[
             "huginn",
             "mimir",
@@ -105,6 +107,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "sif",
             "nidhogg",
             "tyr",
+            "groa",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -749,6 +752,40 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to smaller coder model
         fallback_model="qwen2.5-coder:3b",
         fallback_vram_gb=2.5,
+    ),
+    # Phase 12: Document/Vision agent (2026-01-20)
+    "groa": AgentDefinition(
+        name="groa",
+        role="Document seeress - vision-based PDF/document understanding and processing",
+        model="granite3.2-vision:2b",  # Vision model for document understanding
+        system_prompt=GROA_PROMPT,
+        tools=[
+            # Core file operations
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            # Vision-based document tools (NEW)
+            "document_describe",
+            "document_extract_structured",
+            "document_summarize",
+            # Traditional document tools
+            "pdf_extract_text",
+            "pdf_to_markdown",
+            "pdf_merge",
+            "pdf_split",
+            "ocr_image",
+            "spreadsheet_read",
+            "spreadsheet_write",
+        ],
+        can_delegate=False,  # Tier 3 specialist, does not delegate
+        estimated_vram_gb=2.0,  # granite3.2-vision:2b is ~2GB
+        priority=2,
+        max_iterations=15,
+        temperature=0.3,  # Lower temp for precise document analysis
+        # Fallback to smaller model (no vision, traditional tools only)
+        fallback_model="qwen2.5-coder:1.5b",
+        fallback_vram_gb=1.0,
     ),
 }
 

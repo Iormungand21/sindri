@@ -177,6 +177,11 @@ from sindri.tools.documents import (
     SpreadsheetReadTool,
     SpreadsheetWriteTool,
 )
+from sindri.tools.vision_documents import (
+    DocumentDescribeTool,
+    DocumentExtractStructuredTool,
+    DocumentSummarizeTool,
+)
 from sindri.tools.network import (
     HttpTraceTool,
     DnsLookupTool,
@@ -622,6 +627,10 @@ class ToolRegistry:
         registry.register(OcrImageTool(work_dir=work_dir))
         registry.register(SpreadsheetReadTool(work_dir=work_dir))
         registry.register(SpreadsheetWriteTool(work_dir=work_dir))
+        # Vision-based document tools
+        registry.register(DocumentDescribeTool(work_dir=work_dir))
+        registry.register(DocumentExtractStructuredTool(work_dir=work_dir))
+        registry.register(DocumentSummarizeTool(work_dir=work_dir))
         # Network and HTTP diagnostic tools
         registry.register(HttpTraceTool(work_dir=work_dir))
         registry.register(DnsLookupTool(work_dir=work_dir))

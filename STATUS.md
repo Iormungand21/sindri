@@ -1,5 +1,5 @@
 # Sindri Project Status Report
-**Date:** 2026-01-19
+**Date:** 2026-01-20
 **Status:** Architecture Transformation COMPLETE - All Milestones Complete
 
 ---
@@ -98,16 +98,16 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 2959 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, **AWS & Kubernetes Tools**
+**Test Status:** 3022 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, **Vision-Based Document Processing (Groa Agent)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 2959 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3022 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 21 agents (including tyr)
+.venv/bin/sindri agents                    # See all 22 agents (including groa)
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -218,6 +218,39 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Vision-Based Document Processing (2026-01-20) - Phase 12 Tier 3 Groa Agent
+
+Added **Groa** - a specialized document processing agent with vision model capability. Named after the Norse Völva (seeress) who could perceive beyond the physical world, Groa uses AI vision to understand documents, going beyond traditional text extraction.
+
+**New Agent:**
+- **Groa** (Norse seeress) - Document/vision specialist using granite3.2-vision:2b
+
+**New Tools (3 total):**
+
+*Vision-Based Document Tools:*
+- `document_describe` - Describe document content using AI vision (layout, text, charts, tables)
+- `document_extract_structured` - Extract structured data (forms, tables, key-value pairs) as JSON/CSV/markdown
+- `document_summarize` - AI-powered document summary with multi-page support and focus areas
+
+**Key Features:**
+- Uses granite3.2-vision:2b for visual document understanding
+- Converts PDF pages to images automatically (PyMuPDF)
+- Supports PDF, PNG, JPG, and other image formats
+- Returns structured JSON/CSV/markdown output for extracted data
+- Combines vision tools with traditional document tools (pdf_extract_text, ocr_image, etc.)
+
+**Agent Assignment:**
+- **Groa** has 14 tools: 3 vision + 7 traditional document + 4 file operations
+- **Brokkr** can delegate to Groa for document understanding tasks
+
+**OllamaClient Enhancement:**
+- Added `images` parameter to `chat()` and `chat_stream()` methods
+- Enables vision model support across the system
+
+**Tests:** +63 new tests (3022 total)
+
+---
 
 ### AWS & Kubernetes Tools (2026-01-19) - Phase 12 Category 12 Complete
 

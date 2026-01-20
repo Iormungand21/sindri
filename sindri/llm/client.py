@@ -51,9 +51,27 @@ class OllamaClient:
         self._async_client = ollama.AsyncClient(host=host)
 
     async def chat(
-        self, model: str, messages: list[dict], tools: list[dict] = None
+        self,
+        model: str,
+        messages: list[dict],
+        tools: list[dict] = None,
+        images: list[str] = None,
     ) -> Response:
-        """Send chat request to Ollama."""
+        """Send chat request to Ollama.
+
+        Args:
+            model: Model name to use
+            messages: Conversation messages
+            tools: Tool definitions (optional)
+            images: Image paths or base64 data for vision models (optional).
+                    Images are added to the last user message.
+
+        Returns:
+            Response with message content and optional tool calls
+        """
+        # If images provided, add them to the last user message
+        if images:
+            messages = self._add_images_to_messages(messages, images)
 
         kwargs = {
             "model": model,
@@ -62,7 +80,12 @@ class OllamaClient:
         if tools:
             kwargs["tools"] = tools
 
-        log.info("ollama_chat_request", model=model, num_messages=len(messages))
+        log.info(
+            "ollama_chat_request",
+            model=model,
+            num_messages=len(messages),
+            has_images=images is not None,
+        )
 
         response = await self._async_client.chat(**kwargs)
 
@@ -106,6 +129,7 @@ class OllamaClient:
         model: str,
         messages: list[dict],
         tools: list[dict] = None,
+        images: list[str] = None,
         on_token: Optional[Callable[[str], None]] = None,
     ) -> StreamingResponse:
         """Stream chat response with tool support.
@@ -114,16 +138,27 @@ class OllamaClient:
             model: Model name to use
             messages: Conversation messages
             tools: Tool definitions (optional)
+            images: Image paths or base64 data for vision models (optional).
+                    Images are added to the last user message.
             on_token: Callback called for each token (optional)
 
         Returns:
             StreamingResponse with accumulated content and tool calls
         """
+        # If images provided, add them to the last user message
+        if images:
+            messages = self._add_images_to_messages(messages, images)
+
         kwargs = {"model": model, "messages": messages, "stream": True}
         if tools:
             kwargs["tools"] = tools
 
-        log.info("ollama_stream_request", model=model, num_messages=len(messages))
+        log.info(
+            "ollama_stream_request",
+            model=model,
+            num_messages=len(messages),
+            has_images=images is not None,
+        )
 
         result = StreamingResponse(model=model)
 
@@ -153,6 +188,37 @@ class OllamaClient:
         )
 
         return result
+
+    def _add_images_to_messages(
+        self, messages: list[dict], images: list[str]
+    ) -> list[dict]:
+        """Add images to the last user message for vision models.
+
+        Args:
+            messages: Original conversation messages
+            images: List of image paths or base64-encoded image data
+
+        Returns:
+            Copy of messages with images added to last user message
+        """
+        if not images or not messages:
+            return messages
+
+        # Create a copy to avoid modifying the original
+        messages = [msg.copy() for msg in messages]
+
+        # Find the last user message and add images
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                msg["images"] = images
+                log.debug(
+                    "added_images_to_message",
+                    num_images=len(images),
+                    message_index=messages.index(msg),
+                )
+                break
+
+        return messages
 
     def list_models(self) -> list[str]:
         """List available models."""
