@@ -294,6 +294,14 @@ from sindri.tools.game_level import (
     GenerateGDScriptTool,
     GenerateUnityScriptTool,
 )
+from sindri.tools.blender import (
+    BlenderScriptTool,
+    CreateMeshTool,
+    ApplyModifierTool,
+    CreateMaterialTool,
+    SetupAnimationTool,
+    RenderSceneTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -770,4 +778,11 @@ class ToolRegistry:
         registry.register(GenerateItemStatsTool(work_dir=work_dir))
         registry.register(GenerateGDScriptTool(work_dir=work_dir))
         registry.register(GenerateUnityScriptTool(work_dir=work_dir))
+        # Blender Python tools (Phase 11 - Dvalin agent)
+        registry.register(BlenderScriptTool(work_dir=work_dir))
+        registry.register(CreateMeshTool(work_dir=work_dir))
+        registry.register(ApplyModifierTool(work_dir=work_dir))
+        registry.register(CreateMaterialTool(work_dir=work_dir))
+        registry.register(SetupAnimationTool(work_dir=work_dir))
+        registry.register(RenderSceneTool(work_dir=work_dir))
         return registry

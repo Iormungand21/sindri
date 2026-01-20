@@ -37,6 +37,8 @@ from sindri.agents.prompts import (
     BRAGI_PROMPT,
     # Phase 11: Game level design agent (2026-01-20)
     NIDHOGR_GAME_PROMPT,
+    # Phase 11: Blender Python agent (2026-01-20)
+    DVALIN_PROMPT,
     # Milestone 6: Self-management agent (2026-01-18)
     SINDRI_ADMIN_PROMPT,
 )
@@ -118,6 +120,7 @@ AGENTS: dict[str, AgentDefinition] = {
             "fafnir",
             "bragi",
             "nidhogr_game",
+            "dvalin",
         ],
         estimated_vram_gb=9.0,
         priority=0,
@@ -887,6 +890,36 @@ AGENTS: dict[str, AgentDefinition] = {
         # Fallback to smaller model
         fallback_model="qwen2.5-coder:3b",
         fallback_vram_gb=2.5,
+    ),
+    # Phase 11: Blender Python agent (2026-01-20)
+    "dvalin": AgentDefinition(
+        name="dvalin",
+        role="Blender Python specialist - 3D modeling, materials, animation, rendering",
+        model="qwen2.5-coder:7b",  # Good for Python code generation
+        system_prompt=DVALIN_PROMPT,
+        tools=[
+            # Core file operations
+            "read_file",
+            "write_file",
+            "list_directory",
+            "read_tree",
+            "search_code",
+            # Blender Python tools
+            "blender_script",
+            "create_mesh",
+            "apply_modifier",
+            "create_material",
+            "setup_animation",
+            "render_scene",
+        ],
+        can_delegate=False,  # Tier 2 specialist, does not delegate
+        estimated_vram_gb=5.0,
+        priority=2,
+        max_iterations=20,
+        temperature=0.4,  # Balanced - creative for 3D but precise for code
+        # Fallback to smaller model
+        fallback_model="qwen2.5:3b-instruct-q8_0",
+        fallback_vram_gb=3.0,
     ),
 }
 

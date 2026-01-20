@@ -98,16 +98,16 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3218 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), **Game Level Design (Nidhogr Game Agent)**
+**Test Status:** 3288 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), **Blender Python 3D Modeling (Dvalin Agent)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3218 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3288 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
-.venv/bin/sindri agents                    # See all 25 agents (including nidhogr_game)
+.venv/bin/sindri agents                    # See all 26 agents (including dvalin)
 
 # System Access Configuration
 .venv/bin/sindri access show               # View current access settings
@@ -218,6 +218,49 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Blender Python 3D Modeling (2026-01-20) - Phase 11 Tier 3 Dvalin Agent
+
+Added **Dvalin** - a specialized Blender Python agent for 3D modeling. Named after the legendary Norse dwarf craftsman who forged magical treasures for the gods, Dvalin creates 3D models, materials, animations, and renders using Blender's Python API (bpy).
+
+**New Agent:**
+- **Dvalin** (Norse dwarf craftsman) - Blender Python specialist using qwen2.5-coder:7b
+
+**New Tools (6 total):**
+
+*Blender Python Tools:*
+- `blender_script` - Generate complete Blender Python scripts from text descriptions with scene cleanup, lighting, and camera setup
+- `create_mesh` - Create 3D meshes from primitives (cube, sphere, cylinder, torus, etc.) or custom vertex/face data
+- `apply_modifier` - Add modifiers (subdivision, boolean, array, mirror, bevel, solidify, etc.) to objects
+- `create_material` - Generate PBR materials with Principled BSDF, noise textures, and shader nodes
+- `setup_animation` - Create keyframe animations with presets (turntable, bounce, orbit) or custom keyframes
+- `render_scene` - Configure Cycles/Eevee rendering with resolution, samples, format, and transparency options
+
+**Key Features:**
+- Pure Python script generation - works even without Blender installed
+- Optional script execution via `blender --background --python script.py`
+- Supports Blender 3.6, 4.0, 4.1, 4.2 API versions
+- Custom mesh creation with BMesh module
+- 18 modifier types: subdivision, boolean, array, mirror, bevel, solidify, screw, displace, wave, etc.
+- PBR material system: metallic, roughness, transmission (glass), emission, procedural noise
+- Animation presets: turntable, bounce, orbit, zoom, shake, wave, fade
+- Render engines: Cycles (GPU), Eevee, Workbench
+- Output formats: PNG, JPEG, EXR, TIFF, FFMPEG (video)
+
+**Agent Assignment:**
+- **Dvalin** has 11 tools: 6 Blender tools + 5 file operations
+- **Brokkr** can delegate to Dvalin for 3D modeling tasks
+
+**Files:**
+- `sindri/tools/blender.py` - All 6 Blender tool implementations (~1200 lines)
+- `sindri/agents/prompts.py` - DVALIN_PROMPT with Blender Python API reference
+- `sindri/agents/registry.py` - Dvalin agent definition
+- `sindri/tools/registry.py` - Tool registration
+- `tests/test_blender_tools.py` - Comprehensive test suite (70 tests)
+
+**Tests:** +70 new tests (3288 total)
+
+---
 
 ### Game Level Design (2026-01-20) - Phase 11 Tier 3 Nidhogr Game Agent
 

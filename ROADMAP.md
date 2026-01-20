@@ -300,7 +300,7 @@ Generate parametric 3D models for 3D printing using code-based CAD.
 - "Generate a procedural terrain with erosion"
 - "Build a product visualization scene"
 
-**Status:** Planned
+**Status:** ✅ Complete (2026-01-20)
 
 ---
 
@@ -871,6 +871,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-20 | **Blender Python 3D Modeling + Dvalin Agent** - blender_script, create_mesh, apply_modifier, create_material, setup_animation, render_scene + Dvalin agent using qwen2.5-coder:7b | +70 |
 | 2026-01-20 | **Advanced SQL Optimization + Fafnir Agent** - sql_optimize, db_schema_diff, db_analyze_indexes, db_backup, db_visualize_schema + Fafnir agent using sqlcoder:7b | +48 |
 | 2026-01-20 | **Vision-Based Document Processing + Groa Agent** - document_describe, document_extract_structured, document_summarize + Groa (Document/Vision) agent using granite3.2-vision:2b | +63 |
 | 2026-01-19 | **AWS & Kubernetes Tools + Tyr Agent** - aws_s3_list, aws_s3_upload, aws_s3_download, aws_logs_query, aws_ec2_list, aws_lambda_invoke, k8s_apply, k8s_get_pods, k8s_logs, k8s_get_services, k8s_describe, k8s_delete + Tyr (Cloud Ops) agent | +72 |
@@ -937,7 +938,7 @@ cd sindri/web/static && npm test -- --run
 ---
 
 **Last Updated:** 2026-01-20
-**Phase 11 Progress:** 6/8 agents complete (Skuld, Kvasir, Völundr, Saga, Bragi, Nidhogr) - Remaining: Blender, KiCad
+**Phase 11 Progress:** 7/8 agents complete (Skuld, Kvasir, Völundr, Saga, Bragi, Nidhogr, Dvalin) - Remaining: KiCad
 **Phase 12 Progress:** Tier 1-3 Complete - 7/8 agents (Vör, Rán, Sif, Nidhogg, Tyr, Groa, Fafnir), 105/~105 tools
-**Phase 12 Added:** Universal Tool Expansion (105+ tools across 13 categories) + 8 New Specialized Agents + 9 Docker Runtime Tools + 3 Vision Document Tools + 5 Advanced SQL Tools
+**Phase 12 Added:** Universal Tool Expansion (105+ tools across 13 categories) + 8 New Specialized Agents + 9 Docker Runtime Tools + 3 Vision Document Tools + 5 Advanced SQL Tools + 6 Blender Python Tools
 **Maintained By:** Project contributors

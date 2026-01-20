@@ -37,9 +37,9 @@ See `STATUS.md` and `ROADMAP.md` for full details.
 
 **Key Facts:**
 - **Status:** Architecture Transformation COMPLETE (Internal-Only Mode)
-- **Tests:** 3218 backend + 104 frontend
-- **Agents:** 25 specialized agents (including bragi, nidhogr_game, fafnir, groa, sindri_admin)
-- **Tools:** 176+ tools (7 new game level design tools)
+- **Tests:** 3288 backend + 104 frontend
+- **Agents:** 26 specialized agents (including dvalin, bragi, nidhogr_game, fafnir, groa, sindri_admin)
+- **Tools:** 182+ tools (6 new Blender Python tools)
 - **Interfaces:** CLI, TUI (Textual), Web UI (React), Voice
 
 ---
@@ -51,7 +51,7 @@ Before starting work, verify the environment:
 ```bash
 cd /home/ryan/projects/sindri
 
-# Run tests (should see 3218 passed)
+# Run tests (should see 3288 passed)
 .venv/bin/pytest tests/ -v --tb=no -q
 
 # Check system health
@@ -248,4 +248,4 @@ Historical documents are in `docs/archive/`:
 
 ---
 
-**Last Updated:** 2026-01-20 (Nidhogr Game Level Agent Added)
+**Last Updated:** 2026-01-20 (Dvalin Blender Agent Added)
