@@ -277,6 +277,54 @@ NEVER output <sindri:complete/> in the same message as tool calls!
 The system executes tools between iterations.
 
 ═══════════════════════════════════════════════════════════════════
+CODE IMPROVEMENT TOOLS (Phase 13 Tier 4)
+═══════════════════════════════════════════════════════════════════
+
+You have AI-powered code improvement tools to enhance your implementations:
+
+**Refactoring Analysis:**
+- `suggest_refactoring`: Analyze code for refactoring opportunities
+  - Detects: extract method, simplify conditionals, reduce duplication
+  - Provides before/after snippets with rationale
+  - Use BEFORE making changes to understand improvement options
+
+**Performance Optimization:**
+- `optimize_performance`: Identify performance bottlenecks
+  - Algorithm complexity analysis (O(n) vs O(n²))
+  - Detects: N+1 queries, unnecessary computations, missing caching
+  - Suggests data structure improvements
+
+**Antipattern Detection:**
+- `detect_antipatterns`: Find coding antipatterns
+  - Detects: God objects, feature envy, long methods, callback hell
+  - Provides severity levels and remediation suggestions
+
+**Design Pattern Recommendations:**
+- `suggest_design_patterns`: Recommend applicable patterns
+  - Suggests: Factory, Strategy, Observer, Builder, etc.
+  - Shows how pattern would apply to current code
+  - Lists benefits of applying each pattern
+
+**Type Hint Generation:**
+- `generate_type_hints`: Generate Python type annotations
+  - Infers types from defaults, usage, and docstrings
+  - Supports generics, Optional, Union, TypedDict
+
+**RECOMMENDED WORKFLOW:**
+
+1. Before implementing complex features:
+   - Run `detect_antipatterns` on affected files
+   - Run `suggest_design_patterns` if adding new classes
+
+2. After writing code:
+   - Run `suggest_refactoring` to identify improvements
+   - Run `optimize_performance` for critical paths
+   - Run `generate_type_hints` for untyped functions
+
+3. Before marking complete:
+   - Use these tools to self-review your implementation
+
+═══════════════════════════════════════════════════════════════════
 
 Be thorough but efficient. Quality over speed. When the code is working, output: <sindri:complete/>
 """

@@ -334,6 +334,13 @@ from sindri.tools.code_review import (
     DetectDeadCodeTool,
     GenerateReviewReportTool,
 )
+from sindri.tools.code_improvement import (
+    SuggestRefactoringTool,
+    OptimizePerformanceTool,
+    DetectAntipatternsTool,
+    SuggestDesignPatternsTool,
+    GenerateTypeHintsTool,
+)
 from sindri.core.errors import (
     ErrorCategory,
     classify_error,
@@ -845,4 +852,10 @@ class ToolRegistry:
         registry.register(SecurityAuditTool(work_dir=work_dir))
         registry.register(DetectDeadCodeTool(work_dir=work_dir))
         registry.register(GenerateReviewReportTool(work_dir=work_dir))
+        # Code Improvement tools (Phase 13 Tier 4 - Huginn agent)
+        registry.register(SuggestRefactoringTool(work_dir=work_dir))
+        registry.register(OptimizePerformanceTool(work_dir=work_dir))
+        registry.register(DetectAntipatternsTool(work_dir=work_dir))
+        registry.register(SuggestDesignPatternsTool(work_dir=work_dir))
+        registry.register(GenerateTypeHintsTool(work_dir=work_dir))
         return registry

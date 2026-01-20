@@ -164,6 +164,12 @@ AGENTS: dict[str, AgentDefinition] = {
             "validate_workflow",
             "shell",
             "delegate",
+            # Phase 13 Tier 4: Code Improvement Tools
+            "suggest_refactoring",
+            "optimize_performance",
+            "detect_antipatterns",
+            "suggest_design_patterns",
+            "generate_type_hints",
         ],
         can_delegate=True,
         delegate_to=["ratatoskr", "skald"],

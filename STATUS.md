@@ -98,13 +98,13 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3603 tests passing (100%)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), AI-Powered Test Generation (Skald Enhancement), AI-Powered Code Documentation (Idunn Enhancement), **AI-Powered Code Review & Quality Analysis (Mimir Enhancement)**
+**Test Status:** 3679 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), AI-Powered Test Generation (Skald Enhancement), AI-Powered Code Documentation (Idunn Enhancement), AI-Powered Code Review & Quality Analysis (Mimir Enhancement), **AI-Powered Code Improvement (Huginn Enhancement)**
 
 ### Try It Out
 ```bash
 # Verify everything works
-.venv/bin/pytest tests/ -v --tb=no -q    # 3603 tests
+.venv/bin/pytest tests/ -v --tb=no -q    # 3679 tests
 cd sindri/web/static && npm test -- --run  # 104 frontend tests
 .venv/bin/sindri doctor --verbose          # Check system health
 .venv/bin/sindri agents                    # See all 27 agents
@@ -218,6 +218,44 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### AI-Powered Code Improvement (2026-01-20) - Phase 13 Tier 4 Complete
+
+Added **5 code improvement tools** to enhance the **Huginn** agent's capabilities. The code implementation specialist now has AI-powered tools for suggesting refactoring opportunities, optimizing performance, detecting antipatterns, recommending design patterns, and generating type hints.
+
+**Agent Enhancement:**
+- **Huginn** (Odin's raven of thought) - Extended from 27 to 32 tools
+
+**New Tools (5 total):**
+
+*Code Improvement Tools:*
+- `suggest_refactoring` - Analyze code for refactoring opportunities: extract method, simplify conditionals, reduce duplication, replace magic numbers
+- `optimize_performance` - Identify performance bottlenecks: algorithm complexity, N+1 queries, nested loops, inefficient data structures
+- `detect_antipatterns` - Find coding antipatterns: god object, feature envy, long method, data clump, primitive obsession
+- `suggest_design_patterns` - Recommend applicable design patterns: Factory, Strategy, Observer, Builder, Singleton, Decorator
+- `generate_type_hints` - Generate Python type annotations from defaults, usage patterns, docstrings, and call sites
+
+**Key Features:**
+- AST-based analysis using Python's ast module
+- Multiple refactoring types: extract_method, simplify_conditional, reduce_duplication, replace_magic_numbers
+- Performance issue detection: algorithm_complexity, n_plus_one, nested_loops, repeated_computation
+- Antipattern severity levels (low/medium/high/critical) with remediation suggestions
+- Design pattern applicability scoring with before/after code examples
+- Type inference from multiple sources: defaults, usage, docstrings, call sites
+- Multiple output formats: text, markdown, JSON
+- Confidence levels (low/medium/high) for all suggestions
+
+**Agent Assignment:**
+- **Huginn** now has 32 tools: 5 new code improvement + 27 original (read/write/edit, git, refactoring, shell, delegate)
+
+**Files:**
+- `sindri/tools/code_improvement.py` - All 5 code improvement tool implementations (~1800 lines)
+- `sindri/agents/prompts.py` - Enhanced HUGINN_PROMPT with code improvement workflow guidance
+- `tests/test_code_improvement.py` - Comprehensive test suite (63 tests)
+
+**Tests:** +63 new tests (3679 total)
+
+---
 
 ### AI-Powered Code Review & Quality Analysis (2026-01-20) - Phase 13 Tier 3 Complete
 
