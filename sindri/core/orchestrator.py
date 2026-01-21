@@ -312,13 +312,34 @@ class Orchestrator:
             description=next_task.description[:50],
         )
 
-        result = await self.loop.run_task(next_task)
+        try:
+            result = await self.loop.run_task(next_task)
+            log.info(
+                "task_result",
+                task_id=next_task.id,
+                success=result.success,
+                iterations=result.iterations,
+            )
+        except Exception as e:
+            log.error("task_exception", task_id=next_task.id, error=str(e))
+            next_task.status = TaskStatus.FAILED
+            next_task.error = str(e)
 
-        log.info(
-            "task_result",
-            task_id=next_task.id,
-            success=result.success,
-            iterations=result.iterations,
-        )
+            # Notify parent task of failure (if this is a child task)
+            await self.delegation.child_failed(next_task)
+
+            # Emit error event for TUI/logging
+            self.event_bus.emit(
+                Event(
+                    type=EventType.ERROR,
+                    data={
+                        "task_id": next_task.id,
+                        "error": str(e),
+                        "error_type": "sequential_task_exception",
+                        "agent": next_task.assigned_agent,
+                        "description": next_task.description[:100],
+                    },
+                )
+            )
 
         return "ok"

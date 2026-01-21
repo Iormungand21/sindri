@@ -5,6 +5,7 @@ These tests verify the fixes for ROADMAP Item 0:
 - Issue 4: VRAM-aware batching with actual free VRAM
 - Issue 2: Model load failure propagation to parents
 - Issue 6: UUID collision prevention (full UUIDs)
+- Sequential exception handling (matching parallel error reporting)
 """
 
 import pytest
@@ -541,3 +542,162 @@ class TestHierarchicalReliabilityIntegration:
             assert retrieved is not None
             assert retrieved.id == task.id
             assert retrieved.description == task.description
+
+
+# =============================================================================
+# Sequential Exception Handling Tests
+# =============================================================================
+
+
+class TestSequentialExceptionPropagation:
+    """Tests for sequential task exception propagation to parents.
+
+    These tests verify that the sequential execution path (_run_sequential)
+    handles exceptions the same way as the parallel execution path.
+    """
+
+    @pytest.fixture
+    def event_bus(self):
+        """Create an event bus for testing."""
+        return EventBus()
+
+    @pytest.mark.asyncio
+    async def test_sequential_exception_marks_task_failed(self, event_bus):
+        """Test that sequential task exceptions mark the task as FAILED."""
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        task = Task(description="Test task", assigned_agent="huginn")
+        orchestrator.scheduler.add_task(task)
+
+        # Mock run_task to raise an exception
+        async def mock_run_task(t):
+            raise RuntimeError("Simulated sequential failure")
+
+        orchestrator.loop.run_task = mock_run_task
+
+        await orchestrator._run_sequential()
+
+        # Task should be marked failed with error message
+        assert task.status == TaskStatus.FAILED
+        assert "Simulated sequential failure" in task.error
+
+    @pytest.mark.asyncio
+    async def test_sequential_exception_notifies_parent(self, event_bus):
+        """Test that sequential task exceptions notify parent via child_failed."""
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        # Create parent and child tasks
+        parent = Task(description="Parent task", assigned_agent="brokkr")
+        child = Task(
+            description="Child task", assigned_agent="huginn", parent_id=parent.id
+        )
+
+        parent.add_subtask(child.id)
+        parent.status = TaskStatus.WAITING
+
+        orchestrator.scheduler.add_task(parent)
+        orchestrator.scheduler.add_task(child)
+
+        # Mock run_task to raise an exception for child
+        async def mock_run_task(task):
+            if task.id == child.id:
+                raise RuntimeError("Simulated child failure")
+            # Return a mock result for other tasks
+            from sindri.core.loop import LoopResult
+
+            return LoopResult(success=True, iterations=1)
+
+        orchestrator.loop.run_task = mock_run_task
+
+        # Run sequential - child should be selected (it's pending)
+        await orchestrator._run_sequential()
+
+        # Child should be marked failed
+        assert child.status == TaskStatus.FAILED
+        assert "Simulated child failure" in child.error
+
+        # Parent should be notified (marked failed via child_failed)
+        assert parent.status == TaskStatus.FAILED
+        assert child.id in parent.error
+
+    @pytest.mark.asyncio
+    async def test_sequential_exception_emits_error_event(self, event_bus):
+        """Test that sequential exceptions emit ERROR events."""
+        events_received = []
+
+        def on_event(event):
+            events_received.append(event)
+
+        # Use subscribe_event to receive full Event objects
+        event_bus.subscribe_event(on_event)
+
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        task = Task(description="Test task", assigned_agent="huginn")
+        orchestrator.scheduler.add_task(task)
+
+        # Mock run_task to raise an exception
+        async def mock_run_task(t):
+            raise RuntimeError("Test sequential exception")
+
+        orchestrator.loop.run_task = mock_run_task
+
+        await orchestrator._run_sequential()
+
+        # Should have received an error event
+        error_events = [e for e in events_received if e.type == EventType.ERROR]
+        assert len(error_events) >= 1
+        assert error_events[0].data["error_type"] == "sequential_task_exception"
+        assert "Test sequential exception" in error_events[0].data["error"]
+
+    @pytest.mark.asyncio
+    async def test_sequential_exception_returns_ok(self, event_bus):
+        """Test that _run_sequential returns 'ok' even after exception."""
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        task = Task(description="Test task", assigned_agent="huginn")
+        orchestrator.scheduler.add_task(task)
+
+        # Mock run_task to raise an exception
+        async def mock_run_task(t):
+            raise RuntimeError("Test exception")
+
+        orchestrator.loop.run_task = mock_run_task
+
+        result = await orchestrator._run_sequential()
+
+        # Should return "ok" to indicate a task was processed
+        assert result == "ok"
+
+    @pytest.mark.asyncio
+    async def test_sequential_exception_stores_error_details(self, event_bus):
+        """Test that sequential exceptions store full error details in event."""
+        events_received = []
+
+        def on_event(event):
+            events_received.append(event)
+
+        event_bus.subscribe_event(on_event)
+
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        task = Task(description="Detailed test task", assigned_agent="mimir")
+        orchestrator.scheduler.add_task(task)
+
+        async def mock_run_task(t):
+            raise ValueError("Detailed error message")
+
+        orchestrator.loop.run_task = mock_run_task
+
+        await orchestrator._run_sequential()
+
+        # Check event contains all required fields
+        error_events = [e for e in events_received if e.type == EventType.ERROR]
+        assert len(error_events) == 1
+
+        event_data = error_events[0].data
+        assert event_data["task_id"] == task.id
+        assert event_data["error"] == "Detailed error message"
+        assert event_data["error_type"] == "sequential_task_exception"
+        assert event_data["agent"] == "mimir"
+        assert "Detailed test task" in event_data["description"]

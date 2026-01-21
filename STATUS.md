@@ -219,6 +219,22 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 
 ## Recent Changes
 
+### Sequential Exception Handling Fix (2026-01-20) - Phase 15 Junior Task
+
+Added **exception handling to the sequential execution path** (`_run_sequential()`) to match the robust error handling in the parallel execution path (`_run_parallel_batch()`).
+
+**Problem Fixed:**
+- Previously, exceptions in `_run_sequential()` propagated unhandled, potentially crashing the orchestrator
+- Now, exceptions are caught, task status is set to FAILED, parent tasks are notified via `child_failed()`, and ERROR events are emitted
+
+**Changes:**
+- `sindri/core/orchestrator.py` - Added try/except block to `_run_sequential()` method (lines 315-340)
+- `tests/test_hierarchical_reliability.py` - Added `TestSequentialExceptionPropagation` test class with 5 tests
+
+**Tests:** +5 new tests (3789 total)
+
+---
+
 ### Event + API Contract v1 (2026-01-20) - Phase 16 Complete
 
 Implemented **versioned JSON schemas** for all WebSocket events and REST API, enabling auto-generation of TypeScript types and contract testing.
