@@ -81,6 +81,13 @@ class HierarchicalAgentLoop:
                 reason=f"Unknown agent: {task.assigned_agent}",
             )
 
+        # Plan-First Execution: Set task context on tools for plan association
+        self.tools.set_task_context(
+            task_id=task.id,
+            session_id=task.session_id,
+            event_bus=self.event_bus,
+        )
+
         # Ensure model is loaded (Phase 5.6: with fallback support)
         loaded = await self.scheduler.model_manager.ensure_loaded(
             agent.model, agent.estimated_vram_gb
@@ -844,6 +851,9 @@ class HierarchicalAgentLoop:
                 # Phase 7.3: Emit PLAN_PROPOSED event for propose_plan tool
                 if call.function.name == "propose_plan" and result.success:
                     plan_data = result.metadata.get("plan", {})
+                    plan_id = result.metadata.get("plan_id")
+                    is_persistent = result.metadata.get("persistent", False)
+
                     self.event_bus.emit(
                         Event(
                             type=EventType.PLAN_PROPOSED,
@@ -851,6 +861,7 @@ class HierarchicalAgentLoop:
                                 "task_id": task.id,
                                 "agent": agent.name,
                                 "plan": plan_data,
+                                "plan_id": plan_id,
                                 "formatted": result.output,
                                 "step_count": result.metadata.get("step_count", 0),
                                 "agents": result.metadata.get("agents", []),
@@ -864,8 +875,54 @@ class HierarchicalAgentLoop:
                     log.info(
                         "plan_proposed",
                         task_id=task.id,
+                        plan_id=plan_id,
                         steps=result.metadata.get("step_count", 0),
                     )
+
+                    # Plan-First Execution: Pause for approval if plan is persistent
+                    if is_persistent and plan_id:
+                        log.info(
+                            "plan_awaiting_approval",
+                            task_id=task.id,
+                            plan_id=plan_id,
+                        )
+
+                        # Update session before pausing
+                        session.add_turn(
+                            "assistant",
+                            assistant_content,
+                            tool_calls=response.message.tool_calls,
+                        )
+                        if tool_results:
+                            session.add_turn("tool", str(tool_results))
+                        session.iterations = iteration + 1
+                        await self.state.save_session(session)
+
+                        # Set task to waiting and store plan_id for resume
+                        task.status = TaskStatus.WAITING
+                        task.metadata = task.metadata or {}
+                        task.metadata["pending_plan_id"] = plan_id
+
+                        # Emit awaiting approval event for TUI
+                        self.event_bus.emit(
+                            Event(
+                                type=EventType.PLAN_AWAITING_APPROVAL,
+                                data={
+                                    "task_id": task.id,
+                                    "plan_id": plan_id,
+                                    "step_count": result.metadata.get("step_count", 0),
+                                },
+                                task_id=task.id,
+                            )
+                        )
+
+                        # Return - task will resume when plan is approved
+                        return LoopResult(
+                            success=None,  # Not complete yet, waiting for approval
+                            iterations=iteration + 1,
+                            reason="plan_approval_waiting",
+                            final_output=f"Plan {plan_id} awaiting approval",
+                        )
 
                 # If delegation occurred, pause this task
                 if call.function.name == "delegate" and result.success:

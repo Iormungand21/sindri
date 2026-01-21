@@ -847,7 +847,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         from sindri.persistence.plans import PlanStore
         from sindri.core.plan_execution import PlanStatus
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         plan_status = PlanStatus(status) if status else None
         plans = await store.list_plans(status=plan_status, task_id=task_id, limit=limit)
         return [p.to_dict() for p in plans]
@@ -857,7 +857,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         """Get a specific execution plan with all steps."""
         from sindri.persistence.plans import PlanStore
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         plan = await store.load_plan(plan_id)
         if not plan:
             raise HTTPException(status_code=404, detail="Plan not found")
@@ -865,38 +865,64 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
 
     @app.post("/api/plans/{plan_id}/approve", tags=["Plans"])
     async def approve_plan(plan_id: str):
-        """Approve a plan for execution."""
+        """Approve a plan for execution.
+
+        This updates the plan status and emits a PLAN_APPROVED event.
+        If an Orchestrator is running, it should listen for this event
+        and resume the waiting task.
+        """
         from sindri.persistence.plans import PlanStore
         from sindri.core.plan_executor import PlanExecutor
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         executor = PlanExecutor(store, event_bus=api.event_bus)
+
+        # Load plan to get task_id before approving
+        plan = await store.load_plan(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        task_id = plan.task_id
+
         success = await executor.approve_plan(plan_id)
         if not success:
             raise HTTPException(
                 status_code=400, detail="Plan not found or not in proposed status"
             )
-        return {"status": "approved", "plan_id": plan_id}
+
+        return {"status": "approved", "plan_id": plan_id, "task_id": task_id}
 
     @app.post("/api/plans/{plan_id}/reject", tags=["Plans"])
     async def reject_plan(plan_id: str, reason: Optional[str] = None):
-        """Reject a plan."""
+        """Reject a plan.
+
+        This updates the plan status and emits a PLAN_REJECTED event.
+        If an Orchestrator is running, it should listen for this event
+        and fail the waiting task.
+        """
         from sindri.persistence.plans import PlanStore
         from sindri.core.plan_executor import PlanExecutor
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         executor = PlanExecutor(store, event_bus=api.event_bus)
+
+        # Load plan to get task_id before rejecting
+        plan = await store.load_plan(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        task_id = plan.task_id
+
         success = await executor.reject_plan(plan_id, reason=reason)
         if not success:
             raise HTTPException(status_code=404, detail="Plan not found")
-        return {"status": "rejected", "plan_id": plan_id}
+
+        return {"status": "rejected", "plan_id": plan_id, "task_id": task_id}
 
     @app.get("/api/plans/{plan_id}/steps", tags=["Plans"])
     async def get_plan_steps(plan_id: str):
         """Get all steps for a plan."""
         from sindri.persistence.plans import PlanStore
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         steps = await store.get_steps_for_plan(plan_id)
         return [s.to_dict() for s in steps]
 
@@ -905,7 +931,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         """Get a specific step from a plan."""
         from sindri.persistence.plans import PlanStore
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         plan = await store.load_plan(plan_id)
         if not plan:
             raise HTTPException(status_code=404, detail="Plan not found")
@@ -921,7 +947,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         from sindri.core.plan_execution import StepStatus, ApprovalStatus
         from datetime import datetime
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         plan = await store.load_plan(plan_id)
         if not plan:
             raise HTTPException(status_code=404, detail="Plan not found")
@@ -941,7 +967,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         from sindri.persistence.plans import PlanStore
         from sindri.core.plan_execution import StepStatus, ApprovalStatus
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         plan = await store.load_plan(plan_id)
         if not plan:
             raise HTTPException(status_code=404, detail="Plan not found")
@@ -962,7 +988,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         from sindri.core.plan_executor import PlanExecutor
         from sindri.core.plan_execution import ApprovalStatus
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         executor = PlanExecutor(store, event_bus=api.event_bus)
         plan = await store.load_plan(plan_id)
         if not plan:
@@ -981,7 +1007,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         from sindri.persistence.plans import PlanStore
         from sindri.core.plan_executor import PlanExecutor
 
-        store = PlanStore(api.state.db.db_path)
+        store = PlanStore(database=api.state.db)
         executor = PlanExecutor(store, event_bus=api.event_bus)
         plan = await store.load_plan(plan_id)
         if not plan:

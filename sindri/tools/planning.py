@@ -178,6 +178,29 @@ class ProposePlanTool(Tool):
         self._task_id = task_id
         self._session_id = session_id
 
+    def set_task_context(
+        self,
+        task_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        event_bus: Optional[EventBus] = None,
+    ):
+        """Update task context for plan association.
+
+        Called by the orchestrator before each task to ensure plans
+        are associated with the correct task and session.
+
+        Args:
+            task_id: Current task ID
+            session_id: Current session ID
+            event_bus: EventBus for notifications (if not set at init)
+        """
+        if task_id is not None:
+            self._task_id = task_id
+        if session_id is not None:
+            self._session_id = session_id
+        if event_bus is not None:
+            self._event_bus = event_bus
+
     parameters = {
         "type": "object",
         "properties": {

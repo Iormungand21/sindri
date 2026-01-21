@@ -49,7 +49,8 @@ class Orchestrator:
             model_manager=self.model_manager,
             event_bus=self.event_bus,
         )
-        self.tools = ToolRegistry.default(work_dir=work_dir)
+        # Plan-First Execution: Pass event_bus to enable plan events
+        self.tools = ToolRegistry.default(work_dir=work_dir, event_bus=self.event_bus)
 
         # Initialize memory system if enabled
         if enable_memory:

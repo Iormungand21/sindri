@@ -286,6 +286,14 @@ class PlanPersistedData(BaseModel):
     agents: list[str] = Field(default_factory=list, description="Agents involved in plan")
 
 
+class PlanAwaitingApprovalData(BaseModel):
+    """Payload for PLAN_AWAITING_APPROVAL event."""
+
+    task_id: str = Field(..., description="Task ID waiting for plan approval")
+    plan_id: str = Field(..., description="Plan identifier (UUID)")
+    step_count: int = Field(..., description="Number of steps in the plan")
+
+
 class PlanExecutionStartedData(BaseModel):
     """Payload for PLAN_EXECUTION_STARTED event."""
 
@@ -430,6 +438,7 @@ EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "POLICY_ESCALATION": PolicyEscalationData,
     # Plan-First Execution events (ROADMAP.md Item 2)
     "PLAN_PERSISTED": PlanPersistedData,
+    "PLAN_AWAITING_APPROVAL": PlanAwaitingApprovalData,
     "PLAN_EXECUTION_STARTED": PlanExecutionStartedData,
     "PLAN_EXECUTION_PAUSED": PlanExecutionPausedData,
     "PLAN_EXECUTION_RESUMED": PlanExecutionResumedData,

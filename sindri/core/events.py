@@ -48,6 +48,7 @@ class EventType(Enum):
     POLICY_ESCALATION = auto()  # Operation escalated for approval
     # Plan-First Execution events (ROADMAP.md Item 2)
     PLAN_PERSISTED = auto()  # Plan saved to database
+    PLAN_AWAITING_APPROVAL = auto()  # Plan needs user approval before task continues
     PLAN_EXECUTION_STARTED = auto()  # Plan execution begun
     PLAN_EXECUTION_PAUSED = auto()  # Waiting for step approval
     PLAN_EXECUTION_RESUMED = auto()  # Resumed after approval

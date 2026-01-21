@@ -408,6 +408,31 @@ class ToolRegistry:
         """Get all tool schemas for Ollama."""
         return [tool.get_schema() for tool in self._tools.values()]
 
+    def set_task_context(
+        self,
+        task_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        event_bus: Optional[EventBus] = None,
+    ):
+        """Set task context on tools that support it.
+
+        Called by the orchestrator before each task to ensure tools
+        like ProposePlanTool associate plans with the correct task/session.
+
+        Args:
+            task_id: Current task ID
+            session_id: Current session ID
+            event_bus: EventBus for notifications
+        """
+        # Update tools that have set_task_context method
+        for tool in self._tools.values():
+            if hasattr(tool, "set_task_context"):
+                tool.set_task_context(
+                    task_id=task_id,
+                    session_id=session_id,
+                    event_bus=event_bus,
+                )
+
     async def execute(self, name: str, arguments: dict | str) -> ToolResult:
         """Execute a tool by name with automatic retry for transient errors.
 

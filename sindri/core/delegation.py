@@ -8,6 +8,7 @@ from typing import Optional, TYPE_CHECKING
 import structlog
 
 from sindri.core.tasks import Task, TaskStatus
+from sindri.core.events import Event, EventType
 from sindri.core.scheduler import TaskScheduler
 from sindri.agents.registry import AGENTS
 
@@ -39,10 +40,12 @@ class DelegationManager:
         scheduler: TaskScheduler,
         state=None,
         model_manager: Optional["ModelManager"] = None,
+        event_bus=None,
     ):
         self.scheduler = scheduler
         self.state = state  # SessionState for updating parent sessions
         self.model_manager = model_manager  # For pre-warming
+        self.event_bus = event_bus
         log.info(
             "delegation_manager_initialized", prewarm_enabled=model_manager is not None
         )
@@ -97,6 +100,20 @@ class DelegationManager:
             prewarm_triggered=self.model_manager is not None,
             description=request.task_description[:50],
         )
+        if self.event_bus:
+            self.event_bus.emit(
+                Event(
+                    type=EventType.DELEGATION_START,
+                    data={
+                        "task_id": child.id,
+                        "parent_task_id": parent_task.id,
+                        "parent_agent": parent_task.assigned_agent,
+                        "child_agent": request.target_agent,
+                        "task": request.task_description,
+                    },
+                    task_id=parent_task.id,
+                )
+            )
 
         return child
 
@@ -116,6 +133,20 @@ class DelegationManager:
             parent_id=parent.id,
             success=child.status == TaskStatus.COMPLETE,
         )
+        if self.event_bus:
+            self.event_bus.emit(
+                Event(
+                    type=EventType.DELEGATION_COMPLETE,
+                    data={
+                        "task_id": child.id,
+                        "parent_task_id": parent.id,
+                        "parent_agent": parent.assigned_agent,
+                        "child_agent": child.assigned_agent,
+                        "status": child.status.value,
+                    },
+                    task_id=parent.id,
+                )
+            )
 
         # Inject child result into parent's session
         if self.state and hasattr(parent, "session_id"):
@@ -174,8 +205,129 @@ class DelegationManager:
         log.warning(
             "child_failed", child_id=child.id, parent_id=parent.id, error=child.error
         )
+        if self.event_bus:
+            self.event_bus.emit(
+                Event(
+                    type=EventType.DELEGATION_FAILED,
+                    data={
+                        "task_id": child.id,
+                        "parent_task_id": parent.id,
+                        "parent_agent": parent.assigned_agent,
+                        "child_agent": child.assigned_agent,
+                        "error": child.error,
+                    },
+                    task_id=parent.id,
+                )
+            )
 
         # For now, fail the parent too
         # In future, could implement retry logic
         parent.status = TaskStatus.FAILED
         parent.error = f"Child task {child.id} failed: {child.error}"
+
+    async def plan_approved(self, task_id: str, plan_id: str):
+        """Handle plan approval - resume the waiting task.
+
+        Called when a user approves a plan that a task was waiting for.
+
+        Args:
+            task_id: The task that was waiting for plan approval
+            plan_id: The approved plan ID
+        """
+        task = self.scheduler.get_task(task_id)
+        if not task:
+            log.warning("plan_approved_task_not_found", task_id=task_id, plan_id=plan_id)
+            return False
+
+        if task.status != TaskStatus.WAITING:
+            log.warning(
+                "plan_approved_task_not_waiting",
+                task_id=task_id,
+                plan_id=plan_id,
+                status=task.status.value,
+            )
+            return False
+
+        # Verify this task was waiting for this plan
+        pending_plan = task.metadata.get("pending_plan_id") if task.metadata else None
+        if pending_plan != plan_id:
+            log.warning(
+                "plan_approved_plan_mismatch",
+                task_id=task_id,
+                expected=pending_plan,
+                got=plan_id,
+            )
+            return False
+
+        log.info("plan_approved_resuming_task", task_id=task_id, plan_id=plan_id)
+
+        # Clear the pending plan from metadata
+        if task.metadata:
+            task.metadata.pop("pending_plan_id", None)
+
+        # Resume the task
+        task.status = TaskStatus.PENDING
+        import heapq
+        heapq.heappush(self.scheduler.pending, (task.priority, task.id))
+
+        # Emit event for TUI
+        if self.event_bus:
+            self.event_bus.emit(
+                Event(
+                    type=EventType.PLAN_APPROVED,
+                    data={
+                        "task_id": task_id,
+                        "plan_id": plan_id,
+                        "agent": task.assigned_agent,
+                    },
+                    task_id=task_id,
+                )
+            )
+
+        return True
+
+    async def plan_rejected(self, task_id: str, plan_id: str, reason: Optional[str] = None):
+        """Handle plan rejection - fail the waiting task.
+
+        Called when a user rejects a plan that a task was waiting for.
+
+        Args:
+            task_id: The task that was waiting for plan approval
+            plan_id: The rejected plan ID
+            reason: Optional rejection reason
+        """
+        task = self.scheduler.get_task(task_id)
+        if not task:
+            log.warning("plan_rejected_task_not_found", task_id=task_id, plan_id=plan_id)
+            return False
+
+        if task.status != TaskStatus.WAITING:
+            log.warning(
+                "plan_rejected_task_not_waiting",
+                task_id=task_id,
+                plan_id=plan_id,
+                status=task.status.value,
+            )
+            return False
+
+        log.info("plan_rejected_failing_task", task_id=task_id, plan_id=plan_id, reason=reason)
+
+        # Fail the task
+        task.status = TaskStatus.FAILED
+        task.error = f"Plan {plan_id} rejected: {reason or 'User rejected plan'}"
+
+        # Emit event for TUI
+        if self.event_bus:
+            self.event_bus.emit(
+                Event(
+                    type=EventType.PLAN_REJECTED,
+                    data={
+                        "task_id": task_id,
+                        "plan_id": plan_id,
+                        "reason": reason,
+                    },
+                    task_id=task_id,
+                )
+            )
+
+        return True
