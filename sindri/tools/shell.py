@@ -3,6 +3,8 @@
 import asyncio
 import structlog
 
+from sindri.config import SindriConfig
+from sindri.core.access import check_system_access
 from sindri.tools.base import Tool, ToolResult
 
 log = structlog.get_logger()
@@ -23,6 +25,26 @@ class ShellTool(Tool):
 
     async def execute(self, command: str) -> ToolResult:
         """Execute shell command."""
+        # Check access control - all shell commands are modifications
+        config = SindriConfig.load()
+        access_result = check_system_access(
+            config,
+            f"execute shell command: {command[:50]}{'...' if len(command) > 50 else ''}",
+            is_modification=True,
+        )
+
+        if not access_result.allowed:
+            log.warning(
+                "shell_access_denied",
+                command=command,
+                reason=access_result.reason,
+            )
+            return ToolResult(
+                success=False,
+                output="",
+                error=access_result.reason,
+            )
+
         try:
             log.info(
                 "shell_execute",

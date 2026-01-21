@@ -6,6 +6,8 @@ import structlog
 from typing import List
 import fnmatch
 
+from sindri.config import SindriConfig
+from sindri.core.access import check_system_access
 from sindri.tools.base import Tool, ToolResult
 
 log = structlog.get_logger()
@@ -78,6 +80,26 @@ class WriteFileTool(Tool):
 
     async def execute(self, path: str, content: str) -> ToolResult:
         """Write content to file."""
+        # Check access control - file writes are modifications
+        config = SindriConfig.load()
+        access_result = check_system_access(
+            config,
+            f"write file: {path}",
+            is_modification=True,
+        )
+
+        if not access_result.allowed:
+            log.warning(
+                "file_write_access_denied",
+                path=path,
+                reason=access_result.reason,
+            )
+            return ToolResult(
+                success=False,
+                output="",
+                error=access_result.reason,
+            )
+
         try:
             file_path = self._resolve_path(path)
 
@@ -127,6 +149,26 @@ class EditFileTool(Tool):
 
     async def execute(self, path: str, old_text: str, new_text: str) -> ToolResult:
         """Edit file by replacing text."""
+        # Check access control - file edits are modifications
+        config = SindriConfig.load()
+        access_result = check_system_access(
+            config,
+            f"edit file: {path}",
+            is_modification=True,
+        )
+
+        if not access_result.allowed:
+            log.warning(
+                "file_edit_access_denied",
+                path=path,
+                reason=access_result.reason,
+            )
+            return ToolResult(
+                success=False,
+                output="",
+                error=access_result.reason,
+            )
+
         try:
             file_path = self._resolve_path(path)
 

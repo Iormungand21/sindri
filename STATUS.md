@@ -8,7 +8,7 @@
 - Security relaxed for localhost/private IPs; cloud metadata endpoints still blocked.
 - Configurable system access (restricted/supervised/full) + self-management + scheduling tools.
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 3,804 passing (100%).
+- Tests: 3,815 passing (100%).
 
 ## Key Capabilities (high level)
 - Hierarchical multi-agent orchestration with 5-tier memory.
@@ -17,6 +17,7 @@
 - Broad tool suite (code, infra, data, media, diagrams, LaTeX, OpenSCAD).
 
 ## Recent Changes (latest first)
+- 2026-01-20: Enforce system access levels for shell/filesystem tools (RESTRICTED blocks shell, write_file, edit_file; +11 tests).
 - 2026-01-20: Tightened ModelManager.can_load() to avoid false positives when VRAM is insufficient (respects keep_warm models).
 - 2026-01-20: Work dir memory indexing respects configured `--work-dir`.
 - 2026-01-20: Sequential orchestrator path now handles exceptions like parallel path.
