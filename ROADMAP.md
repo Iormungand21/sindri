@@ -11,8 +11,8 @@
 Grouped by logical capability area.
 
 **Suggested sequencing:**
-- **Near-term (0–2 months):** items 1 ✅, 2 ✅, 5 ✅, 6 ✅
-- **Mid-term (2–4 months):** items 3, 4, 7
+- **Near-term (0–2 months):** items 1 ✅, 2 ✅, 3 ✅, 5 ✅, 6 ✅
+- **Mid-term (2–4 months):** items 4, 7
 - **Long-term (4–6 months):** items 8, 9, 10
 
 ### Stability + Bugfixes
@@ -43,10 +43,10 @@ Grouped by logical capability area.
    - **Two execution modes:**
      - *Agent-Guided (default)*: Agent proposes plan, task pauses for approval, agent continues with plan as guidance
      - *Step-by-Step (API/programmatic)*: PlanExecutor for fine-grained control with per-step approval and checkpoints
-3. **Reproducible Sessions**
-   - Save model versions, tool params, and environment snapshot
-   - `sindri replay <session>` to re-run or diff outputs
-   - Deterministic execution mode for tool-only flows
+3. **Reproducible Sessions** ✅ **COMPLETE**
+   - ✅ Save model versions, tool params, and environment snapshot
+   - ✅ `sindri replay <session>` to re-run or diff outputs
+   - ✅ Deterministic execution mode for tool-only flows
 
 ### Knowledge + Context
 4. **Multi-Project Workspace Index**
@@ -952,6 +952,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-21 | **Reproducible Sessions (ROADMAP Item 3)** - Environment snapshots (Sindri/Python/Ollama versions, model metadata, inference params), tool output recording, `sindri replay` CLI (info/list/run/compare), session comparison, database schema v7 | +44 |
 | 2026-01-21 | **Plan-First Execution (ROADMAP Item 2)** - Persistent plans with approval gates, step-level checkpointing, step re-run, PlanStore persistence, PlanExecutor orchestration, REST API endpoints for plan/step management, 15 new event types with schemas | +30 |
 | 2026-01-20 | **Event + API Contract v1 (Phase 16)** - event_schemas.py with 24 payload models, /api/schema endpoint, /api/version endpoint, X-Sindri-API-Version header, TypeScript generation script, contract tests | +50 |
 | 2026-01-20 | **Git Automation Tools (Phase 14)** - git_auto_commit, git_branch_compare, git_conflict_assist, git_release_notes + Huginn/Brokkr agents enhanced | +47 |

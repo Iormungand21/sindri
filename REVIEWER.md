@@ -1,98 +1,108 @@
-# Code Review Summary: Plan-First Execution Feature
+# Code Review Summary: Reproducible Sessions Feature
 
-**Feature:** ROADMAP.md Item 2 - Plan-First Execution
+**Feature:** ROADMAP.md Item 3 - Reproducible Sessions
 **Date:** 2026-01-21
 **Author:** Junior Developer (Claude Code)
 **Reviewer:** ChatGPT (Senior Team Member)
 
 ## Summary
 
-Implemented the Plan-First Execution feature, which adds persistent execution plans with user approval gates, step-level checkpointing, and the ability to re-run individual steps.
+Implemented the Reproducible Sessions feature, which enables users to capture complete session execution context, replay sessions for debugging and comparison, and execute tool-only deterministic replays.
 
 ## Requirements Addressed
 
-From ROADMAP.md Item 2:
-1. **Persist plans with user approval gates** - Plans are saved to SQLite database and require explicit user approval before execution begins
-2. **Step-level checkpointing and re-run of individual steps** - Each step can save checkpoints and be re-run independently
-3. **Partial results + explicit acceptance per step** - Users can accept or reject step results before proceeding
+From ROADMAP.md Item 3:
+1. **Save model versions, tool params, and environment snapshot** - Environment snapshots captured at session creation including Sindri version, Python version, Ollama version, model metadata (digest, quantization, family), and inference parameters
+2. **`sindri replay <session>` to re-run or diff outputs** - Full CLI command group with `info`, `list`, `run`, and `compare` subcommands
+3. **Deterministic execution mode for tool-only flows** - Tool-only replay mode uses recorded outputs for deterministic execution
 
-## Code Review Fixes Applied
-
-### Round 1 (Initial Review)
-- **PlanStore database initialization**: Changed to use `Database` instance and call `await self.db.initialize()` before all CRUD operations
-- **ProposePlanTool registry wiring**: `ToolRegistry.default()` now creates a default `PlanStore()` and passes it to `ProposePlanTool`
-
-### Round 2 (Re-review)
-- **Event context propagation**: Added `ToolRegistry.set_task_context()` to propagate `task_id`, `session_id`, `event_bus` to tools like `ProposePlanTool`
-- **Plan approval gates in orchestration**: Task pauses with `WAITING` status after `propose_plan`, emits `PLAN_AWAITING_APPROVAL` event
-- **DelegationManager integration**: Added `plan_approved()` and `plan_rejected()` methods to resume/fail waiting tasks
-
-### Round 3 (Final Review)
-- **Event subscription wiring**: Orchestrator now subscribes to `PLAN_APPROVED` and `PLAN_REJECTED` events and calls `DelegationManager.plan_approved()`/`.plan_rejected()`
-- **Event data includes task_id**: `PlanExecutor` now includes `task_id` in event data for approval/rejection
-- **Documented two modes of plan execution**: Agent-guided (default) vs step-by-step (PlanExecutor)
-
-## Two Modes of Plan Execution
-
-### Mode 1: Agent-Guided Execution (Default)
-When an agent proposes a plan via ProposePlanTool:
-- The plan is persisted to the database with PROPOSED status
-- The task pauses with WAITING status until the user approves
-- On approval, the task resumes and the agent continues execution
-- The agent uses the plan as guidance but executes autonomously
-- This integrates with the main HierarchicalAgentLoop orchestration
-
-### Mode 2: Step-by-Step Execution (PlanExecutor)
-For fine-grained control, use PlanExecutor directly:
-- Execute plans step-by-step with approval gates per step
-- Checkpoint support for crash recovery and resume
-- Re-run individual steps that failed
-- Explicit acceptance/rejection of step results
-
-## Files Created (4 new files)
+## Files Created (6 new files)
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `sindri/core/plan_execution.py` | ~400 | Dataclasses: PersistentPlan, PersistentPlanStep, StepCheckpoint, StepResult, enums |
-| `sindri/persistence/plans.py` | ~350 | PlanStore class for SQLite CRUD operations |
-| `sindri/core/plan_executor.py` | ~420 | PlanExecutor class for orchestrating step execution |
-| `tests/test_plan_execution.py` | ~500 | 30 comprehensive tests |
+| `sindri/persistence/snapshots.py` | ~450 | SnapshotStore and ToolOutputStore classes for persistence; ModelMetadata, InferenceParams, EnvironmentSnapshot dataclasses |
+| `sindri/replay/__init__.py` | ~20 | Module exports |
+| `sindri/replay/snapshot.py` | ~160 | SnapshotCapture class for capturing environment at session creation |
+| `sindri/replay/engine.py` | ~250 | ReplayEngine class with TOOL_ONLY and FULL replay modes; RecordedToolExecutor |
+| `sindri/replay/comparator.py` | ~280 | SessionComparator class for comparing sessions; TurnDiff, EnvironmentDiff, SessionComparison dataclasses |
+| `tests/test_replay.py` | ~650 | 44 comprehensive tests |
 
 ## Files Modified
 
 | File | Changes |
 |------|---------|
-| `sindri/persistence/database.py` | Added `execution_plans` and `plan_steps` tables; bumped SCHEMA_VERSION to 6 |
-| `sindri/core/events.py` | Added 16 new event types for plan/step lifecycle (including `PLAN_AWAITING_APPROVAL`) |
-| `sindri/core/event_schemas.py` | Added 16 Pydantic payload models for new events |
-| `sindri/tools/planning.py` | Updated ProposePlanTool with `set_task_context()` method |
-| `sindri/tools/registry.py` | Added `set_task_context()` method; passes `event_bus` and creates `PlanStore` |
-| `sindri/core/orchestrator.py` | Subscribes to `PLAN_APPROVED`/`PLAN_REJECTED` events; passes `event_bus` to registry |
-| `sindri/core/hierarchical.py` | Calls `tools.set_task_context()` before each task; pauses on plan proposal |
-| `sindri/core/delegation.py` | Added `plan_approved()` and `plan_rejected()` methods |
-| `sindri/tui/app.py` | Added event handlers for plan/step display in TUI |
-| `sindri/web/server.py` | Added 10 REST API endpoints for plan management |
+| `sindri/persistence/database.py` | Added `session_snapshots` and `session_tool_outputs` tables; bumped SCHEMA_VERSION to 7 |
+| `sindri/cli.py` | Added `replay` command group with 4 subcommands (info, list, run, compare) |
+| `STATUS.md` | Updated snapshot and recent changes section |
+| `ROADMAP.md` | Marked Reproducible Sessions as complete; updated changelog |
 
-## New REST API Endpoints
+## Database Schema Changes (v7)
 
-| Endpoint | Method | Purpose |
-|----------|--------|---------|
-| `/api/plans` | GET | List plans with optional status/task_id filtering |
-| `/api/plans/{id}` | GET | Get plan details with all steps |
-| `/api/plans/{id}/approve` | POST | Approve plan for execution (returns task_id) |
-| `/api/plans/{id}/reject` | POST | Reject plan (returns task_id) |
-| `/api/plans/{id}/steps` | GET | List steps for a plan |
-| `/api/plans/{id}/steps/{num}` | GET | Get specific step |
-| `/api/plans/{id}/steps/{num}/approve` | POST | Approve step execution |
-| `/api/plans/{id}/steps/{num}/reject` | POST | Reject/skip step |
-| `/api/plans/{id}/steps/{num}/accept` | POST | Accept step result |
-| `/api/plans/{id}/steps/{num}/rerun` | POST | Re-run step |
+Two new tables added:
+
+### session_snapshots
+Stores environment snapshots for sessions:
+- `session_id` (FK to sessions)
+- `sindri_version`, `sindri_git_commit`
+- `python_version`, `ollama_version`, `ollama_host`
+- `model_metadata_json` (digest, quantization, family, etc.)
+- `inference_params_json` (temperature, top_p, seed, etc.)
+- `config_snapshot_json` (full SindriConfig)
+
+### session_tool_outputs
+Stores full tool outputs for replay:
+- `session_id`, `turn_index`, `tool_index`
+- `tool_name`, `arguments_json`
+- `output_full` (not truncated, unlike audit log)
+- `output_hash` (SHA256 for verification)
+- `duration_ms`, `success`
+
+## New CLI Commands
+
+| Command | Purpose |
+|---------|---------|
+| `sindri replay info <session>` | Show environment snapshot for a session |
+| `sindri replay list` | List sessions with replay snapshots |
+| `sindri replay run <session> --mode [tool-only\|full]` | Replay a session |
+| `sindri replay compare <s1> <s2>` | Compare two sessions |
+
+## Key Classes
+
+### SnapshotCapture
+Captures environment at session creation:
+- Gets Sindri version (package or git commit)
+- Gets Python version
+- Gets Ollama version via /api/version
+- Gets model metadata via /api/show (digest, quantization, family)
+- Serializes SindriConfig
+
+### ReplayEngine
+Orchestrates session replay:
+- `TOOL_ONLY` mode: Uses recorded tool outputs for deterministic replay
+- `FULL` mode: Re-runs with LLM (framework for future implementation)
+- `get_replay_info()`: Check if session is replayable
+
+### SessionComparator
+Compares two sessions:
+- Environment diff (version changes, model changes)
+- Turn-by-turn comparison with similarity scores
+- Unified diff generation for content changes
+- Summary generation
 
 ## Test Coverage
 
-- 30 new tests added in `test_plan_execution.py`
-- Tests cover: dataclass serialization, PlanStore CRUD, PlanExecutor logic, approval workflows, checkpointing
-- All 3,901 tests pass
+- 44 new tests added in `tests/test_replay.py`
+- Test categories:
+  - ModelMetadata/InferenceParams/EnvironmentSnapshot serialization (8 tests)
+  - SnapshotStore/ToolOutputStore persistence (5 tests)
+  - SnapshotCapture (3 tests)
+  - RecordedToolExecutor (4 tests)
+  - ReplayEngine (5 tests)
+  - SessionComparator (6 tests)
+  - CLI commands (6 tests)
+  - Database schema (1 test)
+  - End-to-end integration (3 tests)
+- All 3,945 tests pass (3,901 existing + 44 new)
 
 ## Commands to Test
 
@@ -100,12 +110,21 @@ For fine-grained control, use PlanExecutor directly:
 # Run all tests
 .venv/bin/pytest tests/ -v --tb=no -q
 
-# Run plan execution tests specifically
-.venv/bin/pytest tests/test_plan_execution.py -v
+# Run replay tests specifically
+.venv/bin/pytest tests/test_replay.py -v
 
-# Run planning tests
-.venv/bin/pytest tests/test_planning.py -v
-
-# Run delegation tests
-.venv/bin/pytest tests/test_delegation.py -v
+# Test CLI commands
+.venv/bin/sindri replay --help
+.venv/bin/sindri replay info --help
+.venv/bin/sindri replay list
 ```
+
+## Design Decisions
+
+1. **Separate from session creation** - Snapshot capture is a separate utility class that can be called after session creation, keeping the core state.py simple and backward compatible
+
+2. **Tool outputs not in audit log** - Created separate `session_tool_outputs` table because audit log truncates outputs to 500 chars, but replay needs full outputs
+
+3. **Tool-only replay first** - Full replay with LLM requires deeper orchestrator integration; tool-only mode provides immediate value for deterministic testing
+
+4. **Output hash verification** - SHA256 hash stored with outputs allows verifying replay accuracy

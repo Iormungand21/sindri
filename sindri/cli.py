@@ -7171,5 +7171,431 @@ def policy_violations(limit: int, agent: str = None):
     console.print(table)
 
 
+# ==============================================================================
+# Replay Commands (Reproducible Sessions)
+# ==============================================================================
+
+
+@cli.group()
+def replay():
+    """Replay and compare past sessions.
+
+    The replay command group provides tools for reproducing and comparing
+    sessions. Sessions can be replayed using recorded tool outputs for
+    deterministic execution.
+
+    Examples:
+        sindri replay info <session_id>
+
+        sindri replay list
+
+        sindri replay run <session_id> --mode tool-only
+
+        sindri replay compare <session1> <session2>
+    """
+    pass
+
+
+@replay.command("info")
+@click.argument("session_id")
+@click.option("--show-config", is_flag=True, help="Include full config snapshot")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def replay_info(session_id: str, show_config: bool = False, as_json: bool = False):
+    """Show environment snapshot for a session.
+
+    Displays the captured environment information including Sindri version,
+    Python version, Ollama version, model metadata, and inference parameters.
+
+    Examples:
+        sindri replay info abc12345
+
+        sindri replay info abc12345 --show-config
+
+        sindri replay info abc12345 --json
+    """
+    import json
+    from rich.table import Table
+
+    from sindri.persistence.snapshots import SnapshotStore
+    from sindri.persistence.state import SessionState
+
+    async def fetch():
+        state = SessionState()
+        snapshots = SnapshotStore()
+
+        # Resolve short session ID
+        full_session_id = session_id
+        if len(session_id) < 36:
+            all_sessions = await state.list_sessions(limit=100)
+            matching = [s for s in all_sessions if s["id"].startswith(session_id)]
+
+            if not matching:
+                return None, None, f"No session found starting with {session_id}"
+            elif len(matching) > 1:
+                return (
+                    None,
+                    None,
+                    f"Multiple sessions match {session_id}, use full ID",
+                )
+
+            full_session_id = matching[0]["id"]
+
+        session = await state.load_session(full_session_id)
+        if not session:
+            return None, None, f"Session {full_session_id} not found"
+
+        snapshot = await snapshots.load_snapshot(full_session_id)
+        return session, snapshot, None
+
+    session, snapshot, error = asyncio.run(fetch())
+
+    if error:
+        console.print(f"[red]✗ {error}[/]")
+        return
+
+    if not snapshot:
+        console.print(f"[yellow]⚠ No snapshot found for session {session.id[:8]}[/]")
+        console.print("[dim]Snapshots are only captured for new sessions[/]")
+        return
+
+    if as_json:
+        output = snapshot.to_dict()
+        if not show_config:
+            output.pop("config_snapshot", None)
+        console.print(json.dumps(output, indent=2, default=str))
+        return
+
+    # Display as formatted table
+    console.print(
+        Panel(
+            f"[bold blue]Session:[/] {session.id[:8]}\n"
+            f"[dim]Task:[/] {session.task[:60]}...",
+            title="Session Snapshot",
+        )
+    )
+
+    table = Table(show_header=True, header_style="bold cyan")
+    table.add_column("Property", style="cyan", width=25)
+    table.add_column("Value", width=50)
+
+    table.add_row("Sindri Version", snapshot.sindri_version)
+    if snapshot.sindri_git_commit:
+        table.add_row("Git Commit", snapshot.sindri_git_commit)
+    table.add_row("Python Version", snapshot.python_version)
+    table.add_row("Ollama Version", snapshot.ollama_version or "unknown")
+    table.add_row("Ollama Host", snapshot.ollama_host)
+
+    console.print(table)
+
+    # Model metadata
+    console.print("\n[bold]Model Metadata[/]")
+    model_table = Table(show_header=True, header_style="bold green")
+    model_table.add_column("Property", style="green", width=25)
+    model_table.add_column("Value", width=50)
+
+    model = snapshot.model_metadata
+    model_table.add_row("Name", model.name)
+    model_table.add_row("Family", model.family)
+    model_table.add_row("Parameter Size", model.parameter_size)
+    model_table.add_row("Quantization", model.quantization_level)
+    if model.digest:
+        model_table.add_row("Digest", model.digest[:24] + "...")
+
+    console.print(model_table)
+
+    # Inference params
+    if snapshot.inference_params:
+        console.print("\n[bold]Inference Parameters[/]")
+        params_table = Table(show_header=True, header_style="bold yellow")
+        params_table.add_column("Property", style="yellow", width=25)
+        params_table.add_column("Value", width=50)
+
+        params = snapshot.inference_params
+        params_table.add_row("Temperature", str(params.temperature))
+        params_table.add_row("Top P", str(params.top_p))
+        params_table.add_row("Top K", str(params.top_k))
+        params_table.add_row("Repeat Penalty", str(params.repeat_penalty))
+        params_table.add_row("Context Length", str(params.num_ctx))
+        if params.seed is not None:
+            params_table.add_row("Seed", str(params.seed))
+
+        console.print(params_table)
+
+    if show_config:
+        console.print("\n[bold]Config Snapshot[/]")
+        console.print(json.dumps(snapshot.config_snapshot, indent=2))
+
+
+@replay.command("list")
+@click.option("--limit", "-n", default=20, help="Number of sessions to show")
+def replay_list(limit: int):
+    """List sessions with replay snapshots.
+
+    Shows sessions that have captured environment snapshots and are
+    eligible for replay.
+
+    Examples:
+        sindri replay list
+
+        sindri replay list --limit 50
+    """
+    from rich.table import Table
+
+    from sindri.persistence.snapshots import SnapshotStore, ToolOutputStore
+
+    async def fetch():
+        snapshots = SnapshotStore()
+        tool_outputs = ToolOutputStore()
+
+        sessions = await snapshots.list_sessions_with_snapshots(limit=limit)
+
+        # Add tool output counts
+        for session in sessions:
+            count = await tool_outputs.get_output_count(session["session_id"])
+            session["tool_outputs"] = count
+
+        return sessions
+
+    sessions = asyncio.run(fetch())
+
+    if not sessions:
+        console.print("[dim]No sessions with snapshots found.[/]")
+        console.print(
+            "[dim]Snapshots are captured automatically for new sessions.[/]"
+        )
+        return
+
+    table = Table(
+        title=f"Sessions with Snapshots ({len(sessions)})",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Session ID", style="cyan", width=10)
+    table.add_column("Task", width=35)
+    table.add_column("Model", width=20)
+    table.add_column("Version", width=10)
+    table.add_column("Outputs", width=8)
+    table.add_column("Created", width=19)
+
+    for s in sessions:
+        outputs_str = str(s["tool_outputs"]) if s["tool_outputs"] > 0 else "-"
+        table.add_row(
+            s["session_id"][:8],
+            (s["task"][:32] + "...") if len(s["task"]) > 35 else s["task"],
+            s["model"],
+            s["sindri_version"],
+            outputs_str,
+            s["created_at"][:19] if s["created_at"] else "-",
+        )
+
+    console.print(table)
+    console.print(
+        "\n[dim]Use 'sindri replay info <session_id>' to see full snapshot[/]"
+    )
+
+
+@replay.command("run")
+@click.argument("session_id")
+@click.option(
+    "--mode",
+    type=click.Choice(["full", "tool-only"]),
+    default="tool-only",
+    help="Replay mode",
+)
+def replay_run(session_id: str, mode: str):
+    """Replay a session.
+
+    In tool-only mode (default), replays using recorded tool outputs
+    for deterministic execution without running the LLM.
+
+    In full mode, re-runs with the LLM and compares outputs to the
+    original session.
+
+    Examples:
+        sindri replay run abc12345
+
+        sindri replay run abc12345 --mode tool-only
+
+        sindri replay run abc12345 --mode full
+    """
+    from sindri.replay.engine import ReplayEngine, ReplayMode
+    from sindri.persistence.state import SessionState
+
+    async def execute():
+        state = SessionState()
+
+        # Resolve short session ID
+        full_session_id = session_id
+        if len(session_id) < 36:
+            all_sessions = await state.list_sessions(limit=100)
+            matching = [s for s in all_sessions if s["id"].startswith(session_id)]
+
+            if not matching:
+                console.print(f"[red]✗ No session found starting with {session_id}[/]")
+                return
+            elif len(matching) > 1:
+                console.print(f"[yellow]⚠ Multiple sessions match {session_id}[/]")
+                for m in matching:
+                    console.print(f"  • {m['id'][:8]}")
+                return
+
+            full_session_id = matching[0]["id"]
+
+        session = await state.load_session(full_session_id)
+        if not session:
+            console.print(f"[red]✗ Session {full_session_id} not found[/]")
+            return
+
+        console.print(
+            Panel(
+                f"[bold blue]Session:[/] {full_session_id[:8]}\n"
+                f"[dim]Task:[/] {session.task[:60]}...\n"
+                f"[dim]Mode:[/] {mode}",
+                title="Replay Session",
+            )
+        )
+
+        engine = ReplayEngine()
+        replay_mode = ReplayMode.TOOL_ONLY if mode == "tool-only" else ReplayMode.FULL
+
+        with console.status("[bold green]Replaying..."):
+            result = await engine.replay(full_session_id, mode=replay_mode)
+
+        if result.status == "completed":
+            console.print(f"[green]✓ Replay completed successfully[/]")
+            console.print(
+                f"  Tool outputs: {result.tool_outputs_replayed}/{result.tool_outputs_total}"
+            )
+            if result.duration_seconds:
+                console.print(f"  Duration: {result.duration_seconds:.2f}s")
+        elif result.status == "no_outputs":
+            console.print("[yellow]⚠ No tool outputs recorded for this session[/]")
+            console.print(
+                "[dim]Tool outputs are captured automatically during execution[/]"
+            )
+        elif result.status == "diverged":
+            console.print(f"[yellow]⚠ Replay diverged at turn {result.divergence_point}[/]")
+            if result.divergence_reason:
+                console.print(f"[dim]Reason: {result.divergence_reason}[/]")
+        else:
+            console.print(f"[red]✗ Replay failed: {result.status}[/]")
+            for error in result.errors:
+                console.print(f"  [dim]{error}[/]")
+
+    asyncio.run(execute())
+
+
+@replay.command("compare")
+@click.argument("session1_id")
+@click.argument("session2_id")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def replay_compare(session1_id: str, session2_id: str, as_json: bool = False):
+    """Compare two sessions.
+
+    Shows differences in environment, turns, and outputs between two sessions.
+
+    Examples:
+        sindri replay compare abc12345 def67890
+
+        sindri replay compare abc12345 def67890 --json
+    """
+    import json
+    from rich.table import Table
+
+    from sindri.replay.comparator import SessionComparator
+    from sindri.persistence.state import SessionState
+
+    async def execute():
+        state = SessionState()
+        comparator = SessionComparator()
+
+        # Resolve short session IDs
+        async def resolve_id(sid):
+            if len(sid) < 36:
+                all_sessions = await state.list_sessions(limit=100)
+                matching = [s for s in all_sessions if s["id"].startswith(sid)]
+                if not matching:
+                    return None, f"No session found starting with {sid}"
+                elif len(matching) > 1:
+                    return None, f"Multiple sessions match {sid}"
+                return matching[0]["id"], None
+            return sid, None
+
+        full_id1, err1 = await resolve_id(session1_id)
+        if err1:
+            console.print(f"[red]✗ {err1}[/]")
+            return
+
+        full_id2, err2 = await resolve_id(session2_id)
+        if err2:
+            console.print(f"[red]✗ {err2}[/]")
+            return
+
+        try:
+            comparison = await comparator.compare(full_id1, full_id2)
+        except ValueError as e:
+            console.print(f"[red]✗ {e}[/]")
+            return
+
+        if as_json:
+            output = {
+                "session1_id": comparison.session1_id,
+                "session2_id": comparison.session2_id,
+                "overall_similarity": comparison.overall_similarity,
+                "turns_compared": comparison.turns_compared,
+                "turns_identical": comparison.turns_identical,
+                "summary": comparison.summary,
+                "env_diff": comparison.env_diff.to_dict(),
+            }
+            console.print(json.dumps(output, indent=2, default=str))
+            return
+
+        # Header
+        console.print(
+            Panel(
+                f"[bold blue]Session 1:[/] {comparison.session1_id[:8]}\n"
+                f"[bold blue]Session 2:[/] {comparison.session2_id[:8]}\n"
+                f"[dim]Similarity:[/] {comparison.overall_similarity:.1%}",
+                title="Session Comparison",
+            )
+        )
+
+        # Summary
+        console.print(f"\n[bold]Summary:[/] {comparison.summary}")
+
+        # Environment diff
+        if comparison.env_diff.has_differences:
+            console.print("\n[bold yellow]Environment Differences:[/]")
+            env_table = Table(show_header=True, header_style="bold yellow")
+            env_table.add_column("Property", style="yellow", width=20)
+            env_table.add_column("Session 1", width=25)
+            env_table.add_column("Session 2", width=25)
+
+            diff_dict = comparison.env_diff.to_dict()
+            for key, (val1, val2) in diff_dict.items():
+                env_table.add_row(key.replace("_", " ").title(), str(val1), str(val2))
+
+            console.print(env_table)
+
+        # Turn diffs summary
+        different_turns = [td for td in comparison.turn_diffs if not td.is_identical]
+        if different_turns:
+            console.print(f"\n[bold]Different Turns ({len(different_turns)}):[/]")
+            for td in different_turns[:5]:  # Show first 5
+                status = "content" if not td.content_match else ""
+                if not td.tool_calls_match:
+                    status += " tools" if status else "tools"
+                console.print(
+                    f"  Turn {td.turn_index} ({td.role}): {status} differ "
+                    f"({td.similarity_score:.0%} similar)"
+                )
+            if len(different_turns) > 5:
+                console.print(f"  [dim]... and {len(different_turns) - 5} more[/]")
+        else:
+            console.print("\n[green]All turns are identical.[/]")
+
+    asyncio.run(execute())
+
+
 if __name__ == "__main__":
     cli()

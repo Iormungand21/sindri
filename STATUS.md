@@ -10,7 +10,8 @@
 - Event + API Contract v1 shipped; schema endpoints live.
 - Policy + Guardrails: agent-level constraints (tool limits, file limits, runtime limits, escalation modes).
 - **Plan-First Execution**: Two modes - agent-guided (default, pauses for approval then continues) and step-by-step (API/programmatic via PlanExecutor with checkpoints).
-- Tests: 3,901 passing (100%).
+- **Reproducible Sessions**: Environment snapshots, tool output recording, session replay and comparison.
+- Tests: 3,945 passing (100%).
 
 ## Key Capabilities (high level)
 - Hierarchical multi-agent orchestration with 5-tier memory.
@@ -21,6 +22,7 @@
 - Broad tool suite (code, infra, data, media, diagrams, LaTeX, OpenSCAD).
 
 ## Recent Changes (latest first)
+- 2026-01-21: Reproducible Sessions feature (environment snapshots, tool output recording, `sindri replay` CLI commands, session comparison; +44 tests).
 - 2026-01-21: Plan-First Execution feature (persistent plans, user approval gates, step-level checkpointing, re-run support, REST API endpoints; +30 tests).
 - 2026-01-20: Policy + Guardrails feature (max_tool_calls, max_files_touched, max_runtime_seconds, file_scope, escalation modes; CLI commands; +27 tests).
 - 2026-01-20: Granular Tool Permissions feature (allowlists/blocklists, audit log, dry-run mode; +21 tests).

@@ -14,7 +14,8 @@ log = structlog.get_logger()
 # Version 4: Removed collaboration tables (internal-only mode)
 # Version 5: Added tool_audit_log table for granular tool permissions
 # Version 6: Added execution_plans and plan_steps tables for Plan-First Execution
-SCHEMA_VERSION = 6
+# Version 7: Added session_snapshots and session_tool_outputs for Reproducible Sessions
+SCHEMA_VERSION = 7
 
 
 def _db_debug(message: str):
@@ -302,6 +303,67 @@ class Database:
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_steps_plan_number
                 ON plan_steps(plan_id, step_number)
+            """
+            )
+
+            # Reproducible Sessions: session_snapshots table
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS session_snapshots (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL UNIQUE,
+                    sindri_version TEXT NOT NULL,
+                    sindri_git_commit TEXT,
+                    python_version TEXT NOT NULL,
+                    ollama_version TEXT,
+                    ollama_host TEXT NOT NULL,
+                    model_metadata_json TEXT NOT NULL,
+                    inference_params_json TEXT,
+                    config_snapshot_json TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_snapshot_session
+                ON session_snapshots(session_id)
+            """
+            )
+
+            # Reproducible Sessions: session_tool_outputs table
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS session_tool_outputs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    turn_index INTEGER NOT NULL,
+                    tool_index INTEGER NOT NULL,
+                    tool_name TEXT NOT NULL,
+                    arguments_json TEXT NOT NULL,
+                    output_full TEXT,
+                    output_hash TEXT,
+                    duration_ms INTEGER,
+                    success INTEGER NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_tool_output_session
+                ON session_tool_outputs(session_id)
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_tool_output_turn
+                ON session_tool_outputs(session_id, turn_index, tool_index)
             """
             )
 
