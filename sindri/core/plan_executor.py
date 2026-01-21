@@ -585,7 +585,7 @@ class PlanExecutor:
 
         self._emit(
             EventType.PLAN_APPROVED,
-            {"plan_id": plan_id, "task_summary": plan.task_summary},
+            {"plan_id": plan_id, "task_id": plan.task_id, "task_summary": plan.task_summary},
             task_id=plan.task_id,
         )
 
@@ -611,7 +611,7 @@ class PlanExecutor:
 
         self._emit(
             EventType.PLAN_REJECTED,
-            {"plan_id": plan_id, "reason": reason},
+            {"plan_id": plan_id, "task_id": plan.task_id, "reason": reason},
             task_id=plan.task_id,
         )
 

@@ -270,19 +270,9 @@ class DelegationManager:
         import heapq
         heapq.heappush(self.scheduler.pending, (task.priority, task.id))
 
-        # Emit event for TUI
-        if self.event_bus:
-            self.event_bus.emit(
-                Event(
-                    type=EventType.PLAN_APPROVED,
-                    data={
-                        "task_id": task_id,
-                        "plan_id": plan_id,
-                        "agent": task.assigned_agent,
-                    },
-                    task_id=task_id,
-                )
-            )
+        # Note: PLAN_APPROVED event is emitted by PlanExecutor, not here,
+        # to avoid duplicate events since this method is called in response
+        # to that event.
 
         return True
 
@@ -316,18 +306,8 @@ class DelegationManager:
         task.status = TaskStatus.FAILED
         task.error = f"Plan {plan_id} rejected: {reason or 'User rejected plan'}"
 
-        # Emit event for TUI
-        if self.event_bus:
-            self.event_bus.emit(
-                Event(
-                    type=EventType.PLAN_REJECTED,
-                    data={
-                        "task_id": task_id,
-                        "plan_id": plan_id,
-                        "reason": reason,
-                    },
-                    task_id=task_id,
-                )
-            )
+        # Note: PLAN_REJECTED event is emitted by PlanExecutor, not here,
+        # to avoid duplicate events since this method is called in response
+        # to that event.
 
         return True

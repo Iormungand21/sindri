@@ -4,6 +4,26 @@ This module implements Plan-First Execution (ROADMAP.md Item 2):
 1. Persist plans with user approval gates
 2. Step-level checkpointing and re-run of individual steps
 3. Partial results + explicit acceptance per step
+
+## Two Modes of Plan Execution
+
+### Mode 1: Agent-Guided Execution (Default)
+When an agent proposes a plan via ProposePlanTool:
+- The plan is persisted to the database with PROPOSED status
+- The task pauses with WAITING status until the user approves
+- On approval, the task resumes and the agent continues execution
+- The agent uses the plan as guidance but executes autonomously
+- This integrates with the main HierarchicalAgentLoop orchestration
+
+### Mode 2: Step-by-Step Execution (PlanExecutor)
+For fine-grained control, use PlanExecutor directly:
+- Execute plans step-by-step with approval gates per step
+- Checkpoint support for crash recovery and resume
+- Re-run individual steps that failed
+- Explicit acceptance/rejection of step results
+
+Mode 1 is used when agents propose plans during task execution.
+Mode 2 is available via the REST API for programmatic plan execution.
 """
 
 from dataclasses import dataclass, field

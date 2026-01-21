@@ -76,7 +76,34 @@ class Orchestrator:
             event_bus=self.event_bus,
         )
 
+        # Plan-First Execution: Subscribe to plan approval/rejection events
+        self.event_bus.subscribe(EventType.PLAN_APPROVED, self._handle_plan_approved)
+        self.event_bus.subscribe(EventType.PLAN_REJECTED, self._handle_plan_rejected)
+
         log.info("orchestrator_initialized", memory_enabled=enable_memory)
+
+    def _handle_plan_approved(self, data: dict):
+        """Handle PLAN_APPROVED event - resume waiting task.
+
+        This is called synchronously by EventBus, so we schedule the
+        async DelegationManager call.
+        """
+        task_id = data.get("task_id")
+        plan_id = data.get("plan_id")
+        if task_id and plan_id:
+            asyncio.create_task(self.delegation.plan_approved(task_id, plan_id))
+
+    def _handle_plan_rejected(self, data: dict):
+        """Handle PLAN_REJECTED event - fail waiting task.
+
+        This is called synchronously by EventBus, so we schedule the
+        async DelegationManager call.
+        """
+        task_id = data.get("task_id")
+        plan_id = data.get("plan_id")
+        reason = data.get("reason")
+        if task_id and plan_id:
+            asyncio.create_task(self.delegation.plan_rejected(task_id, plan_id, reason))
 
     def cancel_task(self, task_id: str):
         """Request cancellation of a task and its subtasks."""
