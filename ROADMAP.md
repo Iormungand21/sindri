@@ -40,6 +40,9 @@ Grouped by logical capability area.
    - ✅ Persist plans with user approval gates
    - ✅ Step-level checkpointing and re-run of individual steps
    - ✅ Partial results + explicit acceptance per step
+   - **Two execution modes:**
+     - *Agent-Guided (default)*: Agent proposes plan, task pauses for approval, agent continues with plan as guidance
+     - *Step-by-Step (API/programmatic)*: PlanExecutor for fine-grained control with per-step approval and checkpoints
 3. **Reproducible Sessions**
    - Save model versions, tool params, and environment snapshot
    - `sindri replay <session>` to re-run or diff outputs

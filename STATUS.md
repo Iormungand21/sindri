@@ -9,7 +9,7 @@
 - Configurable system access (restricted/supervised/full) + self-management + scheduling tools.
 - Event + API Contract v1 shipped; schema endpoints live.
 - Policy + Guardrails: agent-level constraints (tool limits, file limits, runtime limits, escalation modes).
-- **Plan-First Execution**: Persistent plans with approval gates, step-level checkpointing, partial results acceptance.
+- **Plan-First Execution**: Two modes - agent-guided (default, pauses for approval then continues) and step-by-step (API/programmatic via PlanExecutor with checkpoints).
 - Tests: 3,901 passing (100%).
 
 ## Key Capabilities (high level)
