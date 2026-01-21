@@ -27,7 +27,7 @@ Grouped by logical capability area.
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Respect configured work_dir when indexing memory context instead of process CWD
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Tighten ModelManager.can_load scheduling check to avoid false positives when VRAM is insufficient
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Enforce system access levels for shell/filesystem tools (define RESTRICTED/SUPERVISED behavior)
-   - **Junior task (Owner: Claude, Reviewer: Codex):** Add command timeout/cancellation support to shell tool to prevent hangs
+   - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Add command timeout/cancellation support to shell tool to prevent hangs
 
 ### API + Contract Stability
 1. **Event + API Contract v1** ✅ **COMPLETE (Phase 16)**

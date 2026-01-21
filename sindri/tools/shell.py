@@ -18,13 +18,30 @@ class ShellTool(Tool):
     parameters = {
         "type": "object",
         "properties": {
-            "command": {"type": "string", "description": "Shell command to execute"}
+            "command": {"type": "string", "description": "Shell command to execute"},
+            "timeout": {
+                "type": "integer",
+                "description": "Command timeout in seconds (default: 300, max: 3600)",
+            },
         },
         "required": ["command"],
     }
 
-    async def execute(self, command: str) -> ToolResult:
-        """Execute shell command."""
+    # Default timeout in seconds (5 minutes)
+    DEFAULT_TIMEOUT = 300
+    # Maximum allowed timeout (1 hour)
+    MAX_TIMEOUT = 3600
+
+    async def execute(self, command: str, timeout: int | None = None) -> ToolResult:
+        """Execute shell command with timeout support.
+
+        Args:
+            command: Shell command to execute
+            timeout: Command timeout in seconds (default: 300, max: 3600)
+
+        Returns:
+            ToolResult with command output or error
+        """
         # Check access control - all shell commands are modifications
         config = SindriConfig.load()
         access_result = check_system_access(
@@ -45,10 +62,16 @@ class ShellTool(Tool):
                 error=access_result.reason,
             )
 
+        # Validate and cap timeout
+        if timeout is None:
+            timeout = self.DEFAULT_TIMEOUT
+        timeout = max(1, min(timeout, self.MAX_TIMEOUT))
+
         try:
             log.info(
                 "shell_execute",
                 command=command,
+                timeout=timeout,
                 work_dir=str(self.work_dir) if self.work_dir else None,
             )
 
@@ -59,7 +82,25 @@ class ShellTool(Tool):
                 cwd=str(self.work_dir) if self.work_dir else None,
             )
 
-            stdout, stderr = await process.communicate()
+            try:
+                stdout, stderr = await asyncio.wait_for(
+                    process.communicate(), timeout=timeout
+                )
+            except asyncio.TimeoutError:
+                # Kill the process on timeout
+                process.kill()
+                await process.wait()  # Ensure process is cleaned up
+                log.warning(
+                    "shell_timeout",
+                    command=command,
+                    timeout=timeout,
+                )
+                return ToolResult(
+                    success=False,
+                    output="",
+                    error=f"Command timed out after {timeout} seconds",
+                    metadata={"timeout": timeout, "timed_out": True},
+                )
 
             stdout_text = stdout.decode() if stdout else ""
             stderr_text = stderr.decode() if stderr else ""
@@ -71,7 +112,11 @@ class ShellTool(Tool):
                 return ToolResult(
                     success=True,
                     output=stdout_text,
-                    metadata={"returncode": process.returncode, "stderr": stderr_text},
+                    metadata={
+                        "returncode": process.returncode,
+                        "stderr": stderr_text,
+                        "timeout": timeout,
+                    },
                 )
             else:
                 log.warning(
@@ -81,7 +126,7 @@ class ShellTool(Tool):
                     success=False,
                     output=stdout_text,
                     error=f"Command failed with exit code {process.returncode}: {stderr_text}",
-                    metadata={"returncode": process.returncode},
+                    metadata={"returncode": process.returncode, "timeout": timeout},
                 )
 
         except Exception as e:

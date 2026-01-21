@@ -17,6 +17,7 @@
 - Broad tool suite (code, infra, data, media, diagrams, LaTeX, OpenSCAD).
 
 ## Recent Changes (latest first)
+- 2026-01-20: Add command timeout/cancellation support to shell tool (default 300s, max 3600s; +5 tests).
 - 2026-01-20: Enforce system access levels for shell/filesystem tools (RESTRICTED blocks shell, write_file, edit_file; +11 tests).
 - 2026-01-20: Tightened ModelManager.can_load() to avoid false positives when VRAM is insufficient (respects keep_warm models).
 - 2026-01-20: Work dir memory indexing respects configured `--work-dir`.

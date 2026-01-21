@@ -79,6 +79,73 @@ async def test_shell_failure():
 
 
 # ============================================================================
+# Shell Timeout Tests
+# ============================================================================
+
+
+@pytest.mark.asyncio
+async def test_shell_timeout_default():
+    """Test shell tool has default timeout in metadata."""
+    tool = ShellTool()
+
+    result = await tool.execute(command="echo 'quick'")
+
+    assert result.success
+    assert result.metadata.get("timeout") == ShellTool.DEFAULT_TIMEOUT
+
+
+@pytest.mark.asyncio
+async def test_shell_timeout_custom():
+    """Test shell tool accepts custom timeout parameter."""
+    tool = ShellTool()
+
+    result = await tool.execute(command="echo 'quick'", timeout=60)
+
+    assert result.success
+    assert result.metadata.get("timeout") == 60
+
+
+@pytest.mark.asyncio
+async def test_shell_timeout_exceeded():
+    """Test that hanging command is killed and error returned on timeout."""
+    tool = ShellTool()
+
+    # Sleep for 10 seconds but timeout after 1 second
+    result = await tool.execute(command="sleep 10", timeout=1)
+
+    assert not result.success
+    assert "timed out" in result.error.lower()
+    assert result.metadata.get("timed_out") is True
+    assert result.metadata.get("timeout") == 1
+
+
+@pytest.mark.asyncio
+async def test_shell_timeout_capped_at_max():
+    """Test that timeout is capped at MAX_TIMEOUT."""
+    tool = ShellTool()
+
+    # Request absurdly high timeout
+    result = await tool.execute(command="echo 'quick'", timeout=999999)
+
+    assert result.success
+    # Should be capped at MAX_TIMEOUT
+    assert result.metadata.get("timeout") == ShellTool.MAX_TIMEOUT
+
+
+@pytest.mark.asyncio
+async def test_shell_timeout_minimum():
+    """Test that timeout cannot be less than 1 second."""
+    tool = ShellTool()
+
+    # Request zero or negative timeout
+    result = await tool.execute(command="echo 'quick'", timeout=0)
+
+    assert result.success
+    # Should be at least 1
+    assert result.metadata.get("timeout") >= 1
+
+
+# ============================================================================
 # Access Control Tests
 # ============================================================================
 
