@@ -332,3 +332,123 @@ class TestCacheEvictionStrategy:
 
         # model1 was used 3 times before eviction
         assert manager.metrics.evictions == 1
+
+
+class TestCanLoadAccuracy:
+    """Test can_load() returns accurate predictions (no false positives).
+
+    Phase 15: Tightened VRAM scheduling check to avoid over-scheduling.
+    """
+
+    @pytest.fixture
+    def manager(self):
+        """Create a model manager with 14GB available (16 - 2 reserve)."""
+        return ModelManager(total_vram_gb=16.0, reserve_gb=2.0)
+
+    def test_can_load_already_loaded_model(self, manager):
+        """Already loaded models should always return True."""
+        manager.loaded["model1"] = LoadedModel(
+            name="model1", vram_gb=5.0, last_used=time.time()
+        )
+        assert manager.can_load("model1", 5.0) is True
+
+    def test_can_load_sufficient_free_vram(self, manager):
+        """Should return True when free VRAM is sufficient."""
+        # No models loaded, 14GB free
+        assert manager.can_load("new-model", 10.0) is True
+        assert manager.can_load("new-model", 14.0) is True
+
+    def test_can_load_insufficient_free_vram_no_models(self, manager):
+        """Should return False when free VRAM insufficient and no evictable models."""
+        # No models loaded, 14GB free, need 15GB
+        assert manager.can_load("huge-model", 15.0) is False
+
+    def test_can_load_false_when_all_keep_warm(self, manager):
+        """Should return False when all loaded models are keep_warm."""
+        manager.keep_warm.add("protected-model")
+        manager.loaded["protected-model"] = LoadedModel(
+            name="protected-model", vram_gb=10.0, last_used=time.time()
+        )
+        # Free: 14 - 10 = 4GB, need 5GB, protected-model can't be evicted
+        assert manager.can_load("new-model", 5.0) is False
+
+    def test_can_load_true_when_eviction_helps(self, manager):
+        """Should return True when evicting non-keep_warm frees enough space."""
+        manager.loaded["evictable"] = LoadedModel(
+            name="evictable", vram_gb=10.0, last_used=time.time()
+        )
+        # Free: 14 - 10 = 4GB, need 8GB
+        # Potential free after eviction: 14GB >= 8GB
+        assert manager.can_load("new-model", 8.0) is True
+
+    def test_can_load_false_when_eviction_insufficient(self, manager):
+        """Should return False even after evicting all evictable models."""
+        manager.loaded["evictable"] = LoadedModel(
+            name="evictable", vram_gb=5.0, last_used=time.time()
+        )
+        # Free: 14 - 5 = 9GB
+        # Potential free after eviction: 14GB
+        # Need: 15GB > 14GB - still not enough
+        assert manager.can_load("huge-model", 15.0) is False
+
+    def test_can_load_mixed_keep_warm_and_evictable(self, manager):
+        """Should only consider evictable models when calculating potential."""
+        manager.keep_warm.add("protected")
+        manager.loaded["protected"] = LoadedModel(
+            name="protected", vram_gb=8.0, last_used=time.time()
+        )
+        manager.loaded["evictable"] = LoadedModel(
+            name="evictable", vram_gb=4.0, last_used=time.time()
+        )
+        # Free: 14 - 8 - 4 = 2GB
+        # Evictable: 4GB (only "evictable")
+        # Potential free: 2 + 4 = 6GB
+        assert manager.can_load("new-model", 6.0) is True
+        assert manager.can_load("new-model", 7.0) is False
+
+    def test_can_load_partial_vram_used_evictable(self, manager):
+        """The original bug scenario: VRAM partially used, can_load should check eviction."""
+        # Simulate 10GB already used by an evictable model
+        manager.loaded["large-model"] = LoadedModel(
+            name="large-model", vram_gb=10.0, last_used=time.time()
+        )
+        # Free: 14 - 10 = 4GB
+        # Task needs 5GB - cannot fit directly
+        # But large-model IS evictable, so potential free = 14GB >= 5GB
+        assert manager.can_load("new-model", 5.0) is True
+
+    def test_can_load_partial_vram_used_keep_warm(self, manager):
+        """Corrected scenario: when loaded model is keep_warm, can't evict."""
+        manager.keep_warm.add("large-model")
+        manager.loaded["large-model"] = LoadedModel(
+            name="large-model", vram_gb=10.0, last_used=time.time()
+        )
+        # Free: 14 - 10 = 4GB
+        # Task needs 5GB
+        # large-model is keep_warm, so potential free = 4GB < 5GB
+        assert manager.can_load("new-model", 5.0) is False
+
+    def test_calculate_potential_free_vram_no_models(self, manager):
+        """Potential free should equal available when no models loaded."""
+        assert manager._calculate_potential_free_vram() == 14.0
+
+    def test_calculate_potential_free_vram_with_evictable(self, manager):
+        """Potential free should include evictable model VRAM."""
+        manager.loaded["model1"] = LoadedModel(
+            name="model1", vram_gb=5.0, last_used=time.time()
+        )
+        # Free: 14 - 5 = 9GB
+        # Evictable: 5GB
+        # Potential: 9 + 5 = 14GB
+        assert manager._calculate_potential_free_vram() == 14.0
+
+    def test_calculate_potential_free_vram_with_keep_warm(self, manager):
+        """Potential free should NOT include keep_warm model VRAM."""
+        manager.keep_warm.add("model1")
+        manager.loaded["model1"] = LoadedModel(
+            name="model1", vram_gb=5.0, last_used=time.time()
+        )
+        # Free: 14 - 5 = 9GB
+        # Evictable: 0GB (model1 is keep_warm)
+        # Potential: 9 + 0 = 9GB
+        assert manager._calculate_potential_free_vram() == 9.0

@@ -92,19 +92,47 @@ class ModelManager:
         """Check if model can be loaded (may require eviction).
 
         Note: This is a non-locking check. For actual loading, use ensure_loaded().
+
+        Returns True ONLY if:
+        - Model is already loaded, OR
+        - Free VRAM >= required, OR
+        - Evicting non-keep_warm models would free enough space
+
+        Args:
+            model: Name of the model to check.
+            required_vram: VRAM required by the model in GB.
+
+        Returns:
+            True if the model can be loaded, False otherwise.
         """
+        # Case 1: Already loaded - always True
         if model in self.loaded:
             return True
 
+        # Case 2: Enough free VRAM right now
         free_vram = self._get_free_vram()
-        # Can load if we have space OR can make space by evicting
-        can = free_vram >= required_vram or len(self.loaded) > 0
+        if free_vram >= required_vram:
+            log.debug(
+                "can_load_check",
+                model=model,
+                required=required_vram,
+                free=free_vram,
+                reason="sufficient_free_vram",
+                can_load=True,
+            )
+            return True
+
+        # Case 3: Check if evicting non-keep_warm models would help
+        potential_free = self._calculate_potential_free_vram()
+        can = potential_free >= required_vram
 
         log.debug(
             "can_load_check",
             model=model,
             required=required_vram,
             free=free_vram,
+            potential_free=potential_free,
+            reason="eviction_possible" if can else "insufficient_even_with_eviction",
             can_load=can,
         )
 
@@ -120,6 +148,23 @@ class ModelManager:
         """Calculate free VRAM."""
         used = sum(m.vram_gb for m in self.loaded.values())
         return self.available - used
+
+    def _calculate_potential_free_vram(self) -> float:
+        """Calculate maximum VRAM available if all evictable models were unloaded.
+
+        This is the free VRAM plus the sum of VRAM used by non-keep_warm models.
+        Used for non-blocking scheduling checks to avoid false positives.
+
+        Returns:
+            Maximum potential free VRAM in GB.
+        """
+        current_free = self._get_free_vram()
+        evictable_vram = sum(
+            m.vram_gb
+            for m in self.loaded.values()
+            if m.name not in self.keep_warm
+        )
+        return current_free + evictable_vram
 
     async def ensure_loaded(self, model: str, required_vram: float) -> bool:
         """Ensure model is loaded, evicting others if needed.
