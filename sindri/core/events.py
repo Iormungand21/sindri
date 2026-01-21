@@ -46,6 +46,23 @@ class EventType(Enum):
     POLICY_VIOLATION = auto()  # Policy limit exceeded
     POLICY_WARNING = auto()  # Policy approaching limit (e.g., 80%)
     POLICY_ESCALATION = auto()  # Operation escalated for approval
+    # Plan-First Execution events (ROADMAP.md Item 2)
+    PLAN_PERSISTED = auto()  # Plan saved to database
+    PLAN_EXECUTION_STARTED = auto()  # Plan execution begun
+    PLAN_EXECUTION_PAUSED = auto()  # Waiting for step approval
+    PLAN_EXECUTION_RESUMED = auto()  # Resumed after approval
+    # Step-level events
+    STEP_AWAITING_APPROVAL = auto()  # Step needs user approval to start
+    STEP_APPROVED = auto()  # User approved step execution
+    STEP_REJECTED = auto()  # User rejected step (skip or fail)
+    STEP_STARTED = auto()  # Step execution started
+    STEP_CHECKPOINTED = auto()  # Step checkpoint saved
+    STEP_COMPLETED = auto()  # Step finished successfully
+    STEP_FAILED = auto()  # Step execution failed
+    STEP_RESULT_PENDING = auto()  # Step result awaiting user acceptance
+    STEP_RESULT_ACCEPTED = auto()  # User accepted step result
+    STEP_RESULT_REJECTED = auto()  # User rejected step result
+    STEP_RERUN_REQUESTED = auto()  # User requested re-run of step
 
 
 @dataclass

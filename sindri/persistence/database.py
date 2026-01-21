@@ -13,7 +13,8 @@ log = structlog.get_logger()
 # Version 3: Added session_feedback table for feedback collection and fine-tuning
 # Version 4: Removed collaboration tables (internal-only mode)
 # Version 5: Added tool_audit_log table for granular tool permissions
-SCHEMA_VERSION = 5
+# Version 6: Added execution_plans and plan_steps tables for Plan-First Execution
+SCHEMA_VERSION = 6
 
 
 def _db_debug(message: str):
@@ -215,6 +216,92 @@ class Database:
                 """
                 CREATE INDEX IF NOT EXISTS idx_audit_created
                 ON tool_audit_log(created_at)
+            """
+            )
+
+            # Plan-First Execution: execution_plans table
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS execution_plans (
+                    id TEXT PRIMARY KEY,
+                    session_id TEXT,
+                    task_id TEXT NOT NULL,
+                    task_summary TEXT NOT NULL,
+                    rationale TEXT,
+                    risks TEXT,
+                    status TEXT NOT NULL DEFAULT 'proposed',
+                    total_estimated_vram_gb REAL DEFAULT 0.0,
+                    plan_json TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    approved_at TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_plans_status
+                ON execution_plans(status)
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_plans_task
+                ON execution_plans(task_id)
+            """
+            )
+
+            # Plan-First Execution: plan_steps table
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS plan_steps (
+                    id TEXT PRIMARY KEY,
+                    plan_id TEXT NOT NULL,
+                    step_number INTEGER NOT NULL,
+                    description TEXT NOT NULL,
+                    agent TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    dependencies TEXT,
+                    tool_hints TEXT,
+                    estimated_iterations INTEGER DEFAULT 5,
+                    started_at TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    iterations_used INTEGER DEFAULT 0,
+                    child_task_id TEXT,
+                    session_id TEXT,
+                    checkpoint_json TEXT,
+                    result_json TEXT,
+                    error TEXT,
+                    approval_required INTEGER DEFAULT 1,
+                    approval_status TEXT,
+                    approved_at TIMESTAMP,
+                    rejection_reason TEXT,
+                    FOREIGN KEY (plan_id) REFERENCES execution_plans(id)
+                )
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_steps_plan
+                ON plan_steps(plan_id)
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_steps_status
+                ON plan_steps(status)
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_steps_plan_number
+                ON plan_steps(plan_id, step_number)
             """
             )
 

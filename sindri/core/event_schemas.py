@@ -274,6 +274,130 @@ class PolicyEscalationData(BaseModel):
     context: Optional[str] = Field(None, description="Additional context")
 
 
+# === Plan-First Execution Event Payloads (ROADMAP.md Item 2) ===
+
+
+class PlanPersistedData(BaseModel):
+    """Payload for PLAN_PERSISTED event."""
+
+    plan_id: str = Field(..., description="Plan identifier (UUID)")
+    task_summary: str = Field(..., description="Summary of the planned task")
+    step_count: int = Field(..., description="Number of steps in the plan")
+    agents: list[str] = Field(default_factory=list, description="Agents involved in plan")
+
+
+class PlanExecutionStartedData(BaseModel):
+    """Payload for PLAN_EXECUTION_STARTED event."""
+
+    plan_id: str = Field(..., description="Plan identifier")
+    task_summary: str = Field(..., description="Task summary")
+    steps: int = Field(..., description="Total number of steps")
+
+
+class PlanExecutionPausedData(BaseModel):
+    """Payload for PLAN_EXECUTION_PAUSED event."""
+
+    plan_id: str = Field(..., description="Plan identifier")
+    current_step: int = Field(..., description="Step number that caused pause")
+    reason: str = Field(..., description="Reason for pause")
+
+
+class PlanExecutionResumedData(BaseModel):
+    """Payload for PLAN_EXECUTION_RESUMED event."""
+
+    plan_id: str = Field(..., description="Plan identifier")
+    from_step: int = Field(..., description="Step number resuming from")
+
+
+class StepAwaitingApprovalData(BaseModel):
+    """Payload for STEP_AWAITING_APPROVAL event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number (1-indexed)")
+    description: str = Field(..., description="Step description")
+    agent: str = Field(..., description="Agent that will execute this step")
+
+
+class StepApprovedData(BaseModel):
+    """Payload for STEP_APPROVED event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+
+
+class StepRejectedData(BaseModel):
+    """Payload for STEP_REJECTED event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+    reason: Optional[str] = Field(None, description="Rejection reason")
+
+
+class StepStartedData(BaseModel):
+    """Payload for STEP_STARTED event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+    description: str = Field(..., description="Step description")
+    agent: str = Field(..., description="Agent executing this step")
+
+
+class StepCheckpointedData(BaseModel):
+    """Payload for STEP_CHECKPOINTED event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+    iteration: int = Field(..., description="Iteration count at checkpoint")
+
+
+class StepCompletedData(BaseModel):
+    """Payload for STEP_COMPLETED event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+    iterations_used: int = Field(..., description="Total iterations used")
+    files_modified: list[str] = Field(default_factory=list, description="Files modified")
+
+
+class StepFailedData(BaseModel):
+    """Payload for STEP_FAILED event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+    error: str = Field(..., description="Error message")
+
+
+class StepResultPendingData(BaseModel):
+    """Payload for STEP_RESULT_PENDING event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+    output: str = Field(..., description="Step output (may be truncated)")
+    files_modified: list[str] = Field(default_factory=list, description="Files modified")
+
+
+class StepResultAcceptedData(BaseModel):
+    """Payload for STEP_RESULT_ACCEPTED event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+
+
+class StepResultRejectedData(BaseModel):
+    """Payload for STEP_RESULT_REJECTED event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+    reason: Optional[str] = Field(None, description="Rejection reason")
+
+
+class StepRerunRequestedData(BaseModel):
+    """Payload for STEP_RERUN_REQUESTED event."""
+
+    step_id: str = Field(..., description="Step identifier")
+    step_number: int = Field(..., description="Step number")
+
+
 # === Event Type to Payload Model Mapping ===
 
 EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
@@ -304,6 +428,22 @@ EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "POLICY_VIOLATION": PolicyViolationData,
     "POLICY_WARNING": PolicyWarningData,
     "POLICY_ESCALATION": PolicyEscalationData,
+    # Plan-First Execution events (ROADMAP.md Item 2)
+    "PLAN_PERSISTED": PlanPersistedData,
+    "PLAN_EXECUTION_STARTED": PlanExecutionStartedData,
+    "PLAN_EXECUTION_PAUSED": PlanExecutionPausedData,
+    "PLAN_EXECUTION_RESUMED": PlanExecutionResumedData,
+    "STEP_AWAITING_APPROVAL": StepAwaitingApprovalData,
+    "STEP_APPROVED": StepApprovedData,
+    "STEP_REJECTED": StepRejectedData,
+    "STEP_STARTED": StepStartedData,
+    "STEP_CHECKPOINTED": StepCheckpointedData,
+    "STEP_COMPLETED": StepCompletedData,
+    "STEP_FAILED": StepFailedData,
+    "STEP_RESULT_PENDING": StepResultPendingData,
+    "STEP_RESULT_ACCEPTED": StepResultAcceptedData,
+    "STEP_RESULT_REJECTED": StepResultRejectedData,
+    "STEP_RERUN_REQUESTED": StepRerunRequestedData,
 }
 
 

@@ -1,6 +1,6 @@
 # Sindri Status
 
-**Date:** 2026-01-20  
+**Date:** 2026-01-21
 **Status:** Internal-only, single-user mode complete
 
 ## Snapshot
@@ -9,16 +9,19 @@
 - Configurable system access (restricted/supervised/full) + self-management + scheduling tools.
 - Event + API Contract v1 shipped; schema endpoints live.
 - Policy + Guardrails: agent-level constraints (tool limits, file limits, runtime limits, escalation modes).
-- Tests: 3,871 passing (100%).
+- **Plan-First Execution**: Persistent plans with approval gates, step-level checkpointing, partial results acceptance.
+- Tests: 3,901 passing (100%).
 
 ## Key Capabilities (high level)
 - Hierarchical multi-agent orchestration with 5-tier memory.
 - Local-first tooling: TUI, Web UI, voice interface.
 - Service management, scheduling, model management, and system access controls.
 - Policy enforcement: per-agent limits on tool calls, files, runtime; escalation modes (deny/warn/escalate).
+- Plan-First Execution: persistent plans, approval gates, step-level checkpointing, re-run capabilities.
 - Broad tool suite (code, infra, data, media, diagrams, LaTeX, OpenSCAD).
 
 ## Recent Changes (latest first)
+- 2026-01-21: Plan-First Execution feature (persistent plans, user approval gates, step-level checkpointing, re-run support, REST API endpoints; +30 tests).
 - 2026-01-20: Policy + Guardrails feature (max_tool_calls, max_files_touched, max_runtime_seconds, file_scope, escalation modes; CLI commands; +27 tests).
 - 2026-01-20: Granular Tool Permissions feature (allowlists/blocklists, audit log, dry-run mode; +21 tests).
 - 2026-01-20: Add command timeout/cancellation support to shell tool (default 300s, max 3600s; +5 tests).

@@ -835,6 +835,168 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             )
         return tasks
 
+    # ===== Plan-First Execution Endpoints (ROADMAP.md Item 2) =====
+
+    @app.get("/api/plans", tags=["Plans"])
+    async def list_plans(
+        status: Optional[str] = None,
+        task_id: Optional[str] = None,
+        limit: int = 50,
+    ):
+        """List execution plans with optional filtering."""
+        from sindri.persistence.plans import PlanStore
+        from sindri.core.plan_execution import PlanStatus
+
+        store = PlanStore(api.state.db.db_path)
+        plan_status = PlanStatus(status) if status else None
+        plans = await store.list_plans(status=plan_status, task_id=task_id, limit=limit)
+        return [p.to_dict() for p in plans]
+
+    @app.get("/api/plans/{plan_id}", tags=["Plans"])
+    async def get_plan(plan_id: str):
+        """Get a specific execution plan with all steps."""
+        from sindri.persistence.plans import PlanStore
+
+        store = PlanStore(api.state.db.db_path)
+        plan = await store.load_plan(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        return plan.to_dict()
+
+    @app.post("/api/plans/{plan_id}/approve", tags=["Plans"])
+    async def approve_plan(plan_id: str):
+        """Approve a plan for execution."""
+        from sindri.persistence.plans import PlanStore
+        from sindri.core.plan_executor import PlanExecutor
+
+        store = PlanStore(api.state.db.db_path)
+        executor = PlanExecutor(store, event_bus=api.event_bus)
+        success = await executor.approve_plan(plan_id)
+        if not success:
+            raise HTTPException(
+                status_code=400, detail="Plan not found or not in proposed status"
+            )
+        return {"status": "approved", "plan_id": plan_id}
+
+    @app.post("/api/plans/{plan_id}/reject", tags=["Plans"])
+    async def reject_plan(plan_id: str, reason: Optional[str] = None):
+        """Reject a plan."""
+        from sindri.persistence.plans import PlanStore
+        from sindri.core.plan_executor import PlanExecutor
+
+        store = PlanStore(api.state.db.db_path)
+        executor = PlanExecutor(store, event_bus=api.event_bus)
+        success = await executor.reject_plan(plan_id, reason=reason)
+        if not success:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        return {"status": "rejected", "plan_id": plan_id}
+
+    @app.get("/api/plans/{plan_id}/steps", tags=["Plans"])
+    async def get_plan_steps(plan_id: str):
+        """Get all steps for a plan."""
+        from sindri.persistence.plans import PlanStore
+
+        store = PlanStore(api.state.db.db_path)
+        steps = await store.get_steps_for_plan(plan_id)
+        return [s.to_dict() for s in steps]
+
+    @app.get("/api/plans/{plan_id}/steps/{step_number}", tags=["Plans"])
+    async def get_plan_step(plan_id: str, step_number: int):
+        """Get a specific step from a plan."""
+        from sindri.persistence.plans import PlanStore
+
+        store = PlanStore(api.state.db.db_path)
+        plan = await store.load_plan(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        step = plan.get_step(step_number)
+        if not step:
+            raise HTTPException(status_code=404, detail="Step not found")
+        return step.to_dict()
+
+    @app.post("/api/plans/{plan_id}/steps/{step_number}/approve", tags=["Plans"])
+    async def approve_step(plan_id: str, step_number: int):
+        """Approve a step to start execution."""
+        from sindri.persistence.plans import PlanStore
+        from sindri.core.plan_execution import StepStatus, ApprovalStatus
+        from datetime import datetime
+
+        store = PlanStore(api.state.db.db_path)
+        plan = await store.load_plan(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        step = plan.get_step(step_number)
+        if not step:
+            raise HTTPException(status_code=404, detail="Step not found")
+
+        await store.update_step_approval(
+            step.id, ApprovalStatus.APPROVED, approved_at=datetime.now()
+        )
+        await store.update_step_status(step.id, StepStatus.APPROVED)
+        return {"status": "approved", "step_number": step_number}
+
+    @app.post("/api/plans/{plan_id}/steps/{step_number}/reject", tags=["Plans"])
+    async def reject_step(plan_id: str, step_number: int, reason: Optional[str] = None):
+        """Reject a step (skip it)."""
+        from sindri.persistence.plans import PlanStore
+        from sindri.core.plan_execution import StepStatus, ApprovalStatus
+
+        store = PlanStore(api.state.db.db_path)
+        plan = await store.load_plan(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        step = plan.get_step(step_number)
+        if not step:
+            raise HTTPException(status_code=404, detail="Step not found")
+
+        await store.update_step_approval(
+            step.id, ApprovalStatus.REJECTED, rejection_reason=reason
+        )
+        await store.update_step_status(step.id, StepStatus.SKIPPED)
+        return {"status": "rejected", "step_number": step_number}
+
+    @app.post("/api/plans/{plan_id}/steps/{step_number}/accept", tags=["Plans"])
+    async def accept_step_result(plan_id: str, step_number: int):
+        """Accept a step's result and proceed."""
+        from sindri.persistence.plans import PlanStore
+        from sindri.core.plan_executor import PlanExecutor
+        from sindri.core.plan_execution import ApprovalStatus
+
+        store = PlanStore(api.state.db.db_path)
+        executor = PlanExecutor(store, event_bus=api.event_bus)
+        plan = await store.load_plan(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        step = plan.get_step(step_number)
+        if not step:
+            raise HTTPException(status_code=404, detail="Step not found")
+
+        # Signal approval through executor
+        executor.approve_pending(ApprovalStatus.APPROVED)
+        return {"status": "accepted", "step_number": step_number}
+
+    @app.post("/api/plans/{plan_id}/steps/{step_number}/rerun", tags=["Plans"])
+    async def rerun_step(plan_id: str, step_number: int):
+        """Request re-run of a step."""
+        from sindri.persistence.plans import PlanStore
+        from sindri.core.plan_executor import PlanExecutor
+
+        store = PlanStore(api.state.db.db_path)
+        executor = PlanExecutor(store, event_bus=api.event_bus)
+        plan = await store.load_plan(plan_id)
+        if not plan:
+            raise HTTPException(status_code=404, detail="Plan not found")
+        step = plan.get_step(step_number)
+        if not step:
+            raise HTTPException(status_code=404, detail="Step not found")
+
+        result = await executor.rerun_step(step.id)
+        return {
+            "status": "rerun_completed" if result else "rerun_failed",
+            "step_number": step_number,
+            "result": result.to_dict() if result else None,
+        }
+
     # ===== Metrics Endpoints =====
 
     @app.get("/api/metrics", response_model=MetricsResponse, tags=["Metrics"])

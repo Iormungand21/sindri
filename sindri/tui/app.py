@@ -214,11 +214,28 @@ class SindriApp(App):
     def _setup_event_handlers(self):
         """Set up event handlers for orchestrator events."""
 
+        def _coerce_status(raw_status):
+            """Normalize status payloads to TaskStatus enum."""
+            if isinstance(raw_status, TaskStatus):
+                return raw_status
+            if isinstance(raw_status, str):
+                normalized = raw_status
+                if normalized.startswith("TaskStatus."):
+                    normalized = normalized.split(".", 1)[1]
+                try:
+                    return TaskStatus(normalized)
+                except ValueError:
+                    try:
+                        return TaskStatus[normalized]
+                    except KeyError:
+                        return TaskStatus.PENDING
+            return TaskStatus.PENDING
+
         def on_task_created(data):
             try:
                 tree = self.query_one("#tasks", Tree)
                 desc = data.get("description", "Unknown")[:50]
-                status = data.get("status", TaskStatus.PENDING)
+                status = _coerce_status(data.get("status", TaskStatus.PENDING))
                 icon = STATUS_ICONS.get(status, "·")
                 label = f"[{icon}] {desc}"
 
@@ -239,7 +256,7 @@ class SindriApp(App):
         def on_task_status(data):
             try:
                 task_id = data.get("task_id")
-                status = data.get("status")
+                status = _coerce_status(data.get("status"))
                 if task_id in self._task_nodes:
                     node = self._task_nodes[task_id]
                     old_label = str(node.label)
@@ -425,6 +442,97 @@ class SindriApp(App):
                 self.log(f"Error in plan_proposed: {e}")
 
         self.event_bus.subscribe(EventType.PLAN_PROPOSED, on_plan_proposed)
+
+        # Plan-First Execution events (ROADMAP.md Item 2)
+        def on_plan_persisted(data):
+            """Handle plan persisted event - show approval prompt."""
+            try:
+                output = self.query_one("#output", RichLog)
+                plan_id = data.get("plan_id", "?")
+                task_summary = data.get("task_summary", "")
+                step_count = data.get("step_count", 0)
+
+                output.write("")
+                output.write("[bold cyan]━━━ Plan Created (Awaiting Approval) ━━━[/bold cyan]")
+                output.write(f"[bold]Plan ID:[/bold] {plan_id}")
+                output.write(f"[bold]Summary:[/bold] {task_summary}")
+                output.write(f"[bold]Steps:[/bold] {step_count}")
+                output.write("")
+                output.write("[dim]Use API or web UI to approve/reject this plan[/dim]")
+            except Exception as e:
+                self.log(f"Error in plan_persisted: {e}")
+
+        def on_step_awaiting_approval(data):
+            """Handle step awaiting approval event."""
+            try:
+                output = self.query_one("#output", RichLog)
+                step_num = data.get("step_number", "?")
+                description = data.get("description", "")
+                agent = data.get("agent", "unknown")
+
+                output.write("")
+                output.write(f"[bold yellow]⏸ Step {step_num} awaiting approval[/bold yellow]")
+                output.write(f"  Agent: {agent}")
+                output.write(f"  Task: {description}")
+            except Exception as e:
+                self.log(f"Error in step_awaiting_approval: {e}")
+
+        def on_step_started(data):
+            """Handle step started event."""
+            try:
+                output = self.query_one("#output", RichLog)
+                step_num = data.get("step_number", "?")
+                description = data.get("description", "")
+
+                output.write(f"[cyan]▶ Starting step {step_num}:[/cyan] {description}")
+            except Exception as e:
+                self.log(f"Error in step_started: {e}")
+
+        def on_step_completed(data):
+            """Handle step completed event."""
+            try:
+                output = self.query_one("#output", RichLog)
+                step_num = data.get("step_number", "?")
+                iterations = data.get("iterations_used", 0)
+                files = data.get("files_modified", [])
+
+                file_str = f", {len(files)} files modified" if files else ""
+                output.write(
+                    f"[green]✓ Step {step_num} completed[/green] "
+                    f"({iterations} iterations{file_str})"
+                )
+            except Exception as e:
+                self.log(f"Error in step_completed: {e}")
+
+        def on_step_failed(data):
+            """Handle step failed event."""
+            try:
+                output = self.query_one("#output", RichLog)
+                step_num = data.get("step_number", "?")
+                error = data.get("error", "Unknown error")
+
+                output.write(f"[red]✗ Step {step_num} failed:[/red] {error}")
+            except Exception as e:
+                self.log(f"Error in step_failed: {e}")
+
+        def on_step_result_pending(data):
+            """Handle step result pending acceptance."""
+            try:
+                output = self.query_one("#output", RichLog)
+                step_num = data.get("step_number", "?")
+
+                output.write(
+                    f"[yellow]📋 Step {step_num} result pending acceptance[/yellow]"
+                )
+            except Exception as e:
+                self.log(f"Error in step_result_pending: {e}")
+
+        self.event_bus.subscribe(EventType.PLAN_PERSISTED, on_plan_persisted)
+        self.event_bus.subscribe(EventType.STEP_AWAITING_APPROVAL, on_step_awaiting_approval)
+        self.event_bus.subscribe(EventType.STEP_STARTED, on_step_started)
+        self.event_bus.subscribe(EventType.STEP_COMPLETED, on_step_completed)
+        self.event_bus.subscribe(EventType.STEP_FAILED, on_step_failed)
+        self.event_bus.subscribe(EventType.STEP_RESULT_PENDING, on_step_result_pending)
 
         # Phase 7.2: Pattern learning events
         def on_pattern_learned(data):

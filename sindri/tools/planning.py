@@ -4,10 +4,23 @@ Phase 7.3: Interactive Planning Mode
 - ProposePlanTool creates execution plans without running them
 - Plans show what agents will be used and what they'll do
 - TUI can display plans for user review before execution
+
+Plan-First Execution (ROADMAP.md Item 2):
+- Plans are persisted to database for approval gates
+- Step-level checkpointing and re-run support
+- Partial results with explicit user acceptance
 """
 
 from dataclasses import dataclass, field
+from typing import Optional
 from sindri.tools.base import Tool, ToolResult
+from sindri.core.plan_execution import (
+    PersistentPlan,
+    PersistentPlanStep,
+    PlanStatus,
+    StepStatus,
+)
+from sindri.core.events import EventBus, Event, EventType
 
 
 @dataclass
@@ -134,10 +147,37 @@ class ProposePlanTool(Tool):
     and what they will do, without actually executing anything.
 
     The plan can be displayed to users for review before execution.
+
+    Plan-First Execution: Plans are persisted to the database and require
+    user approval before execution begins.
     """
 
     name = "propose_plan"
     description = "Create an execution plan for a complex task. Use this before delegating to show what will happen."
+
+    def __init__(
+        self,
+        work_dir=None,
+        plan_store=None,
+        event_bus: Optional[EventBus] = None,
+        task_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ):
+        """Initialize propose plan tool.
+
+        Args:
+            work_dir: Working directory (passed by registry, not used by this tool)
+            plan_store: Optional PlanStore for persistence
+            event_bus: Optional EventBus for notifications
+            task_id: Optional task ID to associate with plans
+            session_id: Optional session ID to associate with plans
+        """
+        super().__init__(work_dir)
+        self._plan_store = plan_store
+        self._event_bus = event_bus
+        self._task_id = task_id
+        self._session_id = session_id
+
     parameters = {
         "type": "object",
         "properties": {
@@ -225,7 +265,7 @@ class ProposePlanTool(Tool):
         """
         risks = risks or []
 
-        # Build plan steps
+        # Build plan steps (basic PlanStep for display)
         plan_steps = []
         for i, step_data in enumerate(steps, 1):
             plan_steps.append(
@@ -252,7 +292,7 @@ class ProposePlanTool(Tool):
             # Top 2 might run together
             max_vram = sum(agent_vrams[:2])
 
-        # Create plan
+        # Create basic plan for display
         plan = ExecutionPlan(
             task_summary=task_summary,
             steps=plan_steps,
@@ -264,13 +304,68 @@ class ProposePlanTool(Tool):
         # Format output
         output = plan.format_display()
 
+        # Build metadata
+        metadata = {
+            "plan": plan.to_dict(),
+            "step_count": len(plan_steps),
+            "agents": list(agents_used),
+            "estimated_vram_gb": max_vram,
+        }
+
+        # Plan-First Execution: Persist plan if store is available
+        if self._plan_store:
+            # Create persistent plan with steps
+            persistent_steps = []
+            for i, step_data in enumerate(steps, 1):
+                persistent_steps.append(
+                    PersistentPlanStep(
+                        step_number=i,
+                        description=step_data.get("description", ""),
+                        agent=step_data.get("agent", "huginn"),
+                        estimated_iterations=step_data.get("estimated_iterations", 5),
+                        dependencies=step_data.get("dependencies", []),
+                        tool_hints=step_data.get("tool_hints", []),
+                        status=StepStatus.PENDING,
+                        approval_required=True,  # Require approval by default
+                    )
+                )
+
+            persistent_plan = PersistentPlan(
+                task_id=self._task_id or "",
+                session_id=self._session_id,
+                task_summary=task_summary,
+                rationale=rationale,
+                risks=risks,
+                status=PlanStatus.PROPOSED,
+                total_estimated_vram_gb=max_vram,
+                steps=persistent_steps,
+            )
+
+            # Save to database
+            plan_id = await self._plan_store.save_plan(persistent_plan)
+            metadata["plan_id"] = plan_id
+            metadata["persistent"] = True
+
+            # Emit event for UI
+            if self._event_bus:
+                self._event_bus.emit(
+                    Event(
+                        type=EventType.PLAN_PERSISTED,
+                        data={
+                            "plan_id": plan_id,
+                            "task_summary": task_summary,
+                            "step_count": len(persistent_steps),
+                            "agents": list(agents_used),
+                        },
+                        task_id=self._task_id,
+                    )
+                )
+
+            output += f"\n\nPlan ID: {plan_id}"
+            output += "\nStatus: Awaiting approval"
+
         return ToolResult(
             success=True,
             output=output,
-            metadata={
-                "plan": plan.to_dict(),
-                "step_count": len(plan_steps),
-                "agents": list(agents_used),
-                "estimated_vram_gb": max_vram,
-            },
+            metadata=metadata,
         )

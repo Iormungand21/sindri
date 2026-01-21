@@ -1,164 +1,87 @@
-# Code Review Summary: Policy + Guardrails Feature
+# Code Review Summary: Plan-First Execution Feature
 
-**Reviewer:** ChatGPT
-**Author:** Claude (Junior Developer)
-**Date:** 2026-01-20
-**Status:** Review Feedback Addressed
+**Feature:** ROADMAP.md Item 2 - Plan-First Execution
+**Date:** 2026-01-21
+**Author:** Junior Developer (Claude Code)
+**Reviewer:** ChatGPT (Senior Team Member)
 
----
+## Summary
 
-## Feature Summary
+Implemented the Plan-First Execution feature, which adds persistent execution plans with user approval gates, step-level checkpointing, and the ability to re-run individual steps.
 
-Implemented **Policy + Guardrails** (ROADMAP item 6) - agent-level constraints and guardrails for controlling what agents can do during task execution.
+## Requirements Addressed
 
-### Key Capabilities Added
+From ROADMAP.md Item 2:
+1. **Persist plans with user approval gates** - Plans are saved to SQLite database and require explicit user approval before execution begins
+2. **Step-level checkpointing and re-run of individual steps** - Each step can save checkpoints and be re-run independently
+3. **Partial results + explicit acceptance per step** - Users can accept or reject step results before proceeding
 
-1. **Resource Limits**
-   - `max_tool_calls`: Maximum tool invocations per task
-   - `max_files_touched`: Maximum unique files accessed
-   - `max_runtime_seconds`: Maximum wall-clock time per task
+## Files Created (4 new files)
 
-2. **File Scope Restrictions**
-   - Glob patterns for allowed/blocked file paths
-   - Allowlist and blocklist modes
+| File | Lines | Purpose |
+|------|-------|---------|
+| `sindri/core/plan_execution.py` | ~380 | Dataclasses: PersistentPlan, PersistentPlanStep, StepCheckpoint, StepResult, enums |
+| `sindri/persistence/plans.py` | ~330 | PlanStore class for SQLite CRUD operations |
+| `sindri/core/plan_executor.py` | ~420 | PlanExecutor class for orchestrating step execution |
+| `tests/test_plan_execution.py` | ~500 | 30 comprehensive tests |
 
-3. **Per-Tool Budgets**
-   - Limit specific tool calls (e.g., max 5 shell commands)
+## Files Modified (7 existing files)
 
-4. **Escalation Modes**
-   - `deny`: Block operation, fail the task
-   - `warn`: Log warning but allow operation
-   - `escalate`: Escalate to supervised mode (placeholder for future approval system)
+| File | Changes |
+|------|---------|
+| `sindri/persistence/database.py` | Added `execution_plans` and `plan_steps` tables; bumped SCHEMA_VERSION to 6 |
+| `sindri/core/events.py` | Added 15 new event types for plan/step lifecycle |
+| `sindri/core/event_schemas.py` | Added 15 Pydantic payload models for new events |
+| `sindri/tools/planning.py` | Updated ProposePlanTool to persist plans and emit events |
+| `sindri/tui/app.py` | Added event handlers for plan/step display in TUI |
+| `sindri/web/server.py` | Added 10 REST API endpoints for plan management |
+| `STATUS.md`, `ROADMAP.md` | Updated documentation |
 
-5. **CLI Commands**
-   - `sindri policy show [--agent NAME]`: View policy configuration
-   - `sindri policy set-default [OPTIONS]`: Set global policy defaults
-   - `sindri policy violations [--limit N]`: View recent violations
+## Key Design Decisions
 
----
+1. **Database Schema**: Two new tables (`execution_plans`, `plan_steps`) with proper foreign keys and indexes
+2. **Event-Driven Architecture**: 15 new events allow TUI/Web UI to react to plan execution state changes
+3. **Approval Flow**: Steps emit `STEP_AWAITING_APPROVAL` and pause until user responds
+4. **Checkpoint Storage**: Checkpoints stored as JSON in `checkpoint_json` column for crash recovery
+5. **Backward Compatibility**: ProposePlanTool maintains compatibility with existing registry (accepts `work_dir` parameter)
 
-## Files Changed
+## New REST API Endpoints
 
-### New Files
-| File | Lines | Description |
-|------|-------|-------------|
-| `sindri/core/policy.py` | ~200 | Core policy classes: `AgentPolicy`, `PolicyState`, `PolicyEnforcer`, `EscalationMode` |
-| `tests/test_policy.py` | ~280 | 27 unit tests covering all policy functionality |
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/plans` | GET | List plans with optional status/task_id filtering |
+| `/api/plans/{id}` | GET | Get plan details with all steps |
+| `/api/plans/{id}/approve` | POST | Approve plan for execution |
+| `/api/plans/{id}/reject` | POST | Reject plan |
+| `/api/plans/{id}/steps` | GET | List steps for a plan |
+| `/api/plans/{id}/steps/{num}` | GET | Get specific step |
+| `/api/plans/{id}/steps/{num}/approve` | POST | Approve step execution |
+| `/api/plans/{id}/steps/{num}/reject` | POST | Reject/skip step |
+| `/api/plans/{id}/steps/{num}/accept` | POST | Accept step result |
+| `/api/plans/{id}/steps/{num}/rerun` | POST | Re-run step |
 
-### Modified Files
-| File | Changes | Description |
-|------|---------|-------------|
-| `sindri/agents/definitions.py` | +50 lines | Added policy fields to `AgentDefinition` + `get_effective_policy()` method |
-| `sindri/config.py` | +30 lines | Added global policy defaults to `SindriConfig` + `get_default_policy()` method |
-| `sindri/core/events.py` | +3 lines | Added `POLICY_VIOLATION`, `POLICY_WARNING`, `POLICY_ESCALATION` event types |
-| `sindri/core/event_schemas.py` | +35 lines | Added `PolicyViolationData`, `PolicyWarningData`, `PolicyEscalationData` schemas |
-| `sindri/core/hierarchical.py` | +80 lines | Integrated policy enforcement into execution loop |
-| `sindri/cli.py` | +200 lines | Added `policy` command group with `show`, `set-default`, `violations` commands |
-| `tests/test_hierarchical_reliability.py` | +2 lines | Fixed mock function signatures for new parameters |
-| `STATUS.md` | +5 lines | Updated test count and added feature to recent changes |
-| `ROADMAP.md` | +5 lines | Marked item 6 as complete |
+## Test Coverage
 
----
+- 30 new tests added in `test_plan_execution.py`
+- Tests cover: dataclass serialization, PlanStore CRUD, PlanExecutor logic, approval workflows, checkpointing
+- All 3,901 tests pass (previously 3,871)
 
-## Test Results
+## Potential Areas for Review
 
-- **Policy tests:** 27/27 passing
-- **Full test suite:** 3,871 passing (0 failed)
-- **Test coverage:** All new code paths tested
+1. **Approval Timeout Handling**: Currently defaults to approve on timeout - is this desired behavior?
+2. **PlanExecutor Integration**: The executor is mostly standalone; full integration with HierarchicalAgentLoop would require additional work
+3. **Concurrent Access**: No explicit locking for database operations - could be an issue with multiple TUI/web clients
+4. **Event Payload Size**: Step results in events are truncated to 500 chars - may need adjustment
 
----
-
-## Review Feedback Addressed
-
-The following issues from the initial review (NOTES.md) have been fixed:
-
-### 1. File-Access Checks Not Wired Into Execution
-
-**Issue:** `PolicyEnforcer.check_file_access()` was never called, so file scope and max_files_touched limits never blocked anything.
-
-**Fix:** Added file access checks before filesystem tools in `hierarchical.py:682-732`:
-- Before executing `read_file`, `write_file`, `edit_file`, `list_directory`, or `read_tree`
-- Extracts path from tool arguments
-- Calls `policy_enforcer.check_file_access(path)` to enforce `file_scope` and `max_files_touched`
-- Emits `POLICY_VIOLATION` event on violations
-
-### 2. Metadata Key Mismatch
-
-**Issue:** File access tracking looked for `result.metadata["file_path"]`, but filesystem tools populate `metadata["path"]`.
-
-**Fix:** Changed `hierarchical.py:779` to handle both keys:
-```python
-file_path = result.metadata.get("path") or result.metadata.get("file_path")
-```
-
-### 3. DENY Escalation Did Not Fail Tasks
-
-**Issue:** DENY escalation mode just skipped the tool and continued. The requirement states DENY should "block operation, fail the task."
-
-**Fix:** Changed both tool-call and file-access violation handlers in `hierarchical.py:672-731` to fail the task when DENY mode triggers:
-```python
-if tool_check.escalation_mode == EscalationMode.DENY:
-    task.status = TaskStatus.FAILED
-    task.error = f"Policy violation: {tool_check.reason}"
-    return LoopResult(
-        success=False,
-        iterations=iteration + 1,
-        reason=f"policy_violation:{tool_check.violation_type}",
-    )
-```
-
-### Follow-up 1: Document Filesystem Tool Limitation
-
-**Issue:** File-access checks only cover a small set of filesystem tools; other tools (codegen, docs, refactoring) may bypass this.
-
-**Resolution:** Added documentation comment in `hierarchical.py:707-712` explaining:
-- Only core filesystem tools (`read_file`, `write_file`, `edit_file`, `list_directory`, `read_tree`) are guarded
-- Other tools use internal implementations or shell commands that bypass the check
-- For full file access control, use `system_access_level=RESTRICTED` or configure `file_scope` patterns
-
-### Follow-up 2: Wire Up `policy_audit_enabled`
-
-**Issue:** `policy_audit_enabled` was defined in config but never used.
-
-**Fix:** Added `_log_policy_violation()` helper method in `hierarchical.py:1527-1572` that:
-- Checks `config.policy_audit_enabled` before logging
-- Logs violations to `AuditStore` as entries with `tool_name=POLICY_VIOLATION:{tool}`
-- Called from all three violation handlers (runtime, tool-call, file-access)
-
----
-
-## Architecture Decisions
-
-1. **PolicyEnforcer pattern**: Follows existing `check_tool_permission()` pattern from `access.py`
-2. **Three-tier policy resolution**: `agent.policy` > `agent convenience fields` > `config defaults`
-3. **Event-driven violations**: Emits `POLICY_VIOLATION` events for TUI/monitoring
-4. **Lazy imports**: Used `TYPE_CHECKING` to avoid circular imports
-5. **Audit integration**: Policy violations logged to `AuditStore` when `policy_audit_enabled=True`
-
----
-
-## Questions for Reviewer
-
-~~1. Is the escalation mode handling appropriate? Currently `ESCALATE` mode behaves like `WARN` since there's no approval system yet.~~
-
-~~2. Should policy violations be logged to the audit store directly, or is the event emission sufficient?~~
-   - **Resolved:** Now logs to audit store when `policy_audit_enabled=True`
-
-3. The file scope matching uses `fnmatch` glob patterns. Should we support regex patterns as well?
-
----
-
-## How to Test
+## Commands to Test
 
 ```bash
-# Run policy tests
-.venv/bin/pytest tests/test_policy.py -v
-
 # Run all tests
-.venv/bin/pytest tests/ --tb=no -q
+.venv/bin/pytest tests/ -v --tb=no -q
 
-# Try CLI commands
-.venv/bin/sindri policy show
-.venv/bin/sindri policy set-default --max-tool-calls 100
-.venv/bin/sindri policy violations
+# Run plan execution tests specifically
+.venv/bin/pytest tests/test_plan_execution.py -v
+
+# Run planning tests
+.venv/bin/pytest tests/test_planning.py -v
 ```
