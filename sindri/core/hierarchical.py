@@ -2,6 +2,7 @@
 
 from datetime import datetime
 import os
+from pathlib import Path
 import time
 import structlog
 
@@ -299,10 +300,12 @@ class HierarchicalAgentLoop:
             task.session_id = session.id
 
         # Index project if memory available and not yet indexed
-        project_id = f"project_{os.getcwd().replace('/', '_')}"
+        # Use configured work_dir or fall back to cwd for memory indexing
+        project_path = self.tools.work_dir or Path.cwd()
+        project_id = f"project_{str(project_path.resolve()).replace('/', '_')}"
         if self.memory and project_id not in self._indexed_projects:
-            log.info("indexing_project", path=os.getcwd())
-            indexed = self.memory.index_project(os.getcwd(), project_id)
+            log.info("indexing_project", path=str(project_path))
+            indexed = self.memory.index_project(str(project_path), project_id)
             self._indexed_projects.add(project_id)
             log.info("project_indexed", files=indexed, project_id=project_id)
 

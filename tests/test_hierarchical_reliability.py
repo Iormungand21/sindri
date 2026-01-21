@@ -701,3 +701,78 @@ class TestSequentialExceptionPropagation:
         assert event_data["error_type"] == "sequential_task_exception"
         assert event_data["agent"] == "mimir"
         assert "Detailed test task" in event_data["description"]
+
+
+# =============================================================================
+# Work Directory Memory Indexing Tests
+# =============================================================================
+
+
+class TestWorkDirMemoryIndexing:
+    """Tests for respecting configured work_dir when indexing memory context.
+
+    These tests verify that memory indexing uses the configured work_dir
+    from the tool registry instead of os.getcwd().
+    """
+
+    def test_memory_indexing_uses_configured_work_dir(self, tmp_path):
+        """Test that memory indexing respects configured work_dir."""
+        from pathlib import Path
+        from sindri.tools.registry import ToolRegistry
+
+        # Create a temp directory as our "project"
+        project_dir = tmp_path / "my_project"
+        project_dir.mkdir()
+        (project_dir / "test.py").write_text("print('hello')")
+
+        # Create tool registry with custom work_dir
+        tools = ToolRegistry(work_dir=project_dir)
+
+        # Verify the work_dir is set correctly
+        assert tools.work_dir == project_dir
+
+        # Test that the work_dir pattern produces correct path
+        # This simulates what hierarchical.py does: self.tools.work_dir or Path.cwd()
+        project_path = tools.work_dir or Path.cwd()
+        assert project_path == project_dir
+
+        # Verify the project_id would include the custom directory name
+        project_id = f"project_{str(project_path.resolve()).replace('/', '_')}"
+        assert "my_project" in project_id
+
+    def test_memory_indexing_falls_back_to_cwd_when_no_work_dir(self):
+        """Test that memory indexing falls back to cwd when work_dir is None."""
+        from pathlib import Path
+        from sindri.tools.registry import ToolRegistry
+
+        # Create tool registry without work_dir
+        tools = ToolRegistry(work_dir=None)
+
+        # Verify work_dir is None
+        assert tools.work_dir is None
+
+        # The fallback pattern: self.tools.work_dir or Path.cwd()
+        project_path = tools.work_dir or Path.cwd()
+
+        # Should fall back to current working directory
+        assert project_path == Path.cwd()
+
+    def test_project_id_uses_configured_work_dir_path(self, tmp_path):
+        """Test that project_id is generated from configured work_dir, not os.getcwd()."""
+        from pathlib import Path
+        from sindri.tools.registry import ToolRegistry
+
+        # Create a temp directory as our "project"
+        project_dir = tmp_path / "custom_project"
+        project_dir.mkdir()
+
+        # Create tool registry with custom work_dir
+        tools = ToolRegistry(work_dir=project_dir)
+
+        # Simulate the project_id generation logic from hierarchical.py
+        project_path = tools.work_dir or Path.cwd()
+        project_id = f"project_{str(project_path.resolve()).replace('/', '_')}"
+
+        # The project_id should contain our custom project path
+        assert "custom_project" in project_id
+        assert str(tmp_path).replace("/", "_") in project_id

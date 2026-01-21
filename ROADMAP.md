@@ -24,7 +24,7 @@ Grouped by logical capability area.
    - Pre-warm behavior clarified (fires async, use wait_for_prewarm() if blocking needed)
    - ✅ Replace truncated UUID task IDs to avoid collisions (now full 36-char UUIDs)
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Add exception handling to sequential execution path to match parallel error reporting
-   - **Junior task (Owner: Claude, Reviewer: Codex):** Respect configured work_dir when indexing memory context instead of process CWD
+   - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Respect configured work_dir when indexing memory context instead of process CWD
    - **Junior task (Owner: Claude, Reviewer: Codex):** Tighten ModelManager.can_load scheduling check to avoid false positives when VRAM is insufficient
    - **Junior task (Owner: Claude, Reviewer: Codex):** Enforce system access levels for shell/filesystem tools (define RESTRICTED/SUPERVISED behavior)
    - **Junior task (Owner: Claude, Reviewer: Codex):** Add command timeout/cancellation support to shell tool to prevent hangs

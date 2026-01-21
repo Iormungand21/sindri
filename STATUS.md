@@ -219,6 +219,23 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 
 ## Recent Changes
 
+### Work Directory Memory Indexing Fix (2026-01-20) - Phase 15 Junior Task
+
+Fixed **memory indexing to respect configured work_dir** instead of using `os.getcwd()`.
+
+**Problem Fixed:**
+- Previously, memory indexing in `HierarchicalAgentLoop` used `os.getcwd()` directly
+- When `--work-dir` was specified, memory would still index the current working directory instead of the configured project directory
+- This caused semantic embeddings to be created for the wrong directory
+
+**Changes:**
+- `sindri/core/hierarchical.py` - Added `Path` import, replaced `os.getcwd()` with `self.tools.work_dir or Path.cwd()` at lines 302-308
+- `tests/test_hierarchical_reliability.py` - Added `TestWorkDirMemoryIndexing` class with 3 tests
+
+**Tests:** +3 new tests (3787 total)
+
+---
+
 ### Sequential Exception Handling Fix (2026-01-20) - Phase 15 Junior Task
 
 Added **exception handling to the sequential execution path** (`_run_sequential()`) to match the robust error handling in the parallel execution path (`_run_parallel_batch()`).
