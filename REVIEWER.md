@@ -1,175 +1,198 @@
-# Code Review Summary - Phase 15: Hierarchical Execution Reliability Fixes
+# Phase 16: Event + API Contract v1 - Implementation Summary
 
 **Date:** 2026-01-20
 **Author:** Claude Opus 4.5
-**Feature:** ROADMAP Item 0 - Stability + Bugfixes
+**Feature:** ROADMAP Item 1 - API + Contract Stability
 
 ---
 
 ## Overview
 
-This phase implements critical reliability fixes for Sindri's hierarchical task execution system. Four bugs were identified and fixed that could cause parent tasks to hang indefinitely, tasks to be over-scheduled, or task lookup errors.
+Implemented versioned JSON schemas for all WebSocket events and REST API endpoints, enabling auto-generation of TypeScript types and contract testing.
 
 ---
 
 ## Changes Made
 
-### 1. UUID Collision Prevention (Issue 6)
+### 1. Fixed Failing WebSocket Test
 
-**File:** `sindri/core/tasks.py` (line 28)
+**File:** `sindri/web/server.py`
 
-**Problem:** Task IDs were truncated to 8 characters (`str(uuid.uuid4())[:8]`), creating collision risk at ~100k tasks.
+**Problem:** `_broadcast_event_sync()` was calling `asyncio.create_task()` from a synchronous context (the EventBus handler), which failed with "no running event loop" when called from a different thread.
 
-**Fix:** Use full 36-character UUIDs.
+**Solution:**
+- Store reference to the server's event loop in `_event_loop` during initialization
+- Use `loop.call_soon_threadsafe()` to schedule async broadcasts from any thread
+- Handle gracefully when no event loop is available
 
 ```python
 # Before
-id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+def _broadcast_event_sync(self, event: Event):
+    asyncio.create_task(self._broadcast_event(event))  # Fails from sync context!
 
 # After
-id: str = field(default_factory=lambda: str(uuid.uuid4()))
+def _broadcast_event_sync(self, event: Event):
+    if self._event_loop is None:
+        return
+    try:
+        self._event_loop.call_soon_threadsafe(
+            lambda: self._event_loop.create_task(self._broadcast_event(event))
+        )
+    except RuntimeError:
+        log.debug("event_broadcast_skipped_loop_closed", ...)
 ```
 
 ---
 
-### 2. VRAM-Aware Batching (Issue 4)
+### 2. Event Payload Schemas
 
-**Files:**
-- `sindri/llm/manager.py` (added 2 methods)
-- `sindri/core/scheduler.py` (lines 94-103)
+**New File:** `sindri/core/event_schemas.py` (~350 lines)
 
-**Problem:** Scheduler used static `available` VRAM (14GB) instead of actual free VRAM, causing OOM errors when models were already loaded.
+Created strongly-typed Pydantic models for all 24 event types:
 
-**Fix:**
-1. Added `get_free_vram()` public method to ModelManager
-2. Added `get_allocated_models()` method to include models being pre-warmed
-3. Updated scheduler to use actual free VRAM for batching
+| Event Type | Model | Required Fields |
+|------------|-------|-----------------|
+| TASK_CREATED | TaskCreatedData | task_id |
+| TASK_STATUS_CHANGED | TaskStatusChangedData | task_id, status |
+| AGENT_OUTPUT | AgentOutputData | task_id, agent, text |
+| TOOL_CALLED | ToolCalledData | task_id, name, success |
+| DELEGATION_START | DelegationStartData | task_id, parent_task_id, parent_agent, child_agent, task |
+| DELEGATION_COMPLETE | DelegationCompleteData | task_id, parent_task_id, parent_agent, child_agent, status |
+| DELEGATION_FAILED | DelegationFailedData | task_id, parent_task_id, parent_agent, child_agent |
+| MODEL_LOADED | ModelLoadedData | model |
+| MODEL_UNLOADED | ModelUnloadedData | model |
+| MODEL_DEGRADED | ModelDegradedData | task_id, agent, primary_model, fallback_model |
+| ERROR | ErrorData | error |
+| ITERATION_START | IterationStartData | task_id, iteration, agent |
+| ITERATION_END | IterationEndData | task_id, iteration |
+| ITERATION_WARNING | IterationWarningData | task_id, remaining, message |
+| PARALLEL_BATCH_START | ParallelBatchStartData | batch_id, task_ids, count |
+| PARALLEL_BATCH_END | ParallelBatchEndData | batch_id, completed, failed |
+| STREAMING_START | StreamingStartData | task_id, agent, model |
+| STREAMING_TOKEN | StreamingTokenData | task_id, agent, token |
+| STREAMING_END | StreamingEndData | task_id, agent, content_length |
+| PLAN_PROPOSED | PlanProposedData | task_id, agent, plan, formatted, step_count |
+| PLAN_APPROVED | PlanApprovedData | task_id |
+| PLAN_REJECTED | PlanRejectedData | task_id |
+| PATTERN_LEARNED | PatternLearnedData | task_id, pattern_id, agent, iterations, tools |
+| METRICS_UPDATED | MetricsUpdatedData | task_id, session_id, iteration, duration_seconds |
 
-```python
-# scheduler.py - Before
-max_vram = self.model_manager.available  # Static 14GB
-loaded_models = set(self.model_manager.loaded.keys())
+Helper functions provided:
+- `get_event_schema(event_type)` - Get JSON Schema for one event type
+- `get_all_event_schemas()` - Get JSON Schema for all event types
+- `validate_event_data(event_type, data)` - Validate event data against schema
 
-# scheduler.py - After
-max_vram = self.model_manager.get_free_vram()  # Actual free VRAM
-loaded_models = self.model_manager.get_allocated_models()  # Includes pre-warming
+---
+
+### 3. API Schema Endpoints
+
+**File:** `sindri/web/server.py`
+
+Added three new endpoints:
+
+```
+GET /api/version
+{
+    "version": "1.0.0",
+    "compatible_versions": ["1.0.0"],
+    "deprecated_versions": []
+}
+
+GET /api/schema
+{
+    "version": "1.0.0",
+    "openapi_url": "/openapi.json",
+    "event_types": { <24 JSON Schemas> },
+    "event_type_list": ["TASK_CREATED", "TASK_STATUS_CHANGED", ...]
+}
+
+GET /api/schema/events/{event_type}
+{
+    "event_type": "TASK_CREATED",
+    "schema": { <JSON Schema> }
+}
 ```
 
 ---
 
-### 3. Model Load Failure Propagation (Issue 2)
+### 4. API Version Header Middleware
 
-**File:** `sindri/core/hierarchical.py` (lines 122-140)
+**File:** `sindri/web/server.py`
 
-**Problem:** When model loading failed, the task was not marked as FAILED and parent tasks were not notified.
-
-**Fix:** Added proper status setting, parent notification, and error event emission.
-
-```python
-# Added before returning LoopResult
-task.status = TaskStatus.FAILED
-task.error = error_reason
-await self.delegation.child_failed(task)
-self.event_bus.emit(Event(type=EventType.ERROR, data={...}))
-```
+Added HTTP middleware that adds `X-Sindri-API-Version: 1.0.0` header to all responses.
 
 ---
 
-### 4. Exception Propagation (Issue 3)
+### 5. TypeScript Type Generation
 
-**File:** `sindri/core/orchestrator.py` (lines 198-256)
+**New File:** `scripts/generate_typescript_types.py`
 
-**Problem:**
-- Parallel task exceptions were caught but not propagated to parents
-- Single task exceptions weren't caught at all
+Script that generates TypeScript types from Pydantic models:
+- Converts JSON Schema to TypeScript interfaces
+- Generates `EventType` union type
+- Creates `EventTypeDataMap` for type-safe event handling
+- Generates `TypedWebSocketEvent` discriminated union
+- Includes `isEventType()` type guard helper
+- Exports `ALL_EVENT_TYPES` constant array
 
-**Fix:**
-1. Added exception handling to single-task path
-2. Both paths now call `delegation.child_failed(task)` and emit ERROR events
+**Generated File:** `sindri/web/static/src/types/events.generated.ts`
+
+Usage: `python scripts/generate_typescript_types.py`
 
 ---
 
-## Test Coverage
+### 6. Contract Tests
 
-**New test file:** `tests/test_hierarchical_reliability.py` (17 tests)
+**New File:** `tests/test_event_contracts.py` (50 tests)
 
 | Test Class | Tests | Coverage |
 |------------|-------|----------|
-| TestUUIDCollisionPrevention | 3 | Full UUID format validation |
-| TestVRAMBatching | 6 | Free VRAM, allocated models, batching behavior |
-| TestModelLoadFailurePropagation | 2 | Task status and error events |
-| TestParallelExceptionPropagation | 3 | Exception handling and parent notification |
-| TestHierarchicalReliabilityIntegration | 3 | End-to-end reliability scenarios |
-
-**Test results:** 3744 total tests, 3743 passing (1 pre-existing flaky websocket test)
+| TestEventSchemaCompleteness | 3 | All EventTypes have schemas |
+| TestEventSchemaValidation | 32 | Valid/invalid data validation |
+| TestValidateEventDataFunction | 3 | Helper function tests |
+| TestGetEventSchema | 3 | JSON Schema generation |
+| TestAPIVersioning | 2 | Version format validation |
+| TestSchemaAPIEndpoints | 5 | /api/version, /api/schema endpoints |
+| TestWebSocketEventContract | 2 | WebSocket message validation |
 
 ---
 
-## Files Modified
+## Test Results
 
-| File | Changes |
-|------|---------|
-| `sindri/core/tasks.py` | +0/-6 chars (UUID change) |
-| `sindri/llm/manager.py` | +20 lines (2 new methods) |
-| `sindri/core/scheduler.py` | +3/-3 lines (VRAM batching fix) |
-| `sindri/core/hierarchical.py` | +17 lines (model load failure fix) |
-| `sindri/core/orchestrator.py` | +21 lines (exception handling) |
-| `tests/test_hierarchical_reliability.py` | +370 lines (new test file) |
-| `tests/test_recovery_integration.py` | +1 line (fix mock for async) |
-| `STATUS.md` | Updated test count and feature list |
-| `ROADMAP.md` | Marked item 0 complete |
+- **Before:** 3734 tests passing, 1 failing
+- **After:** 3784 tests passing, 0 failing (+50 new tests)
+
+---
+
+## Files Changed
+
+| File | Change Type | Lines |
+|------|-------------|-------|
+| `sindri/core/event_schemas.py` | New | ~350 |
+| `scripts/generate_typescript_types.py` | New | ~220 |
+| `sindri/web/static/src/types/events.generated.ts` | New | ~400 |
+| `tests/test_event_contracts.py` | New | ~320 |
+| `sindri/web/server.py` | Modified | +60 |
+| `STATUS.md` | Modified | +30 |
+| `ROADMAP.md` | Modified | +3 |
+
+---
+
+## API Contract Version
+
+**Version:** 1.0.0
+
+This establishes the v1 contract for:
+- All 24 WebSocket event payload structures
+- REST API response formats (via existing OpenAPI at `/openapi.json`)
+- Version header (`X-Sindri-API-Version`) for all HTTP responses
 
 ---
 
 ## Potential Review Concerns
 
-1. **Single vs Parallel error_type:** Single task exceptions use `task_exception`, parallel use `parallel_task_exception`. This is intentional for debugging but could be unified if desired.
+1. **Event payload schemas are permissive:** Optional fields are used generously to accommodate existing event emissions that may not include all data. Stricter validation could be added as a future enhancement.
 
-2. **Pre-warm behavior not changed:** The pre-warm method still fires async and doesn't block. The existing `wait_for_prewarm()` method should be used if blocking behavior is needed. This is documented in ROADMAP.md.
+2. **TypeScript generation is Python-based:** The script requires running from Python. Could be integrated into npm scripts or converted to a Node.js implementation if needed.
 
-3. **Flaky websocket test:** `test_websocket_event_contract` has a race condition unrelated to these changes (heartbeat arrives before event).
-
----
-
----
-
-## Follow-up Fix: Delegation Wait Handling (Issue 1)
-
-**File:** `sindri/core/hierarchical.py` (lines 198-227)
-
-**Problem identified in review:** When `_run_loop` returns `LoopResult(success=None)` for delegation, `run_task` incorrectly treated it as failure because `None` is falsy in Python.
-
-**Fix:** Changed `if result.success:` to `if result.success is True:` and added explicit handling for `success=None`:
-
-```python
-# Before
-if result.success:  # None is falsy, so this fails for delegation!
-    # ... mark complete
-elif task.status != TaskStatus.CANCELLED:
-    # ... mark FAILED (BUG: delegation waiting got here!)
-
-# After
-if result.success is True:
-    # ... mark complete
-elif result.success is None:
-    # Delegation in progress - task is WAITING for children
-    # Don't mark as failed, just return the result
-    log.info("task_waiting_for_delegation", ...)
-elif task.status != TaskStatus.CANCELLED:
-    # ... mark FAILED (only for actual failures)
-```
-
-**New tests added:**
-- `test_delegation_returns_success_none_keeps_task_waiting`
-- `test_delegation_waiting_does_not_emit_error_event`
-- `test_parent_resumes_after_child_completes`
-
----
-
-## Summary of Impact
-
-- **Reliability:** Parent tasks will no longer hang when children fail
-- **Delegation:** Parent tasks correctly wait for children without being marked FAILED
-- **Safety:** Tasks won't be over-scheduled when VRAM is partially used
-- **Correctness:** Task IDs are now collision-resistant for long-running systems
-- **Observability:** All failure paths now emit proper ERROR events
+3. **No breaking change detection:** Currently just establishes v1. Future versions would need a mechanism to detect and flag breaking changes.

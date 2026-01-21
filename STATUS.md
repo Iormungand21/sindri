@@ -98,8 +98,8 @@ See: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
 ## Current State
 
 **Status:** Internal-only mode COMPLETE (single-user, no collaboration, no IDE integration, local-only marketplace, relaxed security for localhost, configurable system access, self-management tools)
-**Test Status:** 3744 tests passing (99.9% - 1 flaky websocket test)
-**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), AI-Powered Test Generation (Skald Enhancement), AI-Powered Code Documentation (Idunn Enhancement), AI-Powered Code Review & Quality Analysis (Mimir Enhancement), AI-Powered Code Improvement (Huginn Enhancement), Git Automation Tools (Phase 14), **Hierarchical Execution Reliability Fixes (Phase 15)**
+**Test Status:** 3784 tests passing (100%)
+**Features:** Diagram Generation, LaTeX, OpenSCAD 3D Modeling, Data Visualization, Text/Regex Processing, Compression, Crypto/Encoding, System/Process, Image, Document Processing, Network/HTTP, Database, Media, Profiling, Browser Automation Tools, System Access Configuration, Service Management, Scheduling, Self-Management, Bash Scripting & Systemd Generation, Docker Runtime Tools, AWS & Kubernetes Tools, Vision-Based Document Processing (Groa Agent), Advanced SQL Optimization (Fafnir Agent), Music Composition (Bragi Agent), Game Level Design (Nidhogr Game Agent), Blender Python 3D Modeling (Dvalin Agent), KiCad Electronics Design (Regin Agent), AI-Powered Test Generation (Skald Enhancement), AI-Powered Code Documentation (Idunn Enhancement), AI-Powered Code Review & Quality Analysis (Mimir Enhancement), AI-Powered Code Improvement (Huginn Enhancement), Git Automation Tools (Phase 14), Hierarchical Execution Reliability Fixes (Phase 15), **Event + API Contract v1 (Phase 16)**
 
 ### Try It Out
 ```bash
@@ -218,6 +218,37 @@ cd sindri/web/static && npm test -- --run  # 104 frontend tests
 ---
 
 ## Recent Changes
+
+### Event + API Contract v1 (2026-01-20) - Phase 16 Complete
+
+Implemented **versioned JSON schemas** for all WebSocket events and REST API, enabling auto-generation of TypeScript types and contract testing.
+
+**New Features:**
+- **Event Payload Schemas** - Strongly-typed Pydantic models for all 24 event types
+- **`/api/schema` Endpoint** - Returns JSON Schema for all event types
+- **`/api/version` Endpoint** - Returns API version and compatibility info
+- **API Version Header** - `X-Sindri-API-Version` header on all responses
+- **TypeScript Generation** - Script to auto-generate TypeScript from Python schemas
+- **Contract Tests** - 50 new tests verifying event/API contracts
+
+**API Endpoints:**
+- `GET /api/version` - API version info (v1.0.0)
+- `GET /api/schema` - All event type JSON schemas
+- `GET /api/schema/events/{event_type}` - Specific event schema
+
+**Files:**
+- `sindri/core/event_schemas.py` - 24 Pydantic models for event payloads (~350 lines)
+- `sindri/web/server.py` - Schema endpoints, version header middleware
+- `scripts/generate_typescript_types.py` - TypeScript generation script
+- `sindri/web/static/src/types/events.generated.ts` - Auto-generated TypeScript types
+- `tests/test_event_contracts.py` - Contract test suite (50 tests)
+
+**Bug Fix:**
+- Fixed `test_websocket_event_contract` async/sync issue in event broadcasting
+
+**Tests:** +50 new tests (3784 total)
+
+---
 
 ### Git Automation Tools (2026-01-20) - Phase 14 Complete
 

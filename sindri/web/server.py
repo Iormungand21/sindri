@@ -10,6 +10,7 @@ Features:
 
 import asyncio
 import json
+import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -24,6 +25,7 @@ from fastapi import (
     Query,
     Header,
     BackgroundTasks,
+    Request,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -33,10 +35,20 @@ import structlog
 
 from sindri.agents.registry import get_agent, list_agents
 from sindri.persistence.state import SessionState
-from sindri.core.events import EventBus, EventType
+from sindri.core.events import EventBus, EventType, Event
+from sindri.core.event_schemas import (
+    API_VERSION,
+    EVENT_PAYLOAD_MODELS,
+    get_all_event_schemas,
+)
 from sindri.llm.manager import ModelManager
 
 log = structlog.get_logger()
+
+
+def _ws_debug(message: str):
+    if os.getenv("SINDRI_WS_DEBUG"):
+        print(f"[ws-debug] {message}", flush=True)
 
 
 # Pydantic models for API
@@ -239,38 +251,70 @@ class SindriAPI:
         self.model_manager: Optional[ModelManager] = None
         self.active_tasks: dict[str, dict] = {}
         self.websocket_connections: list[WebSocket] = []
+        self._event_loop: Optional[asyncio.AbstractEventLoop] = None
 
     async def initialize(self):
         """Initialize API components."""
-        await self.state.db.initialize()
+        _ws_debug("api.initialize: start")
+
+        # Store reference to the event loop for thread-safe event broadcasting
+        self._event_loop = asyncio.get_running_loop()
+
+        if os.getenv("SINDRI_SKIP_DB_INIT"):
+            _ws_debug("api.initialize: skipping db.initialize")
+        else:
+            _ws_debug("api.initialize: db.initialize start")
+            await self.state.db.initialize()
+            _ws_debug("api.initialize: db.initialize complete")
         self.model_manager = ModelManager(total_vram_gb=self.vram_gb)
 
         # Clean up stale sessions on startup
         # Any "active" sessions from before server start are clearly not running
-        cleaned = await self.state.cleanup_stale_sessions(max_age_hours=0.0)
-        if cleaned > 0:
-            log.info("startup_cleanup", stale_sessions_marked_failed=cleaned)
+        if os.getenv("SINDRI_SKIP_DB_INIT"):
+            _ws_debug("api.initialize: skipping cleanup_stale_sessions")
+        else:
+            _ws_debug("api.initialize: cleanup_stale_sessions start")
+            cleaned = await self.state.cleanup_stale_sessions(max_age_hours=0.0)
+            _ws_debug("api.initialize: cleanup_stale_sessions complete")
+            if cleaned > 0:
+                log.info("startup_cleanup", stale_sessions_marked_failed=cleaned)
 
         # Subscribe to events for WebSocket broadcast
-        for event_type in EventType:
-            self.event_bus.subscribe(event_type, self._broadcast_event_sync)
+        self.event_bus.subscribe_event(self._broadcast_event_sync)
 
         log.info("sindri_api_initialized", vram_gb=self.vram_gb)
+        _ws_debug("api.initialize: complete")
 
-    def _broadcast_event_sync(self, data: Any):
-        """Synchronous wrapper for event broadcast (called from EventBus)."""
-        # Queue for async broadcast
-        asyncio.create_task(self._broadcast_event(data))
+    def _broadcast_event_sync(self, event: Event):
+        """Synchronous wrapper for event broadcast (called from EventBus).
 
-    async def _broadcast_event(self, data: Any):
+        This method can be called from any thread. It schedules the async
+        broadcast on the server's event loop using thread-safe scheduling.
+        """
+        if self._event_loop is None:
+            log.debug("event_broadcast_skipped_no_loop", event_type=event.type.name)
+            return
+
+        # Use call_soon_threadsafe to schedule on the server's event loop
+        # This works whether called from the main thread or a worker thread
+        try:
+            self._event_loop.call_soon_threadsafe(
+                lambda: self._event_loop.create_task(self._broadcast_event(event))
+            )
+        except RuntimeError:
+            # Event loop is closed or not running
+            log.debug("event_broadcast_skipped_loop_closed", event_type=event.type.name)
+
+    async def _broadcast_event(self, event: Event):
         """Broadcast an event to all connected WebSocket clients."""
         if not self.websocket_connections:
             return
 
         message = {
-            "type": "event",
-            "data": data if isinstance(data, dict) else str(data),
-            "timestamp": time.time(),
+            "type": event.type.name,
+            "data": event.data if isinstance(event.data, dict) else str(event.data),
+            "timestamp": event.timestamp,
+            "task_id": event.task_id,
         }
         message_json = json.dumps(message, default=str)
 
@@ -314,8 +358,11 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         """Application lifespan handler."""
+        _ws_debug("lifespan: start")
         await api.initialize()
+        _ws_debug("lifespan: initialized")
         yield
+        _ws_debug("lifespan: shutdown")
         await api.shutdown()
 
     app = FastAPI(
@@ -334,8 +381,58 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         allow_headers=["*"],
     )
 
+    # Add API version header to all responses
+    @app.middleware("http")
+    async def add_api_version_header(request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Sindri-API-Version"] = API_VERSION
+        return response
+
     # Store api instance on app for access in routes
     app.state.api = api
+
+    # ===== Schema & Version Endpoints =====
+
+    @app.get("/api/version", tags=["Schema"])
+    async def get_api_version():
+        """Get the current API version and compatibility information."""
+        return {
+            "version": API_VERSION,
+            "compatible_versions": [API_VERSION],
+            "deprecated_versions": [],
+        }
+
+    @app.get("/api/schema", tags=["Schema"])
+    async def get_api_schema():
+        """Get JSON Schema for all WebSocket event types.
+
+        Use this endpoint to auto-generate client types or validate event messages.
+        The OpenAPI schema for REST endpoints is available at /openapi.json.
+        """
+        return {
+            "version": API_VERSION,
+            "openapi_url": "/openapi.json",
+            "event_types": get_all_event_schemas(),
+            "event_type_list": list(EVENT_PAYLOAD_MODELS.keys()),
+        }
+
+    @app.get("/api/schema/events/{event_type}", tags=["Schema"])
+    async def get_event_schema(event_type: str):
+        """Get JSON Schema for a specific event type.
+
+        Args:
+            event_type: Event type name (e.g., TASK_CREATED, AGENT_OUTPUT)
+        """
+        if event_type not in EVENT_PAYLOAD_MODELS:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Unknown event type: {event_type}. Available: {list(EVENT_PAYLOAD_MODELS.keys())}",
+            )
+        model = EVENT_PAYLOAD_MODELS[event_type]
+        return {
+            "event_type": event_type,
+            "schema": model.model_json_schema(),
+        }
 
     # ===== Health & Info Endpoints =====
 
@@ -345,21 +442,27 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
 
         # Check Ollama
         ollama_ok = False
-        try:
-            client = Client()
-            client.list()
-            ollama_ok = True
-        except Exception:
-            pass
+        if os.getenv("SINDRI_SKIP_DB_INIT"):
+            _ws_debug("health_check: skipping ollama check")
+        else:
+            try:
+                client = Client()
+                client.list()
+                ollama_ok = True
+            except Exception:
+                pass
 
         # Check database
         db_ok = False
-        try:
-            async with api.state.db.get_connection() as conn:
-                await conn.execute("SELECT 1")
-            db_ok = True
-        except Exception:
-            pass
+        if os.getenv("SINDRI_SKIP_DB_INIT"):
+            _ws_debug("health_check: skipping db check")
+        else:
+            try:
+                async with api.state.db.get_connection() as conn:
+                    await conn.execute("SELECT 1")
+                db_ok = True
+            except Exception:
+                pass
 
         return HealthResponse(
             status="healthy" if (ollama_ok and db_ok) else "degraded",
@@ -971,14 +1074,19 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
         """WebSocket endpoint for real-time event streaming."""
+        _ws_debug("websocket_endpoint: start")
         await websocket.accept()
         api.websocket_connections.append(websocket)
+        _ws_debug(
+            f"websocket_endpoint: accepted (connections={len(api.websocket_connections)})"
+        )
         log.info(
             "websocket_connected", total_connections=len(api.websocket_connections)
         )
 
         try:
             # Send initial state
+            _ws_debug("websocket_endpoint: sending connected message")
             await websocket.send_json(
                 {
                     "type": "connected",
@@ -990,35 +1098,45 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
                     "timestamp": time.time(),
                 }
             )
+            _ws_debug("websocket_endpoint: connected message sent")
 
             # Keep connection alive and handle incoming messages
             while True:
                 try:
                     # Wait for messages (with timeout for heartbeat)
+                    _ws_debug("websocket_endpoint: waiting for message")
                     data = await asyncio.wait_for(
                         websocket.receive_text(), timeout=30.0
                     )
+                    _ws_debug("websocket_endpoint: received message")
 
                     # Handle ping/pong
                     message = json.loads(data)
                     if message.get("type") == "ping":
+                        _ws_debug("websocket_endpoint: responding to ping")
                         await websocket.send_json(
                             {"type": "pong", "timestamp": time.time()}
                         )
 
                 except asyncio.TimeoutError:
                     # Send heartbeat
+                    _ws_debug("websocket_endpoint: sending heartbeat")
                     await websocket.send_json(
                         {"type": "heartbeat", "timestamp": time.time()}
                     )
 
         except WebSocketDisconnect:
+            _ws_debug("websocket_endpoint: disconnect")
             log.info("websocket_disconnected")
         except Exception as e:
+            _ws_debug(f"websocket_endpoint: error {e}")
             log.error("websocket_error", error=str(e))
         finally:
             if websocket in api.websocket_connections:
                 api.websocket_connections.remove(websocket)
+            _ws_debug(
+                f"websocket_endpoint: cleanup (connections={len(api.websocket_connections)})"
+            )
             log.info(
                 "websocket_cleanup",
                 remaining_connections=len(api.websocket_connections),

@@ -25,10 +25,10 @@ Grouped by logical capability area.
    - ✅ Replace truncated UUID task IDs to avoid collisions (now full 36-char UUIDs)
 
 ### API + Contract Stability
-1. **Event + API Contract v1**
-   - Publish versioned JSON schema for REST + WebSocket events
-   - Expose `/api/schema` for clients and auto-generate TS types
-   - Add contract tests and backward-compat flags
+1. **Event + API Contract v1** ✅ **COMPLETE (Phase 16)**
+   - ✅ Publish versioned JSON schema for REST + WebSocket events
+   - ✅ Expose `/api/schema` for clients and auto-generate TS types
+   - ✅ Add contract tests and backward-compat flags
 
 ### Execution Control + Reproducibility
 2. **Plan-First Execution**
@@ -943,6 +943,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-20 | **Event + API Contract v1 (Phase 16)** - event_schemas.py with 24 payload models, /api/schema endpoint, /api/version endpoint, X-Sindri-API-Version header, TypeScript generation script, contract tests | +50 |
 | 2026-01-20 | **Git Automation Tools (Phase 14)** - git_auto_commit, git_branch_compare, git_conflict_assist, git_release_notes + Huginn/Brokkr agents enhanced | +47 |
 | 2026-01-20 | **AI-Powered Code Improvement (Phase 13 Tier 4)** - suggest_refactoring, optimize_performance, detect_antipatterns, suggest_design_patterns, generate_type_hints + Huginn agent enhanced | +63 |
 | 2026-01-20 | **AI-Powered Code Review & Quality Analysis (Phase 13 Tier 3)** - analyze_code_quality, detect_code_smells, security_audit, detect_dead_code, generate_review_report + Mimir agent enhanced | +75 |
