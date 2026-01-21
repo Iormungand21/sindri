@@ -8,15 +8,18 @@
 - Security relaxed for localhost/private IPs; cloud metadata endpoints still blocked.
 - Configurable system access (restricted/supervised/full) + self-management + scheduling tools.
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 3,815 passing (100%).
+- Policy + Guardrails: agent-level constraints (tool limits, file limits, runtime limits, escalation modes).
+- Tests: 3,871 passing (100%).
 
 ## Key Capabilities (high level)
 - Hierarchical multi-agent orchestration with 5-tier memory.
 - Local-first tooling: TUI, Web UI, voice interface.
 - Service management, scheduling, model management, and system access controls.
+- Policy enforcement: per-agent limits on tool calls, files, runtime; escalation modes (deny/warn/escalate).
 - Broad tool suite (code, infra, data, media, diagrams, LaTeX, OpenSCAD).
 
 ## Recent Changes (latest first)
+- 2026-01-20: Policy + Guardrails feature (max_tool_calls, max_files_touched, max_runtime_seconds, file_scope, escalation modes; CLI commands; +27 tests).
 - 2026-01-20: Granular Tool Permissions feature (allowlists/blocklists, audit log, dry-run mode; +21 tests).
 - 2026-01-20: Add command timeout/cancellation support to shell tool (default 300s, max 3600s; +5 tests).
 - 2026-01-20: Enforce system access levels for shell/filesystem tools (RESTRICTED blocks shell, write_file, edit_file; +11 tests).

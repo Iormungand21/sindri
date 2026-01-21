@@ -6973,5 +6973,203 @@ def audit_clear(days: int, yes: bool):
     asyncio.run(run())
 
 
+# ============================================
+# Policy + Guardrails Commands
+# ============================================
+
+
+@cli.group()
+def policy():
+    """Manage agent policy and guardrails.
+
+    Configure limits on tool calls, files touched, runtime, and file scope
+    for each agent or globally.
+    """
+    pass
+
+
+@policy.command("show")
+@click.option("--agent", "-a", help="Show policy for specific agent")
+def policy_show(agent: str = None):
+    """Show current policy configuration.
+
+    Examples:
+        sindri policy show
+
+        sindri policy show --agent ratatoskr
+    """
+    from sindri.config import SindriConfig
+    from sindri.agents.registry import AGENTS
+
+    config = SindriConfig.load()
+
+    console.print("[bold]Global Policy Defaults[/bold]")
+    console.print(f"  Max Tool Calls: {config.default_max_tool_calls or 'unlimited'}")
+    console.print(f"  Max Files: {config.default_max_files_touched or 'unlimited'}")
+    console.print(f"  Max Runtime: {config.default_max_runtime_seconds or 'unlimited'}s")
+    console.print(f"  File Scope: {config.default_file_scope or '(all files)'}")
+    console.print(f"  Escalation Mode: {config.default_escalation_mode}")
+    console.print(f"  Audit Enabled: {config.policy_audit_enabled}")
+    console.print()
+
+    if agent:
+        if agent not in AGENTS:
+            console.print(f"[red]Unknown agent: {agent}[/red]")
+            return
+        agent_def = AGENTS[agent]
+        console.print(f"[bold]Agent: {agent}[/bold]")
+        console.print(f"  Role: {agent_def.role}")
+        console.print(f"  Max Tool Calls: {agent_def.max_tool_calls or 'default'}")
+        console.print(f"  Max Files: {agent_def.max_files_touched or 'default'}")
+        console.print(f"  Max Runtime: {agent_def.max_runtime_seconds or 'default'}s")
+        console.print(f"  File Scope: {agent_def.file_scope or 'default'}")
+        console.print(f"  Escalation: {agent_def.escalation_mode}")
+    else:
+        # Show agents with custom policy overrides
+        overrides = []
+        for name, agent_def in AGENTS.items():
+            has_override = any([
+                agent_def.max_tool_calls is not None,
+                agent_def.max_files_touched is not None,
+                agent_def.max_runtime_seconds is not None,
+                agent_def.file_scope,
+            ])
+            if has_override:
+                overrides.append((name, agent_def))
+
+        if overrides:
+            console.print("[bold]Agent Policy Overrides[/bold]")
+            for name, agent_def in overrides:
+                parts = []
+                if agent_def.max_tool_calls is not None:
+                    parts.append(f"max_tools={agent_def.max_tool_calls}")
+                if agent_def.max_files_touched is not None:
+                    parts.append(f"max_files={agent_def.max_files_touched}")
+                if agent_def.max_runtime_seconds is not None:
+                    parts.append(f"max_runtime={agent_def.max_runtime_seconds}s")
+                console.print(f"  [cyan]{name}[/cyan]: {', '.join(parts)}")
+        else:
+            console.print("[dim]No agent-specific policy overrides configured.[/dim]")
+
+
+@policy.command("set-default")
+@click.option("--max-tool-calls", type=int, help="Max tool calls per task (0 for unlimited)")
+@click.option("--max-files", type=int, help="Max files touched per task (0 for unlimited)")
+@click.option("--max-runtime", type=float, help="Max runtime in seconds (0 for unlimited)")
+@click.option("--escalation", type=click.Choice(["deny", "warn", "escalate"]), help="Escalation mode")
+@click.option("--audit/--no-audit", default=None, help="Enable/disable policy audit logging")
+def policy_set_default(
+    max_tool_calls: int = None,
+    max_files: int = None,
+    max_runtime: float = None,
+    escalation: str = None,
+    audit: bool = None,
+):
+    """Set global policy defaults.
+
+    Examples:
+        sindri policy set-default --max-tool-calls 100
+
+        sindri policy set-default --max-runtime 300 --escalation warn
+
+        sindri policy set-default --no-audit
+    """
+    from pathlib import Path
+    from sindri.config import SindriConfig
+
+    config = SindriConfig.load()
+    modified = False
+
+    if max_tool_calls is not None:
+        config.default_max_tool_calls = max_tool_calls if max_tool_calls > 0 else None
+        console.print(f"[green]Set max tool calls: {max_tool_calls or 'unlimited'}[/green]")
+        modified = True
+
+    if max_files is not None:
+        config.default_max_files_touched = max_files if max_files > 0 else None
+        console.print(f"[green]Set max files: {max_files or 'unlimited'}[/green]")
+        modified = True
+
+    if max_runtime is not None:
+        config.default_max_runtime_seconds = max_runtime if max_runtime > 0 else None
+        console.print(f"[green]Set max runtime: {max_runtime or 'unlimited'}s[/green]")
+        modified = True
+
+    if escalation:
+        config.default_escalation_mode = escalation
+        console.print(f"[green]Set escalation mode: {escalation}[/green]")
+        modified = True
+
+    if audit is not None:
+        config.policy_audit_enabled = audit
+        console.print(f"[green]Set policy audit: {'enabled' if audit else 'disabled'}[/green]")
+        modified = True
+
+    if modified:
+        config_path = Path.home() / ".sindri" / "config.toml"
+        try:
+            config.save(str(config_path))
+            console.print(f"[dim]Saved to: {config_path}[/dim]")
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not save config: {e}[/yellow]")
+    else:
+        console.print("[yellow]No changes specified. Use --help to see options.[/yellow]")
+
+
+@policy.command("violations")
+@click.option("--limit", "-n", default=20, help="Number of violations to show")
+@click.option("--agent", "-a", help="Filter by agent name")
+def policy_violations(limit: int, agent: str = None):
+    """Show recent policy violations from audit log.
+
+    Examples:
+        sindri policy violations
+
+        sindri policy violations --limit 50 --agent ratatoskr
+    """
+    from rich.table import Table
+    from sindri.persistence.audit import AuditStore
+
+    async def fetch():
+        store = AuditStore()
+        # Policy violations are logged with tool_name starting with "policy_violation:"
+        entries = await store.list_entries(limit=limit * 3)  # Fetch extra, filter in Python
+        violations = [e for e in entries if e.tool_name.startswith("policy_violation:")]
+
+        if agent:
+            # Filter by agent (stored in task_id context)
+            violations = [e for e in violations if agent in (e.task_id or "")]
+
+        return violations[:limit]
+
+    violations = asyncio.run(fetch())
+
+    if not violations:
+        console.print("[dim]No recent policy violations found.[/dim]")
+        return
+
+    table = Table(
+        title=f"Recent Policy Violations ({len(violations)})",
+        show_header=True,
+        header_style="bold yellow",
+    )
+    table.add_column("Time", width=19)
+    table.add_column("Type", style="yellow", width=20)
+    table.add_column("Task ID", width=12)
+    table.add_column("Reason", width=40)
+
+    for v in violations:
+        violation_type = v.tool_name.replace("policy_violation:", "")
+        task_id = (v.task_id or "")[:12]
+        table.add_row(
+            v.created_at.strftime("%Y-%m-%d %H:%M:%S") if v.created_at else "-",
+            violation_type,
+            task_id,
+            v.error or "-",
+        )
+
+    console.print(table)
+
+
 if __name__ == "__main__":
     cli()

@@ -16,6 +16,9 @@ class EventType(Enum):
     TASK_STATUS_CHANGED = auto()
     AGENT_OUTPUT = auto()
     TOOL_CALLED = auto()
+    DELEGATION_START = auto()
+    DELEGATION_COMPLETE = auto()
+    DELEGATION_FAILED = auto()
     MODEL_LOADED = auto()
     MODEL_UNLOADED = auto()
     ERROR = auto()
@@ -39,6 +42,10 @@ class EventType(Enum):
     PATTERN_LEARNED = auto()  # New pattern extracted from successful task
     # Phase 5.5: Performance metrics
     METRICS_UPDATED = auto()  # Real-time metrics update for TUI
+    # Policy + Guardrails events
+    POLICY_VIOLATION = auto()  # Policy limit exceeded
+    POLICY_WARNING = auto()  # Policy approaching limit (e.g., 80%)
+    POLICY_ESCALATION = auto()  # Operation escalated for approval
 
 
 @dataclass
@@ -59,6 +66,7 @@ class EventBus:
 
     def __init__(self):
         self._handlers: dict[EventType, list[Callable]] = {}
+        self._event_handlers: list[Callable[[Event], None]] = []
         self._enabled = True
 
     def subscribe(self, event_type: EventType, handler: Callable):
@@ -68,6 +76,11 @@ class EventBus:
         self._handlers[event_type].append(handler)
         log.debug("event_handler_subscribed", event_type=event_type.name)
 
+    def subscribe_event(self, handler: Callable[[Event], None]):
+        """Subscribe a handler to full Event objects."""
+        self._event_handlers.append(handler)
+        log.debug("event_handler_subscribed_full_event", handlers=len(self._event_handlers))
+
     def unsubscribe(self, event_type: EventType, handler: Callable):
         """Unsubscribe a handler from an event type."""
         if event_type in self._handlers:
@@ -76,6 +89,17 @@ class EventBus:
                 log.debug("event_handler_unsubscribed", event_type=event_type.name)
             except ValueError:
                 pass
+
+    def unsubscribe_event(self, handler: Callable[[Event], None]):
+        """Unsubscribe a handler from full Event objects."""
+        try:
+            self._event_handlers.remove(handler)
+            log.debug(
+                "event_handler_unsubscribed_full_event",
+                handlers=len(self._event_handlers),
+            )
+        except ValueError:
+            pass
 
     def emit(self, event: Event):
         """Emit an event to all subscribed handlers."""
@@ -91,6 +115,16 @@ class EventBus:
             except Exception as e:
                 log.error(
                     "event_handler_failed", event_type=event.type.name, error=str(e)
+                )
+
+        for handler in self._event_handlers:
+            try:
+                handler(event)
+            except Exception as e:
+                log.error(
+                    "event_handler_failed_full_event",
+                    event_type=event.type.name,
+                    error=str(e),
                 )
 
     def clear(self):

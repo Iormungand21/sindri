@@ -24,6 +24,8 @@ from sindri.agents.registry import AGENTS
 from sindri.memory.system import MuninnMemory
 from sindri.memory.summarizer import ConversationSummarizer
 from sindri.core.events import EventBus, Event, EventType
+from sindri.core.policy import PolicyState, PolicyEnforcer, EscalationMode
+from sindri.config import SindriConfig
 from typing import Optional
 
 log = structlog.get_logger()
@@ -165,6 +167,26 @@ class HierarchicalAgentLoop:
         task.status = TaskStatus.RUNNING
         task.started_at = datetime.now()
 
+        # Policy + Guardrails: Initialize policy enforcement
+        config = SindriConfig.load()
+        default_policy = config.get_default_policy()
+        effective_policy = agent.get_effective_policy(default_policy)
+        policy_state = PolicyState(
+            task_id=task.id,
+            agent_name=agent.name,
+            policy=effective_policy,
+        )
+        policy_enforcer = PolicyEnforcer(policy_state)
+
+        log.info(
+            "policy_initialized",
+            task_id=task.id,
+            agent=agent.name,
+            max_tool_calls=effective_policy.max_tool_calls,
+            max_files_touched=effective_policy.max_files_touched,
+            max_runtime=effective_policy.max_runtime_seconds,
+        )
+
         # Emit task status event
         self.event_bus.emit(
             Event(
@@ -193,7 +215,8 @@ class HierarchicalAgentLoop:
                     task_tools.register(tool)
 
         result = await self._run_loop(
-            task, agent, task_tools, active_model=active_model
+            task, agent, task_tools, active_model=active_model,
+            policy_enforcer=policy_enforcer, config=config
         )
 
         if result.success is True:
@@ -263,7 +286,8 @@ class HierarchicalAgentLoop:
         return result
 
     async def _run_loop(
-        self, task: Task, agent, task_tools: ToolRegistry, active_model: str = None
+        self, task: Task, agent, task_tools: ToolRegistry, active_model: str = None,
+        policy_enforcer: PolicyEnforcer = None, config: SindriConfig = None
     ) -> LoopResult:
         """Execute the agent loop for a task.
 
@@ -272,6 +296,8 @@ class HierarchicalAgentLoop:
             agent: Agent definition
             task_tools: Tool registry for this task
             active_model: Model to use (may differ from agent.model if degraded)
+            policy_enforcer: Policy enforcer for this task
+            config: Sindri config for policy audit settings
         """
         # Phase 5.6: Use active_model if provided, otherwise agent.model
         model_to_use = active_model or agent.model
@@ -358,6 +384,46 @@ class HierarchicalAgentLoop:
                 )
 
                 return LoopResult(success=False, iterations=iteration + 1)
+
+            # Policy + Guardrails: Check runtime limit at start of each iteration
+            if policy_enforcer:
+                runtime_check = policy_enforcer.check_runtime()
+                if not runtime_check.allowed:
+                    log.warning(
+                        "policy_violation_runtime",
+                        task_id=task.id,
+                        reason=runtime_check.reason,
+                        escalation=runtime_check.escalation_mode.value if runtime_check.escalation_mode else None,
+                    )
+
+                    # Emit policy violation event
+                    self.event_bus.emit(
+                        Event(
+                            type=EventType.POLICY_VIOLATION,
+                            data={
+                                "task_id": task.id,
+                                "agent": agent.name,
+                                "violation_type": runtime_check.violation_type,
+                                "reason": runtime_check.reason,
+                                "escalation_mode": runtime_check.escalation_mode.value if runtime_check.escalation_mode else None,
+                                "current_value": runtime_check.current_value,
+                                "limit_value": runtime_check.limit_value,
+                            },
+                            task_id=task.id,
+                        )
+                    )
+
+                    # Handle based on escalation mode
+                    if runtime_check.escalation_mode == EscalationMode.DENY:
+                        task.status = TaskStatus.FAILED
+                        task.error = f"Policy violation: {runtime_check.reason}"
+                        return LoopResult(
+                            success=False,
+                            iterations=iteration + 1,
+                            reason=f"policy_violation:{runtime_check.violation_type}",
+                        )
+                    # WARN mode: log but continue
+                    # ESCALATE mode: for now, treat like WARN (approval system TBD)
 
             # Phase 5.6: Warn agent about remaining iterations
             iterations_remaining = agent.max_iterations - iteration
@@ -572,6 +638,45 @@ class HierarchicalAgentLoop:
                     args=call.function.arguments,
                 )
 
+                # Policy + Guardrails: Check tool call limits before execution
+                if policy_enforcer:
+                    tool_check = policy_enforcer.check_tool_call(call.function.name)
+                    if not tool_check.allowed:
+                        log.warning(
+                            "policy_violation_tool",
+                            task_id=task.id,
+                            tool=call.function.name,
+                            reason=tool_check.reason,
+                            escalation=tool_check.escalation_mode.value if tool_check.escalation_mode else None,
+                        )
+
+                        # Emit policy violation event
+                        self.event_bus.emit(
+                            Event(
+                                type=EventType.POLICY_VIOLATION,
+                                data={
+                                    "task_id": task.id,
+                                    "agent": agent.name,
+                                    "tool": call.function.name,
+                                    "violation_type": tool_check.violation_type,
+                                    "reason": tool_check.reason,
+                                    "escalation_mode": tool_check.escalation_mode.value if tool_check.escalation_mode else None,
+                                    "current_value": tool_check.current_value,
+                                    "limit_value": tool_check.limit_value,
+                                },
+                                task_id=task.id,
+                            )
+                        )
+
+                        # Handle based on escalation mode
+                        if tool_check.escalation_mode == EscalationMode.DENY:
+                            tool_results.append({
+                                "tool": call.function.name,
+                                "result": f"POLICY VIOLATION: {tool_check.reason}",
+                            })
+                            continue  # Skip this tool call
+                        # WARN/ESCALATE: log but allow
+
                 # Phase 5.5: Track tool execution timing
                 tool_start_time = time.time()
 
@@ -610,6 +715,15 @@ class HierarchicalAgentLoop:
                 tool_call_history.append((call.function.name, args_hash))
                 if len(tool_call_history) > 10:  # Keep only recent history
                     tool_call_history.pop(0)
+
+                # Policy + Guardrails: Record tool call for policy tracking
+                if policy_enforcer:
+                    policy_enforcer.state.record_tool_call(call.function.name)
+                    # Track file access if this is a filesystem tool
+                    if result.success and result.metadata:
+                        file_path = result.metadata.get("file_path")
+                        if file_path:
+                            policy_enforcer.state.record_file_access(file_path)
 
                 log.info(
                     "tool_executed",

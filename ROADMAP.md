@@ -11,7 +11,7 @@
 Grouped by logical capability area.
 
 **Suggested sequencing:**
-- **Near-term (0–2 months):** items 1, 2, 5, 6
+- **Near-term (0–2 months):** items 1 ✅, 2, 5 ✅, 6 ✅
 - **Mid-term (2–4 months):** items 3, 4, 7
 - **Long-term (4–6 months):** items 8, 9, 10
 
@@ -56,10 +56,11 @@ Grouped by logical capability area.
    - ✅ Per-project allowlists and approval prompts
    - ✅ Audit log of tool usage and file modifications
    - ✅ Dry-run mode for system and filesystem tools
-6. **Policy + Guardrails**
-   - Agent-level constraints (file scope, tools, budgets)
-   - Max files touched, max tool calls, max runtime
-   - Per-agent escalation to supervised mode
+6. **Policy + Guardrails** ✅ **COMPLETE**
+   - ✅ Agent-level constraints (file scope, tools, budgets)
+   - ✅ Max files touched, max tool calls, max runtime
+   - ✅ Per-agent escalation to supervised mode
+   - ✅ CLI commands: `sindri policy show`, `sindri policy set-default`, `sindri policy violations`
 
 ### Observability + Performance
 7. **Performance Telemetry Stream**

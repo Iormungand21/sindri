@@ -239,6 +239,41 @@ class MetricsUpdatedData(BaseModel):
     duration_seconds: float = Field(..., description="Session duration so far")
 
 
+class PolicyViolationData(BaseModel):
+    """Payload for POLICY_VIOLATION event."""
+
+    task_id: str = Field(..., description="Task identifier")
+    agent: str = Field(..., description="Agent name")
+    violation_type: str = Field(
+        ..., description="Type: max_tool_calls, max_files_touched, max_runtime, file_scope, tool_budget"
+    )
+    reason: str = Field(..., description="Human-readable explanation")
+    escalation_mode: Optional[str] = Field(None, description="Escalation mode: deny, warn, escalate")
+    tool: Optional[str] = Field(None, description="Tool name if tool-related violation")
+    current_value: Optional[float] = Field(None, description="Current value that exceeded limit")
+    limit_value: Optional[float] = Field(None, description="Configured limit value")
+
+
+class PolicyWarningData(BaseModel):
+    """Payload for POLICY_WARNING event."""
+
+    task_id: str = Field(..., description="Task identifier")
+    agent: str = Field(..., description="Agent name")
+    warning_type: str = Field(..., description="Type of warning")
+    message: str = Field(..., description="Warning message")
+    percent_used: Optional[float] = Field(None, description="Percentage of limit used")
+
+
+class PolicyEscalationData(BaseModel):
+    """Payload for POLICY_ESCALATION event."""
+
+    task_id: str = Field(..., description="Task identifier")
+    agent: str = Field(..., description="Agent name")
+    escalation_type: str = Field(..., description="Type of escalation")
+    reason: str = Field(..., description="Why escalation was triggered")
+    context: Optional[str] = Field(None, description="Additional context")
+
+
 # === Event Type to Payload Model Mapping ===
 
 EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
@@ -266,6 +301,9 @@ EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "PLAN_REJECTED": PlanRejectedData,
     "PATTERN_LEARNED": PatternLearnedData,
     "METRICS_UPDATED": MetricsUpdatedData,
+    "POLICY_VIOLATION": PolicyViolationData,
+    "POLICY_WARNING": PolicyWarningData,
+    "POLICY_ESCALATION": PolicyEscalationData,
 }
 
 

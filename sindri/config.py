@@ -2,7 +2,10 @@
 
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Dict, List
+from typing import Optional, Dict, List, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from sindri.core.policy import AgentPolicy
 from pydantic import BaseModel, Field, field_validator, ConfigDict
 import structlog
 
@@ -129,6 +132,32 @@ class SindriConfig(BaseModel):
         description="Run dangerous tools in dry-run mode by default",
     )
 
+    # Policy + Guardrails: Global defaults for agent policies
+    default_max_tool_calls: Optional[int] = Field(
+        default=None,
+        description="Default max tool calls per task (None = unlimited)",
+    )
+    default_max_files_touched: Optional[int] = Field(
+        default=None,
+        description="Default max files an agent can touch per task",
+    )
+    default_max_runtime_seconds: Optional[float] = Field(
+        default=None,
+        description="Default max runtime in seconds per task",
+    )
+    default_file_scope: List[str] = Field(
+        default_factory=list,
+        description="Default allowed file patterns (glob)",
+    )
+    default_escalation_mode: str = Field(
+        default="deny",
+        description="Default escalation mode: deny, warn, or escalate",
+    )
+    policy_audit_enabled: bool = Field(
+        default=True,
+        description="Log policy violations to audit log",
+    )
+
     @field_validator("allowed_services")
     @classmethod
     def validate_allowed_services(cls, v):
@@ -220,6 +249,22 @@ class SindriConfig(BaseModel):
             data = self.model_dump(mode="json")
             toml.dump(data, f)
         log.info("config_saved", path=path)
+
+    def get_default_policy(self) -> "AgentPolicy":
+        """Get the default agent policy from config.
+
+        Returns:
+            AgentPolicy with global defaults
+        """
+        from sindri.core.policy import AgentPolicy, EscalationMode
+
+        return AgentPolicy(
+            max_tool_calls=self.default_max_tool_calls,
+            max_files_touched=self.default_max_files_touched,
+            max_runtime_seconds=self.default_max_runtime_seconds,
+            file_scope=self.default_file_scope,
+            escalation_mode=EscalationMode(self.default_escalation_mode),
+        )
 
 
 def validate_config(config: SindriConfig) -> list[str]:

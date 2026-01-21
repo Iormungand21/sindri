@@ -372,7 +372,7 @@ class TestDelegationWaitHandling:
         orchestrator.scheduler.add_task(parent)
 
         # Mock run_loop to return success=None (delegation waiting)
-        async def mock_run_loop(task, agent, tools, active_model=None):
+        async def mock_run_loop(task, agent, tools, active_model=None, policy_enforcer=None, config=None):
             # Simulate delegation - set task to WAITING
             task.status = TaskStatus.WAITING
             return LoopResult(
@@ -409,7 +409,7 @@ class TestDelegationWaitHandling:
         parent = Task(description="Parent task", assigned_agent="brokkr")
         orchestrator.scheduler.add_task(parent)
 
-        async def mock_run_loop(task, agent, tools, active_model=None):
+        async def mock_run_loop(task, agent, tools, active_model=None, policy_enforcer=None, config=None):
             task.status = TaskStatus.WAITING
             return LoopResult(
                 success=None,
