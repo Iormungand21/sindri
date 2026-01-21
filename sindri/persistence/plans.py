@@ -6,11 +6,11 @@ supporting the Plan-First Execution feature (ROADMAP.md Item 2).
 
 import json
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 import aiosqlite
 import structlog
 
+from sindri.persistence.database import Database
 from sindri.core.plan_execution import (
     PersistentPlan,
     PersistentPlanStep,
@@ -27,19 +27,17 @@ log = structlog.get_logger()
 class PlanStore:
     """Manages persistence of execution plans and steps to SQLite."""
 
-    def __init__(self, db_path: Optional[Path] = None):
+    def __init__(self, database: Optional[Database] = None):
         """Initialize plan store.
 
         Args:
-            db_path: Path to the database file. Defaults to ~/.sindri/sindri.db
+            database: Database instance (uses default if not provided)
         """
-        if db_path is None:
-            db_path = Path.home() / ".sindri" / "sindri.db"
-        self.db_path = db_path
+        self.db = database or Database()
 
     def _get_connection(self):
         """Get an async database connection context manager."""
-        return aiosqlite.connect(self.db_path)
+        return self.db.get_connection()
 
     # ============== Plan CRUD ==============
 
@@ -52,6 +50,8 @@ class PlanStore:
         Returns:
             The plan ID
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             # Serialize plan to JSON for plan_json column
             plan_json = json.dumps(plan.to_dict())
@@ -99,6 +99,8 @@ class PlanStore:
         Returns:
             The plan or None if not found
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
@@ -147,6 +149,8 @@ class PlanStore:
         Returns:
             True if updated, False if plan not found
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             result = await db.execute(
                 """
@@ -173,6 +177,8 @@ class PlanStore:
         Returns:
             True if deleted, False if plan not found
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             # Delete steps first (foreign key)
             await db.execute("DELETE FROM plan_steps WHERE plan_id = ?", (plan_id,))
@@ -198,6 +204,8 @@ class PlanStore:
         Returns:
             List of plans (without full step details for efficiency)
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             db.row_factory = aiosqlite.Row
 
@@ -294,6 +302,8 @@ class PlanStore:
         Returns:
             The step ID
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             await self._save_step_internal(db, step)
             await db.commit()
@@ -310,6 +320,8 @@ class PlanStore:
         Returns:
             The step or None if not found
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(
@@ -342,6 +354,8 @@ class PlanStore:
         Returns:
             True if updated, False if step not found
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             # Build dynamic update
             updates = ["status = ?"]
@@ -382,6 +396,8 @@ class PlanStore:
         Returns:
             True if saved, False if step not found
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             checkpoint_json = json.dumps(checkpoint.to_dict()) if checkpoint else None
             result = await db.execute(
@@ -400,6 +416,8 @@ class PlanStore:
         Returns:
             The checkpoint or None if not found
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             async with db.execute(
                 "SELECT checkpoint_json FROM plan_steps WHERE id = ?", (step_id,)
@@ -419,6 +437,8 @@ class PlanStore:
         Returns:
             True if saved, False if step not found
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             res = await db.execute(
                 "UPDATE plan_steps SET result_json = ? WHERE id = ?",
@@ -445,6 +465,8 @@ class PlanStore:
         Returns:
             True if updated, False if step not found
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             result = await db.execute(
                 """
@@ -471,6 +493,8 @@ class PlanStore:
         Returns:
             List of steps ordered by step number
         """
+        await self.db.initialize()
+
         async with self._get_connection() as db:
             db.row_factory = aiosqlite.Row
             async with db.execute(

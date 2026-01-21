@@ -11,7 +11,9 @@ import time
 
 from sindri.config import SindriConfig
 from sindri.core.access import check_tool_permission
+from sindri.core.events import EventBus
 from sindri.persistence.audit import AuditEntry, AuditStore
+from sindri.persistence.plans import PlanStore
 from sindri.tools.base import Tool, ToolResult
 from sindri.tools.filesystem import (
     ReadFileTool,
@@ -648,11 +650,22 @@ class ToolRegistry:
             return unexpected_result
 
     @classmethod
-    def default(cls, work_dir: Optional[Path] = None) -> "ToolRegistry":
+    def default(
+        cls,
+        work_dir: Optional[Path] = None,
+        plan_store: Optional[PlanStore] = None,
+        event_bus: Optional[EventBus] = None,
+        task_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+    ) -> "ToolRegistry":
         """Create a registry with default tools.
 
         Args:
             work_dir: Working directory for file operations. None = current directory.
+            plan_store: Optional PlanStore for plan persistence. Creates default if None.
+            event_bus: Optional EventBus for plan events.
+            task_id: Optional task ID for plan association.
+            session_id: Optional session ID for plan association.
 
         Returns:
             ToolRegistry with default filesystem and shell tools registered.
@@ -664,7 +677,15 @@ class ToolRegistry:
         registry.register(ListDirectoryTool(work_dir=work_dir))
         registry.register(ReadTreeTool(work_dir=work_dir))
         registry.register(ShellTool(work_dir=work_dir))
-        registry.register(ProposePlanTool(work_dir=work_dir))
+        # Plan-First Execution: wire up PlanStore for persistence
+        effective_plan_store = plan_store if plan_store is not None else PlanStore()
+        registry.register(ProposePlanTool(
+            work_dir=work_dir,
+            plan_store=effective_plan_store,
+            event_bus=event_bus,
+            task_id=task_id,
+            session_id=session_id,
+        ))
         registry.register(SearchCodeTool(work_dir=work_dir))
         registry.register(FindSymbolTool(work_dir=work_dir))
         registry.register(GitStatusTool(work_dir=work_dir))

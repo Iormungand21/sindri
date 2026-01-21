@@ -42,16 +42,16 @@ def temp_db():
 
 @pytest.fixture
 async def initialized_db(temp_db):
-    """Initialize database with schema."""
+    """Initialize database with schema and return Database instance."""
     db = Database(temp_db)
     await db.initialize()
-    return temp_db
+    return db
 
 
 @pytest.fixture
 async def plan_store(initialized_db):
     """Create a PlanStore with initialized database."""
-    return PlanStore(initialized_db)
+    return PlanStore(database=initialized_db)
 
 
 @pytest.fixture
