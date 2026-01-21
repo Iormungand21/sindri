@@ -347,6 +347,110 @@ class TestParallelExceptionPropagation:
 
 
 # =============================================================================
+# Issue 1: Delegation Wait Handling Tests
+# =============================================================================
+
+
+class TestDelegationWaitHandling:
+    """Tests for delegation wait handling (success=None case)."""
+
+    @pytest.fixture
+    def event_bus(self):
+        """Create an event bus for testing."""
+        return EventBus()
+
+    @pytest.mark.asyncio
+    async def test_delegation_returns_success_none_keeps_task_waiting(self, event_bus):
+        """Test that success=None from delegation doesn't mark parent as FAILED."""
+        from sindri.core.loop import LoopResult
+
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        # Create parent task
+        parent = Task(description="Parent task", assigned_agent="brokkr")
+        orchestrator.scheduler.add_task(parent)
+
+        # Mock run_loop to return success=None (delegation waiting)
+        async def mock_run_loop(task, agent, tools, active_model=None):
+            # Simulate delegation - set task to WAITING
+            task.status = TaskStatus.WAITING
+            return LoopResult(
+                success=None,
+                iterations=1,
+                reason="delegation_waiting",
+                final_output="Waiting for delegated child task",
+            )
+
+        orchestrator.loop._run_loop = mock_run_loop
+
+        # Run the task
+        result = await orchestrator.loop.run_task(parent)
+
+        # Task should still be WAITING, not FAILED
+        assert parent.status == TaskStatus.WAITING
+        assert result.success is None
+        assert result.reason == "delegation_waiting"
+
+    @pytest.mark.asyncio
+    async def test_delegation_waiting_does_not_emit_error_event(self, event_bus):
+        """Test that delegation waiting doesn't emit ERROR events."""
+        from sindri.core.loop import LoopResult
+
+        events_received = []
+
+        def on_event(event):
+            events_received.append(event)
+
+        event_bus.subscribe_event(on_event)
+
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        parent = Task(description="Parent task", assigned_agent="brokkr")
+        orchestrator.scheduler.add_task(parent)
+
+        async def mock_run_loop(task, agent, tools, active_model=None):
+            task.status = TaskStatus.WAITING
+            return LoopResult(
+                success=None,
+                iterations=1,
+                reason="delegation_waiting",
+            )
+
+        orchestrator.loop._run_loop = mock_run_loop
+
+        await orchestrator.loop.run_task(parent)
+
+        # Should NOT have any ERROR events
+        error_events = [e for e in events_received if e.type == EventType.ERROR]
+        assert len(error_events) == 0
+
+    @pytest.mark.asyncio
+    async def test_parent_resumes_after_child_completes(self):
+        """Test that parent task resumes (becomes PENDING) when child completes."""
+        orchestrator = Orchestrator(enable_memory=False)
+
+        # Create parent and child tasks
+        parent = Task(description="Parent task", assigned_agent="brokkr")
+        child = Task(
+            description="Child task", assigned_agent="huginn", parent_id=parent.id
+        )
+
+        parent.add_subtask(child.id)
+        parent.status = TaskStatus.WAITING
+
+        orchestrator.scheduler.add_task(parent)
+        orchestrator.scheduler.add_task(child)
+
+        # Complete the child
+        child.status = TaskStatus.COMPLETE
+
+        await orchestrator.delegation.child_completed(child)
+
+        # Parent should be resumed (PENDING) not FAILED
+        assert parent.status == TaskStatus.PENDING
+
+
+# =============================================================================
 # Integration Tests
 # =============================================================================
 

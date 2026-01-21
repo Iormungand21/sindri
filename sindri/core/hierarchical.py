@@ -195,7 +195,7 @@ class HierarchicalAgentLoop:
             task, agent, task_tools, active_model=active_model
         )
 
-        if result.success:
+        if result.success is True:
             task.status = TaskStatus.COMPLETE
             task.completed_at = datetime.now()
             task.result = {"output": result.final_output}
@@ -214,6 +214,16 @@ class HierarchicalAgentLoop:
             )
 
             log.info("task_completed", task_id=task.id, iterations=result.iterations)
+        elif result.success is None:
+            # Delegation in progress - task is WAITING for children
+            # Don't mark as failed, just return the result
+            # DelegationManager has already set status to WAITING
+            log.info(
+                "task_waiting_for_delegation",
+                task_id=task.id,
+                iterations=result.iterations,
+                reason=result.reason,
+            )
         elif task.status != TaskStatus.CANCELLED:
             # Only mark as FAILED if not already CANCELLED
             task.status = TaskStatus.FAILED

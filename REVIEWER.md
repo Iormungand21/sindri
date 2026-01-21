@@ -131,9 +131,45 @@ self.event_bus.emit(Event(type=EventType.ERROR, data={...}))
 
 ---
 
+---
+
+## Follow-up Fix: Delegation Wait Handling (Issue 1)
+
+**File:** `sindri/core/hierarchical.py` (lines 198-227)
+
+**Problem identified in review:** When `_run_loop` returns `LoopResult(success=None)` for delegation, `run_task` incorrectly treated it as failure because `None` is falsy in Python.
+
+**Fix:** Changed `if result.success:` to `if result.success is True:` and added explicit handling for `success=None`:
+
+```python
+# Before
+if result.success:  # None is falsy, so this fails for delegation!
+    # ... mark complete
+elif task.status != TaskStatus.CANCELLED:
+    # ... mark FAILED (BUG: delegation waiting got here!)
+
+# After
+if result.success is True:
+    # ... mark complete
+elif result.success is None:
+    # Delegation in progress - task is WAITING for children
+    # Don't mark as failed, just return the result
+    log.info("task_waiting_for_delegation", ...)
+elif task.status != TaskStatus.CANCELLED:
+    # ... mark FAILED (only for actual failures)
+```
+
+**New tests added:**
+- `test_delegation_returns_success_none_keeps_task_waiting`
+- `test_delegation_waiting_does_not_emit_error_event`
+- `test_parent_resumes_after_child_completes`
+
+---
+
 ## Summary of Impact
 
 - **Reliability:** Parent tasks will no longer hang when children fail
+- **Delegation:** Parent tasks correctly wait for children without being marked FAILED
 - **Safety:** Tasks won't be over-scheduled when VRAM is partially used
 - **Correctness:** Task IDs are now collision-resistant for long-running systems
 - **Observability:** All failure paths now emit proper ERROR events
