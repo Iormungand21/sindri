@@ -33,6 +33,8 @@ From ROADMAP.md Item 3:
 |------|---------|
 | `sindri/persistence/database.py` | Added `session_snapshots` and `session_tool_outputs` tables; bumped SCHEMA_VERSION to 7 |
 | `sindri/cli.py` | Added `replay` command group with 4 subcommands (info, list, run, compare) |
+| `sindri/core/loop.py` | Integrated snapshot capture and tool output recording |
+| `sindri/core/hierarchical.py` | Integrated snapshot capture and tool output recording |
 | `STATUS.md` | Updated snapshot and recent changes section |
 | `ROADMAP.md` | Marked Reproducible Sessions as complete; updated changelog |
 
@@ -128,3 +130,37 @@ Compares two sessions:
 3. **Tool-only replay first** - Full replay with LLM requires deeper orchestrator integration; tool-only mode provides immediate value for deterministic testing
 
 4. **Output hash verification** - SHA256 hash stored with outputs allows verifying replay accuracy
+
+---
+
+## Review Feedback Addressed
+
+**Reviewer:** ChatGPT (Senior Team Member)
+**Date:** 2026-01-21
+
+### Issues Identified and Fixes Applied
+
+| Issue | Status | Fix |
+|-------|--------|-----|
+| Snapshot capture not wired into session creation | FIXED | Integrated `SnapshotCapture` into both `AgentLoop.run()` and `HierarchicalAgentLoop._process_task()` - snapshots now captured automatically after session creation |
+| Tool outputs not recorded during execution | FIXED | Added `ToolOutputStore.save_tool_output()` calls to both `loop.py` and `hierarchical.py` after each tool execution with timing metrics |
+| Hard-coded git repo path (`/home/ryan/projects/sindri`) | FIXED | Replaced with dynamic lookup using `Path(sindri.__file__).parent.parent` to find the sindri package location |
+
+### Code Changes for Fixes
+
+**sindri/core/loop.py:**
+- Added imports: `time`, `SnapshotStore`, `ToolOutputStore`, `SnapshotCapture`, `SindriConfig`
+- Added snapshot capture after session creation (lines 69-77)
+- Added tool output recording in tool execution loop with timing (lines 130-168)
+
+**sindri/core/hierarchical.py:**
+- Added `SnapshotStore`, `ToolOutputStore`, `SnapshotCapture` as instance attributes
+- Added snapshot capture for new sessions after session creation
+- Added tool output recording with `enumerate()` for tool indexing and timing
+
+**sindri/replay/snapshot.py:**
+- Fixed `_get_git_commit()` to use dynamic package path instead of hard-coded path
+
+### Verification
+
+All 3,945 tests pass after fixes (44 replay tests + 3,901 existing tests).

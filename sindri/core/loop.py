@@ -10,11 +10,15 @@ Iterates until:
 from dataclasses import dataclass
 import structlog
 
+import time
 from sindri.llm.client import OllamaClient
 from sindri.tools.registry import ToolRegistry
 from sindri.persistence.state import SessionState
+from sindri.persistence.snapshots import SnapshotStore, ToolOutputStore
+from sindri.replay.snapshot import SnapshotCapture
 from sindri.core.completion import CompletionDetector
 from sindri.core.context import ContextBuilder
+from sindri.config import SindriConfig
 
 log = structlog.get_logger()
 
@@ -61,6 +65,17 @@ class AgentLoop:
         """Execute the loop until completion."""
 
         session = await self.state.create_session(task, model)
+
+        # Reproducible Sessions: Capture environment snapshot
+        try:
+            snapshot_capture = SnapshotCapture(self.client, SindriConfig())
+            snapshot = await snapshot_capture.capture(model)
+            snapshot_store = SnapshotStore()
+            await snapshot_store.save_snapshot(session.id, snapshot)
+            log.info("session_snapshot_captured", session_id=session.id)
+        except Exception as e:
+            log.warning("snapshot_capture_failed", session_id=session.id, error=str(e))
+
         recent_responses = []
 
         for iteration in range(self.config.max_iterations):
@@ -113,15 +128,18 @@ class AgentLoop:
                     ]
 
             # Execute all tool calls
-            for call in calls_to_execute:
+            tool_output_store = ToolOutputStore()
+            for tool_idx, call in enumerate(calls_to_execute):
                 log.info(
                     "executing_tool",
                     tool=call.function.name,
                     args=call.function.arguments,
                 )
+                tool_start_time = time.time()
                 result = await self.tools.execute(
                     call.function.name, call.function.arguments
                 )
+                tool_duration_ms = int((time.time() - tool_start_time) * 1000)
                 tool_results.append(
                     {
                         "tool": call.function.name,
@@ -135,6 +153,25 @@ class AgentLoop:
                 log.info(
                     "tool_executed", tool=call.function.name, success=result.success
                 )
+
+                # Reproducible Sessions: Record full tool output
+                try:
+                    await tool_output_store.save_tool_output(
+                        session_id=session.id,
+                        turn_index=iteration,
+                        tool_index=tool_idx,
+                        tool_name=call.function.name,
+                        arguments=(
+                            call.function.arguments
+                            if isinstance(call.function.arguments, dict)
+                            else {}
+                        ),
+                        output=result.output if result.success else result.error,
+                        success=result.success,
+                        duration_ms=tool_duration_ms,
+                    )
+                except Exception as e:
+                    log.warning("tool_output_recording_failed", error=str(e))
 
             # 4. Check completion (after tool execution)
             if self.completion.is_complete(assistant_content):

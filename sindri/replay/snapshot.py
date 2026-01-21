@@ -3,6 +3,7 @@
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 import structlog
@@ -100,12 +101,16 @@ class SnapshotCapture:
     def _get_git_commit(self) -> Optional[str]:
         """Get current git commit hash if in a git repo."""
         try:
+            # Try to find sindri package location for git info
+            import sindri
+            package_dir = Path(sindri.__file__).parent.parent
+
             result = subprocess.run(
                 ["git", "rev-parse", "--short", "HEAD"],
                 capture_output=True,
                 text=True,
                 timeout=5,
-                cwd="/home/ryan/projects/sindri",  # Assume project root
+                cwd=package_dir,
             )
             if result.returncode == 0:
                 return result.stdout.strip()

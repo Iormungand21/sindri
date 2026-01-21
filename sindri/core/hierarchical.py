@@ -14,6 +14,8 @@ from sindri.tools.delegation import DelegateTool
 from sindri.persistence.state import SessionState
 from sindri.persistence.metrics import MetricsCollector, MetricsStore
 from sindri.persistence.audit import AuditStore, AuditEntry
+from sindri.persistence.snapshots import SnapshotStore, ToolOutputStore
+from sindri.replay.snapshot import SnapshotCapture
 from sindri.core.loop import LoopConfig, LoopResult
 from sindri.core.completion import CompletionDetector
 from sindri.core.context import ContextBuilder
@@ -69,6 +71,10 @@ class HierarchicalAgentLoop:
         )  # Per-session collectors
         # Policy + Guardrails: Audit store for violation logging
         self._audit_store = AuditStore()
+        # Reproducible Sessions: Snapshot and tool output stores
+        self._snapshot_store = SnapshotStore()
+        self._tool_output_store = ToolOutputStore()
+        self._snapshot_capture = SnapshotCapture(client, SindriConfig())
 
     async def run_task(self, task: Task) -> LoopResult:
         """Run a specific task with its assigned agent."""
@@ -322,6 +328,7 @@ class HierarchicalAgentLoop:
                 model=model_to_use,
             )
             session = await self.state.load_session(task.session_id)
+            is_new_session = False
             if not session:
                 log.warning("session_not_found", session_id=task.session_id)
                 # Fallback: create new session
@@ -329,11 +336,22 @@ class HierarchicalAgentLoop:
                     task.description, model_to_use
                 )
                 task.session_id = session.id
+                is_new_session = True
         else:
             # Create new session for new task
             log.info("creating_new_session", task_id=task.id)
             session = await self.state.create_session(task.description, agent.model)
             task.session_id = session.id
+            is_new_session = True
+
+        # Reproducible Sessions: Capture environment snapshot for new sessions
+        if is_new_session:
+            try:
+                snapshot = await self._snapshot_capture.capture(session.model)
+                await self._snapshot_store.save_snapshot(session.id, snapshot)
+                log.info("session_snapshot_captured", session_id=session.id)
+            except Exception as e:
+                log.warning("snapshot_capture_failed", session_id=session.id, error=str(e))
 
         # Index project if memory available and not yet indexed
         # Use configured work_dir or fall back to cwd for memory indexing
@@ -651,7 +669,7 @@ class HierarchicalAgentLoop:
                     ]
 
             # Execute all calls
-            for call in calls_to_execute:
+            for tool_idx, call in enumerate(calls_to_execute):
                 log.info(
                     "executing_tool",
                     task_id=task.id,
@@ -788,6 +806,7 @@ class HierarchicalAgentLoop:
 
                 # Phase 5.5: Record tool execution metrics
                 tool_end_time = time.time()
+                tool_duration_ms = int((tool_end_time - tool_start_time) * 1000)
                 if metrics_collector:
                     metrics_collector.record_tool_execution(
                         tool_name=call.function.name,
@@ -800,6 +819,25 @@ class HierarchicalAgentLoop:
                             else None
                         ),
                     )
+
+                # Reproducible Sessions: Record full tool output
+                try:
+                    await self._tool_output_store.save_tool_output(
+                        session_id=session.id,
+                        turn_index=iteration,
+                        tool_index=tool_idx,
+                        tool_name=call.function.name,
+                        arguments=(
+                            call.function.arguments
+                            if isinstance(call.function.arguments, dict)
+                            else {}
+                        ),
+                        output=result.output if result.success else result.error,
+                        success=result.success,
+                        duration_ms=tool_duration_ms,
+                    )
+                except Exception as e:
+                    log.warning("tool_output_recording_failed", error=str(e))
 
                 tool_results.append(
                     {
