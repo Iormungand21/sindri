@@ -52,10 +52,10 @@ Grouped by logical capability area.
    - Per-project embedder settings and exclusion rules
 
 ### Safety + Governance
-5. **Granular Tool Permissions**
-   - Per-project allowlists and approval prompts
-   - Audit log of tool usage and file modifications
-   - Dry-run mode for system and filesystem tools
+5. **Granular Tool Permissions** ✅ **COMPLETE**
+   - ✅ Per-project allowlists and approval prompts
+   - ✅ Audit log of tool usage and file modifications
+   - ✅ Dry-run mode for system and filesystem tools
 6. **Policy + Guardrails**
    - Agent-level constraints (file scope, tools, budgets)
    - Max files touched, max tool calls, max runtime

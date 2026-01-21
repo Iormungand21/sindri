@@ -74,14 +74,34 @@ class WriteFileTool(Tool):
                 "type": "string",
                 "description": "Content to write to the file",
             },
+            "dry_run": {
+                "type": "boolean",
+                "description": "If true, simulate execution without writing",
+            },
         },
         "required": ["path", "content"],
     }
 
-    async def execute(self, path: str, content: str) -> ToolResult:
-        """Write content to file."""
+    async def execute(
+        self, path: str, content: str, dry_run: bool | None = None
+    ) -> ToolResult:
+        """Write content to file with dry-run support."""
         # Check access control - file writes are modifications
         config = SindriConfig.load()
+
+        # Resolve dry_run from parameter or config default
+        if dry_run is None:
+            dry_run = config.default_dry_run
+
+        # Handle dry-run mode
+        if dry_run:
+            log.info("file_write_dry_run", path=path, size=len(content))
+            return ToolResult(
+                success=True,
+                output=f"[DRY RUN] Would write {len(content)} bytes to {path}",
+                metadata={"dry_run": True, "path": path, "size": len(content)},
+            )
+
         access_result = check_system_access(
             config,
             f"write file: {path}",
@@ -143,14 +163,36 @@ class EditFileTool(Tool):
                 "description": "Text to search for and replace",
             },
             "new_text": {"type": "string", "description": "Text to replace with"},
+            "dry_run": {
+                "type": "boolean",
+                "description": "If true, simulate execution without editing",
+            },
         },
         "required": ["path", "old_text", "new_text"],
     }
 
-    async def execute(self, path: str, old_text: str, new_text: str) -> ToolResult:
-        """Edit file by replacing text."""
+    async def execute(
+        self, path: str, old_text: str, new_text: str, dry_run: bool | None = None
+    ) -> ToolResult:
+        """Edit file by replacing text with dry-run support."""
         # Check access control - file edits are modifications
         config = SindriConfig.load()
+
+        # Resolve dry_run from parameter or config default
+        if dry_run is None:
+            dry_run = config.default_dry_run
+
+        # Handle dry-run mode
+        if dry_run:
+            old_preview = old_text[:50] + "..." if len(old_text) > 50 else old_text
+            new_preview = new_text[:50] + "..." if len(new_text) > 50 else new_text
+            log.info("file_edit_dry_run", path=path)
+            return ToolResult(
+                success=True,
+                output=f"[DRY RUN] Would replace '{old_preview}' with '{new_preview}' in {path}",
+                metadata={"dry_run": True, "path": path},
+            )
+
         access_result = check_system_access(
             config,
             f"edit file: {path}",

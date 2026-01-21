@@ -7,6 +7,11 @@ from pathlib import Path
 from typing import Optional
 import structlog
 
+import time
+
+from sindri.config import SindriConfig
+from sindri.core.access import check_tool_permission
+from sindri.persistence.audit import AuditEntry, AuditStore
 from sindri.tools.base import Tool, ToolResult
 from sindri.tools.filesystem import (
     ReadFileTool,
@@ -438,9 +443,44 @@ class ToolRegistry:
 
         log.info("tool_execute", name=name, args=arguments)
 
+        # Check tool permission
+        config = SindriConfig.load()
+        permission = check_tool_permission(config, name)
+        if not permission.allowed:
+            log.warning(
+                "tool_permission_denied",
+                tool=name,
+                reason=permission.reason,
+            )
+            return ToolResult(
+                success=False,
+                output="",
+                error=permission.reason,
+                error_category=ErrorCategory.FATAL,
+                suggestion="Check allowed_tools and blocked_tools in config",
+            )
+
         # Execute with retry for transient errors
         last_result: Optional[ToolResult] = None
         last_exception: Optional[Exception] = None
+        start_time = time.time()
+
+        # Helper to log audit entry
+        async def log_audit(result: ToolResult):
+            try:
+                duration_ms = int((time.time() - start_time) * 1000)
+                audit_store = AuditStore()
+                await audit_store.log_tool_execution(AuditEntry(
+                    tool_name=name,
+                    arguments=json.dumps(arguments)[:1000] if arguments else None,
+                    success=result.success,
+                    output_summary=result.output[:500] if result.output else None,
+                    error=result.error,
+                    duration_ms=duration_ms,
+                    dry_run=arguments.get("dry_run", False) if isinstance(arguments, dict) else False,
+                ))
+            except Exception as e:
+                log.warning("audit_log_failed", tool=name, error=str(e))
 
         for attempt in range(self.retry_config.max_attempts):
             try:
@@ -449,6 +489,7 @@ class ToolRegistry:
                 if result.success:
                     # Success - return with retry count
                     result.retries_attempted = attempt
+                    await log_audit(result)
                     return result
 
                 # Tool returned failure - classify and maybe retry
@@ -459,6 +500,7 @@ class ToolRegistry:
 
                 if not classified.retryable:
                     # Fatal error - don't retry
+                    await log_audit(result)
                     return result
 
                 # Transient error - retry if not exhausted
@@ -492,7 +534,7 @@ class ToolRegistry:
                         error=str(e),
                         category=classified.category.value,
                     )
-                    return ToolResult(
+                    fatal_result = ToolResult(
                         success=False,
                         output="",
                         error=f"Tool execution failed: {str(e)}",
@@ -500,6 +542,8 @@ class ToolRegistry:
                         suggestion=classified.suggestion,
                         retries_attempted=attempt,
                     )
+                    await log_audit(fatal_result)
+                    return fatal_result
 
                 # Transient exception - retry if not exhausted
                 if attempt < self.retry_config.max_attempts - 1:
@@ -526,6 +570,7 @@ class ToolRegistry:
                 attempts=self.retry_config.max_attempts,
                 error=last_result.error,
             )
+            await log_audit(last_result)
             return last_result
         elif last_exception:
             classified = classify_error(last_exception)
@@ -535,7 +580,7 @@ class ToolRegistry:
                 attempts=self.retry_config.max_attempts,
                 error=str(last_exception),
             )
-            return ToolResult(
+            exhausted_result = ToolResult(
                 success=False,
                 output="",
                 error=f"Tool execution failed after {self.retry_config.max_attempts} attempts: {str(last_exception)}",
@@ -543,15 +588,19 @@ class ToolRegistry:
                 suggestion=classified.suggestion,
                 retries_attempted=self.retry_config.max_attempts - 1,
             )
+            await log_audit(exhausted_result)
+            return exhausted_result
         else:
             # Should never happen
-            return ToolResult(
+            unexpected_result = ToolResult(
                 success=False,
                 output="",
                 error="Tool execution failed unexpectedly",
                 error_category=ErrorCategory.FATAL,
                 retries_attempted=self.retry_config.max_attempts - 1,
             )
+            await log_audit(unexpected_result)
+            return unexpected_result
 
     @classmethod
     def default(cls, work_dir: Optional[Path] = None) -> "ToolRegistry":

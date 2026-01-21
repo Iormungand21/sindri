@@ -1,6 +1,7 @@
 """SQLite database setup for Sindri."""
 
 import aiosqlite
+import os
 from pathlib import Path
 from typing import Optional
 import structlog
@@ -11,7 +12,13 @@ log = structlog.get_logger()
 # Version 2: Added session_metrics table for performance tracking
 # Version 3: Added session_feedback table for feedback collection and fine-tuning
 # Version 4: Removed collaboration tables (internal-only mode)
-SCHEMA_VERSION = 4
+# Version 5: Added tool_audit_log table for granular tool permissions
+SCHEMA_VERSION = 5
+
+
+def _db_debug(message: str):
+    if os.getenv("SINDRI_DB_DEBUG"):
+        print(f"[db-debug] {message}", flush=True)
 
 
 class Database:
@@ -24,6 +31,9 @@ class Database:
             db_path: Path to the database file. Defaults to ~/.sindri/sindri.db
             auto_backup: Create backup before schema changes (default True)
         """
+        env_path = os.getenv("SINDRI_DB_PATH")
+        if env_path:
+            db_path = Path(env_path)
         if db_path is None:
             db_path = Path.home() / ".sindri" / "sindri.db"
 
@@ -60,10 +70,12 @@ class Database:
         Creates auto-backup before schema changes if database exists
         and auto_backup is enabled.
         """
+        _db_debug(f"initialize: start db_path={self.db_path}")
         # Check if we need to create backup before schema changes
         needs_migration = False
         if self.db_path.exists() and self.auto_backup:
             try:
+                _db_debug("initialize: checking schema version")
                 async with aiosqlite.connect(self.db_path) as db:
                     current_version = await self._get_schema_version(db)
                     needs_migration = current_version < SCHEMA_VERSION
@@ -73,13 +85,16 @@ class Database:
         # Create backup before migration
         if needs_migration:
             try:
+                _db_debug("initialize: creating pre-migration backup")
                 await self.backup_manager.create_backup(reason="pre_migration")
                 log.info("pre_migration_backup_created")
             except Exception as e:
                 log.warning("pre_migration_backup_failed", error=str(e))
                 # Continue with migration anyway
 
+        _db_debug("initialize: opening aiosqlite connection")
         async with aiosqlite.connect(self.db_path) as db:
+            _db_debug("initialize: connection open, creating tables")
             await db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS sessions (
@@ -162,11 +177,53 @@ class Database:
             """
             )
 
+            # Granular Tool Permissions: Audit log table
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS tool_audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT,
+                    task_id TEXT,
+                    tool_name TEXT NOT NULL,
+                    arguments TEXT,
+                    success INTEGER NOT NULL,
+                    output_summary TEXT,
+                    error TEXT,
+                    duration_ms INTEGER,
+                    dry_run INTEGER DEFAULT 0,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (session_id) REFERENCES sessions(id)
+                )
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_audit_session
+                ON tool_audit_log(session_id)
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_audit_tool
+                ON tool_audit_log(tool_name)
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_audit_created
+                ON tool_audit_log(created_at)
+            """
+            )
+
             # Update schema version
             await self._set_schema_version(db, SCHEMA_VERSION)
 
             await db.commit()
 
+        _db_debug("initialize: complete")
         log.info("database_initialized", path=str(self.db_path))
 
     def get_connection(self):

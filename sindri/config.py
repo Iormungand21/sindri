@@ -111,6 +111,24 @@ class SindriConfig(BaseModel):
         description="Whether Sindri can modify its own config",
     )
 
+    # Tool Permissions (Granular Tool Permissions feature)
+    allowed_tools: Optional[List[str]] = Field(
+        default=None,
+        description="Allowlist of tool names (None = all tools allowed)",
+    )
+    blocked_tools: List[str] = Field(
+        default_factory=list,
+        description="Blocklist of tool names (applied after allowlist)",
+    )
+    tool_approval_required: List[str] = Field(
+        default_factory=list,
+        description="Tools requiring explicit approval before execution",
+    )
+    default_dry_run: bool = Field(
+        default=False,
+        description="Run dangerous tools in dry-run mode by default",
+    )
+
     @field_validator("allowed_services")
     @classmethod
     def validate_allowed_services(cls, v):

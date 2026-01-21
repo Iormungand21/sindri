@@ -6780,5 +6780,198 @@ def self_ollama_status_cmd():
     asyncio.run(run())
 
 
+# ============================================
+# Tool Audit Commands (Granular Tool Permissions)
+# ============================================
+
+
+@cli.group()
+def audit():
+    """View tool execution audit log."""
+    pass
+
+
+@audit.command("list")
+@click.option("--limit", "-n", default=50, help="Maximum entries to show")
+@click.option("--tool", "-t", help="Filter by tool name")
+@click.option("--session", "-s", help="Filter by session ID")
+@click.option("--success-only", is_flag=True, help="Only show successful executions")
+@click.option("--failed-only", is_flag=True, help="Only show failed executions")
+def audit_list(limit: int, tool: str, session: str, success_only: bool, failed_only: bool):
+    """List recent tool executions.
+
+    Examples:
+        sindri audit list
+
+        sindri audit list --limit 100 --tool shell
+
+        sindri audit list --failed-only
+    """
+    from rich.table import Table
+    from sindri.persistence.audit import AuditStore
+
+    async def run():
+        store = AuditStore()
+        entries = await store.list_entries(
+            limit=limit,
+            tool_name=tool,
+            session_id=session,
+            success_only=success_only,
+            failed_only=failed_only,
+        )
+
+        if not entries:
+            console.print("[yellow]No audit entries found.[/yellow]")
+            return
+
+        table = Table(
+            title=f"Tool Audit Log (last {len(entries)} entries)",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("ID", style="dim", width=6)
+        table.add_column("Time", width=19)
+        table.add_column("Tool", style="cyan", width=20)
+        table.add_column("Status", width=8)
+        table.add_column("Duration", width=10)
+        table.add_column("Error", style="red", width=30)
+
+        for entry in entries:
+            status = "[green]✓[/green]" if entry.success else "[red]✗[/red]"
+            if entry.dry_run:
+                status = "[yellow]DRY[/yellow]"
+
+            duration = f"{entry.duration_ms}ms" if entry.duration_ms else "-"
+            error = (entry.error[:30] + "...") if entry.error and len(entry.error) > 30 else (entry.error or "")
+            time_str = entry.created_at.strftime("%Y-%m-%d %H:%M:%S")
+
+            table.add_row(
+                str(entry.id),
+                time_str,
+                entry.tool_name,
+                status,
+                duration,
+                error,
+            )
+
+        console.print(table)
+
+    asyncio.run(run())
+
+
+@audit.command("stats")
+@click.option("--days", "-d", default=7, help="Number of days to analyze")
+def audit_stats(days: int):
+    """Show tool usage statistics.
+
+    Examples:
+        sindri audit stats
+
+        sindri audit stats --days 30
+    """
+    from rich.table import Table
+    from datetime import datetime, timedelta
+    from sindri.persistence.audit import AuditStore
+
+    async def run():
+        store = AuditStore()
+        start_date = datetime.now() - timedelta(days=days)
+        stats = await store.get_tool_stats(start_date=start_date)
+
+        if not stats:
+            console.print("[yellow]No audit data found for the specified period.[/yellow]")
+            return
+
+        table = Table(
+            title=f"Tool Usage Statistics (last {days} days)",
+            show_header=True,
+            header_style="bold cyan",
+        )
+        table.add_column("Tool", style="cyan", width=25)
+        table.add_column("Total", width=8)
+        table.add_column("Success", style="green", width=8)
+        table.add_column("Failed", style="red", width=8)
+        table.add_column("Success Rate", width=12)
+        table.add_column("Avg Duration", width=12)
+
+        for tool_name, tool_stats in stats.items():
+            success_rate = f"{tool_stats['success_rate']:.1f}%"
+            avg_duration = f"{tool_stats['avg_duration_ms']:.0f}ms" if tool_stats['avg_duration_ms'] else "-"
+
+            table.add_row(
+                tool_name,
+                str(tool_stats["total"]),
+                str(tool_stats["successes"]),
+                str(tool_stats["failures"]),
+                success_rate,
+                avg_duration,
+            )
+
+        console.print(table)
+
+    asyncio.run(run())
+
+
+@audit.command("export")
+@click.option("--format", "-f", type=click.Choice(["json", "csv"]), default="json", help="Export format")
+@click.option("--output", "-o", help="Output file (default: stdout)")
+@click.option("--limit", "-n", default=1000, help="Maximum entries to export")
+@click.option("--tool", "-t", help="Filter by tool name")
+def audit_export(format: str, output: str, limit: int, tool: str):
+    """Export audit log to JSON or CSV.
+
+    Examples:
+        sindri audit export --format json -o audit.json
+
+        sindri audit export --format csv --tool shell
+
+        sindri audit export --limit 5000 -o full_audit.json
+    """
+    from sindri.persistence.audit import AuditStore
+
+    async def run():
+        store = AuditStore()
+        data = await store.export_entries(
+            format=format,
+            limit=limit,
+            tool_name=tool,
+        )
+
+        if output:
+            with open(output, "w") as f:
+                f.write(data)
+            console.print(f"[green]✓[/green] Exported to {output}")
+        else:
+            print(data)
+
+    asyncio.run(run())
+
+
+@audit.command("clear")
+@click.option("--days", "-d", default=30, help="Delete entries older than this many days")
+@click.option("--yes", "-y", is_flag=True, help="Skip confirmation")
+def audit_clear(days: int, yes: bool):
+    """Clear old audit entries.
+
+    Examples:
+        sindri audit clear --days 90
+
+        sindri audit clear --days 7 --yes
+    """
+    from sindri.persistence.audit import AuditStore
+
+    if not yes:
+        if not click.confirm(f"Delete audit entries older than {days} days?"):
+            console.print("[yellow]Cancelled.[/yellow]")
+            return
+
+    async def run():
+        store = AuditStore()
+        deleted = await store.clear_old_entries(days=days)
+        console.print(f"[green]✓[/green] Deleted {deleted} old audit entries")
+
+    asyncio.run(run())
+
+
 if __name__ == "__main__":
     cli()

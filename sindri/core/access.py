@@ -93,6 +93,72 @@ def check_system_access(
     return AccessCheckResult(allowed=True, reason="Full access granted")
 
 
+def check_tool_permission(
+    config: SindriConfig,
+    tool_name: str,
+) -> AccessCheckResult:
+    """Check if a tool is allowed by the current configuration.
+
+    This function checks tool permissions based on allowlists and blocklists
+    configured in SindriConfig. The check order is:
+    1. If allowed_tools is set, tool must be in the list
+    2. If tool is in blocked_tools, it is rejected
+    3. If tool is in tool_approval_required, it needs confirmation
+
+    Args:
+        config: Sindri configuration with tool permission settings
+        tool_name: Name of the tool to check
+
+    Returns:
+        AccessCheckResult with allowed status and reason
+
+    Examples:
+        >>> config = SindriConfig(allowed_tools=["read_file", "write_file"])
+        >>> result = check_tool_permission(config, "shell")
+        >>> result.allowed
+        False
+
+        >>> config = SindriConfig(blocked_tools=["shell"])
+        >>> result = check_tool_permission(config, "shell")
+        >>> result.allowed
+        False
+
+        >>> config = SindriConfig(tool_approval_required=["write_file"])
+        >>> result = check_tool_permission(config, "write_file")
+        >>> result.needs_confirmation
+        True
+    """
+    # Check allowlist (if set)
+    if config.allowed_tools is not None:
+        if tool_name not in config.allowed_tools:
+            return AccessCheckResult(
+                allowed=False,
+                reason=f"Tool '{tool_name}' not in allowed_tools list",
+            )
+
+    # Check blocklist
+    if tool_name in config.blocked_tools:
+        return AccessCheckResult(
+            allowed=False,
+            reason=f"Tool '{tool_name}' is blocked",
+        )
+
+    # Check if approval required
+    needs_approval = tool_name in config.tool_approval_required
+
+    if needs_approval:
+        return AccessCheckResult(
+            allowed=True,
+            needs_confirmation=True,
+            reason=f"Tool '{tool_name}' requires approval",
+        )
+
+    return AccessCheckResult(
+        allowed=True,
+        reason="Tool allowed",
+    )
+
+
 def confirm_operation(operation: str, details: str = "") -> bool:
     """Prompt user to confirm a supervised operation.
 

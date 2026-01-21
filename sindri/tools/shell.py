@@ -23,6 +23,10 @@ class ShellTool(Tool):
                 "type": "integer",
                 "description": "Command timeout in seconds (default: 300, max: 3600)",
             },
+            "dry_run": {
+                "type": "boolean",
+                "description": "If true, simulate execution without running the command",
+            },
         },
         "required": ["command"],
     }
@@ -32,18 +36,38 @@ class ShellTool(Tool):
     # Maximum allowed timeout (1 hour)
     MAX_TIMEOUT = 3600
 
-    async def execute(self, command: str, timeout: int | None = None) -> ToolResult:
-        """Execute shell command with timeout support.
+    async def execute(
+        self,
+        command: str,
+        timeout: int | None = None,
+        dry_run: bool | None = None,
+    ) -> ToolResult:
+        """Execute shell command with timeout and dry-run support.
 
         Args:
             command: Shell command to execute
             timeout: Command timeout in seconds (default: 300, max: 3600)
+            dry_run: If true, simulate execution without running
 
         Returns:
             ToolResult with command output or error
         """
         # Check access control - all shell commands are modifications
         config = SindriConfig.load()
+
+        # Resolve dry_run from parameter or config default
+        if dry_run is None:
+            dry_run = config.default_dry_run
+
+        # Handle dry-run mode
+        if dry_run:
+            log.info("shell_dry_run", command=command)
+            return ToolResult(
+                success=True,
+                output=f"[DRY RUN] Would execute: {command}",
+                metadata={"dry_run": True, "command": command},
+            )
+
         access_result = check_system_access(
             config,
             f"execute shell command: {command[:50]}{'...' if len(command) > 50 else ''}",

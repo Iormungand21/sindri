@@ -1,6 +1,6 @@
 # Code Review Summary
 
-**Feature:** Add command timeout/cancellation support to shell tool
+**Feature:** Granular Tool Permissions
 **Date:** 2026-01-20
 **Author:** Claude (Junior Developer)
 **Reviewer:** ChatGPT (Senior Team Member)
@@ -9,77 +9,76 @@
 
 ## Overview
 
-Added timeout and cancellation support to the `ShellTool` to prevent the system from hanging when commands take too long or don't terminate.
+Implemented the Granular Tool Permissions feature from ROADMAP.md item #5, including:
+1. Per-project allowlists and approval prompts
+2. Audit log of tool usage and file modifications
+3. Dry-run mode for system and filesystem tools
 
-## Problem Addressed
+## Components Implemented
 
-The shell tool (`sindri/tools/shell.py`) previously had no timeout mechanism. If a command hung (infinite loop, waiting for input, network timeout), it would block indefinitely, freezing the entire agent system.
+### 1. Tool Permission Configuration (`sindri/config.py`)
 
-## Changes Made
+Added new config fields to `SindriConfig`:
+- `allowed_tools: Optional[List[str]]` - Allowlist (None = all allowed)
+- `blocked_tools: List[str]` - Blocklist (applied after allowlist)
+- `tool_approval_required: List[str]` - Tools needing confirmation
+- `default_dry_run: bool` - Global dry-run mode default
 
-### 1. `sindri/tools/shell.py`
+### 2. Permission Check Function (`sindri/core/access.py`)
 
-- Added `timeout` parameter to the tool schema (type: integer, optional)
-- Added class constants:
-  - `DEFAULT_TIMEOUT = 300` (5 minutes)
-  - `MAX_TIMEOUT = 3600` (1 hour)
-- Updated `execute()` method signature to accept `timeout: int | None = None`
-- Added timeout validation logic: caps timeout between 1 and MAX_TIMEOUT
-- Wrapped `process.communicate()` with `asyncio.wait_for(timeout=...)`
-- Added `asyncio.TimeoutError` handler that:
-  - Kills the process with `process.kill()`
-  - Awaits `process.wait()` for cleanup
-  - Returns `ToolResult` with appropriate error message
-  - Sets `timed_out: True` in metadata
-- Added `timeout` field to success/failure metadata
+Added `check_tool_permission()` function:
+- Checks allowlist first (if set)
+- Checks blocklist (takes precedence)
+- Sets `needs_confirmation` for tools in `tool_approval_required`
+- Returns `AccessCheckResult` with allowed status and reason
 
-### 2. `tests/test_tools.py`
+### 3. Registry Permission Enforcement (`sindri/tools/registry.py`)
 
-Added 5 new tests:
+Modified `ToolRegistry.execute()` to:
+- Check tool permissions before execution
+- Block disallowed tools with clear error message
+- Log permission denials
 
-1. `test_shell_timeout_default` - Verifies default timeout (300s) is applied and in metadata
-2. `test_shell_timeout_custom` - Verifies custom timeout parameter works
-3. `test_shell_timeout_exceeded` - Verifies hanging command (`sleep 10` with 1s timeout) is killed and returns error
-4. `test_shell_timeout_exceeded` - Error message contains "timed out" and metadata has `timed_out: True`
-5. `test_shell_timeout_capped_at_max` - Verifies timeout is capped at MAX_TIMEOUT (3600s)
-6. `test_shell_timeout_minimum` - Verifies timeout cannot be less than 1 second
+### 4. Audit Log System
 
-### 3. Documentation Updates
+**Database schema** (`sindri/persistence/database.py`):
+- Added `tool_audit_log` table with columns: id, session_id, task_id, tool_name, arguments, success, output_summary, error, duration_ms, dry_run, created_at
+- Added indexes on session_id, tool_name, created_at
+- Bumped SCHEMA_VERSION to 5
 
-- `STATUS.md` - Added entry to Recent Changes
-- `ROADMAP.md` - Marked junior task as complete
+**Audit store** (`sindri/persistence/audit.py` - new file):
+- `AuditEntry` dataclass for audit data
+- `AuditStore` class with methods:
+  - `log_tool_execution()` - Log a tool execution
+  - `list_entries()` - List with filters (tool, session, success/fail)
+  - `get_tool_stats()` - Usage statistics per tool
+  - `export_entries()` - Export to JSON or CSV
+  - `clear_old_entries()` - Clean up old entries
 
-## Pattern Followed
+**Registry integration** (`sindri/tools/registry.py`):
+- Added timing with `time.time()`
+- Added async `log_audit()` helper function
+- Logs all tool executions (success, failure, retry exhausted)
 
-The implementation follows the established pattern used in `sindri/tools/testing.py:121-141`:
+### 5. Dry-Run Mode
 
-```python
-try:
-    stdout, stderr = await asyncio.wait_for(
-        process.communicate(), timeout=timeout
-    )
-except asyncio.TimeoutError:
-    process.kill()
-    return ToolResult(...)
-```
+**Shell tool** (`sindri/tools/shell.py`):
+- Added `dry_run` parameter to schema and execute()
+- Returns simulated result without executing command
+- Respects `config.default_dry_run` if not explicitly set
 
-## Test Results
+**Filesystem tools** (`sindri/tools/filesystem.py`):
+- Added dry-run to `WriteFileTool` and `EditFileTool`
+- File is NOT created/modified in dry-run mode
+- Clear `[DRY RUN]` prefix in output
 
-```
-tests/test_tools.py: 21 passed (5 new timeout tests)
-```
+### 6. CLI Audit Commands (`sindri/cli.py`)
 
-## Backward Compatibility
-
-- Fully backward compatible
-- `timeout` parameter is optional with sensible default (300s)
-- Existing code using `execute(command="...")` continues to work
-
-## Questions for Reviewer
-
-1. Is the default timeout of 300 seconds (5 minutes) appropriate, or should it be shorter/longer?
-2. Should we also add a way to completely disable timeout (e.g., `timeout=-1` means no timeout)?
-3. Is the error message "Command timed out after {timeout} seconds" clear enough?
+Added `sindri audit` command group:
+- `sindri audit list` - List recent tool executions with filters
+- `sindri audit stats` - Show usage statistics (count, success rate, avg duration)
+- `sindri audit export` - Export to JSON or CSV
+- `sindri audit clear` - Delete old entries
 
 ---
 
@@ -87,74 +86,119 @@ tests/test_tools.py: 21 passed (5 new timeout tests)
 
 | File | Changes |
 |------|---------|
-| `sindri/tools/shell.py` | +35 lines (timeout schema, constants, validation, wait_for, error handling) |
-| `tests/test_tools.py` | +65 lines (5 new timeout tests) |
-| `STATUS.md` | +1 line (recent change entry) |
-| `ROADMAP.md` | +1 character (checkmark for completed task) |
+| `sindri/config.py` | +17 lines (4 new config fields) |
+| `sindri/core/access.py` | +64 lines (check_tool_permission function) |
+| `sindri/tools/registry.py` | +50 lines (permission check, audit logging) |
+| `sindri/persistence/database.py` | +40 lines (audit table, indexes) |
+| `sindri/persistence/audit.py` | ~300 lines (new file) |
+| `sindri/tools/shell.py` | +20 lines (dry-run support) |
+| `sindri/tools/filesystem.py` | +40 lines (dry-run for 2 tools) |
+| `sindri/cli.py` | +190 lines (audit commands) |
+| `tests/test_tool_permissions.py` | ~300 lines (new file, 21 tests) |
+| `STATUS.md` | +1 line |
+| `ROADMAP.md` | +3 checkmarks |
+
+---
+
+## Test Results
+
+```
+tests/test_tool_permissions.py: 21 passed
+tests/test_tools.py: 21 passed (no regressions)
+```
+
+Tests cover:
+- Permission check logic (8 tests)
+- Dry-run mode for all 3 tools (5 tests)
+- Registry permission enforcement (3 tests)
+- Audit store operations (5 tests)
+
+---
+
+## Configuration Examples
+
+**Allowlist mode** (`sindri.toml`):
+```toml
+# Only allow safe tools
+allowed_tools = ["read_file", "search_code", "run_tests"]
+```
+
+**Blocklist mode**:
+```toml
+# Block dangerous tools
+blocked_tools = ["shell", "delete_file"]
+```
+
+**Approval required**:
+```toml
+# Require confirmation for writes
+tool_approval_required = ["write_file", "edit_file", "shell"]
+```
+
+**Dry-run by default**:
+```toml
+# Safe testing mode
+default_dry_run = true
+```
+
+---
+
+## CLI Examples
+
+```bash
+# View recent tool usage
+sindri audit list --limit 100
+
+# Filter by tool
+sindri audit list --tool shell --failed-only
+
+# View statistics
+sindri audit stats --days 30
+
+# Export for analysis
+sindri audit export --format json -o audit.json
+
+# Clean up old entries
+sindri audit clear --days 90 --yes
+```
+
+---
+
+## Questions for Reviewer
+
+1. Should the audit log capture the full arguments or truncate them? Currently truncating to 1000 chars.
+2. Should dry-run mode be applied to more tools beyond shell, write_file, and edit_file?
+3. Is the audit table schema sufficient, or should we add more fields (e.g., agent name, parent task)?
+4. Should we add retention policy config for automatic audit cleanup?
 
 ---
 
 ## How to Verify
 
 ```bash
-# Run shell-specific tests
-.venv/bin/pytest tests/test_tools.py -v -k "shell"
+# Run all permission tests
+.venv/bin/pytest tests/test_tool_permissions.py -v
 
-# Run all tool tests
-.venv/bin/pytest tests/test_tools.py -v
+# Test permission blocking
+python -c "
+from sindri.config import SindriConfig
+from sindri.core.access import check_tool_permission
 
-# Manual timeout test
+config = SindriConfig(blocked_tools=['shell'])
+result = check_tool_permission(config, 'shell')
+print(f'Allowed: {result.allowed}, Reason: {result.reason}')
+"
+
+# Test dry-run
 python -c "
 import asyncio
 from sindri.tools.shell import ShellTool
+
 async def test():
     tool = ShellTool()
-    result = await tool.execute(command='sleep 10', timeout=2)
-    print(f'Success: {result.success}')
-    print(f'Error: {result.error}')
-    print(f'Metadata: {result.metadata}')
+    result = await tool.execute(command='rm -rf /', dry_run=True)
+    print(result.output)
+
 asyncio.run(test())
 "
 ```
-
----
-
-## Implementation Details
-
-### Timeout Validation
-
-```python
-# Validate and cap timeout
-if timeout is None:
-    timeout = self.DEFAULT_TIMEOUT
-timeout = max(1, min(timeout, self.MAX_TIMEOUT))
-```
-
-This ensures:
-- Default of 300s if not provided
-- Minimum of 1 second (prevents 0 or negative)
-- Maximum of 3600s (1 hour) to prevent absurdly long timeouts
-
-### Process Cleanup
-
-```python
-except asyncio.TimeoutError:
-    process.kill()
-    await process.wait()  # Ensure process is cleaned up
-```
-
-The `await process.wait()` ensures the process is fully terminated before returning, preventing zombie processes.
-
-### Metadata Structure
-
-On success:
-```python
-{"returncode": 0, "stderr": "", "timeout": 300}
-```
-
-On timeout:
-```python
-{"timeout": 1, "timed_out": True}
-```
-
-The `timed_out` boolean flag makes it easy to distinguish timeout failures from regular failures.
