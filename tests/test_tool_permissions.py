@@ -183,6 +183,49 @@ class TestDryRunMode:
         # File should NOT be modified
         assert file_path.read_text() == "Hello, world!"
 
+    @pytest.mark.asyncio
+    async def test_audit_records_dry_run_from_config_default(self, tmp_path, monkeypatch):
+        """Test that audit log records dry_run=True when config.default_dry_run=True."""
+        from sindri.tools.registry import ToolRegistry
+        from sindri.persistence.audit import AuditStore
+        from sindri.config import SystemAccessLevel
+        import os
+
+        os.environ["SINDRI_DB_PATH"] = str(tmp_path / "test.db")
+
+        # Config has default_dry_run=True but caller doesn't pass dry_run
+        monkeypatch.setattr(
+            "sindri.tools.registry.SindriConfig.load",
+            lambda path=None: SindriConfig(
+                data_dir=tmp_path,
+                default_dry_run=True,
+                system_access=SystemAccessLevel.FULL,
+            ),
+        )
+        monkeypatch.setattr(
+            "sindri.tools.shell.SindriConfig.load",
+            lambda path=None: SindriConfig(
+                data_dir=tmp_path,
+                default_dry_run=True,
+                system_access=SystemAccessLevel.FULL,
+            ),
+        )
+
+        registry = ToolRegistry.default()
+        # Note: NOT passing dry_run argument - should use config default
+        result = await registry.execute("shell", {"command": "echo test"})
+
+        assert result.success
+        assert "[DRY RUN]" in result.output
+
+        # Audit should record dry_run=True from result.metadata
+        store = AuditStore()
+        entries = await store.list_entries(tool_name="shell")
+        assert len(entries) == 1
+        assert entries[0].dry_run is True
+
+        del os.environ["SINDRI_DB_PATH"]
+
 
 # ============================================================================
 # Tool Registry Permission Enforcement Tests
@@ -258,6 +301,56 @@ class TestToolRegistryPermissions:
 
         assert result.success
         assert "permitted" in result.output
+
+    @pytest.mark.asyncio
+    async def test_registry_blocks_approval_required_tool(self, tmp_path, monkeypatch):
+        """Test that ToolRegistry blocks tools requiring approval."""
+        from sindri.tools.registry import ToolRegistry
+        from sindri.config import SystemAccessLevel
+
+        monkeypatch.setattr(
+            "sindri.tools.registry.SindriConfig.load",
+            lambda path=None: SindriConfig(
+                data_dir=tmp_path,
+                tool_approval_required=["shell"],
+                system_access=SystemAccessLevel.FULL,
+            ),
+        )
+
+        registry = ToolRegistry.default()
+        result = await registry.execute("shell", {"command": "echo test"})
+
+        assert not result.success
+        assert "requires approval" in result.error
+
+    @pytest.mark.asyncio
+    async def test_registry_logs_permission_denial(self, tmp_path, monkeypatch):
+        """Test that permission denials are logged to audit."""
+        from sindri.tools.registry import ToolRegistry
+        from sindri.persistence.audit import AuditStore
+        import os
+
+        os.environ["SINDRI_DB_PATH"] = str(tmp_path / "test.db")
+
+        monkeypatch.setattr(
+            "sindri.tools.registry.SindriConfig.load",
+            lambda path=None: SindriConfig(
+                data_dir=tmp_path,
+                blocked_tools=["shell"],
+            ),
+        )
+
+        registry = ToolRegistry.default()
+        await registry.execute("shell", {"command": "echo test"})
+
+        # Check audit log has denial entry
+        store = AuditStore()
+        entries = await store.list_entries(tool_name="shell")
+        assert len(entries) == 1
+        assert entries[0].success is False
+        assert "blocked" in entries[0].error
+
+        del os.environ["SINDRI_DB_PATH"]
 
 
 # ============================================================================

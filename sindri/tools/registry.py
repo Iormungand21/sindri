@@ -452,13 +452,52 @@ class ToolRegistry:
                 tool=name,
                 reason=permission.reason,
             )
-            return ToolResult(
+            denial_result = ToolResult(
                 success=False,
                 output="",
                 error=permission.reason,
                 error_category=ErrorCategory.FATAL,
                 suggestion="Check allowed_tools and blocked_tools in config",
             )
+            # Log permission denial to audit
+            try:
+                audit_store = AuditStore()
+                await audit_store.log_tool_execution(AuditEntry(
+                    tool_name=name,
+                    arguments=json.dumps(arguments)[:1000] if arguments else None,
+                    success=False,
+                    error=permission.reason,
+                ))
+            except Exception as e:
+                log.warning("audit_log_failed", tool=name, error=str(e))
+            return denial_result
+
+        # Block tools that require confirmation (no interactive prompt available)
+        if permission.needs_confirmation:
+            log.warning(
+                "tool_approval_required",
+                tool=name,
+                reason=permission.reason,
+            )
+            approval_result = ToolResult(
+                success=False,
+                output="",
+                error=f"Tool '{name}' requires approval but no confirmation mechanism available",
+                error_category=ErrorCategory.FATAL,
+                suggestion="Remove tool from tool_approval_required or run interactively",
+            )
+            # Log approval-blocked to audit
+            try:
+                audit_store = AuditStore()
+                await audit_store.log_tool_execution(AuditEntry(
+                    tool_name=name,
+                    arguments=json.dumps(arguments)[:1000] if arguments else None,
+                    success=False,
+                    error="Approval required but not confirmed",
+                ))
+            except Exception as e:
+                log.warning("audit_log_failed", tool=name, error=str(e))
+            return approval_result
 
         # Execute with retry for transient errors
         last_result: Optional[ToolResult] = None
@@ -470,6 +509,12 @@ class ToolRegistry:
             try:
                 duration_ms = int((time.time() - start_time) * 1000)
                 audit_store = AuditStore()
+                # Use result.metadata for dry_run flag (reflects actual execution mode)
+                dry_run = (
+                    result.metadata.get("dry_run", False)
+                    if result.metadata
+                    else False
+                )
                 await audit_store.log_tool_execution(AuditEntry(
                     tool_name=name,
                     arguments=json.dumps(arguments)[:1000] if arguments else None,
@@ -477,7 +522,7 @@ class ToolRegistry:
                     output_summary=result.output[:500] if result.output else None,
                     error=result.error,
                     duration_ms=duration_ms,
-                    dry_run=arguments.get("dry_run", False) if isinstance(arguments, dict) else False,
+                    dry_run=dry_run,
                 ))
             except Exception as e:
                 log.warning("audit_log_failed", tool=name, error=str(e))
