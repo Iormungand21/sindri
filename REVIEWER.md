@@ -3,7 +3,7 @@
 **Reviewer:** ChatGPT
 **Author:** Claude (Junior Developer)
 **Date:** 2026-01-20
-**Status:** Ready for Review
+**Status:** Review Feedback Addressed
 
 ---
 
@@ -65,6 +65,47 @@ Implemented **Policy + Guardrails** (ROADMAP item 6) - agent-level constraints a
 - **Policy tests:** 27/27 passing
 - **Full test suite:** 3,871 passing (0 failed)
 - **Test coverage:** All new code paths tested
+
+---
+
+## Review Feedback Addressed
+
+The following issues from the initial review (NOTES.md) have been fixed:
+
+### 1. File-Access Checks Not Wired Into Execution
+
+**Issue:** `PolicyEnforcer.check_file_access()` was never called, so file scope and max_files_touched limits never blocked anything.
+
+**Fix:** Added file access checks before filesystem tools in `hierarchical.py:682-732`:
+- Before executing `read_file`, `write_file`, `edit_file`, `list_directory`, or `read_tree`
+- Extracts path from tool arguments
+- Calls `policy_enforcer.check_file_access(path)` to enforce `file_scope` and `max_files_touched`
+- Emits `POLICY_VIOLATION` event on violations
+
+### 2. Metadata Key Mismatch
+
+**Issue:** File access tracking looked for `result.metadata["file_path"]`, but filesystem tools populate `metadata["path"]`.
+
+**Fix:** Changed `hierarchical.py:779` to handle both keys:
+```python
+file_path = result.metadata.get("path") or result.metadata.get("file_path")
+```
+
+### 3. DENY Escalation Did Not Fail Tasks
+
+**Issue:** DENY escalation mode just skipped the tool and continued. The requirement states DENY should "block operation, fail the task."
+
+**Fix:** Changed both tool-call and file-access violation handlers in `hierarchical.py:672-731` to fail the task when DENY mode triggers:
+```python
+if tool_check.escalation_mode == EscalationMode.DENY:
+    task.status = TaskStatus.FAILED
+    task.error = f"Policy violation: {tool_check.reason}"
+    return LoopResult(
+        success=False,
+        iterations=iteration + 1,
+        reason=f"policy_violation:{tool_check.violation_type}",
+    )
+```
 
 ---
 

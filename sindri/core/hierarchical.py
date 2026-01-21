@@ -670,12 +670,66 @@ class HierarchicalAgentLoop:
 
                         # Handle based on escalation mode
                         if tool_check.escalation_mode == EscalationMode.DENY:
-                            tool_results.append({
-                                "tool": call.function.name,
-                                "result": f"POLICY VIOLATION: {tool_check.reason}",
-                            })
-                            continue  # Skip this tool call
+                            task.status = TaskStatus.FAILED
+                            task.error = f"Policy violation: {tool_check.reason}"
+                            return LoopResult(
+                                success=False,
+                                iterations=iteration + 1,
+                                reason=f"policy_violation:{tool_check.violation_type}",
+                            )
                         # WARN/ESCALATE: log but allow
+
+                    # Policy + Guardrails: Check file access for filesystem tools
+                    filesystem_tools = {"read_file", "write_file", "edit_file", "list_directory", "read_tree"}
+                    if call.function.name in filesystem_tools:
+                        # Extract path from arguments
+                        args = call.function.arguments
+                        if isinstance(args, str):
+                            import json
+                            try:
+                                args = json.loads(args)
+                            except json.JSONDecodeError:
+                                args = {}
+                        file_path = args.get("path") if isinstance(args, dict) else None
+                        if file_path:
+                            file_check = policy_enforcer.check_file_access(file_path)
+                            if not file_check.allowed:
+                                log.warning(
+                                    "policy_violation_file",
+                                    task_id=task.id,
+                                    tool=call.function.name,
+                                    path=file_path,
+                                    reason=file_check.reason,
+                                )
+
+                                # Emit policy violation event
+                                self.event_bus.emit(
+                                    Event(
+                                        type=EventType.POLICY_VIOLATION,
+                                        data={
+                                            "task_id": task.id,
+                                            "agent": agent.name,
+                                            "tool": call.function.name,
+                                            "violation_type": file_check.violation_type,
+                                            "reason": file_check.reason,
+                                            "escalation_mode": file_check.escalation_mode.value if file_check.escalation_mode else None,
+                                            "current_value": file_check.current_value,
+                                            "limit_value": file_check.limit_value,
+                                        },
+                                        task_id=task.id,
+                                    )
+                                )
+
+                                # Handle based on escalation mode
+                                if file_check.escalation_mode == EscalationMode.DENY:
+                                    task.status = TaskStatus.FAILED
+                                    task.error = f"Policy violation: {file_check.reason}"
+                                    return LoopResult(
+                                        success=False,
+                                        iterations=iteration + 1,
+                                        reason=f"policy_violation:{file_check.violation_type}",
+                                    )
+                                # WARN/ESCALATE: log but allow
 
                 # Phase 5.5: Track tool execution timing
                 tool_start_time = time.time()
@@ -721,7 +775,8 @@ class HierarchicalAgentLoop:
                     policy_enforcer.state.record_tool_call(call.function.name)
                     # Track file access if this is a filesystem tool
                     if result.success and result.metadata:
-                        file_path = result.metadata.get("file_path")
+                        # Handle both "path" and "file_path" metadata keys
+                        file_path = result.metadata.get("path") or result.metadata.get("file_path")
                         if file_path:
                             policy_enforcer.state.record_file_access(file_path)
 
