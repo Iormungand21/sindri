@@ -489,7 +489,7 @@ class SindriApp(App):
                     data={
                         "task_id": root_task.id,
                         "description": task_description,
-                        "status": TaskStatus.PENDING,
+                        "status": TaskStatus.PENDING.value,
                         "parent_id": None,
                     },
                 )
@@ -503,7 +503,7 @@ class SindriApp(App):
             self.event_bus.emit(
                 Event(
                     type=EventType.TASK_STATUS_CHANGED,
-                    data={"task_id": root_task.id, "status": status},
+                    data={"task_id": root_task.id, "status": status.value},
                 )
             )
 

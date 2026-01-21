@@ -168,7 +168,7 @@ class HierarchicalAgentLoop:
         self.event_bus.emit(
             Event(
                 type=EventType.TASK_STATUS_CHANGED,
-                data={"task_id": task.id, "status": TaskStatus.RUNNING},
+                data={"task_id": task.id, "status": TaskStatus.RUNNING.value},
             )
         )
 
@@ -209,7 +209,7 @@ class HierarchicalAgentLoop:
             self.event_bus.emit(
                 Event(
                     type=EventType.TASK_STATUS_CHANGED,
-                    data={"task_id": task.id, "status": TaskStatus.COMPLETE},
+                    data={"task_id": task.id, "status": TaskStatus.COMPLETE.value},
                 )
             )
 
@@ -234,7 +234,7 @@ class HierarchicalAgentLoop:
             self.event_bus.emit(
                 Event(
                     type=EventType.TASK_STATUS_CHANGED,
-                    data={"task_id": task.id, "status": TaskStatus.FAILED},
+                    data={"task_id": task.id, "status": TaskStatus.FAILED.value},
                 )
             )
 
@@ -342,7 +342,7 @@ class HierarchicalAgentLoop:
                 self.event_bus.emit(
                     Event(
                         type=EventType.TASK_STATUS_CHANGED,
-                        data={"task_id": task.id, "status": TaskStatus.CANCELLED},
+                        data={"task_id": task.id, "status": TaskStatus.CANCELLED.value},
                     )
                 )
 
@@ -479,7 +479,7 @@ class HierarchicalAgentLoop:
                 self.event_bus.emit(
                     Event(
                         type=EventType.TASK_STATUS_CHANGED,
-                        data={"task_id": task.id, "status": TaskStatus.CANCELLED},
+                        data={"task_id": task.id, "status": TaskStatus.CANCELLED.value},
                     )
                 )
 

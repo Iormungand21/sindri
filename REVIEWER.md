@@ -196,3 +196,15 @@ This establishes the v1 contract for:
 2. **TypeScript generation is Python-based:** The script requires running from Python. Could be integrated into npm scripts or converted to a Node.js implementation if needed.
 
 3. **No breaking change detection:** Currently just establishes v1. Future versions would need a mechanism to detect and flag breaking changes.
+
+---
+
+## Follow-up Fix: TaskStatus Enum Serialization
+
+**Issue identified in review:** Events were emitting `TaskStatus` enum objects directly, which serialized as `"TaskStatus.RUNNING"` instead of `"running"`.
+
+**Fix:** Changed all 7 occurrences to use `.value`:
+- `sindri/core/hierarchical.py`: 5 fixes (RUNNING, COMPLETE, FAILED, CANCELLED x2)
+- `sindri/tui/app.py`: 2 fixes (PENDING, dynamic status)
+
+**Commit:** `f3a7c8e fix: Use TaskStatus.value for event payload serialization`
