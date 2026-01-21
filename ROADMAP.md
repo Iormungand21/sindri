@@ -6,6 +6,78 @@
 
 ---
 
+## Next Up: Feature Expansion
+
+Grouped by logical capability area.
+
+**Suggested sequencing:**
+- **Near-term (0–2 months):** items 1, 2, 5, 6
+- **Mid-term (2–4 months):** items 3, 4, 7
+- **Long-term (4–6 months):** items 8, 9, 10
+
+### Stability + Bugfixes
+0. **Hierarchical Execution Reliability** ✅ **COMPLETE (Phase 15)**
+   - ✅ Fix delegation wait handling so parent tasks resume instead of failing
+   - ✅ Ensure model load failures mark task status and propagate errors
+   - ✅ Propagate parallel task exceptions to parents and emit failure events
+   - ✅ Respect current VRAM usage when building parallel batches
+   - Pre-warm behavior clarified (fires async, use wait_for_prewarm() if blocking needed)
+   - ✅ Replace truncated UUID task IDs to avoid collisions (now full 36-char UUIDs)
+
+### API + Contract Stability
+1. **Event + API Contract v1**
+   - Publish versioned JSON schema for REST + WebSocket events
+   - Expose `/api/schema` for clients and auto-generate TS types
+   - Add contract tests and backward-compat flags
+
+### Execution Control + Reproducibility
+2. **Plan-First Execution**
+   - Persist plans with user approval gates
+   - Step-level checkpointing and re-run of individual steps
+   - Partial results + explicit acceptance per step
+3. **Reproducible Sessions**
+   - Save model versions, tool params, and environment snapshot
+   - `sindri replay <session>` to re-run or diff outputs
+   - Deterministic execution mode for tool-only flows
+
+### Knowledge + Context
+4. **Multi-Project Workspace Index**
+   - Background indexer for multiple repos
+   - Cross-project semantic search + pinned “active” contexts
+   - Per-project embedder settings and exclusion rules
+
+### Safety + Governance
+5. **Granular Tool Permissions**
+   - Per-project allowlists and approval prompts
+   - Audit log of tool usage and file modifications
+   - Dry-run mode for system and filesystem tools
+6. **Policy + Guardrails**
+   - Agent-level constraints (file scope, tools, budgets)
+   - Max files touched, max tool calls, max runtime
+   - Per-agent escalation to supervised mode
+
+### Observability + Performance
+7. **Performance Telemetry Stream**
+   - `/api/metrics/live` stream for agent/tool timing
+   - VRAM + concurrency tuning dashboard
+   - Exportable traces for profiling and regression checks
+
+### Extensibility + Automation
+8. **Agents as Plugins**
+   - SDK for packaging agents + prompts + tests
+   - Compatibility validation and versioned bundles
+   - Marketplace metadata for local-only distribution
+9. **Triggers & Automations**
+   - Webhook/cron triggers for routines (security scans, health checks)
+   - Scheduled codebase review and dependency audits
+   - Notification hooks (local desktop or log targets)
+
+### Model Strategy
+10. **Model-Aware Routing**
+    - Lightweight router for model selection by task type
+    - VRAM-aware fallback + cost/latency heuristics
+    - Per-project model preferences
+
 ## ACTIVE: Architecture Transformation
 
 **Sindri is being transformed from a multi-user deployable tool to an internal-only research assistant.**

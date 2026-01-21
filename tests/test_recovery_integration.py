@@ -181,6 +181,7 @@ class TestRecoveryOnFailurePaths:
         scheduler.model_manager.ensure_loaded = AsyncMock(return_value=False)
 
         delegation = MagicMock()
+        delegation.child_failed = AsyncMock()  # Async mock for await
         config = LoopConfig()
         event_bus = EventBus()
         recovery = RecoveryManager(state_dir=str(tmp_path / "state"))

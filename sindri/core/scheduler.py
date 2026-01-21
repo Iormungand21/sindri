@@ -92,15 +92,17 @@ class TaskScheduler:
             List of tasks that can run concurrently.
         """
         if max_vram is None:
-            max_vram = self.model_manager.available
+            # Use actual free VRAM, not static available value
+            max_vram = self.model_manager.get_free_vram()
 
         ready_tasks: list[Task] = []
         vram_allocated: float = 0.0
         models_used: set[str] = set()
         not_ready: list[tuple[int, str]] = []
 
-        # Get currently loaded models - they don't need additional VRAM
-        loaded_models = set(self.model_manager.loaded.keys())
+        # Get models that are loaded OR currently loading (pre-warming)
+        # These don't need additional VRAM allocation
+        loaded_models = self.model_manager.get_allocated_models()
 
         while self.pending:
             priority, task_id = heapq.heappop(self.pending)

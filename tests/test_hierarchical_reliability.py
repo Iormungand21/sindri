@@ -1,0 +1,439 @@
+"""Tests for hierarchical execution reliability fixes.
+
+These tests verify the fixes for ROADMAP Item 0:
+- Issue 3: Parallel exception propagation to parents
+- Issue 4: VRAM-aware batching with actual free VRAM
+- Issue 2: Model load failure propagation to parents
+- Issue 6: UUID collision prevention (full UUIDs)
+"""
+
+import pytest
+import asyncio
+from unittest.mock import AsyncMock, MagicMock, patch
+
+from sindri.core.tasks import Task, TaskStatus
+from sindri.core.scheduler import TaskScheduler
+from sindri.core.delegation import DelegationManager, DelegationRequest
+from sindri.core.orchestrator import Orchestrator
+from sindri.core.events import EventBus, Event, EventType
+from sindri.llm.manager import ModelManager
+
+
+# =============================================================================
+# Issue 6: UUID Collision Prevention Tests
+# =============================================================================
+
+
+class TestUUIDCollisionPrevention:
+    """Tests for full UUID usage instead of truncated."""
+
+    def test_task_id_is_full_uuid(self):
+        """Test that task IDs are full UUIDs (36 chars with hyphens)."""
+        task = Task(description="Test task", assigned_agent="brokkr")
+        # Full UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx (36 chars)
+        assert len(task.id) == 36
+        assert task.id.count("-") == 4
+
+    def test_task_ids_are_unique(self):
+        """Test that generated task IDs are unique."""
+        ids = set()
+        for _ in range(1000):
+            task = Task(description="Test task", assigned_agent="brokkr")
+            assert task.id not in ids, "UUID collision detected!"
+            ids.add(task.id)
+
+    def test_task_id_format_valid(self):
+        """Test that task IDs are valid UUID format."""
+        import uuid
+
+        task = Task(description="Test task", assigned_agent="brokkr")
+        # Should not raise ValueError if valid UUID
+        parsed = uuid.UUID(task.id)
+        assert str(parsed) == task.id
+
+
+# =============================================================================
+# Issue 4: VRAM-Aware Batching Tests
+# =============================================================================
+
+
+class TestVRAMBatching:
+    """Tests for VRAM-aware batching using actual free VRAM."""
+
+    @pytest.fixture
+    def model_manager(self):
+        """Create a model manager for testing."""
+        return ModelManager(total_vram_gb=16.0, reserve_gb=2.0)
+
+    @pytest.fixture
+    def scheduler(self, model_manager):
+        """Create a scheduler for testing."""
+        return TaskScheduler(model_manager)
+
+    def test_get_allocated_models_empty(self, model_manager):
+        """Test get_allocated_models with no models loaded."""
+        allocated = model_manager.get_allocated_models()
+        assert allocated == set()
+
+    def test_get_allocated_models_with_loaded(self, model_manager):
+        """Test get_allocated_models includes loaded models."""
+        # Simulate loaded model
+        from sindri.llm.manager import LoadedModel
+        import time
+
+        model_manager.loaded["qwen2.5:7b"] = LoadedModel(
+            name="qwen2.5:7b", vram_gb=5.0, last_used=time.time()
+        )
+        allocated = model_manager.get_allocated_models()
+        assert "qwen2.5:7b" in allocated
+
+    @pytest.mark.asyncio
+    async def test_get_allocated_models_includes_prewarming(self, model_manager):
+        """Test get_allocated_models includes models being pre-warmed."""
+        # Create a prewarm task that's not done
+        async def slow_prewarm():
+            await asyncio.sleep(10)  # Won't complete
+
+        model_manager._prewarm_tasks["codestral:22b"] = asyncio.create_task(
+            slow_prewarm()
+        )
+
+        allocated = model_manager.get_allocated_models()
+        assert "codestral:22b" in allocated
+
+        # Cleanup
+        model_manager._prewarm_tasks["codestral:22b"].cancel()
+        try:
+            await model_manager._prewarm_tasks["codestral:22b"]
+        except asyncio.CancelledError:
+            pass
+
+    def test_get_free_vram_public_method(self, model_manager):
+        """Test public get_free_vram method exists and works."""
+        free = model_manager.get_free_vram()
+        # Should be available (14GB) minus loaded (0GB) = 14GB
+        assert free == 14.0
+
+    def test_scheduler_uses_actual_free_vram(self, model_manager, scheduler):
+        """Test that scheduler uses actual free VRAM for batching."""
+        from sindri.llm.manager import LoadedModel
+        import time
+
+        # Simulate a model already loaded (uses 8GB)
+        model_manager.loaded["deepseek-r1:14b"] = LoadedModel(
+            name="deepseek-r1:14b", vram_gb=8.0, last_used=time.time()
+        )
+
+        # Create a task that needs 7GB
+        task = Task(
+            description="Task needing 7GB", assigned_agent="brokkr", vram_required=7.0
+        )
+        scheduler.add_task(task)
+
+        # Actual free: 14 - 8 = 6GB, task needs 7GB
+        # Without fix: would use 14GB available, schedule task
+        # With fix: uses 6GB free, task won't fit
+
+        batch = scheduler.get_ready_batch()
+        # Task should NOT be in batch because actual free (6GB) < required (7GB)
+        assert task not in batch
+
+    def test_scheduler_batch_with_shared_model(self, model_manager, scheduler):
+        """Test batching accounts for shared models correctly."""
+        # Create two tasks using the same model
+        task1 = Task(
+            description="Task 1",
+            assigned_agent="huginn",
+            vram_required=5.0,
+            model_name="qwen2.5-coder:7b",
+        )
+        task2 = Task(
+            description="Task 2",
+            assigned_agent="huginn",
+            vram_required=5.0,
+            model_name="qwen2.5-coder:7b",
+        )
+
+        scheduler.add_task(task1)
+        scheduler.add_task(task2)
+
+        batch = scheduler.get_ready_batch()
+
+        # Both tasks should be in batch - they share a model so only 5GB needed
+        assert len(batch) == 2
+
+
+# =============================================================================
+# Issue 2: Model Load Failure Propagation Tests
+# =============================================================================
+
+
+class TestModelLoadFailurePropagation:
+    """Tests for model load failure notification to parents."""
+
+    @pytest.fixture
+    def event_bus(self):
+        """Create an event bus for testing."""
+        return EventBus()
+
+    @pytest.fixture
+    def scheduler(self):
+        """Create a scheduler for testing."""
+        model_manager = ModelManager(total_vram_gb=16.0, reserve_gb=2.0)
+        return TaskScheduler(model_manager)
+
+    @pytest.fixture
+    def delegation_manager(self, scheduler, event_bus):
+        """Create a delegation manager for testing."""
+        return DelegationManager(scheduler, event_bus=event_bus)
+
+    @pytest.mark.asyncio
+    async def test_model_load_failure_marks_task_failed(self):
+        """Test that model load failure sets task status to FAILED."""
+        # This is tested through the hierarchical loop integration
+        # Mock the model manager to always fail loading
+        with patch("sindri.llm.manager.ModelManager.ensure_loaded") as mock_load:
+            mock_load.return_value = False
+
+            orchestrator = Orchestrator(enable_memory=False)
+
+            # Create a task that will fail to load its model
+            task = Task(description="Test task", assigned_agent="huginn")
+            orchestrator.scheduler.add_task(task)
+
+            # Run the task
+            result = await orchestrator.loop.run_task(task)
+
+            assert result.success == False
+            assert task.status == TaskStatus.FAILED
+            assert "Could not load model" in task.error
+
+    @pytest.mark.asyncio
+    async def test_model_load_failure_emits_error_event(self, event_bus):
+        """Test that model load failure emits ERROR event."""
+        events_received = []
+
+        def on_event(event):
+            events_received.append(event)
+
+        # Use subscribe_event to receive full Event objects
+        event_bus.subscribe_event(on_event)
+
+        with patch("sindri.llm.manager.ModelManager.ensure_loaded") as mock_load:
+            mock_load.return_value = False
+
+            orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+            task = Task(description="Test task", assigned_agent="huginn")
+            orchestrator.scheduler.add_task(task)
+
+            await orchestrator.loop.run_task(task)
+
+            # Should have received an error event
+            error_events = [e for e in events_received if e.type == EventType.ERROR]
+            assert len(error_events) >= 1
+            assert error_events[0].data["error_type"] == "model_load_failure"
+
+
+# =============================================================================
+# Issue 3: Parallel Exception Propagation Tests
+# =============================================================================
+
+
+class TestParallelExceptionPropagation:
+    """Tests for parallel task exception propagation to parents."""
+
+    @pytest.fixture
+    def event_bus(self):
+        """Create an event bus for testing."""
+        return EventBus()
+
+    @pytest.mark.asyncio
+    async def test_parallel_exception_notifies_parent(self, event_bus):
+        """Test that parallel task exceptions notify parent via child_failed."""
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        # Create parent and child tasks
+        parent = Task(description="Parent task", assigned_agent="brokkr")
+        child = Task(
+            description="Child task", assigned_agent="huginn", parent_id=parent.id
+        )
+
+        parent.add_subtask(child.id)
+        parent.status = TaskStatus.WAITING
+
+        orchestrator.scheduler.add_task(parent)
+        orchestrator.scheduler.add_task(child)
+
+        # Mock run_task to raise an exception for child
+        async def mock_run_task(task):
+            if task.id == child.id:
+                raise RuntimeError("Simulated failure")
+            # Return a mock result for other tasks
+            from sindri.core.loop import LoopResult
+            return LoopResult(success=True, iterations=1)
+
+        orchestrator.loop.run_task = mock_run_task
+
+        # Run parallel batch - child should be selected (it's pending)
+        # But parent is WAITING so won't be in the batch
+        await orchestrator._run_parallel_batch()
+
+        # Child should be marked failed
+        assert child.status == TaskStatus.FAILED
+        assert "Simulated failure" in child.error
+
+        # Parent should be notified (marked failed via child_failed)
+        assert parent.status == TaskStatus.FAILED
+        assert child.id in parent.error
+
+    @pytest.mark.asyncio
+    async def test_parallel_exception_emits_error_event(self, event_bus):
+        """Test that parallel exceptions emit ERROR events."""
+        events_received = []
+
+        def on_event(event):
+            events_received.append(event)
+
+        # Use subscribe_event to receive full Event objects
+        event_bus.subscribe_event(on_event)
+
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        task = Task(description="Test task", assigned_agent="huginn")
+        orchestrator.scheduler.add_task(task)
+
+        # Mock run_task to raise an exception
+        async def mock_run_task(t):
+            raise RuntimeError("Test exception")
+
+        orchestrator.loop.run_task = mock_run_task
+
+        await orchestrator._run_parallel_batch()
+
+        # Should have received an error event
+        error_events = [e for e in events_received if e.type == EventType.ERROR]
+        assert len(error_events) >= 1
+        # Single task uses "task_exception", multiple tasks use "parallel_task_exception"
+        assert error_events[0].data["error_type"] in (
+            "task_exception",
+            "parallel_task_exception",
+        )
+        assert "Test exception" in error_events[0].data["error"]
+
+    @pytest.mark.asyncio
+    async def test_multiple_parallel_failures_all_notify(self, event_bus):
+        """Test that multiple parallel failures all notify their parents."""
+        orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+        # Create multiple tasks
+        task1 = Task(description="Task 1", assigned_agent="huginn")
+        task2 = Task(description="Task 2", assigned_agent="mimir")
+
+        orchestrator.scheduler.add_task(task1)
+        orchestrator.scheduler.add_task(task2)
+
+        # Mock run_task to raise exceptions
+        async def mock_run_task(t):
+            raise RuntimeError(f"Failure in {t.id}")
+
+        orchestrator.loop.run_task = mock_run_task
+
+        await orchestrator._run_parallel_batch()
+
+        # Both tasks should be marked failed
+        assert task1.status == TaskStatus.FAILED
+        assert task2.status == TaskStatus.FAILED
+
+
+# =============================================================================
+# Integration Tests
+# =============================================================================
+
+
+class TestHierarchicalReliabilityIntegration:
+    """Integration tests for hierarchical execution reliability."""
+
+    @pytest.mark.asyncio
+    async def test_delegation_failure_propagates_to_root(self):
+        """Test that failures in delegated tasks propagate to root."""
+        orchestrator = Orchestrator(enable_memory=False)
+
+        # Create a hierarchy: root -> child
+        root = Task(description="Root task", assigned_agent="brokkr")
+        child = Task(
+            description="Child task", assigned_agent="huginn", parent_id=root.id
+        )
+
+        root.add_subtask(child.id)
+        root.status = TaskStatus.WAITING
+
+        orchestrator.scheduler.add_task(root)
+        orchestrator.scheduler.add_task(child)
+
+        # Fail the child
+        child.status = TaskStatus.FAILED
+        child.error = "Child failed"
+
+        await orchestrator.delegation.child_failed(child)
+
+        # Root should now be failed
+        assert root.status == TaskStatus.FAILED
+        assert "Child failed" in root.error
+
+    def test_scheduler_respects_vram_under_load(self):
+        """Test scheduler doesn't over-schedule when VRAM is partially used."""
+        model_manager = ModelManager(total_vram_gb=16.0, reserve_gb=2.0)
+        scheduler = TaskScheduler(model_manager)
+
+        from sindri.llm.manager import LoadedModel
+        import time
+
+        # Simulate 10GB of VRAM already used
+        model_manager.loaded["large-model"] = LoadedModel(
+            name="large-model", vram_gb=10.0, last_used=time.time()
+        )
+
+        # Free: 14 - 10 = 4GB
+        assert model_manager.get_free_vram() == 4.0
+
+        # Create tasks needing 5GB each (different models)
+        task1 = Task(
+            description="Task 1",
+            assigned_agent="huginn",
+            vram_required=5.0,
+            model_name="model-a",
+        )
+        task2 = Task(
+            description="Task 2",
+            assigned_agent="mimir",
+            vram_required=5.0,
+            model_name="model-b",
+        )
+
+        scheduler.add_task(task1)
+        scheduler.add_task(task2)
+
+        batch = scheduler.get_ready_batch()
+
+        # Neither task should fit (only 4GB free, each needs 5GB)
+        assert len(batch) == 0
+
+    def test_full_uuid_prevents_lookup_errors(self):
+        """Test that full UUIDs prevent task lookup errors."""
+        model_manager = ModelManager(total_vram_gb=16.0, reserve_gb=2.0)
+        scheduler = TaskScheduler(model_manager)
+
+        # Create many tasks
+        tasks = []
+        for i in range(100):
+            task = Task(description=f"Task {i}", assigned_agent="brokkr")
+            scheduler.add_task(task)
+            tasks.append(task)
+
+        # All tasks should be retrievable by their unique ID
+        for task in tasks:
+            retrieved = scheduler.get_task(task.id)
+            assert retrieved is not None
+            assert retrieved.id == task.id
+            assert retrieved.description == task.description

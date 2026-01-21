@@ -16,7 +16,7 @@ from sindri.core.hierarchical import HierarchicalAgentLoop
 from sindri.core.loop import LoopConfig
 from sindri.memory.system import MuninnMemory
 from sindri.memory.summarizer import ConversationSummarizer
-from sindri.core.events import EventBus
+from sindri.core.events import EventBus, Event, EventType
 
 log = structlog.get_logger()
 
@@ -44,7 +44,10 @@ class Orchestrator:
         self.state = SessionState()
         # Phase 6.2: Pass model_manager for pre-warming during delegation
         self.delegation = DelegationManager(
-            self.scheduler, self.state, model_manager=self.model_manager
+            self.scheduler,
+            self.state,
+            model_manager=self.model_manager,
+            event_bus=self.event_bus,
         )
         self.tools = ToolRegistry.default(work_dir=work_dir)
 
@@ -193,7 +196,7 @@ class Orchestrator:
                 return "stuck"
 
         if len(batch) == 1:
-            # Single task - run directly
+            # Single task - run directly with exception handling
             task = batch[0]
             log.info(
                 "executing_task",
@@ -201,13 +204,35 @@ class Orchestrator:
                 agent=task.assigned_agent,
                 description=task.description[:50],
             )
-            result = await self.loop.run_task(task)
-            log.info(
-                "task_result",
-                task_id=task.id,
-                success=result.success,
-                iterations=result.iterations,
-            )
+            try:
+                result = await self.loop.run_task(task)
+                log.info(
+                    "task_result",
+                    task_id=task.id,
+                    success=result.success,
+                    iterations=result.iterations,
+                )
+            except Exception as e:
+                log.error("task_exception", task_id=task.id, error=str(e))
+                task.status = TaskStatus.FAILED
+                task.error = str(e)
+
+                # Notify parent task of failure (if this is a child task)
+                await self.delegation.child_failed(task)
+
+                # Emit error event for TUI/logging
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.ERROR,
+                        data={
+                            "task_id": task.id,
+                            "error": str(e),
+                            "error_type": "task_exception",
+                            "agent": task.assigned_agent,
+                            "description": task.description[:100],
+                        },
+                    )
+                )
         else:
             # Multiple tasks - run in parallel
             log.info(
@@ -221,12 +246,29 @@ class Orchestrator:
                 *[self.loop.run_task(task) for task in batch], return_exceptions=True
             )
 
-            # Log results
+            # Log results and handle failures
             for task, result in zip(batch, results):
                 if isinstance(result, Exception):
                     log.error("task_exception", task_id=task.id, error=str(result))
                     task.status = TaskStatus.FAILED
                     task.error = str(result)
+
+                    # Notify parent task of failure (if this is a child task)
+                    await self.delegation.child_failed(task)
+
+                    # Emit error event for TUI/logging
+                    self.event_bus.emit(
+                        Event(
+                            type=EventType.ERROR,
+                            data={
+                                "task_id": task.id,
+                                "error": str(result),
+                                "error_type": "parallel_task_exception",
+                                "agent": task.assigned_agent,
+                                "description": task.description[:100],
+                            },
+                        )
+                    )
                 else:
                     log.info(
                         "task_result",

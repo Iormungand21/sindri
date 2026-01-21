@@ -25,7 +25,7 @@ class Task:
     """A hierarchical task that can spawn subtasks."""
 
     # Identity
-    id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
     parent_id: Optional[str] = None
 
     # Description

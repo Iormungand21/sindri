@@ -127,6 +127,28 @@ class HierarchicalAgentLoop:
             )
             error_reason = f"Could not load model {agent.model}{fallback_info}"
 
+            # Mark task as failed and notify parent
+            task.status = TaskStatus.FAILED
+            task.error = error_reason
+
+            # Notify parent task of failure (if this is a child task)
+            await self.delegation.child_failed(task)
+
+            # Emit error event for TUI/logging
+            self.event_bus.emit(
+                Event(
+                    type=EventType.ERROR,
+                    data={
+                        "task_id": task.id,
+                        "error": error_reason,
+                        "error_type": "model_load_failure",
+                        "agent": agent.name,
+                        "model": agent.model,
+                        "fallback_model": agent.fallback_model,
+                    },
+                )
+            )
+
             # Phase 5.6: Save checkpoint on model load failure
             self._save_error_checkpoint(
                 task=task,

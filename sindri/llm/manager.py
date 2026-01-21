@@ -326,3 +326,23 @@ class ModelManager:
         """Remove a model from the keep-warm list."""
         self.keep_warm.discard(model)
         log.info("model_removed_from_keep_warm", model=model)
+
+    def get_allocated_models(self) -> set[str]:
+        """Get models that are loaded or currently loading (pre-warming).
+
+        This is useful for VRAM-aware scheduling to avoid counting
+        models that are already allocated or being loaded.
+        """
+        models = set(self.loaded.keys())
+        for model, task in self._prewarm_tasks.items():
+            if not task.done():
+                models.add(model)
+        return models
+
+    def get_free_vram(self) -> float:
+        """Get actual free VRAM (public interface for _get_free_vram).
+
+        Returns:
+            Free VRAM in GB after accounting for loaded models.
+        """
+        return self._get_free_vram()
