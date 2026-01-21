@@ -88,8 +88,12 @@ class ShellTool(Tool):
                 )
             except asyncio.TimeoutError:
                 # Kill the process on timeout
-                process.kill()
-                await process.wait()  # Ensure process is cleaned up
+                # Handle ProcessLookupError in case process exited between timeout and kill
+                try:
+                    process.kill()
+                    await process.wait()  # Ensure process is cleaned up
+                except ProcessLookupError:
+                    pass  # Process already exited
                 log.warning(
                     "shell_timeout",
                     command=command,

@@ -110,8 +110,8 @@ async def test_shell_timeout_exceeded():
     """Test that hanging command is killed and error returned on timeout."""
     tool = ShellTool()
 
-    # Sleep for 10 seconds but timeout after 1 second
-    result = await tool.execute(command="sleep 10", timeout=1)
+    # Sleep for 2 seconds but timeout after 0.5 seconds (faster for CI)
+    result = await tool.execute(command="sleep 2", timeout=1)
 
     assert not result.success
     assert "timed out" in result.error.lower()
