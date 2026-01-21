@@ -107,6 +107,24 @@ if tool_check.escalation_mode == EscalationMode.DENY:
     )
 ```
 
+### Follow-up 1: Document Filesystem Tool Limitation
+
+**Issue:** File-access checks only cover a small set of filesystem tools; other tools (codegen, docs, refactoring) may bypass this.
+
+**Resolution:** Added documentation comment in `hierarchical.py:707-712` explaining:
+- Only core filesystem tools (`read_file`, `write_file`, `edit_file`, `list_directory`, `read_tree`) are guarded
+- Other tools use internal implementations or shell commands that bypass the check
+- For full file access control, use `system_access_level=RESTRICTED` or configure `file_scope` patterns
+
+### Follow-up 2: Wire Up `policy_audit_enabled`
+
+**Issue:** `policy_audit_enabled` was defined in config but never used.
+
+**Fix:** Added `_log_policy_violation()` helper method in `hierarchical.py:1527-1572` that:
+- Checks `config.policy_audit_enabled` before logging
+- Logs violations to `AuditStore` as entries with `tool_name=POLICY_VIOLATION:{tool}`
+- Called from all three violation handlers (runtime, tool-call, file-access)
+
 ---
 
 ## Architecture Decisions
@@ -115,14 +133,16 @@ if tool_check.escalation_mode == EscalationMode.DENY:
 2. **Three-tier policy resolution**: `agent.policy` > `agent convenience fields` > `config defaults`
 3. **Event-driven violations**: Emits `POLICY_VIOLATION` events for TUI/monitoring
 4. **Lazy imports**: Used `TYPE_CHECKING` to avoid circular imports
+5. **Audit integration**: Policy violations logged to `AuditStore` when `policy_audit_enabled=True`
 
 ---
 
 ## Questions for Reviewer
 
-1. Is the escalation mode handling appropriate? Currently `ESCALATE` mode behaves like `WARN` since there's no approval system yet.
+~~1. Is the escalation mode handling appropriate? Currently `ESCALATE` mode behaves like `WARN` since there's no approval system yet.~~
 
-2. Should policy violations be logged to the audit store directly, or is the event emission sufficient?
+~~2. Should policy violations be logged to the audit store directly, or is the event emission sufficient?~~
+   - **Resolved:** Now logs to audit store when `policy_audit_enabled=True`
 
 3. The file scope matching uses `fnmatch` glob patterns. Should we support regex patterns as well?
 

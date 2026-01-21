@@ -13,6 +13,7 @@ from sindri.tools.registry import ToolRegistry
 from sindri.tools.delegation import DelegateTool
 from sindri.persistence.state import SessionState
 from sindri.persistence.metrics import MetricsCollector, MetricsStore
+from sindri.persistence.audit import AuditStore, AuditEntry
 from sindri.core.loop import LoopConfig, LoopResult
 from sindri.core.completion import CompletionDetector
 from sindri.core.context import ContextBuilder
@@ -66,6 +67,8 @@ class HierarchicalAgentLoop:
         self._metrics_collectors: dict[str, MetricsCollector] = (
             {}
         )  # Per-session collectors
+        # Policy + Guardrails: Audit store for violation logging
+        self._audit_store = AuditStore()
 
     async def run_task(self, task: Task) -> LoopResult:
         """Run a specific task with its assigned agent."""
@@ -413,6 +416,17 @@ class HierarchicalAgentLoop:
                         )
                     )
 
+                    # Log to audit store if enabled
+                    await self._log_policy_violation(
+                        task=task,
+                        agent_name=agent.name,
+                        tool_name="__runtime__",
+                        violation_type=runtime_check.violation_type,
+                        reason=runtime_check.reason,
+                        config=config,
+                        session_id=session.id if session else None,
+                    )
+
                     # Handle based on escalation mode
                     if runtime_check.escalation_mode == EscalationMode.DENY:
                         task.status = TaskStatus.FAILED
@@ -668,6 +682,17 @@ class HierarchicalAgentLoop:
                             )
                         )
 
+                        # Log to audit store if enabled
+                        await self._log_policy_violation(
+                            task=task,
+                            agent_name=agent.name,
+                            tool_name=call.function.name,
+                            violation_type=tool_check.violation_type,
+                            reason=tool_check.reason,
+                            config=config,
+                            session_id=session.id if session else None,
+                        )
+
                         # Handle based on escalation mode
                         if tool_check.escalation_mode == EscalationMode.DENY:
                             task.status = TaskStatus.FAILED
@@ -680,6 +705,11 @@ class HierarchicalAgentLoop:
                         # WARN/ESCALATE: log but allow
 
                     # Policy + Guardrails: Check file access for filesystem tools
+                    # NOTE: Only core filesystem tools are guarded here. Other tools that may
+                    # read/write files (e.g., code_improvement, documentation, refactoring) use
+                    # internal implementations or shell commands that bypass this check. For
+                    # full file access control, use system_access_level=RESTRICTED or configure
+                    # appropriate file_scope patterns at the agent level.
                     filesystem_tools = {"read_file", "write_file", "edit_file", "list_directory", "read_tree"}
                     if call.function.name in filesystem_tools:
                         # Extract path from arguments
@@ -718,6 +748,17 @@ class HierarchicalAgentLoop:
                                         },
                                         task_id=task.id,
                                     )
+                                )
+
+                                # Log to audit store if enabled
+                                await self._log_policy_violation(
+                                    task=task,
+                                    agent_name=agent.name,
+                                    tool_name=call.function.name,
+                                    violation_type=file_check.violation_type,
+                                    reason=file_check.reason,
+                                    config=config,
+                                    session_id=session.id if session else None,
                                 )
 
                                 # Handle based on escalation mode
@@ -1479,3 +1520,50 @@ class HierarchicalAgentLoop:
 
         except Exception as e:
             log.warning("error_checkpoint_failed", task_id=task.id, error=str(e))
+
+    async def _log_policy_violation(
+        self,
+        task: Task,
+        agent_name: str,
+        tool_name: str,
+        violation_type: str,
+        reason: str,
+        config: SindriConfig,
+        session_id: str = None,
+    ):
+        """Log a policy violation to the audit store if audit is enabled.
+
+        Policy + Guardrails: Uses config.policy_audit_enabled to control
+        whether violations are persisted to the audit log.
+
+        Args:
+            task: The task that triggered the violation
+            agent_name: Name of the agent
+            tool_name: Name of the tool that was blocked
+            violation_type: Type of violation (e.g., "max_tool_calls", "file_scope")
+            reason: Human-readable reason for the violation
+            config: SindriConfig for audit settings
+            session_id: Optional session ID for context
+        """
+        if not config.policy_audit_enabled:
+            return
+
+        try:
+            entry = AuditEntry(
+                tool_name=f"POLICY_VIOLATION:{tool_name}",
+                success=False,
+                arguments=f'{{"violation_type": "{violation_type}", "agent": "{agent_name}"}}',
+                session_id=session_id,
+                task_id=task.id,
+                error=reason,
+                dry_run=False,
+            )
+            await self._audit_store.log_tool_execution(entry)
+            log.debug(
+                "policy_violation_audited",
+                task_id=task.id,
+                tool=tool_name,
+                violation_type=violation_type,
+            )
+        except Exception as e:
+            log.warning("policy_audit_failed", task_id=task.id, error=str(e))
