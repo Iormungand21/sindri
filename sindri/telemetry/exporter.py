@@ -26,6 +26,7 @@ class TraceExporter:
         metrics_store=None,
         snapshot_store=None,
         audit_store=None,
+        tool_output_store=None,
     ):
         """Initialize the TraceExporter.
 
@@ -33,10 +34,12 @@ class TraceExporter:
             metrics_store: Optional MetricsStore instance
             snapshot_store: Optional SnapshotStore instance
             audit_store: Optional AuditStore instance
+            tool_output_store: Optional ToolOutputStore instance
         """
         self._metrics_store = metrics_store
         self._snapshot_store = snapshot_store
         self._audit_store = audit_store
+        self._tool_output_store = tool_output_store
 
     def _get_metrics_store(self):
         """Lazy-load MetricsStore."""
@@ -62,6 +65,14 @@ class TraceExporter:
             self._audit_store = AuditStore()
         return self._audit_store
 
+    def _get_tool_output_store(self):
+        """Lazy-load ToolOutputStore."""
+        if self._tool_output_store is None:
+            from sindri.persistence.snapshots import ToolOutputStore
+
+            self._tool_output_store = ToolOutputStore()
+        return self._tool_output_store
+
     async def export_session_trace(
         self,
         session_id: str,
@@ -86,6 +97,7 @@ class TraceExporter:
             "metrics": None,
             "environment": None,
             "audit_log": None,
+            "tool_outputs": None,
         }
 
         # Load metrics
@@ -125,6 +137,29 @@ class TraceExporter:
                 ]
         except Exception as e:
             log.warning("trace_export_audit_error", session_id=session_id, error=str(e))
+
+        # Load full tool outputs if requested (can be large)
+        if include_tool_outputs:
+            try:
+                tool_output_store = self._get_tool_output_store()
+                tool_outputs = await tool_output_store.get_session_outputs(session_id)
+                if tool_outputs:
+                    trace["tool_outputs"] = [
+                        {
+                            "turn_index": t.turn_index,
+                            "tool_index": t.tool_index,
+                            "tool_name": t.tool_name,
+                            "arguments": t.arguments,
+                            "output": t.output,
+                            "output_hash": t.output_hash,
+                            "duration_ms": t.duration_ms,
+                            "success": t.success,
+                            "created_at": t.created_at.isoformat() if t.created_at else None,
+                        }
+                        for t in tool_outputs
+                    ]
+            except Exception as e:
+                log.warning("trace_export_tool_outputs_error", session_id=session_id, error=str(e))
 
         # Write to file if path provided
         if output_path:

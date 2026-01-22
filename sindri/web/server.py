@@ -42,6 +42,7 @@ from sindri.core.event_schemas import (
     get_all_event_schemas,
 )
 from sindri.llm.manager import ModelManager
+from sindri.telemetry.collector import TelemetryCollector
 
 log = structlog.get_logger()
 
@@ -249,6 +250,7 @@ class SindriAPI:
         self.state = SessionState()
         self.event_bus = EventBus()
         self.model_manager: Optional[ModelManager] = None
+        self.telemetry_collector: Optional[TelemetryCollector] = None
         self.active_tasks: dict[str, dict] = {}
         self.websocket_connections: list[WebSocket] = []
         self._event_loop: Optional[asyncio.AbstractEventLoop] = None
@@ -281,6 +283,14 @@ class SindriAPI:
 
         # Subscribe to events for WebSocket broadcast
         self.event_bus.subscribe_event(self._broadcast_event_sync)
+
+        # Start TelemetryCollector for real-time metrics
+        self.telemetry_collector = TelemetryCollector(
+            event_bus=self.event_bus,
+            model_manager=self.model_manager,
+        )
+        await self.telemetry_collector.start()
+        _ws_debug("api.initialize: telemetry collector started")
 
         log.info("sindri_api_initialized", vram_gb=self.vram_gb)
         _ws_debug("api.initialize: complete")
@@ -332,6 +342,11 @@ class SindriAPI:
 
     async def shutdown(self):
         """Clean shutdown of API components."""
+        # Stop TelemetryCollector
+        if self.telemetry_collector:
+            await self.telemetry_collector.stop()
+            _ws_debug("api.shutdown: telemetry collector stopped")
+
         # Close WebSocket connections
         for ws in self.websocket_connections:
             try:

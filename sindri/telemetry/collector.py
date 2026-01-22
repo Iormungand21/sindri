@@ -131,11 +131,11 @@ class TelemetryCollector:
         # Callbacks for live updates (used by SSE endpoint)
         self._tick_callbacks: list[Callable[[TelemetryTickData], None]] = []
 
-    async def start(self, session_id: str):
-        """Start telemetry collection for a session.
+    async def start(self, session_id: Optional[str] = None):
+        """Start telemetry collection.
 
         Args:
-            session_id: Session ID to track
+            session_id: Optional session ID to track. Can be set later via set_session().
         """
         self._session_id = session_id
         self._session_start = time.time()
@@ -157,6 +157,17 @@ class TelemetryCollector:
         self._tick_task = asyncio.create_task(self._tick_loop())
 
         log.info("telemetry_collector_started", session_id=session_id)
+
+    def set_session(self, session_id: str):
+        """Set or update the current session ID.
+
+        Args:
+            session_id: Session ID to track
+        """
+        self._session_id = session_id
+        if self._session_start is None:
+            self._session_start = time.time()
+        log.debug("telemetry_session_updated", session_id=session_id)
 
     async def stop(self) -> TelemetrySnapshotData:
         """Stop collection and return final snapshot.

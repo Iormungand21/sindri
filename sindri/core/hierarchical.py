@@ -543,7 +543,7 @@ class HierarchicalAgentLoop:
             )
 
             # Phase 5.5: Start iteration timing
-            time.time()
+            iteration_start_time = time.time()
             if metrics_collector:
                 metrics_collector.start_iteration(
                     iteration_number=iteration + 1,
@@ -914,6 +914,7 @@ class HierarchicalAgentLoop:
                             "name": call.function.name,
                             "success": result.success,
                             "result": result.output if result.success else result.error,
+                            "duration_ms": tool_duration_ms,
                         },
                     )
                 )
@@ -1041,6 +1042,22 @@ class HierarchicalAgentLoop:
                 await self.state.save_session(session)
 
             # Phase 5.5: End iteration timing
+            iteration_end_time = time.time()
+            iteration_duration_ms = int((iteration_end_time - iteration_start_time) * 1000)
+
+            # Emit ITERATION_END event for telemetry
+            self.event_bus.emit(
+                Event(
+                    type=EventType.ITERATION_END,
+                    data={
+                        "task_id": task.id,
+                        "iteration": iteration + 1,
+                        "agent": agent.name,
+                        "duration_ms": iteration_duration_ms,
+                    },
+                )
+            )
+
             if metrics_collector:
                 metrics_collector.end_iteration()
                 # Emit metrics update event for TUI
