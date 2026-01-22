@@ -11,8 +11,8 @@
 Grouped by logical capability area.
 
 **Suggested sequencing:**
-- **Near-term (0–2 months):** items 1 ✅, 2 ✅, 3 ✅, 5 ✅, 6 ✅
-- **Mid-term (2–4 months):** items 4, 7
+- **Near-term (0–2 months):** items 1 ✅, 2 ✅, 3 ✅, 4 ✅, 5 ✅, 6 ✅
+- **Mid-term (2–4 months):** item 7
 - **Long-term (4–6 months):** items 8, 9, 10
 
 ### Stability + Bugfixes
@@ -49,10 +49,13 @@ Grouped by logical capability area.
    - ✅ Deterministic execution mode for tool-only flows
 
 ### Knowledge + Context
-4. **Multi-Project Workspace Index**
-   - Background indexer for multiple repos
-   - Cross-project semantic search + pinned “active” contexts
-   - Per-project embedder settings and exclusion rules
+4. **Multi-Project Workspace Index** ✅ **COMPLETE**
+   - ✅ Background indexer with priority queue and async loop
+   - ✅ Incremental indexing with MD5-based change detection
+   - ✅ Active/pinned projects for immediate context inclusion in agent prompts
+   - ✅ Per-project embedder settings (chunk size, file extensions, exclude/include patterns)
+   - ✅ CLI commands: `sindri projects activate/deactivate/settings/index-incremental/active`
+   - ✅ Event types for progress reporting (INDEX_QUEUED, INDEX_STARTED, INDEX_PROGRESS, etc.)
 
 ### Safety + Governance
 5. **Granular Tool Permissions** ✅ **COMPLETE**
@@ -87,126 +90,10 @@ Grouped by logical capability area.
     - VRAM-aware fallback + cost/latency heuristics
     - Per-project model preferences
 
-## ACTIVE: Architecture Transformation
+## Architecture Transformation
 
-**Sindri is being transformed from a multi-user deployable tool to an internal-only research assistant.**
-
-### Approved Plan
-Read the full plan: `/home/ryan/.claude/plans/silly-kindling-parnas.md`
-
-### Execution Progress
-
-| Milestone | Description | Status | Lines |
-|-----------|-------------|--------|-------|
-| 1. Collaboration | Delete `sindri/collaboration/` module | ✅ **COMPLETE** | -16,200 |
-| 2. IDE Integration | Delete `sindri/ide/` module | ✅ **COMPLETE** | -2,100 |
-| 3. Marketplace | Simplify to local-only | ✅ **COMPLETE** | -220 |
-| 4. Security | Relax localhost/private IP restrictions | ✅ **COMPLETE** | ~0 |
-| 5. Access Config | Add system access configuration | ✅ **COMPLETE** | +300 |
-| 6. Self-Management | Add service/cron/update tools | ✅ **COMPLETE** | +2,500 |
-| 7. Web UI | Remove auth/collaboration UI | ✅ **COMPLETE** | 0 (already clean) |
-| 8. Documentation | Update all docs | ✅ **COMPLETE** | ~200 |
-
-### Milestone 1 Complete (2026-01-18)
-**Removed:**
-- `sindri/collaboration/` directory (11 files, ~8,948 lines)
-- 7 test files (~7,271 lines)
-- 28+ CLI commands (share, comment, notifications, activity, webhooks, audit, api-keys)
-- 50+ API endpoints
-- Collaboration database tables
-
-**Result:** Tests: 3095 → 2710
-
-### Milestone 2 Complete (2026-01-18)
-**Removed:**
-- `sindri/ide/` directory (3 Python files + 3 Lua files, ~1,295 lines)
-- `tests/test_ide.py` (818 lines)
-- 2 CLI commands (ide, ide-status)
-
-**Result:** Tests: 2710 → 2654 (2629 passing)
-
-### Milestone 3 Complete (2026-01-18)
-**Simplified Marketplace to Local-Only:**
-- `sindri/marketplace/installer.py` - removed `_detect_source_type()`, `install_from_git()`, `install_from_url()` (~220 lines)
-- CLI commands - removed `--ref` option, updated help text
-- `sindri/marketplace/metadata.py` - updated docstrings for local-only mode
-- Removed 4 tests for removed `_detect_source_type()` method
-
-**Result:** Marketplace now only supports local path installation. Tests unchanged at 2654 (2625 passing)
-
-### Milestone 4 Complete (2026-01-18)
-**Relaxed Security Restrictions for Internal-Only Mode:**
-- Updated 4 tool files: `browser.py`, `http.py`, `network.py`, `scraping.py`
-- Now allow localhost (127.0.0.1, localhost, ::1) and private IP ranges
-- Only block cloud metadata endpoints (169.254.169.254, 169.254.170.2, metadata.google.internal) and file:// protocol
-- Changed default `allow_localhost=True` in HTTP/network tools
-- Updated tests to verify new behavior
-
-**Result:** Enables local service integration for internal-only mode. Tests unchanged at 2654 (2624 passing)
-
-### Milestone 5 Complete (2026-01-18)
-**Added System Access Configuration:**
-- Added `SystemAccessLevel` enum (RESTRICTED, SUPERVISED, FULL) to `sindri/config.py`
-- Added config fields: `system_access`, `allowed_services`, `allow_self_modification`
-- Created `sindri/core/access.py` with access checking and confirmation utilities
-- Added CLI commands: `sindri access show`, `sindri access set`, `sindri access services`, `sindri access self-modify`
-- **Access Levels:**
-  - RESTRICTED: Read-only system info, no modifications
-  - SUPERVISED: Modifications require user confirmation (default)
-  - FULL: Full autonomous access (for dedicated machine)
-- Services whitelist allows granular control over which services can be managed
-
-**Result:** Configurable system access for graduated trust levels. Tests: 2654 → 2691 (+37 new tests)
-
-### Milestone 6 Complete (2026-01-18)
-**Added Self-Management Tools:**
-- Created `sindri/tools/services.py` - 8 service management tools
-- Created `sindri/tools/self_management.py` - 9 self-management tools
-- Created `sindri/tools/scheduling.py` - 9 scheduling tools
-- Added `sindri_admin` agent with all 26 new tools
-- Added CLI command groups: `service`, `schedule`, `self`
-
-**New Tools (26 total):**
-- **Service:** service_status, service_start, service_stop, service_restart, service_enable, service_disable, service_logs, service_list
-- **Self-Management:** sindri_version, sindri_update, sindri_config_get, sindri_config_set, ollama_list, ollama_pull, ollama_remove, ollama_status, vram_status
-- **Scheduling:** cron_list, cron_add, cron_remove, timer_list, timer_create, timer_remove, at_schedule, at_list, at_remove
-
-**New CLI Commands:**
-- `sindri service status/start/stop/restart/logs/list` - systemd service management
-- `sindri schedule list/cron-add/cron-remove/timer-create/timer-remove/at` - task scheduling
-- `sindri self version/update/models/pull/remove/vram/ollama-status` - self-management
-
-**Result:** Full self-management capability for autonomous operation. Tests: 2691 → 2778 (+87 new tests)
-
-### Milestone 7 Complete (2026-01-18)
-**Finding:** No auth/collaboration UI exists in React frontend
-- Verified 23 React components - no authentication, team, or multi-user features
-- Verified FastAPI server has no auth middleware or team/user context
-- Frontend already single-user ready - no changes needed
-- Updated agent count test (17 → 18 to include sindri_admin)
-
-**Result:** Web UI was already clean. No code changes needed.
-
-### Milestone 8 Complete (2026-01-18)
-**Updated Documentation for Internal-Only Mode:**
-- `README.md` - Removed collaboration feature, updated counts (18 agents, 155+ tools, 2726 tests)
-- `ARCHITECTURE.md` - Removed collaboration references, updated counts
-- `STATUS.md` - Marked all milestones complete, added recent changes
-- `ROADMAP.md` - Marked milestones 7-8 complete
-- `ONBOARDING.md` - Updated milestone status
-
-**Cleanup:**
-- Deleted untracked WIP files: `sindri/tools/docker_tools.py`, `tests/test_docker_tools.py`
-
-**Result:** Architecture transformation complete. All tests passing (2726).
-
-### Features Being Kept
-- Core Ralph loop and agent hierarchy
-- Memory system (Muninn)
-- Fine-tuning pipeline
-- Full Web UI (minus auth/collaboration)
-- All 129+ tools
-- TUI and Voice interfaces
+- Status: complete (internal-only, single-user mode).
+- Historical milestones: `docs/archive/ROADMAP-full-history.md`
 
 ---
 
@@ -952,6 +839,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-01-21 | **Multi-Project Workspace Index (ROADMAP Item 4)** - BackgroundIndexer with priority queue, incremental MD5-based indexing, active/pinned projects, per-project embedder settings (ProjectEmbedderSettings), CLI commands (activate/deactivate/settings/index-incremental/active), INDEX_* events | +47 |
 | 2026-01-21 | **Reproducible Sessions (ROADMAP Item 3)** - Environment snapshots (Sindri/Python/Ollama versions, model metadata, inference params), tool output recording, `sindri replay` CLI (info/list/run/compare), session comparison, database schema v7 | +44 |
 | 2026-01-21 | **Plan-First Execution (ROADMAP Item 2)** - Persistent plans with approval gates, step-level checkpointing, step re-run, PlanStore persistence, PlanExecutor orchestration, REST API endpoints for plan/step management, 15 new event types with schemas | +30 |
 | 2026-01-20 | **Event + API Contract v1 (Phase 16)** - event_schemas.py with 24 payload models, /api/schema endpoint, /api/version endpoint, X-Sindri-API-Version header, TypeScript generation script, contract tests | +50 |
@@ -1027,9 +915,5 @@ cd sindri/web/static && npm test -- --run
 
 ---
 
-**Last Updated:** 2026-01-20
-**Phase 11 Progress:** 8/8 agents COMPLETE (Skuld, Kvasir, Völundr, Saga, Bragi, Nidhogr, Dvalin, Regin)
-**Phase 12 Progress:** Tier 1-3 Complete - 8/8 agents (Vör, Rán, Sif, Nidhogg, Tyr, Groa, Fafnir) + Heimdall extended, 108 tools
-**Phase 13 Progress:** Tier 1-4 Complete - AI-Powered Test Generation (Skald +4 tools), AI-Powered Code Documentation (Idunn +5 tools), AI-Powered Code Review & Quality Analysis (Mimir +5 tools), AI-Powered Code Improvement (Huginn +5 tools)
-**Phase 14 Progress:** COMPLETE - Git Automation Tools (git_auto_commit, git_branch_compare, git_conflict_assist, git_release_notes) + Huginn/Brokkr agents enhanced (+4/+3 tools)
+**Last Updated:** 2026-01-21
 **Maintained By:** Project contributors

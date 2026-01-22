@@ -45,6 +45,47 @@ class ModelConfig(BaseModel):
         return v.strip()
 
 
+class IndexerConfig(BaseModel):
+    """Background indexer configuration (ROADMAP Item 4).
+
+    Controls the behavior of the multi-project workspace indexer.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Whether the background indexer is enabled",
+    )
+    auto_start: bool = Field(
+        default=False,
+        description="Start indexer automatically with TUI/Web",
+    )
+    schedule_interval_minutes: int = Field(
+        default=60,
+        ge=0,
+        description="Re-index interval in minutes (0 = no automatic re-indexing)",
+    )
+    max_vram_percent: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Max VRAM fraction to use for embedding (0.0-1.0)",
+    )
+    cooldown_seconds: float = Field(
+        default=1.0,
+        ge=0.0,
+        description="Pause between indexing projects (seconds)",
+    )
+    include_active_in_context: bool = Field(
+        default=True,
+        description="Include active project context in agent prompts",
+    )
+    active_project_budget_tokens: int = Field(
+        default=2000,
+        gt=0,
+        description="Token budget for active project context",
+    )
+
+
 class MemoryConfig(BaseModel):
     """Memory system configuration."""
 
@@ -52,6 +93,8 @@ class MemoryConfig(BaseModel):
     episodic_limit: int = Field(gt=0, default=5)
     semantic_limit: int = Field(gt=0, default=10)
     max_context_tokens: int = Field(gt=0, default=16384)
+    # Workspace indexer settings (ROADMAP Item 4)
+    indexer: IndexerConfig = Field(default_factory=IndexerConfig)
 
 
 class TUIConfig(BaseModel):

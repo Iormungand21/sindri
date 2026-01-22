@@ -64,6 +64,16 @@ class EventType(Enum):
     STEP_RESULT_ACCEPTED = auto()  # User accepted step result
     STEP_RESULT_REJECTED = auto()  # User rejected step result
     STEP_RERUN_REQUESTED = auto()  # User requested re-run of step
+    # Background Indexer events (ROADMAP Item 4: Multi-Project Workspace Index)
+    INDEX_QUEUED = auto()  # Project queued for indexing
+    INDEX_STARTED = auto()  # Project indexing started
+    INDEX_PROGRESS = auto()  # Progress update (files/chunks processed)
+    INDEX_COMPLETED = auto()  # Project indexing finished successfully
+    INDEX_FAILED = auto()  # Project indexing failed
+    INDEX_FILE_PROCESSED = auto()  # Individual file indexed (detailed progress)
+    INDEXER_STARTED = auto()  # Background indexer service started
+    INDEXER_STOPPED = auto()  # Background indexer service stopped
+    INDEXER_PAUSED = auto()  # Background indexer paused (e.g., VRAM constraints)
 
 
 @dataclass

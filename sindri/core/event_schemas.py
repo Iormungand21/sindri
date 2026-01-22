@@ -406,6 +406,92 @@ class StepRerunRequestedData(BaseModel):
     step_number: int = Field(..., description="Step number")
 
 
+# === Background Indexer Event Payloads (ROADMAP Item 4: Multi-Project Workspace Index) ===
+
+
+class IndexQueuedData(BaseModel):
+    """Payload for INDEX_QUEUED event."""
+
+    project_path: str = Field(..., description="Absolute path to the project")
+    project_name: str = Field(..., description="Display name of the project")
+    priority: int = Field(..., description="Queue priority (1=highest, 10=lowest)")
+    queue_position: int = Field(..., description="Position in the indexer queue")
+
+
+class IndexStartedData(BaseModel):
+    """Payload for INDEX_STARTED event."""
+
+    project_path: str = Field(..., description="Absolute path to the project")
+    project_name: str = Field(..., description="Display name of the project")
+    total_files: int = Field(..., description="Total files to index (estimated)")
+    force: bool = Field(default=False, description="Whether this is a forced re-index")
+
+
+class IndexProgressData(BaseModel):
+    """Payload for INDEX_PROGRESS event."""
+
+    project_path: str = Field(..., description="Absolute path to the project")
+    project_name: str = Field(..., description="Display name of the project")
+    files_processed: int = Field(..., description="Number of files processed so far")
+    total_files: int = Field(..., description="Total files to process")
+    chunks_added: int = Field(..., description="Embedding chunks added so far")
+    files_skipped: int = Field(default=0, description="Files skipped (unchanged)")
+    percent_complete: float = Field(..., description="Progress percentage (0-100)")
+
+
+class IndexCompletedData(BaseModel):
+    """Payload for INDEX_COMPLETED event."""
+
+    project_path: str = Field(..., description="Absolute path to the project")
+    project_name: str = Field(..., description="Display name of the project")
+    files_indexed: int = Field(..., description="Total files successfully indexed")
+    files_skipped: int = Field(default=0, description="Files skipped (unchanged)")
+    files_failed: int = Field(default=0, description="Files that failed to index")
+    chunks_added: int = Field(..., description="Total embedding chunks created")
+    chunks_removed: int = Field(default=0, description="Chunks removed (deleted/changed files)")
+    duration_seconds: float = Field(..., description="Total indexing duration")
+
+
+class IndexFailedData(BaseModel):
+    """Payload for INDEX_FAILED event."""
+
+    project_path: str = Field(..., description="Absolute path to the project")
+    project_name: str = Field(..., description="Display name of the project")
+    error: str = Field(..., description="Error message describing the failure")
+    files_processed: int = Field(default=0, description="Files processed before failure")
+    duration_seconds: float = Field(default=0.0, description="Duration until failure")
+
+
+class IndexFileProcessedData(BaseModel):
+    """Payload for INDEX_FILE_PROCESSED event (detailed progress)."""
+
+    project_path: str = Field(..., description="Absolute path to the project")
+    file_path: str = Field(..., description="Relative path of the indexed file")
+    chunks_created: int = Field(..., description="Number of chunks created for this file")
+    skipped: bool = Field(default=False, description="Whether file was skipped (unchanged)")
+
+
+class IndexerStartedData(BaseModel):
+    """Payload for INDEXER_STARTED event."""
+
+    queued_projects: int = Field(..., description="Number of projects in the queue")
+    auto_index_enabled: bool = Field(default=True, description="Whether auto-indexing is enabled")
+
+
+class IndexerStoppedData(BaseModel):
+    """Payload for INDEXER_STOPPED event."""
+
+    reason: str = Field(default="user_requested", description="Reason for stopping")
+    projects_indexed: int = Field(default=0, description="Projects indexed in this session")
+
+
+class IndexerPausedData(BaseModel):
+    """Payload for INDEXER_PAUSED event."""
+
+    reason: str = Field(..., description="Reason for pausing (e.g., VRAM constraints)")
+    resume_after_seconds: Optional[int] = Field(None, description="Expected resume time")
+
+
 # === Event Type to Payload Model Mapping ===
 
 EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
@@ -453,6 +539,16 @@ EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "STEP_RESULT_ACCEPTED": StepResultAcceptedData,
     "STEP_RESULT_REJECTED": StepResultRejectedData,
     "STEP_RERUN_REQUESTED": StepRerunRequestedData,
+    # Background Indexer events (ROADMAP Item 4: Multi-Project Workspace Index)
+    "INDEX_QUEUED": IndexQueuedData,
+    "INDEX_STARTED": IndexStartedData,
+    "INDEX_PROGRESS": IndexProgressData,
+    "INDEX_COMPLETED": IndexCompletedData,
+    "INDEX_FAILED": IndexFailedData,
+    "INDEX_FILE_PROCESSED": IndexFileProcessedData,
+    "INDEXER_STARTED": IndexerStartedData,
+    "INDEXER_STOPPED": IndexerStoppedData,
+    "INDEXER_PAUSED": IndexerPausedData,
 }
 
 

@@ -1953,6 +1953,268 @@ def projects_stats():
             console.print(f"               (+{len(all_tags)-10} more)[/dim]")
 
 
+# === Workspace Index Commands (ROADMAP Item 4) ===
+
+
+@projects.command("activate")
+@click.argument("path", type=click.Path())
+def projects_activate(path: str):
+    """Activate a project for immediate context inclusion.
+
+    Active projects are pinned and their relevant content is automatically
+    included in agent prompts for cross-project context.
+
+    Examples:
+        sindri projects activate .
+        sindri projects activate ~/shared-utils
+    """
+    from sindri.memory.projects import ProjectRegistry
+
+    registry = ProjectRegistry()
+    project = registry.set_active(path, active=True)
+
+    if not project:
+        console.print(f"[red]x[/red] Project not found: {path}")
+        return
+
+    console.print(f"[green]v[/green] Activated project: [cyan]{project.name}[/cyan]")
+    console.print("  [dim]This project's context will be included in agent prompts[/dim]")
+
+    # Show active count
+    active_count = registry.get_active_project_count()
+    console.print(f"\n  [dim]Active projects: {active_count}[/dim]")
+
+
+@projects.command("deactivate")
+@click.argument("path", type=click.Path())
+def projects_deactivate(path: str):
+    """Deactivate a project from immediate context inclusion.
+
+    The project will remain indexed but won't be automatically included
+    in agent prompts.
+    """
+    from sindri.memory.projects import ProjectRegistry
+
+    registry = ProjectRegistry()
+    project = registry.set_active(path, active=False)
+
+    if not project:
+        console.print(f"[red]x[/red] Project not found: {path}")
+        return
+
+    console.print(f"[yellow]![/yellow] Deactivated project: [cyan]{project.name}[/cyan]")
+
+
+@projects.command("settings")
+@click.argument("path", type=click.Path())
+@click.option("--show", "-s", is_flag=True, help="Show current settings")
+@click.option("--chunk-size", "-c", type=int, help="Lines per chunk (default: 50)")
+@click.option("--max-chunk-chars", type=int, help="Max chars per chunk (default: 2000)")
+@click.option("--max-line-chars", type=int, help="Max line length before truncation (default: 500)")
+@click.option("--exclude", "-e", help="Glob patterns to exclude (comma-separated)")
+@click.option("--include", "-i", help="Glob patterns to include (comma-separated, priority)")
+@click.option("--extensions", help="File extensions to index (comma-separated, e.g. '.py,.js')")
+@click.option("--clear", is_flag=True, help="Clear custom settings (use defaults)")
+def projects_settings(
+    path: str,
+    show: bool = False,
+    chunk_size: int = None,
+    max_chunk_chars: int = None,
+    max_line_chars: int = None,
+    exclude: str = None,
+    include: str = None,
+    extensions: str = None,
+    clear: bool = False,
+):
+    """View or update per-project embedder settings.
+
+    Examples:
+        sindri projects settings . --show
+        sindri projects settings . --chunk-size 100 --exclude "*.min.js,dist/*"
+        sindri projects settings . --clear
+    """
+    from sindri.memory.projects import ProjectRegistry, ProjectEmbedderSettings
+
+    registry = ProjectRegistry()
+    project = registry.get_project(path)
+
+    if not project:
+        console.print(f"[red]x[/red] Project not found: {path}")
+        return
+
+    # Show current settings
+    if show or (not clear and chunk_size is None and exclude is None and include is None and extensions is None and max_chunk_chars is None and max_line_chars is None):
+        console.print(f"[bold]Settings for [cyan]{project.name}[/cyan][/bold]\n")
+
+        if project.embedder_settings:
+            s = project.embedder_settings
+            console.print(f"  Chunk size (lines):    {s.chunk_size_lines}")
+            console.print(f"  Max chunk chars:       {s.max_chunk_chars}")
+            console.print(f"  Max line chars:        {s.max_line_chars}")
+            console.print(f"  File extensions:       {', '.join(s.file_extensions) if s.file_extensions else '[default]'}")
+            console.print(f"  Exclude patterns:      {', '.join(s.exclude_patterns) if s.exclude_patterns else '[none]'}")
+            console.print(f"  Include patterns:      {', '.join(s.include_patterns) if s.include_patterns else '[none]'}")
+        else:
+            console.print("  [dim]Using default settings[/dim]")
+            console.print("  Chunk size (lines):    50")
+            console.print("  Max chunk chars:       2000")
+            console.print("  Max line chars:        500")
+
+        console.print(f"\n  Active:                {'[green]yes[/green]' if project.active else '[dim]no[/dim]'}")
+        console.print(f"  Auto-index:            {'[green]yes[/green]' if project.auto_index else '[dim]no[/dim]'}")
+        console.print(f"  Index priority:        {project.index_priority}")
+        return
+
+    # Clear settings
+    if clear:
+        registry.clear_embedder_settings(path)
+        console.print(f"[green]v[/green] Cleared settings for [cyan]{project.name}[/cyan]")
+        console.print("  [dim]Will use default settings[/dim]")
+        return
+
+    # Update settings
+    current = project.embedder_settings or ProjectEmbedderSettings()
+
+    new_settings = ProjectEmbedderSettings(
+        chunk_size_lines=chunk_size if chunk_size is not None else current.chunk_size_lines,
+        max_chunk_chars=max_chunk_chars if max_chunk_chars is not None else current.max_chunk_chars,
+        max_line_chars=max_line_chars if max_line_chars is not None else current.max_line_chars,
+        file_extensions=[e.strip() for e in extensions.split(",")] if extensions else current.file_extensions,
+        exclude_patterns=[p.strip() for p in exclude.split(",")] if exclude else current.exclude_patterns,
+        include_patterns=[p.strip() for p in include.split(",")] if include else current.include_patterns,
+    )
+
+    registry.set_embedder_settings(path, new_settings)
+    console.print(f"[green]v[/green] Updated settings for [cyan]{project.name}[/cyan]")
+
+    # Show what changed
+    changes = []
+    if chunk_size is not None:
+        changes.append(f"chunk_size={chunk_size}")
+    if max_chunk_chars is not None:
+        changes.append(f"max_chunk_chars={max_chunk_chars}")
+    if max_line_chars is not None:
+        changes.append(f"max_line_chars={max_line_chars}")
+    if exclude:
+        changes.append(f"exclude={exclude}")
+    if include:
+        changes.append(f"include={include}")
+    if extensions:
+        changes.append(f"extensions={extensions}")
+
+    if changes:
+        console.print(f"  [dim]Changed: {', '.join(changes)}[/dim]")
+
+    console.print("\n  [dim]Re-index to apply: sindri projects index <path> --force[/dim]")
+
+
+@projects.command("active")
+def projects_active():
+    """List all active (pinned) projects."""
+    from rich.table import Table
+    from sindri.memory.projects import ProjectRegistry
+
+    registry = ProjectRegistry()
+    active_projects = registry.list_active_projects()
+
+    if not active_projects:
+        console.print("[yellow]No active projects.[/yellow]")
+        console.print("\n[dim]Activate with: sindri projects activate <path>[/dim]")
+        return
+
+    table = Table(
+        title=f"Active Projects ({len(active_projects)})",
+        show_header=True,
+        header_style="bold green",
+    )
+    table.add_column("Name", style="cyan", width=20)
+    table.add_column("Priority", width=10)
+    table.add_column("Indexed", width=15)
+    table.add_column("Path", style="dim", width=40)
+
+    for p in active_projects:
+        indexed = (
+            f"[green]{p.file_count} files[/green]"
+            if p.indexed
+            else "[yellow]not indexed[/yellow]"
+        )
+        table.add_row(p.name, str(p.index_priority), indexed, p.path)
+
+    console.print(table)
+    console.print("\n[dim]Active projects provide cross-project context in agent prompts[/dim]")
+
+
+@projects.command("index-incremental")
+@click.argument("path", type=click.Path(), required=False)
+@click.option("--all", "-a", "index_all", is_flag=True, help="Index all registered projects")
+@click.option("--force", "-f", is_flag=True, help="Force re-index all files (ignore hashes)")
+def projects_index_incremental(path: str = None, index_all: bool = False, force: bool = False):
+    """Incrementally index project(s), only processing changed files.
+
+    This is faster than full indexing as it uses file hashes to detect changes
+    and only re-indexes modified files.
+
+    Examples:
+        sindri projects index-incremental .
+        sindri projects index-incremental --all
+        sindri projects index-incremental . --force
+    """
+    from sindri.memory.global_memory import GlobalMemoryStore
+
+    if not path and not index_all:
+        console.print("[red]x[/red] Specify a path or use --all")
+        return
+
+    global_memory = GlobalMemoryStore()
+
+    if index_all:
+        console.print("[dim]Incrementally indexing all registered projects...[/dim]\n")
+
+        projects = global_memory.registry.list_projects(enabled_only=True)
+        if not projects:
+            console.print("[yellow]No projects to index.[/yellow]")
+            return
+
+        total_indexed = 0
+        total_skipped = 0
+        total_removed = 0
+
+        for proj in projects:
+            console.print(f"  Indexing [cyan]{proj.name}[/cyan]...", end=" ")
+            result = global_memory.index_project_incremental(proj.path, force=force)
+
+            if result.error:
+                console.print(f"[red]error: {result.error}[/red]")
+            else:
+                console.print(
+                    f"[green]+{result.files_indexed}[/green] indexed, "
+                    f"[dim]{result.files_skipped} skipped[/dim], "
+                    f"[yellow]-{result.files_removed}[/yellow] removed "
+                    f"({result.duration_seconds:.1f}s)"
+                )
+                total_indexed += result.files_indexed
+                total_skipped += result.files_skipped
+                total_removed += result.files_removed
+
+        console.print(
+            f"\n[green]v[/green] Done: {total_indexed} files indexed, "
+            f"{total_skipped} skipped, {total_removed} removed"
+        )
+    else:
+        console.print(f"[dim]Incrementally indexing {path}...[/dim]")
+        result = global_memory.index_project_incremental(path, force=force)
+
+        if result.error:
+            console.print(f"[red]x[/red] Error: {result.error}")
+        else:
+            console.print(f"[green]v[/green] Indexed in {result.duration_seconds:.2f}s:")
+            console.print(f"  Files indexed:  {result.files_indexed}")
+            console.print(f"  Files skipped:  {result.files_skipped} (unchanged)")
+            console.print(f"  Files removed:  {result.files_removed} (deleted)")
+            console.print(f"  Chunks added:   {result.chunks_added}")
+            console.print(f"  Chunks removed: {result.chunks_removed}")
+
+
 @cli.command()
 @click.argument("session_id")
 @click.argument("rating", type=click.IntRange(1, 5))

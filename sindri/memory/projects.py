@@ -1,4 +1,10 @@
-"""Project registry for multi-project memory (Phase 8.4)."""
+"""Project registry for multi-project memory (Phase 8.4).
+
+Extended with Multi-Project Workspace Index (ROADMAP Item 4):
+- Per-project embedder settings (chunk size, exclusion patterns)
+- Active/pinned projects for immediate context inclusion
+- Auto-index and priority settings for background indexer
+"""
 
 import json
 from dataclasses import dataclass, field
@@ -11,8 +17,54 @@ log = structlog.get_logger()
 
 
 @dataclass
+class ProjectEmbedderSettings:
+    """Per-project embedder configuration for workspace indexing.
+
+    Allows customization of how a project is indexed, including chunk sizes
+    and file inclusion/exclusion patterns.
+    """
+
+    chunk_size_lines: int = 50  # Lines per chunk (default matches GlobalMemoryStore)
+    max_chunk_chars: int = 2000  # Maximum characters per chunk
+    max_line_chars: int = 500  # Truncate lines longer than this
+    file_extensions: Optional[List[str]] = None  # Override default extensions (None = use defaults)
+    exclude_patterns: List[str] = field(default_factory=list)  # Glob patterns to exclude
+    include_patterns: List[str] = field(default_factory=list)  # Glob patterns to include (priority)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "chunk_size_lines": self.chunk_size_lines,
+            "max_chunk_chars": self.max_chunk_chars,
+            "max_line_chars": self.max_line_chars,
+            "file_extensions": self.file_extensions,
+            "exclude_patterns": self.exclude_patterns,
+            "include_patterns": self.include_patterns,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ProjectEmbedderSettings":
+        """Create from dictionary."""
+        return cls(
+            chunk_size_lines=data.get("chunk_size_lines", 50),
+            max_chunk_chars=data.get("max_chunk_chars", 2000),
+            max_line_chars=data.get("max_line_chars", 500),
+            file_extensions=data.get("file_extensions"),
+            exclude_patterns=data.get("exclude_patterns", []),
+            include_patterns=data.get("include_patterns", []),
+        )
+
+
+@dataclass
 class ProjectConfig:
-    """Configuration for a registered project."""
+    """Configuration for a registered project.
+
+    Extended with workspace index fields:
+    - active: Pin project for immediate context inclusion in agent prompts
+    - auto_index: Include in background indexer queue
+    - index_priority: Priority in indexer queue (1=highest, 10=lowest)
+    - embedder_settings: Per-project indexing configuration
+    """
 
     path: str
     name: str = ""
@@ -22,6 +74,11 @@ class ProjectConfig:
     last_indexed: Optional[datetime] = None
     file_count: int = 0
     created_at: Optional[datetime] = None
+    # Workspace Index fields (ROADMAP Item 4)
+    active: bool = False  # Pinned for immediate context inclusion
+    auto_index: bool = True  # Include in background indexer
+    index_priority: int = 5  # Priority: 1=highest, 10=lowest
+    embedder_settings: Optional[ProjectEmbedderSettings] = None  # Per-project config
 
     def __post_init__(self):
         if not self.name:
@@ -43,11 +100,23 @@ class ProjectConfig:
             ),
             "file_count": self.file_count,
             "created_at": self.created_at.isoformat() if self.created_at else None,
+            # Workspace Index fields
+            "active": self.active,
+            "auto_index": self.auto_index,
+            "index_priority": self.index_priority,
+            "embedder_settings": (
+                self.embedder_settings.to_dict() if self.embedder_settings else None
+            ),
         }
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ProjectConfig":
         """Create from dictionary."""
+        # Parse embedder settings if present
+        embedder_settings = None
+        if data.get("embedder_settings"):
+            embedder_settings = ProjectEmbedderSettings.from_dict(data["embedder_settings"])
+
         return cls(
             path=data["path"],
             name=data.get("name", ""),
@@ -65,6 +134,11 @@ class ProjectConfig:
                 if data.get("created_at")
                 else None
             ),
+            # Workspace Index fields
+            active=data.get("active", False),
+            auto_index=data.get("auto_index", True),
+            index_priority=data.get("index_priority", 5),
+            embedder_settings=embedder_settings,
         )
 
     def matches_tag(self, tag: str) -> bool:
@@ -383,3 +457,126 @@ class ProjectRegistry:
         for project in self._projects.values():
             tags_set.update(project.tags)
         return sorted(tags_set, key=str.lower)
+
+    # Workspace Index methods (ROADMAP Item 4)
+
+    def list_active_projects(self) -> List[ProjectConfig]:
+        """List all active (pinned) projects for context inclusion.
+
+        Returns:
+            List of ProjectConfig objects with active=True
+        """
+        projects = [p for p in self._projects.values() if p.active]
+        # Sort by priority (lower = higher priority), then name
+        projects.sort(key=lambda p: (p.index_priority, p.name.lower()))
+        return projects
+
+    def get_active_project_count(self) -> int:
+        """Get the number of active (pinned) projects."""
+        return sum(1 for p in self._projects.values() if p.active)
+
+    def set_active(self, path: str, active: bool = True) -> Optional[ProjectConfig]:
+        """Set a project as active/inactive for context inclusion.
+
+        Args:
+            path: Path to the project directory
+            active: Whether to mark as active (True) or inactive (False)
+
+        Returns:
+            Updated ProjectConfig, or None if project not found
+        """
+        project = self.get_project(path)
+        if not project:
+            log.warning("project_not_found_for_activation", path=path)
+            return None
+
+        project.active = active
+        self._save()
+
+        log.info("project_active_changed", path=path, active=active)
+        return project
+
+    def set_auto_index(
+        self, path: str, auto_index: bool = True, priority: Optional[int] = None
+    ) -> Optional[ProjectConfig]:
+        """Configure auto-indexing for a project.
+
+        Args:
+            path: Path to the project directory
+            auto_index: Whether to include in background indexer
+            priority: Optional priority (1=highest, 10=lowest)
+
+        Returns:
+            Updated ProjectConfig, or None if project not found
+        """
+        project = self.get_project(path)
+        if not project:
+            log.warning("project_not_found_for_auto_index", path=path)
+            return None
+
+        project.auto_index = auto_index
+        if priority is not None:
+            project.index_priority = max(1, min(10, priority))  # Clamp to 1-10
+
+        self._save()
+
+        log.info(
+            "project_auto_index_changed",
+            path=path,
+            auto_index=auto_index,
+            priority=project.index_priority,
+        )
+        return project
+
+    def set_embedder_settings(
+        self, path: str, settings: ProjectEmbedderSettings
+    ) -> Optional[ProjectConfig]:
+        """Set embedder settings for a project.
+
+        Args:
+            path: Path to the project directory
+            settings: ProjectEmbedderSettings instance
+
+        Returns:
+            Updated ProjectConfig, or None if project not found
+        """
+        project = self.get_project(path)
+        if not project:
+            log.warning("project_not_found_for_settings", path=path)
+            return None
+
+        project.embedder_settings = settings
+        self._save()
+
+        log.info("project_embedder_settings_changed", path=path)
+        return project
+
+    def clear_embedder_settings(self, path: str) -> Optional[ProjectConfig]:
+        """Clear embedder settings for a project (use defaults).
+
+        Args:
+            path: Path to the project directory
+
+        Returns:
+            Updated ProjectConfig, or None if project not found
+        """
+        project = self.get_project(path)
+        if not project:
+            return None
+
+        project.embedder_settings = None
+        self._save()
+
+        log.info("project_embedder_settings_cleared", path=path)
+        return project
+
+    def list_auto_index_projects(self) -> List[ProjectConfig]:
+        """List all projects enabled for auto-indexing.
+
+        Returns:
+            List of ProjectConfig objects with auto_index=True, sorted by priority
+        """
+        projects = [p for p in self._projects.values() if p.auto_index and p.enabled]
+        # Sort by priority (lower = higher priority)
+        projects.sort(key=lambda p: (p.index_priority, p.name.lower()))
+        return projects
