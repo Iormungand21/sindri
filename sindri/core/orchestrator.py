@@ -86,12 +86,25 @@ class Orchestrator:
             self.summarizer = ConversationSummarizer(self.client)
 
             # Initialize background indexer if enabled
+            # Note: BackgroundIndexer has its own IndexerConfig dataclass,
+            # but SindriConfig.memory.indexer (IndexerConfig pydantic model) has
+            # compatible fields. We pass the indexer config, not full SindriConfig.
             if self._sindri_config.memory.indexer.enabled:
+                from sindri.memory.background_indexer import IndexerConfig as BGIndexerConfig
+
+                # Convert pydantic IndexerConfig to dataclass IndexerConfig
+                bg_config = BGIndexerConfig(
+                    enabled=self._sindri_config.memory.indexer.enabled,
+                    auto_start=self._sindri_config.memory.indexer.auto_start,
+                    schedule_interval_minutes=self._sindri_config.memory.indexer.schedule_interval_minutes,
+                    max_vram_percent=self._sindri_config.memory.indexer.max_vram_percent,
+                    cooldown_seconds=self._sindri_config.memory.indexer.cooldown_seconds,
+                )
                 self.background_indexer = BackgroundIndexer(
                     global_memory=self.global_memory,
                     registry=self.project_registry,
                     event_bus=self.event_bus,
-                    config=self._sindri_config,
+                    config=bg_config,
                 )
 
             log.info(

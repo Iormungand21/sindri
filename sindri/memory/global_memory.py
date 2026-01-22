@@ -16,7 +16,7 @@ import sqlite_vec
 import struct
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Callable
 import structlog
 
 from sindri.memory.embedder import LocalEmbedder
@@ -672,13 +672,24 @@ class GlobalMemoryStore:
             file_path: Absolute path to the file
             rel_path: Path relative to project root (for pattern matching)
             settings: Per-project embedder settings
+
+        Pattern behavior:
+            - If include_patterns is set, it acts as a whitelist - only matching
+              files are included (exclude_patterns and extensions are still checked)
+            - If include_patterns is not set, fall through to exclude/extension checks
         """
-        # Check include patterns first (they have priority)
         # Patterns are matched against project-relative paths (e.g., "src/*", "*.py")
+
+        # Check include patterns first - they act as a whitelist when set
         if settings and settings.include_patterns:
+            include_matched = False
             for pattern in settings.include_patterns:
                 if fnmatch.fnmatch(rel_path, pattern):
-                    return True
+                    include_matched = True
+                    break
+            # If include_patterns is configured but nothing matched, exclude the file
+            if not include_matched:
+                return False
 
         # Check exclude patterns
         if settings and settings.exclude_patterns:
@@ -761,7 +772,10 @@ class GlobalMemoryStore:
         return chunks_indexed
 
     def index_project_incremental(
-        self, project_path: str, force: bool = False
+        self,
+        project_path: str,
+        force: bool = False,
+        on_file_indexed: Optional[Callable[[str, str, int, bool], None]] = None,
     ) -> IncrementalIndexResult:
         """Incrementally index a project, only processing changed files.
 
@@ -771,6 +785,8 @@ class GlobalMemoryStore:
         Args:
             project_path: Path to project directory
             force: Force re-index all files (ignores hashes)
+            on_file_indexed: Optional callback called after each file is processed.
+                Signature: (project_path, file_path, chunks_created, skipped) -> None
 
         Returns:
             IncrementalIndexResult with detailed statistics
@@ -842,6 +858,9 @@ class GlobalMemoryStore:
                 # Skip if unchanged (unless force)
                 if not force and stored_hash == current_hash:
                     result.files_skipped += 1
+                    # Notify callback for skipped file
+                    if on_file_indexed:
+                        on_file_indexed(normalized_path, rel_path, 0, True)
                     continue
 
                 # Remove old chunks if file exists and changed
@@ -857,6 +876,10 @@ class GlobalMemoryStore:
 
                 result.files_indexed += 1
                 result.chunks_added += chunks
+
+                # Notify callback for indexed file
+                if on_file_indexed:
+                    on_file_indexed(normalized_path, rel_path, chunks, False)
 
             except Exception as e:
                 log.warning(

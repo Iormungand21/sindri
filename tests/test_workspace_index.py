@@ -524,6 +524,78 @@ class TestGlobalMemoryStoreIncremental:
         # Should only index .py files (README.md excluded)
         assert result.files_indexed == 2
 
+    def test_include_patterns_whitelist_behavior(self, setup):
+        """Test that include_patterns acts as a whitelist when set."""
+        store = setup["store"]
+        registry = setup["registry"]
+        project_dir = setup["project_dir"]
+
+        # Create additional files
+        (project_dir / "src").mkdir(exist_ok=True)
+        (project_dir / "src" / "main.py").write_text("# Main code\ndef main(): pass\n")
+        (project_dir / "tests").mkdir(exist_ok=True)
+        (project_dir / "tests" / "test_main.py").write_text("# Test code\ndef test_main(): pass\n")
+        (project_dir / "utils.py").write_text("# Utils\ndef util(): pass\n")
+
+        # Set include_patterns to only include src/* files
+        settings = ProjectEmbedderSettings(
+            include_patterns=["src/*"],
+        )
+        registry.set_embedder_settings(str(project_dir), settings)
+
+        result = store.index_project_incremental(str(project_dir))
+
+        # Only src/main.py should be indexed (include_patterns acts as whitelist)
+        assert result.files_indexed == 1
+
+    def test_include_patterns_with_exclude_patterns(self, setup):
+        """Test that exclude_patterns still applies when include_patterns is set."""
+        store = setup["store"]
+        registry = setup["registry"]
+        project_dir = setup["project_dir"]
+
+        # Create files in src
+        (project_dir / "src").mkdir(exist_ok=True)
+        (project_dir / "src" / "main.py").write_text("# Main\n")
+        (project_dir / "src" / "main.min.py").write_text("# Minified\n")
+        (project_dir / "src" / "utils.py").write_text("# Utils\n")
+
+        # Set include_patterns with exclude override
+        settings = ProjectEmbedderSettings(
+            include_patterns=["src/*"],
+            exclude_patterns=["*.min.py"],
+        )
+        registry.set_embedder_settings(str(project_dir), settings)
+
+        result = store.index_project_incremental(str(project_dir))
+
+        # Should index src/main.py and src/utils.py, exclude *.min.py
+        assert result.files_indexed == 2
+
+    def test_on_file_indexed_callback(self, setup):
+        """Test that on_file_indexed callback is called for each file."""
+        store = setup["store"]
+        project_dir = setup["project_dir"]
+
+        processed_files = []
+
+        def callback(proj_path, file_path, chunks, skipped):
+            processed_files.append({
+                "project_path": proj_path,
+                "file_path": file_path,
+                "chunks": chunks,
+                "skipped": skipped,
+            })
+
+        result = store.index_project_incremental(
+            str(project_dir), on_file_indexed=callback
+        )
+
+        # Should have called callback for each file processed
+        assert len(processed_files) == result.files_indexed + result.files_skipped
+        # All files should have project_path set
+        assert all(f["project_path"] == str(project_dir.resolve()) for f in processed_files)
+
 
 # === GlobalMemoryStore Active Context Tests ===
 

@@ -9,7 +9,7 @@
 - Plan-first execution (approval gates) and reproducible sessions (snapshots + replay).
 - Multi-project workspace index (background indexer, active contexts, per-project settings).
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 3,994 passing (100%).
+- Tests: 3,997 passing (100%).
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)

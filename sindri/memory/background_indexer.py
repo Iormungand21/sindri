@@ -19,6 +19,7 @@ from sindri.core.event_schemas import (
     IndexProgressData,
     IndexCompletedData,
     IndexFailedData,
+    IndexFileProcessedData,
     IndexerStartedData,
     IndexerStoppedData,
     IndexerPausedData,
@@ -420,9 +421,21 @@ class BackgroundIndexer:
         )
 
         try:
+            # Create callback to emit per-file events
+            def on_file_indexed(proj_path: str, file_path: str, chunks: int, skipped: bool):
+                self._emit(
+                    EventType.INDEX_FILE_PROCESSED,
+                    IndexFileProcessedData(
+                        project_path=proj_path,
+                        file_path=file_path,
+                        chunks_created=chunks,
+                        skipped=skipped,
+                    ),
+                )
+
             # Run indexing (this is synchronous, could be wrapped in executor for true async)
             result = self.global_memory.index_project_incremental(
-                project_path, force=queued.force
+                project_path, force=queued.force, on_file_indexed=on_file_indexed
             )
 
             if result.error:

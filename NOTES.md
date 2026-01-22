@@ -1,58 +1,59 @@
 # Review Notes - Multi-Project Workspace Index
 
-Status: **RESOLVED**
+Status: **RESOLVED** (Round 2)
 
-## Original Findings (ChatGPT Review)
+## Round 2 Findings (ChatGPT Review)
 
-1. **Active/pinned project context never injected** - `GlobalMemoryStore.get_active_project_context()` and `IndexerConfig.include_active_in_context` were unused.
+1. **BackgroundIndexer config type mismatch** - `BackgroundIndexer` expects its own `IndexerConfig` dataclass, but orchestrator passed full `SindriConfig`, causing `AttributeError` on `schedule_interval_minutes` etc.
 
-2. **Background indexer standalone** - Not started anywhere (no orchestrator/TUI/web integration). `IndexerConfig.auto_start` and `schedule_interval_minutes` were unused.
+2. **include_patterns don't behave as whitelist** - When `include_patterns` is set but nothing matches, it fell through to extension checks instead of excluding the file.
 
-3. **Pattern matching used absolute paths** - `include_patterns` / `exclude_patterns` were matched against absolute paths instead of project-relative paths.
+3. **INDEX_FILE_PROCESSED event never emitted** - Event type and schema defined but never actually emitted during indexing.
 
-## Fixes Applied
+## Fixes Applied (Round 2)
 
-### 1. Active Project Context Injection
-**Files modified:** `sindri/memory/system.py`
+### 1. BackgroundIndexer Config Type Fix
+**File modified:** `sindri/core/orchestrator.py`
 
-- Extended `MuninnMemory.__init__()` to accept optional `GlobalMemoryStore` parameter
-- Added `enable_active_projects` and `active_project_tokens` to `MemoryConfig`
-- Modified `build_context()` to include cross-project context as the first tier:
-  - Allocates 9% of token budget to cross-project context
-  - Calls `global_memory.get_active_project_context()` when enabled
-  - Excludes current project from cross-project search
+- Import `IndexerConfig as BGIndexerConfig` from `background_indexer`
+- Convert pydantic `IndexerConfig` to dataclass `BGIndexerConfig` with explicit field mapping
+- Pass the converted config to `BackgroundIndexer`
 
-### 2. BackgroundIndexer Integration with Orchestrator
-**Files modified:** `sindri/core/orchestrator.py`
+### 2. include_patterns Whitelist Behavior
+**File modified:** `sindri/memory/global_memory.py`
 
-- Added imports for `GlobalMemoryStore`, `BackgroundIndexer`, `ProjectRegistry`, `SindriConfig`
-- Created `GlobalMemoryStore` and `ProjectRegistry` in orchestrator init
-- Passed `global_memory` to `MuninnMemory` for context injection
-- Created `BackgroundIndexer` when `config.memory.indexer.enabled` is True
-- Added `start_background_indexer()` and `stop_background_indexer()` methods
-- Modified `run()` to auto-start indexer when `config.memory.indexer.auto_start` is True
-- Updated `configure_for_model()` to propagate indexer settings to memory config
+- Modified `_should_include_file()` to track whether include_patterns matched
+- If `include_patterns` is set and nothing matches, return `False` immediately
+- This makes `include_patterns` act as a true whitelist
 
-### 3. Pattern Matching with Relative Paths
-**Files modified:** `sindri/memory/global_memory.py`
+### 3. INDEX_FILE_PROCESSED Event Emission
+**Files modified:** `sindri/memory/global_memory.py`, `sindri/memory/background_indexer.py`
 
-- Updated `_should_include_file()` signature to accept `rel_path` parameter
-- Patterns now matched against project-relative paths (e.g., `src/*`, `*.min.js`)
-- Updated call site in `index_project_incremental()` to pass `rel_path`
+- Added optional `on_file_indexed` callback parameter to `index_project_incremental()`
+- Callback signature: `(project_path, file_path, chunks_created, skipped) -> None`
+- `BackgroundIndexer._index_project()` creates callback that emits `INDEX_FILE_PROCESSED` events
+- Events emitted for both indexed and skipped files
+
+### 4. New Tests Added
+**File modified:** `tests/test_workspace_index.py`
+
+- `test_include_patterns_whitelist_behavior` - Verifies only matching files are indexed
+- `test_include_patterns_with_exclude_patterns` - Verifies exclude still applies with include
+- `test_on_file_indexed_callback` - Verifies callback is called for each file
 
 ## Tests Verified
 
 ```bash
 .venv/bin/pytest tests/test_workspace_index.py -v
-# Result: 47 passed
+# Result: 50 passed (3 new tests)
 
 .venv/bin/pytest tests/ -v --tb=short -q
-# Result: 3994 passed, 13 skipped, 12 warnings
+# Result: 3997 passed, 13 skipped, 12 warnings
 ```
 
 ## Summary
 
-All three issues from the ChatGPT review have been addressed:
-- Cross-project context is now injected into agent prompts via `MuninnMemory.build_context()`
-- BackgroundIndexer lifecycle is wired to the Orchestrator with auto_start support
-- Include/exclude patterns now work correctly with project-relative paths
+All three issues from the second ChatGPT review have been addressed:
+- BackgroundIndexer now receives correctly-typed `IndexerConfig` dataclass
+- `include_patterns` properly acts as whitelist (no match = exclude)
+- `INDEX_FILE_PROCESSED` events are now emitted during indexing via callback
