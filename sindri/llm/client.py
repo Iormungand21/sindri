@@ -56,6 +56,7 @@ class OllamaClient:
         messages: list[dict],
         tools: list[dict] = None,
         images: list[str] = None,
+        options: Optional[dict] = None,
     ) -> Response:
         """Send chat request to Ollama.
 
@@ -65,6 +66,7 @@ class OllamaClient:
             tools: Tool definitions (optional)
             images: Image paths or base64 data for vision models (optional).
                     Images are added to the last user message.
+            options: Ollama options like num_ctx, temperature, etc. (optional)
 
         Returns:
             Response with message content and optional tool calls
@@ -79,12 +81,15 @@ class OllamaClient:
         }
         if tools:
             kwargs["tools"] = tools
+        if options:
+            kwargs["options"] = options
 
         log.info(
             "ollama_chat_request",
             model=model,
             num_messages=len(messages),
             has_images=images is not None,
+            options=options,
         )
 
         response = await self._async_client.chat(**kwargs)
@@ -131,6 +136,7 @@ class OllamaClient:
         tools: list[dict] = None,
         images: list[str] = None,
         on_token: Optional[Callable[[str], None]] = None,
+        options: Optional[dict] = None,
     ) -> StreamingResponse:
         """Stream chat response with tool support.
 
@@ -141,6 +147,7 @@ class OllamaClient:
             images: Image paths or base64 data for vision models (optional).
                     Images are added to the last user message.
             on_token: Callback called for each token (optional)
+            options: Ollama options like num_ctx, temperature, etc. (optional)
 
         Returns:
             StreamingResponse with accumulated content and tool calls
@@ -152,12 +159,15 @@ class OllamaClient:
         kwargs = {"model": model, "messages": messages, "stream": True}
         if tools:
             kwargs["tools"] = tools
+        if options:
+            kwargs["options"] = options
 
         log.info(
             "ollama_stream_request",
             model=model,
             num_messages=len(messages),
             has_images=images is not None,
+            options=options,
         )
 
         result = StreamingResponse(model=model)

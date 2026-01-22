@@ -57,6 +57,7 @@ class Orchestrator:
         self._enable_memory = enable_memory
         self._memory_db_path = str(Path.home() / ".sindri" / "memory.db")
         self._context_configured = False
+        self._model_context_length = 4096  # Default, updated in configure_for_model
 
         if enable_memory:
             Path(self._memory_db_path).parent.mkdir(parents=True, exist_ok=True)
@@ -149,14 +150,18 @@ class Orchestrator:
             model_info = await self.client.get_model_info(model)
             context_length = model_info.get("context_length", 4096)
 
+            # Store for passing to Ollama API calls
+            self._model_context_length = context_length
+
             # Create appropriately-sized memory config
             memory_config = get_context_budget(context_length)
 
             # Reinitialize memory with new config
             self.memory = MuninnMemory(self._memory_db_path, memory_config)
 
-            # Update the loop's memory reference
+            # Update the loop's memory reference and context length
             self.loop.memory = self.memory
+            self.loop.model_context_length = context_length
 
             log.info(
                 "context_configured",

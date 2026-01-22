@@ -66,6 +66,20 @@ class AgentLoop:
 
         session = await self.state.create_session(task, model)
 
+        # Get model context length for Ollama options
+        try:
+            model_info = await self.client.get_model_info(model)
+            model_context_length = model_info.get("context_length", 4096)
+            ollama_options = {"num_ctx": model_context_length}
+            log.info(
+                "model_context_configured",
+                model=model,
+                context_length=model_context_length,
+            )
+        except Exception as e:
+            log.warning("model_info_failed", model=model, error=str(e))
+            ollama_options = None
+
         # Reproducible Sessions: Capture environment snapshot
         try:
             snapshot_capture = SnapshotCapture(self.client, SindriConfig())
@@ -88,7 +102,8 @@ class AgentLoop:
 
             # 2. Call LLM
             response = await self.client.chat(
-                model=model, messages=messages, tools=self.tools.get_schemas()
+                model=model, messages=messages, tools=self.tools.get_schemas(),
+                options=ollama_options,
             )
 
             assistant_content = response.message.content

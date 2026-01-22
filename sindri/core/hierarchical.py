@@ -63,6 +63,8 @@ class HierarchicalAgentLoop:
         self.event_bus = event_bus or EventBus()
         self.recovery = recovery  # Phase 5.6: Recovery manager for error checkpoints
         self._indexed_projects = set()  # Track indexed projects
+        # Context length for Ollama num_ctx option (set by orchestrator.configure_for_model)
+        self.model_context_length: Optional[int] = None
         # Phase 5.5: Performance metrics
         self.enable_metrics = enable_metrics
         self._metrics_store = MetricsStore() if enable_metrics else None
@@ -595,10 +597,17 @@ class HierarchicalAgentLoop:
                     agent=agent,
                 )
             else:
+                # Build Ollama options with num_ctx if context length is known
+                ollama_options = (
+                    {"num_ctx": self.model_context_length}
+                    if self.model_context_length
+                    else None
+                )
                 response = await self.client.chat(
                     model=model_to_use,
                     messages=messages,
                     tools=task_tools.get_schemas(),
+                    options=ollama_options,
                 )
                 assistant_content = response.message.content
 
@@ -1313,9 +1322,16 @@ class HierarchicalAgentLoop:
                 )
 
         try:
+            # Build Ollama options with num_ctx if context length is known
+            ollama_options = (
+                {"num_ctx": self.model_context_length}
+                if self.model_context_length
+                else None
+            )
             # Use streaming chat
             streaming_response = await self.client.chat_stream(
-                model=model, messages=messages, tools=tools, on_token=on_token
+                model=model, messages=messages, tools=tools, on_token=on_token,
+                options=ollama_options,
             )
 
             # Convert to standard Response
@@ -1359,7 +1375,7 @@ class HierarchicalAgentLoop:
             log.error("streaming_error", task_id=task.id, error=str(e))
             # Fallback to non-streaming
             response = await self.client.chat(
-                model=model, messages=messages, tools=tools
+                model=model, messages=messages, tools=tools, options=ollama_options
             )
             return response, response.message.content
 
