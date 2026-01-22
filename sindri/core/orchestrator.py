@@ -16,7 +16,11 @@ from sindri.core.hierarchical import HierarchicalAgentLoop
 from sindri.core.loop import LoopConfig
 from sindri.memory.system import MuninnMemory, get_context_budget
 from sindri.memory.summarizer import ConversationSummarizer
+from sindri.memory.global_memory import GlobalMemoryStore
+from sindri.memory.background_indexer import BackgroundIndexer
+from sindri.memory.projects import ProjectRegistry
 from sindri.core.events import EventBus, Event, EventType
+from sindri.config import SindriConfig
 
 log = structlog.get_logger()
 
@@ -59,12 +63,43 @@ class Orchestrator:
         self._context_configured = False
         self._model_context_length = 4096  # Default, updated in configure_for_model
 
+        # Load config for indexer settings
+        self._sindri_config = SindriConfig.load()
+
+        # ROADMAP Item 4: Global memory and background indexer
+        self.global_memory: Optional[GlobalMemoryStore] = None
+        self.project_registry: Optional[ProjectRegistry] = None
+        self.background_indexer: Optional[BackgroundIndexer] = None
+
         if enable_memory:
             Path(self._memory_db_path).parent.mkdir(parents=True, exist_ok=True)
+
+            # Initialize project registry and global memory store
+            self.project_registry = ProjectRegistry()
+            self.global_memory = GlobalMemoryStore(registry=self.project_registry)
+
             # Start with default config - will be adjusted in configure_for_model()
-            self.memory = MuninnMemory(self._memory_db_path)
+            # Pass global_memory for cross-project context injection
+            self.memory = MuninnMemory(
+                self._memory_db_path, global_memory=self.global_memory
+            )
             self.summarizer = ConversationSummarizer(self.client)
-            log.info("memory_system_enabled", db_path=self._memory_db_path)
+
+            # Initialize background indexer if enabled
+            if self._sindri_config.memory.indexer.enabled:
+                self.background_indexer = BackgroundIndexer(
+                    global_memory=self.global_memory,
+                    registry=self.project_registry,
+                    event_bus=self.event_bus,
+                    config=self._sindri_config,
+                )
+
+            log.info(
+                "memory_system_enabled",
+                db_path=self._memory_db_path,
+                indexer_enabled=self._sindri_config.memory.indexer.enabled,
+                indexer_auto_start=self._sindri_config.memory.indexer.auto_start,
+            )
         else:
             self.memory = None
             self.summarizer = None
@@ -87,6 +122,37 @@ class Orchestrator:
         self.event_bus.subscribe(EventType.PLAN_REJECTED, self._handle_plan_rejected)
 
         log.info("orchestrator_initialized", memory_enabled=enable_memory)
+
+    async def start_background_indexer(self) -> bool:
+        """Start the background indexer if not already running.
+
+        Returns:
+            True if indexer was started, False if already running or not available.
+        """
+        if not self.background_indexer:
+            log.warning("background_indexer_not_available")
+            return False
+
+        if self.background_indexer.is_running:
+            log.debug("background_indexer_already_running")
+            return False
+
+        await self.background_indexer.start()
+        log.info("background_indexer_started")
+        return True
+
+    async def stop_background_indexer(self) -> bool:
+        """Stop the background indexer if running.
+
+        Returns:
+            True if indexer was stopped, False if not running.
+        """
+        if not self.background_indexer or not self.background_indexer.is_running:
+            return False
+
+        await self.background_indexer.stop()
+        log.info("background_indexer_stopped")
+        return True
 
     def _handle_plan_approved(self, data: dict):
         """Handle PLAN_APPROVED event - resume waiting task.
@@ -156,8 +222,18 @@ class Orchestrator:
             # Create appropriately-sized memory config
             memory_config = get_context_budget(context_length)
 
-            # Reinitialize memory with new config
-            self.memory = MuninnMemory(self._memory_db_path, memory_config)
+            # Update memory config with indexer settings from SindriConfig
+            memory_config.enable_active_projects = (
+                self._sindri_config.memory.indexer.include_active_in_context
+            )
+            memory_config.active_project_tokens = (
+                self._sindri_config.memory.indexer.active_project_budget_tokens
+            )
+
+            # Reinitialize memory with new config (pass global_memory for cross-project context)
+            self.memory = MuninnMemory(
+                self._memory_db_path, memory_config, global_memory=self.global_memory
+            )
 
             # Update the loop's memory reference and context length
             self.loop.memory = self.memory
@@ -194,6 +270,14 @@ class Orchestrator:
             Dict with success status, task_id, result, and subtask count.
         """
         log.info("orchestrator_started", request=user_request[:100], parallel=parallel)
+
+        # ROADMAP Item 4: Auto-start background indexer if configured
+        if (
+            self.background_indexer
+            and self._sindri_config.memory.indexer.auto_start
+            and not self.background_indexer.is_running
+        ):
+            await self.start_background_indexer()
 
         # Auto-configure memory for the default model's context size
         # This prevents context overflow with small-context models

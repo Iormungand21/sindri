@@ -664,12 +664,17 @@ class GlobalMemoryStore:
         return chunks_removed
 
     def _should_include_file(
-        self, file_path: Path, settings: Optional[ProjectEmbedderSettings]
+        self, file_path: Path, rel_path: str, settings: Optional[ProjectEmbedderSettings]
     ) -> bool:
-        """Check if a file should be included based on settings."""
-        rel_path = str(file_path)
+        """Check if a file should be included based on settings.
 
+        Args:
+            file_path: Absolute path to the file
+            rel_path: Path relative to project root (for pattern matching)
+            settings: Per-project embedder settings
+        """
         # Check include patterns first (they have priority)
+        # Patterns are matched against project-relative paths (e.g., "src/*", "*.py")
         if settings and settings.include_patterns:
             for pattern in settings.include_patterns:
                 if fnmatch.fnmatch(rel_path, pattern):
@@ -820,8 +825,8 @@ class GlobalMemoryStore:
 
             rel_path = str(file_path.relative_to(path_obj))
 
-            # Check if file should be included
-            if not self._should_include_file(file_path, settings):
+            # Check if file should be included (pass rel_path for pattern matching)
+            if not self._should_include_file(file_path, rel_path, settings):
                 continue
 
             seen_files.add(rel_path)

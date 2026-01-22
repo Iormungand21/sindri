@@ -16,6 +16,8 @@ from sindri.persistence.vectors import VectorStore
 if TYPE_CHECKING:
     from sindri.core.tasks import Task
     from sindri.analysis.results import CodebaseAnalysis
+    from sindri.memory.global_memory import GlobalMemoryStore
+    from sindri.config import SindriConfig
 
 log = structlog.get_logger()
 
@@ -31,6 +33,9 @@ class MemoryConfig:
     working_memory_ratio: float = 0.6  # 60% for conversation
     enable_learning: bool = True  # Whether to learn from completions
     enable_codebase_analysis: bool = True  # Phase 7.4: Codebase understanding
+    # ROADMAP Item 4: Active project context injection
+    enable_active_projects: bool = True  # Whether to include active project context
+    active_project_tokens: int = 2000  # Token budget for active project context
 
 
 def get_context_budget(model_context_length: int) -> MemoryConfig:
@@ -109,15 +114,21 @@ def get_context_budget(model_context_length: int) -> MemoryConfig:
 class MuninnMemory:
     """The complete memory system - Odin's raven of memory.
 
-    Five-tier architecture:
+    Six-tier architecture:
     - Working: Immediate context (recent conversation)
     - Episodic: Project history (past tasks/decisions)
     - Semantic: Codebase index (code embeddings)
     - Patterns: Learned successful approaches (Phase 7.2)
     - Analysis: Codebase structure understanding (Phase 7.4)
+    - Cross-Project: Active project context (ROADMAP Item 4)
     """
 
-    def __init__(self, db_path: str, config: Optional[MemoryConfig] = None):
+    def __init__(
+        self,
+        db_path: str,
+        config: Optional[MemoryConfig] = None,
+        global_memory: Optional["GlobalMemoryStore"] = None,
+    ):
         self.config = config or MemoryConfig()
         self.embedder = LocalEmbedder()
         self.vectors = VectorStore(db_path, self.embedder.dimension)
@@ -138,11 +149,16 @@ class MuninnMemory:
             CodebaseAnalyzer(db_path) if self.config.enable_codebase_analysis else None
         )
 
+        # ROADMAP Item 4: Cross-project memory (active projects)
+        self.global_memory = global_memory
+
         log.info(
             "muninn_memory_initialized",
             db_path=db_path,
             learning_enabled=self.config.enable_learning,
             analysis_enabled=self.config.enable_codebase_analysis,
+            active_projects_enabled=self.config.enable_active_projects
+            and global_memory is not None,
         )
 
     def build_context(
@@ -154,26 +170,58 @@ class MuninnMemory:
     ) -> list[dict]:
         """Build complete context for an agent invocation.
 
-        Allocates token budget across five memory tiers:
-        - 50% working memory (recent conversation)
-        - 18% episodic memory (past tasks)
-        - 18% semantic memory (codebase)
+        Allocates token budget across six memory tiers:
+        - 46% working memory (recent conversation)
+        - 16% episodic memory (past tasks)
+        - 16% semantic memory (codebase)
         - 5% patterns (learned approaches)
-        - 9% codebase analysis (Phase 7.4)
+        - 8% codebase analysis (Phase 7.4)
+        - 9% cross-project context (ROADMAP Item 4)
         """
 
         max_tokens = max_tokens or self.config.max_context_tokens
 
-        # Budget allocation (adjusted for codebase analysis)
-        working_budget = int(max_tokens * 0.50)
-        episodic_budget = int(max_tokens * 0.18)
-        semantic_budget = int(max_tokens * 0.18)
+        # Budget allocation (adjusted for cross-project context)
+        working_budget = int(max_tokens * 0.46)
+        episodic_budget = int(max_tokens * 0.16)
+        semantic_budget = int(max_tokens * 0.16)
         pattern_budget = int(max_tokens * 0.05)
-        analysis_budget = int(max_tokens * 0.09)
+        analysis_budget = int(max_tokens * 0.08)
+        cross_project_budget = int(max_tokens * 0.09)
 
         context_parts = []
 
-        # 1. Codebase analysis context (Phase 7.4) - project structure understanding
+        # 1. Cross-project context (ROADMAP Item 4) - active project context
+        try:
+            if (
+                self.global_memory
+                and self.config.enable_active_projects
+            ):
+                # Use configured budget or fallback to percentage-based
+                token_budget = min(
+                    cross_project_budget, self.config.active_project_tokens
+                )
+                cross_project_context = self.global_memory.get_active_project_context(
+                    query=current_task,
+                    max_tokens=token_budget,
+                    exclude_current=project_id,
+                )
+                if cross_project_context:
+                    context_parts.append(
+                        {
+                            "role": "user",
+                            "content": cross_project_context,
+                        }
+                    )
+                    log.debug(
+                        "cross_project_context_added",
+                        project_id=project_id,
+                        tokens=len(cross_project_context) // 4,
+                    )
+        except Exception as e:
+            log.warning("cross_project_context_failed", error=str(e))
+
+        # 2. Codebase analysis context (Phase 7.4) - project structure understanding
         try:
             if self.codebase_analyzer:
                 analysis_context = self.codebase_analyzer.get_context_for_agent(
@@ -193,7 +241,7 @@ class MuninnMemory:
         except Exception as e:
             log.warning("analysis_context_failed", error=str(e))
 
-        # 2. Pattern suggestions (learned approaches) - Phase 7.2
+        # 3. Pattern suggestions (learned approaches) - Phase 7.2
         try:
             if self.learner:
                 suggestions = self.learner.suggest_patterns(
@@ -216,7 +264,7 @@ class MuninnMemory:
         except Exception as e:
             log.warning("pattern_context_failed", error=str(e))
 
-        # 3. Semantic memory (codebase context)
+        # 4. Semantic memory (codebase context)
         try:
             semantic_results = self.semantic.search(
                 namespace=project_id,
@@ -236,7 +284,7 @@ class MuninnMemory:
         except Exception as e:
             log.warning("semantic_context_failed", error=str(e))
 
-        # 4. Episodic memory (past decisions)
+        # 5. Episodic memory (past decisions)
         try:
             episodes = self.episodic.retrieve_relevant(
                 project_id=project_id,
@@ -256,7 +304,7 @@ class MuninnMemory:
         except Exception as e:
             log.warning("episodic_context_failed", error=str(e))
 
-        # 5. Working memory (recent conversation)
+        # 6. Working memory (recent conversation)
         working_conv = self._fit_conversation(conversation, working_budget)
         log.debug(
             "context_built",
