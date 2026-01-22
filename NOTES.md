@@ -1,59 +1,32 @@
-# Review Notes - Multi-Project Workspace Index
+# Review Notes - Performance Telemetry Stream
 
-Status: **RESOLVED** (Round 2)
+## Findings (All Resolved)
 
-## Round 2 Findings (ChatGPT Review)
+1) ~~TelemetryCollector is never instantiated or started~~ **FIXED**
+- Fixed: TelemetryCollector now starts in `SindriAPI.initialize()` and stops in `shutdown()`
+- Made `session_id` optional in `start()` for pre-session metrics
+- Added `set_session()` method to update session ID when tasks begin
+- Files changed: `sindri/telemetry/collector.py`, `sindri/web/server.py`
 
-1. **BackgroundIndexer config type mismatch** - `BackgroundIndexer` expects its own `IndexerConfig` dataclass, but orchestrator passed full `SindriConfig`, causing `AttributeError` on `schedule_interval_minutes` etc.
+2) ~~ITERATION_END events are never emitted~~ **FIXED**
+- Fixed: ITERATION_END event now emitted after each iteration with `duration_ms`
+- Tracks `iteration_start_time` and calculates duration at iteration end
+- Files changed: `sindri/core/hierarchical.py`
 
-2. **include_patterns don't behave as whitelist** - When `include_patterns` is set but nothing matches, it fell through to extension checks instead of excluding the file.
+3) ~~TOOL_CALLED event lacks duration_ms~~ **FIXED**
+- Fixed: `duration_ms` now included in TOOL_CALLED event payload
+- Uses already-calculated `tool_duration_ms` value
+- Files changed: `sindri/core/hierarchical.py`
 
-3. **INDEX_FILE_PROCESSED event never emitted** - Event type and schema defined but never actually emitted during indexing.
+4) ~~TraceExporter ignores include_tool_outputs~~ **FIXED**
+- Fixed: `include_tool_outputs=True` now loads full tool outputs from ToolOutputStore
+- Added `_tool_output_store` attribute and `_get_tool_output_store()` lazy-loader
+- Outputs included in trace as `tool_outputs` field
+- Files changed: `sindri/telemetry/exporter.py`
 
-## Fixes Applied (Round 2)
+## Suggested Follow-ups (Pending)
+- Add integration tests that start a session and verify telemetry ticks and snapshots are non-empty.
+- Add a regression test that validates tool duration appears in telemetry when TOOL_CALLED is emitted.
 
-### 1. BackgroundIndexer Config Type Fix
-**File modified:** `sindri/core/orchestrator.py`
-
-- Import `IndexerConfig as BGIndexerConfig` from `background_indexer`
-- Convert pydantic `IndexerConfig` to dataclass `BGIndexerConfig` with explicit field mapping
-- Pass the converted config to `BackgroundIndexer`
-
-### 2. include_patterns Whitelist Behavior
-**File modified:** `sindri/memory/global_memory.py`
-
-- Modified `_should_include_file()` to track whether include_patterns matched
-- If `include_patterns` is set and nothing matches, return `False` immediately
-- This makes `include_patterns` act as a true whitelist
-
-### 3. INDEX_FILE_PROCESSED Event Emission
-**Files modified:** `sindri/memory/global_memory.py`, `sindri/memory/background_indexer.py`
-
-- Added optional `on_file_indexed` callback parameter to `index_project_incremental()`
-- Callback signature: `(project_path, file_path, chunks_created, skipped) -> None`
-- `BackgroundIndexer._index_project()` creates callback that emits `INDEX_FILE_PROCESSED` events
-- Events emitted for both indexed and skipped files
-
-### 4. New Tests Added
-**File modified:** `tests/test_workspace_index.py`
-
-- `test_include_patterns_whitelist_behavior` - Verifies only matching files are indexed
-- `test_include_patterns_with_exclude_patterns` - Verifies exclude still applies with include
-- `test_on_file_indexed_callback` - Verifies callback is called for each file
-
-## Tests Verified
-
-```bash
-.venv/bin/pytest tests/test_workspace_index.py -v
-# Result: 50 passed (3 new tests)
-
-.venv/bin/pytest tests/ -v --tb=short -q
-# Result: 3997 passed, 13 skipped, 12 warnings
-```
-
-## Summary
-
-All three issues from the second ChatGPT review have been addressed:
-- BackgroundIndexer now receives correctly-typed `IndexerConfig` dataclass
-- `include_patterns` properly acts as whitelist (no match = exclude)
-- `INDEX_FILE_PROCESSED` events are now emitted during indexing via callback
+## Resolution
+All four issues fixed in commit ec11aaa. All 4,036 tests pass.
