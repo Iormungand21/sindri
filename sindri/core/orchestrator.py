@@ -14,7 +14,7 @@ from sindri.core.scheduler import TaskScheduler
 from sindri.core.delegation import DelegationManager
 from sindri.core.hierarchical import HierarchicalAgentLoop
 from sindri.core.loop import LoopConfig
-from sindri.memory.system import MuninnMemory
+from sindri.memory.system import MuninnMemory, get_context_budget
 from sindri.memory.summarizer import ConversationSummarizer
 from sindri.core.events import EventBus, Event, EventType
 
@@ -52,13 +52,18 @@ class Orchestrator:
         # Plan-First Execution: Pass event_bus to enable plan events
         self.tools = ToolRegistry.default(work_dir=work_dir, event_bus=self.event_bus)
 
-        # Initialize memory system if enabled
+        # Initialize memory system if enabled (with default config)
+        # Context budget will be adjusted on first run based on model
+        self._enable_memory = enable_memory
+        self._memory_db_path = str(Path.home() / ".sindri" / "memory.db")
+        self._context_configured = False
+
         if enable_memory:
-            db_path = str(Path.home() / ".sindri" / "memory.db")
-            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-            self.memory = MuninnMemory(db_path)
+            Path(self._memory_db_path).parent.mkdir(parents=True, exist_ok=True)
+            # Start with default config - will be adjusted in configure_for_model()
+            self.memory = MuninnMemory(self._memory_db_path)
             self.summarizer = ConversationSummarizer(self.client)
-            log.info("memory_system_enabled", db_path=db_path)
+            log.info("memory_system_enabled", db_path=self._memory_db_path)
         else:
             self.memory = None
             self.summarizer = None
@@ -122,6 +127,56 @@ class Orchestrator:
         for task_id in list(self.scheduler.tasks.keys()):
             self.cancel_task(task_id)
 
+    async def configure_for_model(self, model: str) -> None:
+        """Configure memory system based on model's context length.
+
+        This queries the model's context window size and adjusts the memory
+        configuration to avoid overflowing the context. Should be called
+        before running tasks, or will be auto-called on first run().
+
+        Args:
+            model: The model name to configure for
+        """
+        if self._context_configured:
+            return
+
+        if not self._enable_memory or not self.memory:
+            self._context_configured = True
+            return
+
+        try:
+            # Get model info from Ollama
+            model_info = await self.client.get_model_info(model)
+            context_length = model_info.get("context_length", 4096)
+
+            # Create appropriately-sized memory config
+            memory_config = get_context_budget(context_length)
+
+            # Reinitialize memory with new config
+            self.memory = MuninnMemory(self._memory_db_path, memory_config)
+
+            # Update the loop's memory reference
+            self.loop.memory = self.memory
+
+            log.info(
+                "context_configured",
+                model=model,
+                context_length=context_length,
+                max_context_tokens=memory_config.max_context_tokens,
+                episodic_limit=memory_config.episodic_limit,
+                semantic_limit=memory_config.semantic_limit,
+            )
+
+        except Exception as e:
+            log.warning(
+                "context_configuration_failed",
+                model=model,
+                error=str(e),
+                fallback="using_defaults",
+            )
+
+        self._context_configured = True
+
     async def run(self, user_request: str, parallel: bool = True) -> dict:
         """Run a user request through the hierarchical system.
 
@@ -134,6 +189,13 @@ class Orchestrator:
             Dict with success status, task_id, result, and subtask count.
         """
         log.info("orchestrator_started", request=user_request[:100], parallel=parallel)
+
+        # Auto-configure memory for the default model's context size
+        # This prevents context overflow with small-context models
+        from sindri.agents.registry import AGENTS
+        default_model = AGENTS.get("brokkr", {})
+        if hasattr(default_model, "model"):
+            await self.configure_for_model(default_model.model)
 
         # Create root task assigned to Brokkr (orchestrator)
         root_task = Task(

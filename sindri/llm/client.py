@@ -224,3 +224,75 @@ class OllamaClient:
         """List available models."""
         response = self._client.list()
         return [m.model for m in response.models]
+
+    async def get_model_info(self, model: str) -> dict:
+        """Get model information including context length.
+
+        Args:
+            model: Model name to query
+
+        Returns:
+            Dict with model info including 'context_length' key
+        """
+        try:
+            response = await self._async_client.show(model)
+
+            # Extract context length from model parameters or defaults
+            # Ollama stores this in modelinfo or model_info
+            model_info = response.get("modelinfo", response.get("model_info", {}))
+            details = response.get("details", {})
+
+            # Try to find context length in various locations
+            context_length = None
+
+            # Check model_info for context-related keys
+            for key in model_info:
+                if "context" in key.lower() and "length" in key.lower():
+                    context_length = model_info[key]
+                    break
+
+            # Default context lengths by model family if not found
+            if context_length is None:
+                family = details.get("family", "").lower()
+                param_size = details.get("parameter_size", "")
+
+                # Common defaults based on model families
+                if "qwen" in family or "qwen" in model.lower():
+                    context_length = 32768
+                elif "llama" in family or "llama" in model.lower():
+                    context_length = 8192
+                elif "deepseek" in family or "deepseek" in model.lower():
+                    context_length = 16384
+                elif "mistral" in family or "mistral" in model.lower():
+                    context_length = 32768
+                else:
+                    # Conservative default
+                    context_length = 4096
+
+            log.info(
+                "model_info_retrieved",
+                model=model,
+                context_length=context_length,
+                family=details.get("family", "unknown"),
+            )
+
+            return {
+                "name": model,
+                "context_length": context_length,
+                "family": details.get("family", "unknown"),
+                "parameter_size": details.get("parameter_size", "unknown"),
+                "quantization": details.get("quantization_level", "unknown"),
+                "raw": response,
+            }
+
+        except Exception as e:
+            log.warning("model_info_failed", model=model, error=str(e))
+            # Return conservative defaults on error
+            return {
+                "name": model,
+                "context_length": 4096,
+                "family": "unknown",
+                "parameter_size": "unknown",
+                "quantization": "unknown",
+                "raw": {},
+            }

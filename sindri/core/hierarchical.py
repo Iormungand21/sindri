@@ -358,10 +358,33 @@ class HierarchicalAgentLoop:
         project_path = self.tools.work_dir or Path.cwd()
         project_id = f"project_{str(project_path.resolve()).replace('/', '_')}"
         if self.memory and project_id not in self._indexed_projects:
-            log.info("indexing_project", path=str(project_path))
-            indexed = self.memory.index_project(str(project_path), project_id)
-            self._indexed_projects.add(project_id)
-            log.info("project_indexed", files=indexed, project_id=project_id)
+            # Count indexable files first to avoid blocking on large projects
+            indexable_extensions = {".py", ".js", ".ts", ".jsx", ".tsx", ".md", ".txt",
+                                    ".yaml", ".yml", ".toml", ".json", ".sh", ".sql"}
+            skip_dirs = {".git", "node_modules", "__pycache__", "dist", "build", ".venv", "venv"}
+            file_count = 0
+            max_sync_files = 50  # Limit for synchronous indexing
+
+            for f in project_path.rglob("*"):
+                if f.is_file() and f.suffix in indexable_extensions:
+                    if not any(d in f.parts for d in skip_dirs):
+                        file_count += 1
+                        if file_count > max_sync_files:
+                            break
+
+            if file_count <= max_sync_files:
+                log.info("indexing_project", path=str(project_path), file_count=file_count)
+                indexed = self.memory.index_project(str(project_path), project_id)
+                self._indexed_projects.add(project_id)
+                log.info("project_indexed", files=indexed, project_id=project_id)
+            else:
+                log.info(
+                    "indexing_skipped_large_project",
+                    path=str(project_path),
+                    file_count=file_count,
+                    max_sync_files=max_sync_files,
+                )
+                self._indexed_projects.add(project_id)  # Mark as "indexed" to avoid retry
 
         # Phase 5.5: Initialize metrics collector for this session
         metrics_collector = None
@@ -1348,7 +1371,13 @@ class HierarchicalAgentLoop:
         history: list,
         tools: list[dict],
     ) -> list[dict]:
-        """Build messages for the LLM."""
+        """Build messages for the LLM.
+
+        Note: Tool schemas are passed separately to the LLM via the tools= parameter,
+        so we don't include tool descriptions in the prompt text to save tokens.
+        """
+        # tools parameter kept for API compatibility but not used in prompt
+        _ = tools
 
         messages = []
 
@@ -1359,16 +1388,6 @@ class HierarchicalAgentLoop:
         if task_context:
             context_str = "\n".join([f"- {k}: {v}" for k, v in task_context.items()])
             full_prompt += f"\n\nContext:\n{context_str}"
-
-        # Add tool descriptions
-        if tools:
-            tool_descriptions = "\n".join(
-                [
-                    f"- {tool['function']['name']}: {tool['function']['description']}"
-                    for tool in tools
-                ]
-            )
-            full_prompt += f"\n\nAvailable tools:\n{tool_descriptions}"
 
         messages.append({"role": "system", "content": full_prompt})
 
@@ -1550,7 +1569,13 @@ class HierarchicalAgentLoop:
         task_context: dict,
         tools: list[dict],
     ) -> dict:
-        """Build system message for memory-augmented context."""
+        """Build system message for memory-augmented context.
+
+        Note: Tool schemas are passed separately to the LLM via the tools= parameter,
+        so we don't include tool descriptions in the prompt text to save tokens.
+        """
+        # tools parameter kept for API compatibility but not used in prompt
+        _ = tools
 
         full_prompt = f"{system_prompt}\n\nYour current task: {task_description}"
 
@@ -1558,16 +1583,6 @@ class HierarchicalAgentLoop:
         if task_context:
             context_str = "\n".join([f"- {k}: {v}" for k, v in task_context.items()])
             full_prompt += f"\n\nContext:\n{context_str}"
-
-        # Add tool descriptions
-        if tools:
-            tool_descriptions = "\n".join(
-                [
-                    f"- {tool['function']['name']}: {tool['function']['description']}"
-                    for tool in tools
-                ]
-            )
-            full_prompt += f"\n\nAvailable tools:\n{tool_descriptions}"
 
         return {"role": "system", "content": full_prompt}
 

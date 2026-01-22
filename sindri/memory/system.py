@@ -33,6 +33,79 @@ class MemoryConfig:
     enable_codebase_analysis: bool = True  # Phase 7.4: Codebase understanding
 
 
+def get_context_budget(model_context_length: int) -> MemoryConfig:
+    """Create a MemoryConfig sized appropriately for the model's context window.
+
+    This ensures we don't overflow the model's context by adjusting:
+    - max_context_tokens: How much memory context to include
+    - episodic_limit: How many past episodes to retrieve
+    - semantic_limit: How many code chunks to include
+
+    The total prompt will include:
+    - System prompt (~1-3K tokens depending on agent)
+    - Task description (~100-500 tokens)
+    - Tool schemas passed to Ollama (~2K tokens for 40 tools)
+    - Memory context (controlled by this config)
+    - Conversation history (grows with iterations)
+
+    We reserve ~50% of context for conversation history growth.
+
+    Args:
+        model_context_length: The model's total context window in tokens
+
+    Returns:
+        MemoryConfig sized for the model
+    """
+    # Reserve space for: system prompt (3K) + tools (2K) + task (500) + buffer
+    # Plus ~50% for conversation history growth
+    fixed_overhead = 6000  # System prompt + tools + task
+    conversation_reserve = model_context_length * 0.5
+
+    # Memory budget is what's left after overhead and conversation reserve
+    memory_budget = max(512, model_context_length - fixed_overhead - conversation_reserve)
+
+    if model_context_length <= 4096:
+        # Very small context - minimal memory
+        return MemoryConfig(
+            max_context_tokens=int(memory_budget),
+            episodic_limit=1,
+            semantic_limit=2,
+            pattern_limit=1,
+            enable_learning=False,  # Skip learning overhead
+            enable_codebase_analysis=False,  # Skip analysis overhead
+        )
+    elif model_context_length <= 8192:
+        # Small context - reduced memory
+        return MemoryConfig(
+            max_context_tokens=int(memory_budget),
+            episodic_limit=2,
+            semantic_limit=4,
+            pattern_limit=2,
+            enable_learning=True,
+            enable_codebase_analysis=False,  # Still too expensive
+        )
+    elif model_context_length <= 16384:
+        # Medium context - moderate memory
+        return MemoryConfig(
+            max_context_tokens=int(memory_budget),
+            episodic_limit=3,
+            semantic_limit=6,
+            pattern_limit=2,
+            enable_learning=True,
+            enable_codebase_analysis=True,
+        )
+    else:
+        # Large context (32K+) - full memory
+        return MemoryConfig(
+            max_context_tokens=min(int(memory_budget), 16384),  # Cap at 16K
+            episodic_limit=5,
+            semantic_limit=10,
+            pattern_limit=3,
+            enable_learning=True,
+            enable_codebase_analysis=True,
+        )
+
+
 class MuninnMemory:
     """The complete memory system - Odin's raven of memory.
 

@@ -29,21 +29,17 @@ class ContextBuilder:
         return messages
 
     def _build_system_prompt(self, task: str, tools: list[dict]) -> str:
-        """Build the system prompt."""
+        """Build the system prompt.
 
-        tool_descriptions = "\n".join(
-            [
-                f"- {tool['function']['name']}: {tool['function']['description']}"
-                for tool in tools
-            ]
-        )
+        Note: Tool schemas are passed separately to the LLM via the tools= parameter,
+        so we don't include tool descriptions in the prompt text to save tokens.
+        """
+        # tools parameter kept for API compatibility but not used in prompt
+        _ = tools
 
         return f"""You are Sindri, a local LLM orchestration agent.
 
 Your task: {task}
-
-Available tools:
-{tool_descriptions}
 
 Instructions:
 1. Break down the task into steps
