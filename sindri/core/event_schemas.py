@@ -492,6 +492,82 @@ class IndexerPausedData(BaseModel):
     resume_after_seconds: Optional[int] = Field(None, description="Expected resume time")
 
 
+# === Performance Telemetry Stream Event Payloads (ROADMAP Item 7) ===
+
+
+class VRAMSnapshot(BaseModel):
+    """VRAM state at a point in time."""
+
+    total_gb: float = Field(..., description="Total VRAM capacity in GB")
+    used_gb: float = Field(..., description="VRAM currently in use in GB")
+    free_gb: float = Field(..., description="Available VRAM in GB")
+    loaded_models: list[str] = Field(default_factory=list, description="Currently loaded models")
+    cache_hit_rate: float = Field(default=0.0, description="Model cache hit rate (0.0-1.0)")
+
+
+class ConcurrencySnapshot(BaseModel):
+    """Task concurrency state at a point in time."""
+
+    running_tasks: int = Field(..., description="Currently executing tasks")
+    pending_tasks: int = Field(..., description="Tasks waiting to execute")
+    waiting_tasks: int = Field(default=0, description="Tasks waiting on dependencies")
+    batch_size: int = Field(default=0, description="Current parallel batch size")
+
+
+class AgentTimingStats(BaseModel):
+    """Timing statistics for an agent."""
+
+    agent_name: str = Field(..., description="Agent name")
+    model_name: str = Field(default="", description="Model used by agent")
+    total_iterations: int = Field(default=0, description="Total iterations executed")
+    total_duration_ms: float = Field(default=0.0, description="Total execution time in ms")
+    avg_iteration_ms: float = Field(default=0.0, description="Average iteration time in ms")
+    p95_iteration_ms: Optional[float] = Field(None, description="95th percentile iteration time")
+
+
+class ToolTimingStats(BaseModel):
+    """Timing statistics for a tool."""
+
+    tool_name: str = Field(..., description="Tool name")
+    call_count: int = Field(default=0, description="Total number of calls")
+    total_duration_ms: float = Field(default=0.0, description="Total execution time in ms")
+    avg_duration_ms: float = Field(default=0.0, description="Average execution time in ms")
+    success_rate: float = Field(default=1.0, description="Success rate (0.0-1.0)")
+    p95_duration_ms: Optional[float] = Field(None, description="95th percentile duration")
+
+
+class TelemetryTickData(BaseModel):
+    """Payload for TELEMETRY_TICK event (periodic updates every 2 seconds)."""
+
+    timestamp: float = Field(..., description="Unix timestamp of the tick")
+    session_id: Optional[str] = Field(None, description="Active session ID")
+    vram: VRAMSnapshot = Field(..., description="Current VRAM state")
+    concurrency: ConcurrencySnapshot = Field(..., description="Current task concurrency state")
+    session_duration_seconds: float = Field(default=0.0, description="Current session duration")
+    current_agent: Optional[str] = Field(None, description="Currently executing agent")
+    current_iteration: int = Field(default=0, description="Current iteration number")
+
+
+class TelemetrySnapshotData(BaseModel):
+    """Payload for TELEMETRY_SNAPSHOT event (full dump on demand or session end)."""
+
+    timestamp: float = Field(..., description="Unix timestamp of the snapshot")
+    session_id: str = Field(..., description="Session ID")
+    session_duration_seconds: float = Field(..., description="Total session duration")
+    vram: VRAMSnapshot = Field(..., description="VRAM state")
+    concurrency: ConcurrencySnapshot = Field(..., description="Task concurrency state")
+    agent_stats: list[AgentTimingStats] = Field(
+        default_factory=list, description="Per-agent timing statistics"
+    )
+    tool_stats: list[ToolTimingStats] = Field(
+        default_factory=list, description="Per-tool timing statistics"
+    )
+    total_iterations: int = Field(default=0, description="Total iterations across all agents")
+    total_tool_calls: int = Field(default=0, description="Total tool calls across all tools")
+    llm_time_seconds: float = Field(default=0.0, description="Total LLM inference time")
+    tool_time_seconds: float = Field(default=0.0, description="Total tool execution time")
+
+
 # === Event Type to Payload Model Mapping ===
 
 EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
@@ -549,6 +625,9 @@ EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "INDEXER_STARTED": IndexerStartedData,
     "INDEXER_STOPPED": IndexerStoppedData,
     "INDEXER_PAUSED": IndexerPausedData,
+    # Performance Telemetry Stream (ROADMAP Item 7)
+    "TELEMETRY_TICK": TelemetryTickData,
+    "TELEMETRY_SNAPSHOT": TelemetrySnapshotData,
 }
 
 

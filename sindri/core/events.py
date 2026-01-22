@@ -74,6 +74,9 @@ class EventType(Enum):
     INDEXER_STARTED = auto()  # Background indexer service started
     INDEXER_STOPPED = auto()  # Background indexer service stopped
     INDEXER_PAUSED = auto()  # Background indexer paused (e.g., VRAM constraints)
+    # Performance Telemetry Stream (ROADMAP Item 7)
+    TELEMETRY_TICK = auto()  # Periodic telemetry snapshot (every 2 seconds)
+    TELEMETRY_SNAPSHOT = auto()  # Full telemetry dump (on-demand or session end)
 
 
 @dataclass

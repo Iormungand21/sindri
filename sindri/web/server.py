@@ -29,7 +29,7 @@ from fastapi import (
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 import structlog
 
@@ -1087,6 +1087,191 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             )
 
         return metrics.to_dict()
+
+    # ===== Telemetry Endpoints (ROADMAP Item 7: Performance Telemetry Stream) =====
+
+    @app.get("/api/metrics/live", tags=["Telemetry"])
+    async def stream_live_telemetry():
+        """Stream live telemetry metrics via Server-Sent Events.
+
+        This endpoint provides real-time telemetry data including:
+        - VRAM usage and loaded models
+        - Task concurrency (running/pending/waiting)
+        - Session progress (current agent, iteration)
+
+        Connect with EventSource in browsers or curl:
+            curl -N http://localhost:8000/api/metrics/live
+
+        Events:
+        - connected: Initial connection confirmation
+        - telemetry_tick: Periodic snapshot (every 2 seconds)
+        - heartbeat: Keep-alive (every 30 seconds if no data)
+        """
+        from sindri.core.event_schemas import TelemetryTickData, VRAMSnapshot, ConcurrencySnapshot
+
+        async def event_generator():
+            # Send initial connection event
+            yield f"event: connected\ndata: {json.dumps({'status': 'connected', 'timestamp': time.time()})}\n\n"
+
+            # Create a queue for this connection
+            queue: asyncio.Queue = asyncio.Queue(maxsize=10)
+
+            def on_telemetry_event(event: Event):
+                """Handle TELEMETRY_TICK events from EventBus."""
+                if event.type == EventType.TELEMETRY_TICK:
+                    try:
+                        queue.put_nowait(event.data)
+                    except asyncio.QueueFull:
+                        pass  # Drop if queue is full
+
+            # Subscribe to telemetry events
+            api.event_bus.subscribe_event(on_telemetry_event)
+
+            try:
+                last_heartbeat = time.time()
+                while True:
+                    try:
+                        # Wait for telemetry data with timeout
+                        data = await asyncio.wait_for(queue.get(), timeout=5.0)
+                        yield f"event: telemetry_tick\ndata: {json.dumps(data)}\n\n"
+                        last_heartbeat = time.time()
+                    except asyncio.TimeoutError:
+                        # Send heartbeat if no data for 30 seconds
+                        if time.time() - last_heartbeat > 30:
+                            yield f"event: heartbeat\ndata: {json.dumps({'timestamp': time.time()})}\n\n"
+                            last_heartbeat = time.time()
+
+                        # If no active telemetry collector, generate synthetic tick
+                        if not hasattr(api, "telemetry_collector") or not api.telemetry_collector:
+                            # Generate basic tick from available stats
+                            vram_stats = {}
+                            cache_stats = {}
+                            loaded_models = []
+                            if api.model_manager:
+                                vram_stats = api.model_manager.get_vram_stats()
+                                cache_stats = api.model_manager.get_cache_stats()
+                                loaded_models = vram_stats.get("loaded_models", [])
+
+                            tick_data = {
+                                "timestamp": time.time(),
+                                "session_id": None,
+                                "vram": {
+                                    "total_gb": vram_stats.get("total", api.vram_gb),
+                                    "used_gb": vram_stats.get("used", 0.0),
+                                    "free_gb": vram_stats.get("free", api.vram_gb),
+                                    "loaded_models": loaded_models,
+                                    "cache_hit_rate": cache_stats.get("hit_rate", 0.0),
+                                },
+                                "concurrency": {
+                                    "running_tasks": len(api.active_tasks),
+                                    "pending_tasks": 0,
+                                    "waiting_tasks": 0,
+                                    "batch_size": 0,
+                                },
+                                "session_duration_seconds": 0.0,
+                                "current_agent": None,
+                                "current_iteration": 0,
+                            }
+                            yield f"event: telemetry_tick\ndata: {json.dumps(tick_data)}\n\n"
+                            last_heartbeat = time.time()
+            except asyncio.CancelledError:
+                pass
+            finally:
+                api.event_bus.unsubscribe_event(on_telemetry_event)
+
+        return StreamingResponse(
+            event_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",  # Disable nginx buffering
+            },
+        )
+
+    @app.get("/api/metrics/telemetry/snapshot", tags=["Telemetry"])
+    async def get_telemetry_snapshot():
+        """Get current telemetry snapshot (on-demand).
+
+        Returns full telemetry data including agent and tool statistics
+        if a telemetry collector is active.
+        """
+        from sindri.core.event_schemas import (
+            TelemetrySnapshotData,
+            VRAMSnapshot,
+            ConcurrencySnapshot,
+        )
+
+        # Check for active telemetry collector
+        if hasattr(api, "telemetry_collector") and api.telemetry_collector:
+            return api.telemetry_collector.get_snapshot().model_dump()
+
+        # Generate basic snapshot from available stats
+        vram_stats = {}
+        cache_stats = {}
+        loaded_models = []
+        if api.model_manager:
+            vram_stats = api.model_manager.get_vram_stats()
+            cache_stats = api.model_manager.get_cache_stats()
+            loaded_models = vram_stats.get("loaded_models", [])
+
+        return {
+            "timestamp": time.time(),
+            "session_id": "",
+            "session_duration_seconds": 0.0,
+            "vram": {
+                "total_gb": vram_stats.get("total", api.vram_gb),
+                "used_gb": vram_stats.get("used", 0.0),
+                "free_gb": vram_stats.get("free", api.vram_gb),
+                "loaded_models": loaded_models,
+                "cache_hit_rate": cache_stats.get("hit_rate", 0.0),
+            },
+            "concurrency": {
+                "running_tasks": len(api.active_tasks),
+                "pending_tasks": 0,
+                "waiting_tasks": 0,
+                "batch_size": 0,
+            },
+            "agent_stats": [],
+            "tool_stats": [],
+            "total_iterations": 0,
+            "total_tool_calls": 0,
+            "llm_time_seconds": 0.0,
+            "tool_time_seconds": 0.0,
+        }
+
+    @app.get("/api/metrics/vram/history", tags=["Telemetry"])
+    async def get_vram_history():
+        """Get VRAM usage time-series for charting.
+
+        Returns up to 5 minutes of VRAM history at 2-second intervals
+        if a telemetry collector is active.
+        """
+        if hasattr(api, "telemetry_collector") and api.telemetry_collector:
+            history = api.telemetry_collector.get_vram_history()
+            return {
+                "history": [
+                    {"timestamp": ts, "vram": vram.model_dump()} for ts, vram in history
+                ]
+            }
+        return {"history": [], "message": "No active telemetry collection"}
+
+    @app.get("/api/metrics/concurrency/history", tags=["Telemetry"])
+    async def get_concurrency_history():
+        """Get task concurrency time-series for charting.
+
+        Returns up to 5 minutes of concurrency history at 2-second intervals
+        if a telemetry collector is active.
+        """
+        if hasattr(api, "telemetry_collector") and api.telemetry_collector:
+            history = api.telemetry_collector.get_concurrency_history()
+            return {
+                "history": [
+                    {"timestamp": ts, "concurrency": conc.model_dump()}
+                    for ts, conc in history
+                ]
+            }
+        return {"history": [], "message": "No active telemetry collection"}
 
     # ===== Coverage Endpoints =====
 

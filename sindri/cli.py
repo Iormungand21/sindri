@@ -7434,6 +7434,263 @@ def policy_violations(limit: int, agent: str = None):
 
 
 # ==============================================================================
+# Telemetry Commands (ROADMAP Item 7: Performance Telemetry Stream)
+# ==============================================================================
+
+
+@cli.group()
+def telemetry():
+    """Performance telemetry and trace export commands.
+
+    Stream live telemetry from a running Sindri server, export session traces
+    for profiling, and compare traces for regression checking.
+
+    Examples:
+        sindri telemetry stream --url http://localhost:8000
+
+        sindri telemetry snapshot --url http://localhost:8000
+
+        sindri telemetry export <session_id> -o trace.json
+
+        sindri telemetry compare baseline.json current.json
+    """
+    pass
+
+
+@telemetry.command("stream")
+@click.option("--url", default="http://localhost:8000", help="Sindri API URL")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["json", "table"]),
+    default="table",
+    help="Output format",
+)
+def telemetry_stream(url: str, output_format: str):
+    """Stream live telemetry from a running Sindri server.
+
+    Connects to the SSE endpoint and displays real-time metrics including
+    VRAM usage, loaded models, task concurrency, and session progress.
+
+    Press Ctrl+C to stop streaming.
+    """
+    import httpx
+    from rich.live import Live
+    from rich.table import Table
+
+    def build_table(data: dict) -> Table:
+        table = Table(title="Live Telemetry", show_header=True)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="green")
+
+        # VRAM
+        vram = data.get("vram", {})
+        table.add_row(
+            "VRAM Used",
+            f"{vram.get('used_gb', 0):.1f} / {vram.get('total_gb', 16):.1f} GB",
+        )
+        table.add_row(
+            "Loaded Models", ", ".join(vram.get("loaded_models", [])) or "None"
+        )
+        table.add_row("Cache Hit Rate", f"{vram.get('cache_hit_rate', 0) * 100:.1f}%")
+
+        # Concurrency
+        conc = data.get("concurrency", {})
+        table.add_row("Running Tasks", str(conc.get("running_tasks", 0)))
+        table.add_row("Pending Tasks", str(conc.get("pending_tasks", 0)))
+
+        # Session
+        table.add_row(
+            "Session Duration", f"{data.get('session_duration_seconds', 0):.1f}s"
+        )
+        table.add_row("Current Agent", data.get("current_agent") or "None")
+        table.add_row("Iteration", str(data.get("current_iteration", 0)))
+
+        return table
+
+    console.print(f"[dim]Connecting to {url}/api/metrics/live...[/dim]")
+
+    try:
+        with httpx.stream(
+            "GET", f"{url}/api/metrics/live", timeout=None
+        ) as response:
+            if output_format == "table":
+                with Live(console=console, refresh_per_second=1) as live:
+                    for line in response.iter_lines():
+                        if not line:
+                            continue
+                        if line.startswith("data:"):
+                            try:
+                                data = json.loads(line[5:].strip())
+                                live.update(build_table(data))
+                            except json.JSONDecodeError:
+                                pass
+            else:
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    if line.startswith("data:"):
+                        try:
+                            data = json.loads(line[5:].strip())
+                            console.print(json.dumps(data, indent=2))
+                        except json.JSONDecodeError:
+                            pass
+    except httpx.ConnectError:
+        console.print(f"[red]Could not connect to {url}. Is the server running?[/]")
+    except KeyboardInterrupt:
+        console.print("\n[dim]Stream stopped[/dim]")
+
+
+@telemetry.command("snapshot")
+@click.option("--url", default="http://localhost:8000", help="Sindri API URL")
+def telemetry_snapshot_cmd(url: str):
+    """Get current telemetry snapshot from running server.
+
+    Returns full telemetry data including agent and tool statistics.
+    """
+    import httpx
+
+    try:
+        response = httpx.get(f"{url}/api/metrics/telemetry/snapshot")
+        if response.status_code == 200:
+            data = response.json()
+            console.print(json.dumps(data, indent=2))
+        else:
+            console.print(f"[red]Error: {response.text}[/]")
+    except httpx.ConnectError:
+        console.print(f"[red]Could not connect to {url}. Is the server running?[/]")
+
+
+@telemetry.command("export")
+@click.argument("session_id")
+@click.option("--output", "-o", type=click.Path(), help="Output file path")
+@click.option(
+    "--include-outputs", is_flag=True, help="Include full tool outputs (can be large)"
+)
+def telemetry_export(session_id: str, output: str, include_outputs: bool):
+    """Export session trace for profiling.
+
+    Creates a JSON file containing all timing data, environment info,
+    and tool audit logs for the specified session.
+
+    Example:
+        sindri telemetry export abc12345 -o trace.json
+    """
+    from pathlib import Path
+    from sindri.telemetry.exporter import TraceExporter
+    from sindri.persistence.state import SessionState
+
+    async def do_export():
+        state = SessionState()
+
+        # Resolve short session ID
+        full_id = session_id
+        if len(session_id) < 36:
+            sessions = await state.list_sessions(limit=100)
+            matching = [s for s in sessions if s["id"].startswith(session_id)]
+            if not matching:
+                console.print(f"[red]No session found starting with {session_id}[/]")
+                return
+            if len(matching) > 1:
+                console.print(f"[yellow]Multiple sessions match {session_id}:[/]")
+                for m in matching:
+                    console.print(f"  - {m['id'][:8]}")
+                return
+            full_id = matching[0]["id"]
+
+        # Determine output path
+        output_path = Path(output) if output else Path(f"trace_{full_id[:8]}.json")
+
+        exporter = TraceExporter()
+        with console.status("[bold green]Exporting trace..."):
+            trace = await exporter.export_session_trace(
+                full_id,
+                output_path=output_path,
+                include_tool_outputs=include_outputs,
+            )
+
+        console.print(f"[green]Trace exported to {output_path}[/]")
+        console.print(f"[dim]Session: {full_id[:8]}[/]")
+
+        # Summary
+        summary = TraceExporter.get_trace_summary(trace)
+        if summary.get("duration_seconds"):
+            console.print(f"[dim]Duration: {summary['duration_seconds']:.1f}s[/]")
+        if summary.get("total_iterations"):
+            console.print(f"[dim]Iterations: {summary['total_iterations']}[/]")
+        if summary.get("total_tool_calls"):
+            console.print(f"[dim]Tool calls: {summary['total_tool_calls']}[/]")
+
+    asyncio.run(do_export())
+
+
+@telemetry.command("compare")
+@click.argument("baseline", type=click.Path(exists=True))
+@click.argument("current", type=click.Path(exists=True))
+def telemetry_compare(baseline: str, current: str):
+    """Compare two session traces for regression checking.
+
+    Compares timing, iterations, and tool calls between two trace files
+    and reports regressions (>20% slower) and improvements (>10% faster).
+
+    Example:
+        sindri telemetry compare baseline.json current.json
+    """
+    from pathlib import Path
+    from sindri.telemetry.exporter import TraceExporter
+
+    async def do_compare():
+        exporter = TraceExporter()
+        result = await exporter.compare_traces(Path(baseline), Path(current))
+
+        console.print("[bold]Trace Comparison[/]\n")
+
+        console.print(f"Baseline: {result['baseline_session'][:8] if result.get('baseline_session') else 'unknown'}")
+        console.print(f"Current:  {result['current_session'][:8] if result.get('current_session') else 'unknown'}")
+        console.print()
+
+        # Duration
+        if result.get("duration_delta"):
+            d = result["duration_delta"]
+            change = d.get("change_percent", 0)
+            color = "red" if change > 10 else "green" if change < -10 else "yellow"
+            console.print(
+                f"Duration: {d['baseline']:.1f}s -> {d['current']:.1f}s [{color}]{change:+.1f}%[/]"
+            )
+
+        # Iterations
+        if result.get("iteration_delta"):
+            i = result["iteration_delta"]
+            console.print(
+                f"Iterations: {i['baseline']} -> {i['current']} ({i['change']:+d})"
+            )
+
+        # Tool calls
+        if result.get("tool_call_delta"):
+            t = result["tool_call_delta"]
+            console.print(
+                f"Tool calls: {t['baseline']} -> {t['current']} ({t['change']:+d})"
+            )
+
+        # Regressions
+        if result.get("regressions"):
+            console.print("\n[red bold]Regressions:[/]")
+            for r in result["regressions"]:
+                console.print(f"  - {r['message']}")
+
+        # Improvements
+        if result.get("improvements"):
+            console.print("\n[green bold]Improvements:[/]")
+            for i in result["improvements"]:
+                console.print(f"  - {i['message']}")
+
+        if not result.get("regressions") and not result.get("improvements"):
+            console.print("\n[dim]No significant changes detected[/]")
+
+    asyncio.run(do_compare())
+
+
+# ==============================================================================
 # Replay Commands (Reproducible Sessions)
 # ==============================================================================
 

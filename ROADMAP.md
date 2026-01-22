@@ -11,9 +11,9 @@
 Grouped by logical capability area.
 
 **Suggested sequencing:**
-- **Near-term (0–2 months):** items 1 ✅, 2 ✅, 3 ✅, 4 ✅, 5 ✅, 6 ✅
-- **Mid-term (2–4 months):** item 7
-- **Long-term (4–6 months):** items 8, 9, 10
+- **Near-term (0–2 months):** items 1 ✅, 2 ✅, 3 ✅, 4 ✅, 5 ✅, 6 ✅, 7 ✅
+- **Mid-term (2–4 months):** items 8, 9
+- **Long-term (4–6 months):** item 10
 
 ### Stability + Bugfixes
 0. **Hierarchical Execution Reliability** ✅ **COMPLETE (Phase 15)**
@@ -69,10 +69,12 @@ Grouped by logical capability area.
    - ✅ CLI commands: `sindri policy show`, `sindri policy set-default`, `sindri policy violations`
 
 ### Observability + Performance
-7. **Performance Telemetry Stream**
-   - `/api/metrics/live` stream for agent/tool timing
-   - VRAM + concurrency tuning dashboard
-   - Exportable traces for profiling and regression checks
+7. **Performance Telemetry Stream** ✅ **COMPLETE**
+   - ✅ `/api/metrics/live` SSE stream for real-time telemetry
+   - ✅ `TelemetryCollector` with agent/tool timing statistics
+   - ✅ VRAM + concurrency time-series history for dashboards
+   - ✅ `TraceExporter` for JSON trace export and regression comparison
+   - ✅ CLI commands: `sindri telemetry stream/snapshot/export/compare`
 
 ### Extensibility + Automation
 8. **Agents as Plugins**
