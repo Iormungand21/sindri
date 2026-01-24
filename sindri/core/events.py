@@ -77,6 +77,18 @@ class EventType(Enum):
     # Performance Telemetry Stream (ROADMAP Item 7)
     TELEMETRY_TICK = auto()  # Periodic telemetry snapshot (every 2 seconds)
     TELEMETRY_SNAPSHOT = auto()  # Full telemetry dump (on-demand or session end)
+    # Triggers & Automations (ROADMAP Item 9)
+    TRIGGER_CREATED = auto()  # Trigger definition created
+    TRIGGER_UPDATED = auto()  # Trigger definition updated
+    TRIGGER_DELETED = auto()  # Trigger definition deleted
+    TRIGGER_ENABLED = auto()  # Trigger enabled
+    TRIGGER_DISABLED = auto()  # Trigger disabled
+    TRIGGER_STARTED = auto()  # Trigger execution started
+    TRIGGER_COMPLETED = auto()  # Trigger execution completed successfully
+    TRIGGER_FAILED = auto()  # Trigger execution failed
+    TRIGGER_RATE_LIMITED = auto()  # Webhook rate limited
+    TRIGGER_SCHEDULER_STARTED = auto()  # Trigger scheduler service started
+    TRIGGER_SCHEDULER_STOPPED = auto()  # Trigger scheduler service stopped
 
 
 @dataclass

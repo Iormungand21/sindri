@@ -12,7 +12,7 @@ Grouped by logical capability area.
 
 **Suggested sequencing:**
 - **Near-term (0–2 months):** items 1 ✅, 2 ✅, 3 ✅, 4 ✅, 5 ✅, 6 ✅, 7 ✅
-- **Mid-term (2–4 months):** items 8, 9
+- **Mid-term (2–4 months):** items 8, 9 ✅ (in progress)
 - **Long-term (4–6 months):** item 10
 
 ### Stability + Bugfixes
@@ -95,10 +95,20 @@ Grouped by logical capability area.
    - SDK for packaging agents + prompts + tests
    - Compatibility validation and versioned bundles
    - Marketplace metadata for local-only distribution
-9. **Triggers & Automations**
-   - Webhook/cron triggers for routines (security scans, health checks)
-   - Scheduled codebase review and dependency audits
-   - Notification hooks (local desktop or log targets)
+9. **Triggers & Automations** ✅ **IN PROGRESS**
+   - ✅ Core trigger models (`TriggerDefinition`, `TriggerRun`, `NotificationHook`)
+   - ✅ Database schema v9 with `triggers` and `trigger_runs` tables
+   - ✅ `TriggerStore` for SQLite persistence (CRUD, due triggers, rate limiting)
+   - ✅ `TriggerScheduler` background service with cron evaluation (croniter)
+   - ✅ `TriggerExecutor` for task creation via Orchestrator
+   - ✅ `NotificationService` for desktop (notify-send) and log notifications
+   - ✅ `TriggerConfig` in SindriConfig with tick interval, concurrency settings
+   - ✅ 11 `TRIGGER_*` event types and schemas
+   - ✅ CLI commands: `sindri triggers list/create/show/delete/enable/disable/run/history/stats`
+   - ✅ +50 tests
+   - Webhook triggers with signature verification (deferred)
+   - Event triggers via EventBus subscription (deferred)
+   - Web API endpoints `/api/triggers/*` (deferred)
 
 ### Model Strategy
 10. **Model-Aware Routing**

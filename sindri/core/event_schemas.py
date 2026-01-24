@@ -571,6 +571,99 @@ class TelemetrySnapshotData(BaseModel):
     tool_time_seconds: float = Field(default=0.0, description="Total tool execution time")
 
 
+# === Triggers & Automations events (ROADMAP Item 9) ===
+
+
+class TriggerCreatedData(BaseModel):
+    """Payload for TRIGGER_CREATED event."""
+
+    trigger_id: str = Field(..., description="Trigger identifier (UUID)")
+    name: str = Field(..., description="Trigger name")
+    trigger_type: str = Field(..., description="Trigger type: cron, webhook, event")
+
+
+class TriggerUpdatedData(BaseModel):
+    """Payload for TRIGGER_UPDATED event."""
+
+    trigger_id: str = Field(..., description="Trigger identifier")
+    name: str = Field(..., description="Trigger name")
+    fields_updated: list[str] = Field(
+        default_factory=list, description="List of fields that were updated"
+    )
+
+
+class TriggerDeletedData(BaseModel):
+    """Payload for TRIGGER_DELETED event."""
+
+    trigger_id: str = Field(..., description="Trigger identifier")
+    name: str = Field(..., description="Trigger name")
+
+
+class TriggerEnabledData(BaseModel):
+    """Payload for TRIGGER_ENABLED event."""
+
+    trigger_id: str = Field(..., description="Trigger identifier")
+    name: str = Field(..., description="Trigger name")
+
+
+class TriggerDisabledData(BaseModel):
+    """Payload for TRIGGER_DISABLED event."""
+
+    trigger_id: str = Field(..., description="Trigger identifier")
+    name: str = Field(..., description="Trigger name")
+
+
+class TriggerStartedData(BaseModel):
+    """Payload for TRIGGER_STARTED event."""
+
+    trigger_id: str = Field(..., description="Trigger identifier")
+    trigger_name: str = Field(..., description="Trigger name")
+    trigger_type: str = Field(..., description="Trigger type: cron, webhook, event")
+    run_id: str = Field(..., description="Trigger run identifier (UUID)")
+
+
+class TriggerCompletedData(BaseModel):
+    """Payload for TRIGGER_COMPLETED event."""
+
+    trigger_id: str = Field(..., description="Trigger identifier")
+    trigger_name: str = Field(..., description="Trigger name")
+    run_id: str = Field(..., description="Trigger run identifier")
+    task_id: Optional[str] = Field(None, description="Created task identifier")
+    success: bool = Field(True, description="Whether the trigger execution succeeded")
+    duration_ms: Optional[float] = Field(None, description="Execution duration in milliseconds")
+
+
+class TriggerFailedData(BaseModel):
+    """Payload for TRIGGER_FAILED event."""
+
+    trigger_id: str = Field(..., description="Trigger identifier")
+    trigger_name: str = Field(..., description="Trigger name")
+    run_id: str = Field(..., description="Trigger run identifier")
+    error: str = Field(..., description="Error message")
+    duration_ms: Optional[float] = Field(None, description="Execution duration in milliseconds")
+
+
+class TriggerRateLimitedData(BaseModel):
+    """Payload for TRIGGER_RATE_LIMITED event."""
+
+    trigger_id: str = Field(..., description="Trigger identifier")
+    trigger_name: str = Field(..., description="Trigger name")
+    rate_limit_per_minute: int = Field(..., description="Configured rate limit")
+
+
+class TriggerSchedulerStartedData(BaseModel):
+    """Payload for TRIGGER_SCHEDULER_STARTED event."""
+
+    tick_interval_seconds: int = Field(..., description="Scheduler tick interval in seconds")
+
+
+class TriggerSchedulerStoppedData(BaseModel):
+    """Payload for TRIGGER_SCHEDULER_STOPPED event."""
+
+    reason: str = Field(..., description="Reason for stopping")
+    triggers_fired: int = Field(default=0, description="Total triggers fired during runtime")
+
+
 # === Event Type to Payload Model Mapping ===
 
 EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
@@ -631,6 +724,18 @@ EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     # Performance Telemetry Stream (ROADMAP Item 7)
     "TELEMETRY_TICK": TelemetryTickData,
     "TELEMETRY_SNAPSHOT": TelemetrySnapshotData,
+    # Triggers & Automations (ROADMAP Item 9)
+    "TRIGGER_CREATED": TriggerCreatedData,
+    "TRIGGER_UPDATED": TriggerUpdatedData,
+    "TRIGGER_DELETED": TriggerDeletedData,
+    "TRIGGER_ENABLED": TriggerEnabledData,
+    "TRIGGER_DISABLED": TriggerDisabledData,
+    "TRIGGER_STARTED": TriggerStartedData,
+    "TRIGGER_COMPLETED": TriggerCompletedData,
+    "TRIGGER_FAILED": TriggerFailedData,
+    "TRIGGER_RATE_LIMITED": TriggerRateLimitedData,
+    "TRIGGER_SCHEDULER_STARTED": TriggerSchedulerStartedData,
+    "TRIGGER_SCHEDULER_STOPPED": TriggerSchedulerStoppedData,
 }
 
 

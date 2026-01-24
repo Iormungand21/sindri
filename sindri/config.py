@@ -86,6 +86,44 @@ class IndexerConfig(BaseModel):
     )
 
 
+class TriggerConfig(BaseModel):
+    """Trigger scheduler configuration (ROADMAP Item 9).
+
+    Controls the behavior of the triggers & automations system.
+    """
+
+    enabled: bool = Field(
+        default=True,
+        description="Whether the trigger scheduler is enabled",
+    )
+    auto_start: bool = Field(
+        default=False,
+        description="Start trigger scheduler automatically with TUI/Web",
+    )
+    tick_interval_seconds: int = Field(
+        default=30,
+        ge=10,
+        le=300,
+        description="Scheduler tick interval in seconds",
+    )
+    max_concurrent_triggers: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Max triggers to run in parallel",
+    )
+    auto_pause_after_failures: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Pause trigger after N consecutive failures",
+    )
+    notification_log_path: Optional[Path] = Field(
+        default=None,
+        description="Path for trigger notification log (defaults to ~/.sindri/triggers.log)",
+    )
+
+
 class MemoryConfig(BaseModel):
     """Memory system configuration."""
 
@@ -129,6 +167,9 @@ class SindriConfig(BaseModel):
 
     # Memory
     memory: MemoryConfig = Field(default_factory=MemoryConfig)
+
+    # Triggers & Automations (ROADMAP Item 9)
+    triggers: TriggerConfig = Field(default_factory=TriggerConfig)
 
     # TUI
     tui: TUIConfig = Field(default_factory=TUIConfig)

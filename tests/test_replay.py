@@ -770,11 +770,11 @@ class TestDatabaseSchema:
     """Tests for database schema changes."""
 
     @pytest.mark.asyncio
-    async def test_schema_version_8(self, tmp_path):
-        """Test that schema version 8 adds error column to sessions."""
+    async def test_schema_version_9(self, tmp_path):
+        """Test that schema version 9 adds triggers tables."""
         from sindri.persistence.database import Database, SCHEMA_VERSION
 
-        assert SCHEMA_VERSION == 8
+        assert SCHEMA_VERSION == 9
 
         db = Database(db_path=tmp_path / "test.db")
         await db.initialize()
@@ -782,14 +782,14 @@ class TestDatabaseSchema:
         # Verify new tables exist
         import aiosqlite
         async with aiosqlite.connect(tmp_path / "test.db") as conn:
-            # Check session_snapshots table
+            # Check session_snapshots table (v7)
             async with conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='session_snapshots'"
             ) as cursor:
                 row = await cursor.fetchone()
                 assert row is not None, "session_snapshots table not created"
 
-            # Check session_tool_outputs table
+            # Check session_tool_outputs table (v7)
             async with conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='session_tool_outputs'"
             ) as cursor:
@@ -801,10 +801,24 @@ class TestDatabaseSchema:
                 columns = [row[1] async for row in cursor]
                 assert "error" in columns, "error column not added to sessions table"
 
+            # Check triggers table (v9)
+            async with conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='triggers'"
+            ) as cursor:
+                row = await cursor.fetchone()
+                assert row is not None, "triggers table not created"
+
+            # Check trigger_runs table (v9)
+            async with conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name='trigger_runs'"
+            ) as cursor:
+                row = await cursor.fetchone()
+                assert row is not None, "trigger_runs table not created"
+
             # Verify schema version
             async with conn.execute("PRAGMA user_version") as cursor:
                 row = await cursor.fetchone()
-                assert row[0] == 8
+                assert row[0] == 9
 
 
 # ==============================================================================

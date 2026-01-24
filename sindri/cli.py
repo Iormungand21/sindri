@@ -656,22 +656,58 @@ def export(
 @click.option(
     "--work-dir", "-w", type=click.Path(), help="Working directory for file operations"
 )
-def tui(task: str = None, no_memory: bool = False, work_dir: str = None):
-    """Launch the interactive TUI."""
+@click.option(
+    "--socket-path",
+    type=click.Path(),
+    help="Unix socket path for TUI event gateway",
+)
+@click.option(
+    "--tui-bin",
+    type=click.Path(),
+    help="Path to the Go TUI binary (sindri-tui)",
+)
+@click.option(
+    "--gateway-only",
+    is_flag=True,
+    help="Run only the Unix socket gateway (no TUI UI)",
+)
+@click.option(
+    "--gateway-timeout",
+    type=float,
+    help="Exit gateway-only mode after N seconds",
+)
+def tui(
+    task: str = None,
+    no_memory: bool = False,
+    work_dir: str = None,
+    socket_path: str | None = None,
+    tui_bin: str | None = None,
+    gateway_only: bool = False,
+    gateway_timeout: float | None = None,
+):
+    """Launch the Go-based TUI."""
 
     from pathlib import Path
-    from sindri.tui.app import run_tui
-    from sindri.core.orchestrator import Orchestrator
-    from sindri.core.events import EventBus
+    from sindri.tui_gateway import run_tui_gateway
+
+    work_path = Path(work_dir).resolve() if work_dir else None
+    socket = Path(socket_path).expanduser().resolve() if socket_path else None
+    tui_path = Path(tui_bin).expanduser().resolve() if tui_bin else None
 
     try:
-        # Create shared event bus for TUI and orchestrator
-        event_bus = EventBus()
-        work_path = Path(work_dir).resolve() if work_dir else None
-        orchestrator = Orchestrator(
-            enable_memory=not no_memory, event_bus=event_bus, work_dir=work_path
+        return_code = asyncio.run(
+            run_tui_gateway(
+                task=task,
+                no_memory=no_memory,
+                work_dir=work_path,
+                socket_path=socket,
+                tui_bin=tui_path,
+                gateway_only=gateway_only,
+                gateway_timeout=gateway_timeout,
+            )
         )
-        run_tui(task=task, orchestrator=orchestrator, event_bus=event_bus)
+        if return_code != 0:
+            console.print(f"[red]TUI exited with code {return_code}[/]")
     except Exception as e:
         console.print(f"[red]Error launching TUI: {str(e)}[/]")
         import traceback
@@ -8112,6 +8148,593 @@ def replay_compare(session1_id: str, session2_id: str, as_json: bool = False):
                 console.print(f"  [dim]... and {len(different_turns) - 5} more[/]")
         else:
             console.print("\n[green]All turns are identical.[/]")
+
+    asyncio.run(execute())
+
+
+# ==============================================================================
+# Triggers Commands (ROADMAP Item 9: Triggers & Automations)
+# ==============================================================================
+
+
+@cli.group()
+def triggers():
+    """Manage triggers and automations.
+
+    The triggers command group provides tools for scheduling recurring tasks,
+    setting up webhooks, and configuring event-driven automations.
+
+    Examples:
+        sindri triggers list
+
+        sindri triggers create -n "nightly-scan" -t cron --cron "0 2 * * *" \\
+            --task "Run security audit"
+
+        sindri triggers show <trigger_id>
+
+        sindri triggers run <trigger_id>
+
+        sindri triggers history <trigger_id>
+    """
+    pass
+
+
+@triggers.command("list")
+@click.option(
+    "--type", "-t", "trigger_type",
+    type=click.Choice(["cron", "webhook", "event"]),
+    help="Filter by trigger type",
+)
+@click.option(
+    "--status", "-s",
+    type=click.Choice(["enabled", "disabled", "paused"]),
+    help="Filter by status",
+)
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def triggers_list(
+    trigger_type: str = None, status: str = None, as_json: bool = False
+):
+    """List all triggers.
+
+    Shows all configured triggers with their status, type, and next run time.
+
+    Examples:
+        sindri triggers list
+
+        sindri triggers list --type cron
+
+        sindri triggers list --status enabled --json
+    """
+    import json as json_module
+    from rich.table import Table
+
+    from sindri.triggers.store import TriggerStore
+    from sindri.triggers.models import TriggerType, TriggerStatus
+
+    async def execute():
+        store = TriggerStore()
+
+        type_filter = TriggerType(trigger_type) if trigger_type else None
+        status_filter = TriggerStatus(status) if status else None
+
+        triggers = await store.list_triggers(
+            trigger_type=type_filter, status=status_filter
+        )
+
+        if as_json:
+            output = [t.to_dict() for t in triggers]
+            console.print(json_module.dumps(output, indent=2, default=str))
+            return
+
+        if not triggers:
+            console.print("[yellow]No triggers found.[/]")
+            return
+
+        table = Table(title="Triggers", show_header=True, header_style="bold blue")
+        table.add_column("ID", style="dim", width=10)
+        table.add_column("Name", width=25)
+        table.add_column("Type", width=10)
+        table.add_column("Status", width=10)
+        table.add_column("Agent", width=12)
+        table.add_column("Runs", width=8)
+        table.add_column("Next Run", width=20)
+
+        for trigger in triggers:
+            status_color = {
+                TriggerStatus.ENABLED: "green",
+                TriggerStatus.DISABLED: "dim",
+                TriggerStatus.PAUSED: "yellow",
+            }.get(trigger.status, "white")
+
+            next_run = "-"
+            if trigger.next_run_at:
+                next_run = trigger.next_run_at.strftime("%Y-%m-%d %H:%M")
+
+            table.add_row(
+                trigger.id[:8],
+                trigger.name[:25],
+                trigger.trigger_type.value,
+                f"[{status_color}]{trigger.status.value}[/]",
+                trigger.agent,
+                str(trigger.run_count),
+                next_run,
+            )
+
+        console.print(table)
+        console.print(f"[dim]Total: {len(triggers)} trigger(s)[/]")
+
+    asyncio.run(execute())
+
+
+@triggers.command("create")
+@click.option("--name", "-n", required=True, help="Trigger name")
+@click.option(
+    "--type", "-t", "trigger_type", required=True,
+    type=click.Choice(["cron", "webhook", "event"]),
+    help="Trigger type",
+)
+@click.option("--task", required=True, help="Task description to run")
+@click.option("--agent", "-a", default="brokkr", help="Agent to use")
+@click.option("--cron", "cron_expression", help="Cron expression (for cron type)")
+@click.option("--events", multiple=True, help="Event types to trigger on (for event type)")
+@click.option("--max-iterations", default=30, help="Max iterations per run")
+@click.option("--notify-desktop", is_flag=True, help="Enable desktop notifications")
+@click.option("--notify-log", is_flag=True, help="Enable log notifications")
+@click.option("--description", "-d", default="", help="Trigger description")
+def triggers_create(
+    name: str,
+    trigger_type: str,
+    task: str,
+    agent: str,
+    cron_expression: str = None,
+    events: tuple = (),
+    max_iterations: int = 30,
+    notify_desktop: bool = False,
+    notify_log: bool = False,
+    description: str = "",
+):
+    """Create a new trigger.
+
+    Examples:
+        sindri triggers create -n "security-scan" -t cron --cron "0 2 * * *" \\
+            --task "Run security audit on this project" --notify-desktop
+
+        sindri triggers create -n "hourly-check" -t cron --cron "0 * * * *" \\
+            --task "Check system health" --agent heimdall
+
+        sindri triggers create -n "on-failure" -t event \\
+            --events TASK_STATUS_CHANGED --task "Review failed task"
+    """
+    from sindri.triggers.store import TriggerStore
+    from sindri.triggers.models import (
+        TriggerDefinition,
+        TriggerType,
+        NotificationHook,
+        NotificationTarget,
+    )
+    from sindri.triggers.scheduler import TriggerScheduler
+
+    async def execute():
+        store = TriggerStore()
+
+        # Validate cron expression if provided
+        if trigger_type == "cron":
+            if not cron_expression:
+                console.print("[red]✗ Cron expression is required for cron triggers[/]")
+                return
+
+            # Create a temporary scheduler to validate
+            scheduler = TriggerScheduler(store, None)  # type: ignore
+            valid, error = scheduler.validate_cron_expression(cron_expression)
+            if not valid:
+                console.print(f"[red]✗ Invalid cron expression: {error}[/]")
+                return
+
+        # Build notifications list
+        notifications = []
+        if notify_desktop:
+            notifications.append(
+                NotificationHook(target=NotificationTarget.DESKTOP)
+            )
+        if notify_log:
+            notifications.append(
+                NotificationHook(target=NotificationTarget.LOG)
+            )
+
+        # Create trigger definition
+        trigger = TriggerDefinition(
+            name=name,
+            description=description,
+            trigger_type=TriggerType(trigger_type),
+            task_description=task,
+            agent=agent,
+            max_iterations=max_iterations,
+            cron_expression=cron_expression,
+            event_types=list(events),
+            notifications=notifications,
+        )
+
+        # Calculate next run for cron triggers
+        if trigger_type == "cron":
+            scheduler = TriggerScheduler(store, None)  # type: ignore
+            next_run = scheduler._calculate_next_run(trigger)
+            if next_run:
+                trigger.next_run_at = next_run
+
+        # Save trigger
+        trigger_id = await store.save_trigger(trigger)
+
+        console.print(f"[green]✓ Created trigger:[/] {trigger.name}")
+        console.print(f"  [dim]ID:[/] {trigger_id}")
+        console.print(f"  [dim]Type:[/] {trigger.trigger_type.value}")
+        if trigger.next_run_at:
+            console.print(
+                f"  [dim]Next run:[/] {trigger.next_run_at.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+
+        # Show upcoming runs for cron
+        if trigger_type == "cron":
+            scheduler = TriggerScheduler(store, None)  # type: ignore
+            next_runs = scheduler.get_next_runs(cron_expression, count=3)
+            if next_runs:
+                console.print("\n  [dim]Upcoming runs:[/]")
+                for run in next_runs:
+                    console.print(f"    {run.strftime('%Y-%m-%d %H:%M:%S')}")
+
+    asyncio.run(execute())
+
+
+@triggers.command("show")
+@click.argument("trigger_id")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def triggers_show(trigger_id: str, as_json: bool = False):
+    """Show details for a trigger.
+
+    Examples:
+        sindri triggers show abc12345
+
+        sindri triggers show abc12345 --json
+    """
+    import json as json_module
+
+    from sindri.triggers.store import TriggerStore
+
+    async def execute():
+        store = TriggerStore()
+
+        # Try to find trigger by partial ID
+        triggers = await store.list_triggers()
+        matching = [t for t in triggers if t.id.startswith(trigger_id)]
+
+        if not matching:
+            console.print(f"[red]✗ No trigger found with ID starting with {trigger_id}[/]")
+            return
+
+        if len(matching) > 1:
+            console.print(f"[yellow]Multiple triggers match, use full ID:[/]")
+            for t in matching:
+                console.print(f"  {t.id} - {t.name}")
+            return
+
+        trigger = matching[0]
+
+        if as_json:
+            console.print(json_module.dumps(trigger.to_dict(), indent=2, default=str))
+            return
+
+        # Get stats
+        stats = await store.get_run_stats(trigger.id)
+
+        console.print(
+            Panel(
+                f"[bold blue]Name:[/] {trigger.name}\n"
+                f"[dim]ID:[/] {trigger.id}\n"
+                f"[dim]Type:[/] {trigger.trigger_type.value}\n"
+                f"[dim]Status:[/] {trigger.status.value}",
+                title="Trigger Details",
+            )
+        )
+
+        console.print(f"\n[bold]Task:[/] {trigger.task_description}")
+        console.print(f"[dim]Agent:[/] {trigger.agent}")
+        console.print(f"[dim]Max iterations:[/] {trigger.max_iterations}")
+
+        if trigger.cron_expression:
+            console.print(f"\n[bold]Schedule:[/] {trigger.cron_expression}")
+            if trigger.next_run_at:
+                console.print(
+                    f"[dim]Next run:[/] {trigger.next_run_at.strftime('%Y-%m-%d %H:%M:%S')}"
+                )
+
+        if trigger.event_types:
+            console.print(f"\n[bold]Event types:[/] {', '.join(trigger.event_types)}")
+
+        console.print(f"\n[bold]Statistics:[/]")
+        console.print(f"  [dim]Total runs:[/] {stats['total_runs']}")
+        console.print(f"  [dim]Successful:[/] {stats['successful_runs']}")
+        console.print(f"  [dim]Failed:[/] {stats['failed_runs']}")
+        if stats['avg_duration_ms']:
+            console.print(f"  [dim]Avg duration:[/] {stats['avg_duration_ms']:.0f}ms")
+
+        if trigger.notifications:
+            console.print(f"\n[bold]Notifications:[/]")
+            for hook in trigger.notifications:
+                console.print(f"  - {hook.target.value}")
+
+    asyncio.run(execute())
+
+
+@triggers.command("delete")
+@click.argument("trigger_id")
+@click.option("--force", "-f", is_flag=True, help="Skip confirmation")
+def triggers_delete(trigger_id: str, force: bool = False):
+    """Delete a trigger.
+
+    Examples:
+        sindri triggers delete abc12345
+
+        sindri triggers delete abc12345 --force
+    """
+    from sindri.triggers.store import TriggerStore
+
+    async def execute():
+        store = TriggerStore()
+
+        # Find trigger
+        triggers = await store.list_triggers()
+        matching = [t for t in triggers if t.id.startswith(trigger_id)]
+
+        if not matching:
+            console.print(f"[red]✗ No trigger found with ID starting with {trigger_id}[/]")
+            return
+
+        if len(matching) > 1:
+            console.print(f"[yellow]Multiple triggers match, use full ID[/]")
+            return
+
+        trigger = matching[0]
+
+        if not force:
+            confirm = click.confirm(
+                f"Delete trigger '{trigger.name}' ({trigger.id[:8]})?"
+            )
+            if not confirm:
+                console.print("[dim]Cancelled[/]")
+                return
+
+        deleted = await store.delete_trigger(trigger.id)
+        if deleted:
+            console.print(f"[green]✓ Deleted trigger:[/] {trigger.name}")
+        else:
+            console.print(f"[red]✗ Failed to delete trigger[/]")
+
+    asyncio.run(execute())
+
+
+@triggers.command("enable")
+@click.argument("trigger_id")
+def triggers_enable(trigger_id: str):
+    """Enable a trigger.
+
+    Examples:
+        sindri triggers enable abc12345
+    """
+    from sindri.triggers.store import TriggerStore
+    from sindri.triggers.models import TriggerStatus
+
+    async def execute():
+        store = TriggerStore()
+
+        triggers = await store.list_triggers()
+        matching = [t for t in triggers if t.id.startswith(trigger_id)]
+
+        if not matching:
+            console.print(f"[red]✗ No trigger found with ID starting with {trigger_id}[/]")
+            return
+
+        trigger = matching[0]
+
+        await store.update_trigger(trigger.id, {"status": TriggerStatus.ENABLED})
+        console.print(f"[green]✓ Enabled trigger:[/] {trigger.name}")
+
+    asyncio.run(execute())
+
+
+@triggers.command("disable")
+@click.argument("trigger_id")
+def triggers_disable(trigger_id: str):
+    """Disable a trigger.
+
+    Examples:
+        sindri triggers disable abc12345
+    """
+    from sindri.triggers.store import TriggerStore
+    from sindri.triggers.models import TriggerStatus
+
+    async def execute():
+        store = TriggerStore()
+
+        triggers = await store.list_triggers()
+        matching = [t for t in triggers if t.id.startswith(trigger_id)]
+
+        if not matching:
+            console.print(f"[red]✗ No trigger found with ID starting with {trigger_id}[/]")
+            return
+
+        trigger = matching[0]
+
+        await store.update_trigger(trigger.id, {"status": TriggerStatus.DISABLED})
+        console.print(f"[yellow]✓ Disabled trigger:[/] {trigger.name}")
+
+    asyncio.run(execute())
+
+
+@triggers.command("run")
+@click.argument("trigger_id")
+def triggers_run(trigger_id: str):
+    """Manually run a trigger.
+
+    Executes the trigger immediately, regardless of schedule.
+
+    Examples:
+        sindri triggers run abc12345
+    """
+    from sindri.triggers.store import TriggerStore
+    from sindri.triggers.executor import TriggerExecutor
+
+    async def execute():
+        store = TriggerStore()
+        executor = TriggerExecutor(store)
+
+        triggers = await store.list_triggers()
+        matching = [t for t in triggers if t.id.startswith(trigger_id)]
+
+        if not matching:
+            console.print(f"[red]✗ No trigger found with ID starting with {trigger_id}[/]")
+            return
+
+        trigger = matching[0]
+
+        console.print(f"[blue]Running trigger:[/] {trigger.name}")
+        console.print(f"[dim]Task:[/] {trigger.task_description[:60]}...")
+        console.print()
+
+        run = await executor.execute_trigger(trigger)
+
+        if run.success:
+            console.print(f"\n[green]✓ Trigger completed successfully[/]")
+            if run.result_summary:
+                console.print(f"[dim]Result:[/] {run.result_summary[:200]}")
+        else:
+            console.print(f"\n[red]✗ Trigger failed[/]")
+            if run.error:
+                console.print(f"[red]Error:[/] {run.error}")
+
+        console.print(f"\n[dim]Run ID:[/] {run.id}")
+        if run.duration_ms:
+            console.print(f"[dim]Duration:[/] {run.duration_ms:.0f}ms")
+
+    asyncio.run(execute())
+
+
+@triggers.command("history")
+@click.argument("trigger_id")
+@click.option("--limit", "-l", default=20, help="Number of runs to show")
+@click.option("--json", "as_json", is_flag=True, help="Output as JSON")
+def triggers_history(trigger_id: str, limit: int = 20, as_json: bool = False):
+    """View execution history for a trigger.
+
+    Shows recent trigger runs with their status and timing.
+
+    Examples:
+        sindri triggers history abc12345
+
+        sindri triggers history abc12345 --limit 50
+
+        sindri triggers history abc12345 --json
+    """
+    import json as json_module
+    from rich.table import Table
+
+    from sindri.triggers.store import TriggerStore
+
+    async def execute():
+        store = TriggerStore()
+
+        # Find trigger
+        triggers = await store.list_triggers()
+        matching = [t for t in triggers if t.id.startswith(trigger_id)]
+
+        if not matching:
+            console.print(f"[red]✗ No trigger found with ID starting with {trigger_id}[/]")
+            return
+
+        trigger = matching[0]
+
+        runs = await store.list_runs(trigger.id, limit=limit)
+
+        if as_json:
+            output = [r.to_dict() for r in runs]
+            console.print(json_module.dumps(output, indent=2, default=str))
+            return
+
+        if not runs:
+            console.print(f"[yellow]No run history for trigger {trigger.name}[/]")
+            return
+
+        console.print(f"[bold]Run History for:[/] {trigger.name}\n")
+
+        table = Table(show_header=True, header_style="bold blue")
+        table.add_column("Run ID", style="dim", width=10)
+        table.add_column("Started", width=18)
+        table.add_column("Duration", width=10)
+        table.add_column("Status", width=10)
+        table.add_column("Error", width=35)
+
+        for run in runs:
+            status = "[green]Success[/]" if run.success else "[red]Failed[/]"
+            duration = f"{run.duration_ms:.0f}ms" if run.duration_ms else "-"
+            error = run.error[:35] + "..." if run.error and len(run.error) > 35 else (run.error or "-")
+            started = run.started_at.strftime("%Y-%m-%d %H:%M")
+
+            table.add_row(run.id[:8], started, duration, status, error)
+
+        console.print(table)
+        console.print(f"\n[dim]Showing {len(runs)} of {trigger.run_count} total runs[/]")
+
+    asyncio.run(execute())
+
+
+@triggers.command("stats")
+def triggers_stats():
+    """Show aggregate trigger statistics.
+
+    Displays overall statistics for all triggers.
+
+    Examples:
+        sindri triggers stats
+    """
+    from rich.table import Table
+
+    from sindri.triggers.store import TriggerStore
+    from sindri.triggers.models import TriggerStatus
+
+    async def execute():
+        store = TriggerStore()
+        triggers = await store.list_triggers()
+
+        if not triggers:
+            console.print("[yellow]No triggers configured[/]")
+            return
+
+        # Aggregate stats
+        total = len(triggers)
+        enabled = sum(1 for t in triggers if t.status == TriggerStatus.ENABLED)
+        disabled = sum(1 for t in triggers if t.status == TriggerStatus.DISABLED)
+        paused = sum(1 for t in triggers if t.status == TriggerStatus.PAUSED)
+        total_runs = sum(t.run_count for t in triggers)
+        total_failures = sum(t.failure_count for t in triggers)
+
+        console.print(
+            Panel(
+                f"[bold]Total triggers:[/] {total}\n"
+                f"[green]Enabled:[/] {enabled}\n"
+                f"[dim]Disabled:[/] {disabled}\n"
+                f"[yellow]Paused:[/] {paused}\n"
+                f"\n[bold]Total runs:[/] {total_runs}\n"
+                f"[red]Total failures:[/] {total_failures}",
+                title="Trigger Statistics",
+            )
+        )
+
+        # Type breakdown
+        type_counts = {}
+        for t in triggers:
+            type_counts[t.trigger_type.value] = type_counts.get(t.trigger_type.value, 0) + 1
+
+        console.print("\n[bold]By Type:[/]")
+        for type_name, count in type_counts.items():
+            console.print(f"  {type_name}: {count}")
 
     asyncio.run(execute())
 

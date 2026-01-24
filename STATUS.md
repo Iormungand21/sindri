@@ -1,6 +1,6 @@
 # Sindri Status
 
-**Date:** 2026-01-23
+**Date:** 2026-01-24
 **Status:** Internal-only, single-user mode complete
 
 ## TL;DR
@@ -9,11 +9,13 @@
 - Plan-first execution (approval gates) and reproducible sessions (snapshots + replay).
 - Multi-project workspace index (background indexer, active contexts, per-project settings).
 - Performance telemetry stream (SSE endpoint, trace export, regression checking).
+- **Triggers & Automations** (ROADMAP Item 9) - cron triggers, CLI commands, notification hooks.
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 4,036 passing (100%).
+- Tests: 4,086 passing (100%).
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)
+- 2026-01-24: **Triggers & Automations** (ROADMAP Item 9) - Core foundation for scheduled task automation via cron expressions; `TriggerStore` for SQLite persistence (schema v9); `TriggerScheduler` background service with cron evaluation using croniter; `TriggerExecutor` for task creation via Orchestrator; `NotificationService` for desktop (notify-send) and log notifications; 11 `TRIGGER_*` event types; `TriggerConfig` in SindriConfig; CLI commands (`sindri triggers list/create/show/delete/enable/disable/run/history/stats`); +50 tests.
 - 2026-01-23: **Telemetry Wiring to Active Orchestrator** - TelemetryCollector now uses registration pattern to aggregate VRAM/concurrency metrics from all active Orchestrators; Orchestrator registers its ModelManager and TaskScheduler on init and unregisters on cleanup; web API metrics now reflect real workloads; +13 tests.
 - 2026-01-23: **MODEL_LOADED Event Emission** - Added `MODEL_LOADED` event emission in `hierarchical.py` when models are successfully loaded; emits for both primary and fallback models; enables `TelemetryCollector` to track agent→model relationships; event schema and handler already existed but were not being populated; +4 tests.
 - 2026-01-23: **Fallback Model Recording in Session Metadata** - Added `primary_model`, `fallback_model_used`, and `degradation_reason` fields to `EnvironmentSnapshot`; updated `SnapshotCapture.capture()` to accept fallback info; fixed session creation bug in `hierarchical.py` (was using `agent.model` instead of `model_to_use`); snapshots now record when model degradation occurs; fixed persistence in `SnapshotStore` to save/load fallback fields via config_snapshot_json; +11 tests.

@@ -16,7 +16,8 @@ log = structlog.get_logger()
 # Version 6: Added execution_plans and plan_steps tables for Plan-First Execution
 # Version 7: Added session_snapshots and session_tool_outputs for Reproducible Sessions
 # Version 8: Added error column to sessions table for failure/cancellation reasons
-SCHEMA_VERSION = 8
+# Version 9: Added triggers and trigger_runs tables for Triggers & Automations
+SCHEMA_VERSION = 9
 
 
 def _db_debug(message: str):
@@ -373,6 +374,108 @@ class Database:
                 columns = [row[1] async for row in cursor]
             if "error" not in columns:
                 await db.execute("ALTER TABLE sessions ADD COLUMN error TEXT")
+
+            # Version 9: Triggers & Automations (ROADMAP Item 9)
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS triggers (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    description TEXT DEFAULT '',
+                    trigger_type TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'enabled',
+                    task_description TEXT NOT NULL,
+                    agent TEXT DEFAULT 'brokkr',
+                    max_iterations INTEGER DEFAULT 30,
+                    work_dir TEXT,
+                    cron_expression TEXT,
+                    timezone TEXT DEFAULT 'UTC',
+                    webhook_secret TEXT,
+                    rate_limit_per_minute INTEGER DEFAULT 10,
+                    event_types TEXT,
+                    event_filters TEXT,
+                    notifications_json TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    last_run_at TIMESTAMP,
+                    next_run_at TIMESTAMP,
+                    run_count INTEGER DEFAULT 0,
+                    failure_count INTEGER DEFAULT 0,
+                    consecutive_failures INTEGER DEFAULT 0
+                )
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_triggers_type
+                ON triggers(trigger_type)
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_triggers_status
+                ON triggers(status)
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_triggers_next_run
+                ON triggers(next_run_at)
+            """
+            )
+
+            # Trigger runs history
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS trigger_runs (
+                    id TEXT PRIMARY KEY,
+                    trigger_id TEXT NOT NULL,
+                    trigger_name TEXT DEFAULT '',
+                    task_id TEXT,
+                    session_id TEXT,
+                    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    duration_ms REAL,
+                    success INTEGER NOT NULL DEFAULT 0,
+                    error TEXT,
+                    result_summary TEXT,
+                    webhook_payload TEXT,
+                    webhook_headers TEXT,
+                    event_type TEXT,
+                    event_data TEXT,
+                    FOREIGN KEY (trigger_id) REFERENCES triggers(id)
+                )
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_trigger_runs_trigger
+                ON trigger_runs(trigger_id)
+            """
+            )
+
+            await db.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_trigger_runs_started
+                ON trigger_runs(started_at)
+            """
+            )
+
+            # Webhook rate limiting
+            await db.execute(
+                """
+                CREATE TABLE IF NOT EXISTS webhook_rate_limits (
+                    trigger_id TEXT NOT NULL,
+                    minute_bucket INTEGER NOT NULL,
+                    request_count INTEGER DEFAULT 0,
+                    PRIMARY KEY (trigger_id, minute_bucket)
+                )
+            """
+            )
 
             # Update schema version
             await self._set_schema_version(db, SCHEMA_VERSION)
