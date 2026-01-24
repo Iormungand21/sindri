@@ -104,12 +104,14 @@ class RoutingPreferences:
         speed_preference: Speed vs quality tradeoff (0.0=quality, 1.0=speed)
         locked_models: Lock specific agents to specific models
         min_quality_score: Minimum acceptable model quality score
+        prefer_loaded_models: Whether to prefer already-loaded models for latency
     """
 
     model_overrides: dict[RoutingTaskCategory, str] = field(default_factory=dict)
     speed_preference: float = 0.5
     locked_models: dict[str, str] = field(default_factory=dict)
     min_quality_score: float = 0.3
+    prefer_loaded_models: bool = True
 
     def get_override(self, category: RoutingTaskCategory) -> Optional[str]:
         """Get model override for a category if set."""
@@ -126,6 +128,7 @@ class RoutingPreferences:
             "speed_preference": self.speed_preference,
             "locked_models": self.locked_models,
             "min_quality_score": self.min_quality_score,
+            "prefer_loaded_models": self.prefer_loaded_models,
         }
 
     @classmethod
@@ -143,6 +146,7 @@ class RoutingPreferences:
             speed_preference=data.get("speed_preference", 0.5),
             locked_models=data.get("locked_models", {}),
             min_quality_score=data.get("min_quality_score", 0.3),
+            prefer_loaded_models=data.get("prefer_loaded_models", True),
         )
 
 

@@ -304,8 +304,12 @@ class ModelRouter:
             candidates: List of viable ModelCapabilities
 
         Returns:
-            Reordered list with loaded models first
+            Reordered list with loaded models first (if prefer_loaded_models is True)
         """
+        # If prefer_loaded_models is disabled, return candidates as-is (by score)
+        if not self.preferences.prefer_loaded_models:
+            return candidates
+
         loaded = []
         not_loaded = []
 

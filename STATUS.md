@@ -13,7 +13,7 @@
 - **Triggers & Automations** (ROADMAP Item 9) - cron triggers, CLI commands, notification hooks, **REST API endpoints**.
 - **Agents as Plugins** (ROADMAP Item 8) - SDK for packaging agents with prompts and tests, bundle validation, CLI commands.
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 4,201 passing (100%).
+- Tests: 4,202 passing (100%).
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)
