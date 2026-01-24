@@ -3799,15 +3799,36 @@ def validate_api_spec(file_path: str):
 
 
 @cli.command()
-@click.option("--host", "-h", default="0.0.0.0", help="Host to bind to")
-@click.option("--port", "-p", default=8000, help="Port to listen on")
+@click.option(
+    "--host",
+    "-h",
+    default=None,
+    help="Host to bind to (default: from config or 127.0.0.1)",
+)
+@click.option("--port", "-p", default=None, type=int, help="Port to listen on (default: from config or 8000)")
 @click.option("--vram-gb", default=16.0, help="Total VRAM in GB")
 @click.option(
     "--work-dir", "-w", type=click.Path(), help="Working directory for file operations"
 )
+@click.option(
+    "--allow-origin",
+    multiple=True,
+    help="CORS allowed origin (can be repeated). Default: localhost + 127.0.0.1 on port",
+)
+@click.option(
+    "--allow-credentials/--no-allow-credentials",
+    default=None,
+    help="Allow credentials in CORS requests (default: from config or disabled)",
+)
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
 def web(
-    host: str, port: int, vram_gb: float, work_dir: str = None, reload: bool = False
+    host: str,
+    port: int,
+    vram_gb: float,
+    work_dir: str = None,
+    allow_origin: tuple = (),
+    allow_credentials: bool = None,
+    reload: bool = False,
 ):
     """Start the Sindri Web API server.
 
@@ -3816,8 +3837,19 @@ def web(
     - WebSocket for real-time event streaming
     - CORS support for frontend access
 
+    Security defaults (Web/API Hardening):
+    - Binds to localhost (127.0.0.1) by default
+    - CORS allows localhost + 127.0.0.1 by default
+    - Credentials disabled by default
+
+    Configuration can be set via sindri.toml [api] section or CLI flags.
+    CLI flags override config file settings.
+
     Example:
         sindri web --port 8080
+
+    For remote access (use with caution):
+        sindri web --host 0.0.0.0 --allow-origin https://myapp.example.com
 
     Then visit http://localhost:8080/docs for API documentation.
     """
@@ -3830,39 +3862,95 @@ def web(
         return
 
     from pathlib import Path
+    from sindri.config import SindriConfig
+    import os
+
+    # Load config from sindri.toml (provides defaults)
+    config = SindriConfig.load()
+    api_config = config.api
+
+    # CLI flags override config file
+    effective_host = host if host is not None else api_config.bind_host
+    effective_port = port if port is not None else api_config.bind_port
+    effective_credentials = (
+        allow_credentials if allow_credentials is not None else api_config.allow_credentials
+    )
+
+    # Build CORS allowed origins list
+    if allow_origin:
+        # CLI flags override config
+        allowed_origins = list(allow_origin)
+    else:
+        # Use config or generate defaults based on port
+        allowed_origins = api_config.get_allowed_origins(effective_port)
+
+    # Validate CORS configuration
+    try:
+        # Update api_config for validation
+        api_config.allowed_origins = allowed_origins
+        api_config.allow_credentials = effective_credentials
+        api_config.validate_cors_security(effective_port)
+    except ValueError as e:
+        console.print(f"[red]✗ CORS configuration error:[/red] {e}")
+        return
+
+    # Security warning for non-localhost binding
+    if effective_host != "127.0.0.1" and effective_host != "localhost":
+        console.print(
+            "[yellow]⚠ Warning: Binding to non-localhost address. "
+            "Ensure proper network security is in place.[/yellow]"
+        )
+
+    # Build info panel with CORS details
+    cors_info = ", ".join(allowed_origins[:3])
+    if len(allowed_origins) > 3:
+        cors_info += f" (+{len(allowed_origins) - 3} more)"
 
     console.print(
         Panel(
             f"[bold blue]Sindri Web API[/bold blue]\n\n"
-            f"Host: {host}\n"
-            f"Port: {port}\n"
-            f"VRAM: {vram_gb}GB",
+            f"Host: {effective_host}\n"
+            f"Port: {effective_port}\n"
+            f"VRAM: {vram_gb}GB\n"
+            f"CORS Origins: {cors_info}\n"
+            f"CORS Credentials: {effective_credentials}",
             title="🌐 Starting Server",
         )
     )
 
     work_path = Path(work_dir).resolve() if work_dir else None
 
-    console.print(f"\n[dim]API docs: http://{host}:{port}/docs[/dim]")
-    console.print(f"[dim]WebSocket: ws://{host}:{port}/ws[/dim]\n")
+    console.print(f"\n[dim]API docs: http://{effective_host}:{effective_port}/docs[/dim]")
+    console.print(f"[dim]WebSocket: ws://{effective_host}:{effective_port}/ws[/dim]\n")
 
     # Run server
     from sindri.web import create_app
 
     if reload:
         # Development mode with auto-reload
+        # Pass CORS config via environment variables so create_app can read them
+        os.environ["SINDRI_CORS_ORIGINS"] = ",".join(allowed_origins)
+        os.environ["SINDRI_CORS_CREDENTIALS"] = "1" if effective_credentials else "0"
+        os.environ["SINDRI_SERVER_PORT"] = str(effective_port)
+
         uvicorn.run(
             "sindri.web:create_app",
-            host=host,
-            port=port,
+            host=effective_host,
+            port=effective_port,
             reload=True,
             factory=True,
             log_level="info",
         )
     else:
-        # Production mode
-        app = create_app(vram_gb=vram_gb, work_dir=work_path)
-        uvicorn.run(app, host=host, port=port, log_level="info")
+        # Production mode with full config
+        app = create_app(
+            vram_gb=vram_gb,
+            work_dir=work_path,
+            allowed_origins=allowed_origins,
+            allow_credentials=effective_credentials,
+            port=effective_port,
+        )
+        uvicorn.run(app, host=effective_host, port=effective_port, log_level="info")
 
 
 # ============================================

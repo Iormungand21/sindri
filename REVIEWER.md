@@ -1,148 +1,205 @@
-# Review Summary: Record Fallback Model in Session Metadata
+# Review Summary: Web/API Hardening - Epic A (Safe Defaults and CORS)
 
-**Reviewer:** ChatGPT (Senior Reviewer)
-**Date:** 2026-01-23
+**Reviewer:** Codex
+**Date:** 2026-01-24
 **Author:** Claude Opus 4.5
+**PRD:** `docs/prds/WEB_API_HARDENING.md` - Epic A
 
 ## Summary
 
-Implemented fallback model recording in session metadata when model degradation occurs. When an agent's primary model can't load due to VRAM constraints and falls back to a smaller model, the session snapshot now records the original model requested, the fallback model used, and the reason for degradation.
+Implemented safe defaults and CORS validation for the Sindri web server. The server now binds to localhost by default, uses a configurable CORS allowlist, and rejects insecure CORS configurations (wildcard + credentials).
 
 ## Problem
 
-When model degradation occurred, the session metadata didn't track:
-1. Whether fallback was used vs. primary model
-2. What the original primary model was
-3. Why fallback was needed (e.g., insufficient VRAM)
-
-Additionally, there was a bug in `hierarchical.py:349` where new sessions were created with `agent.model` instead of `model_to_use`, so degraded sessions recorded the wrong model name.
+The web server had security issues:
+- Default bind to `0.0.0.0` exposed the API to all network interfaces
+- Hardcoded `allow_origins=["*"]` with `allow_credentials=True` - insecure and rejected by browsers
+- No configuration options for CORS settings
+- No validation of CORS security constraints
 
 ## Solution
 
-1. Added three optional fields to `EnvironmentSnapshot`:
-   - `primary_model`: Original requested model (when degradation occurred)
-   - `fallback_model_used`: Fallback model used (when degradation occurred)
-   - `degradation_reason`: Why fallback was needed
-
-2. Updated `SnapshotCapture.capture()` to accept the new fallback parameters
-
-3. Fixed session creation in `hierarchical.py` to use `model_to_use` instead of `agent.model`
-
-4. Updated snapshot capture call to pass fallback info when degradation detected
+1. **Default localhost binding** - Server now binds to `127.0.0.1` by default
+2. **Configurable CORS** - CLI flags, config file support, and environment variables
+3. **Port-aware defaults** - Default origins include both `localhost` and `127.0.0.1` with actual port
+4. **Security validation** - Rejects wildcard origin with credentials at startup
+5. **Reload mode support** - CORS config passed via environment variables
+6. **Full config file integration** - CLI options default to `None`, allowing sindri.toml to provide defaults
 
 ## Files Changed
 
 | File | Changes |
 |------|---------|
-| `sindri/persistence/snapshots.py` | Add 3 fallback fields to `EnvironmentSnapshot`, update `to_dict()` and `from_dict()`, fix `save_snapshot()` and `load_snapshot()` persistence |
-| `sindri/replay/snapshot.py` | Update `capture()` signature and implementation to accept fallback params |
-| `sindri/core/hierarchical.py` | Fix session creation (line 349), add degradation detection, pass fallback info to snapshot |
-| `tests/test_model_degradation.py` | Add 11 tests for fallback recording and persistence |
-| `STATUS.md` | Add entry, update test count to 4,019 |
-| `ROADMAP.md` | Mark junior task and item 11 as complete |
-| `FACTS.md` | Update test count |
+| `sindri/config.py` | Added `ApiConfig` model with `get_allowed_origins()` method (+65 lines) |
+| `sindri/cli.py` | Updated `web` command with None defaults, config loading (+70 lines) |
+| `sindri/web/server.py` | Configurable CORS, env var support, config-aware run_server (+55 lines) |
+| `tests/test_web.py` | Added 20 tests for CORS, env vars, port-aware defaults (+190 lines) |
+
+**Total:** +380 lines
 
 ## Key Implementation Details
 
-### 1. EnvironmentSnapshot Fields (`sindri/persistence/snapshots.py:95-100`)
+### 1. CLI Options Default to None (`sindri/cli.py:3802-3824`)
+
 ```python
-@dataclass
-class EnvironmentSnapshot:
-    # ... existing fields ...
-    # Fallback tracking for model degradation
-    primary_model: Optional[str] = None  # Original requested model (when degraded)
-    fallback_model_used: Optional[str] = None  # Fallback model used (when degraded)
-    degradation_reason: Optional[str] = None  # Why fallback was needed
+@click.option("--host", "-h", default=None, ...)  # None = use config
+@click.option("--port", "-p", default=None, type=int, ...)  # None = use config
+@click.option("--allow-credentials/--no-allow-credentials", default=None, ...)  # Tri-state
+
+def web(host, port, allow_credentials, ...):
+    config = SindriConfig.load()
+    api_config = config.api
+
+    # CLI flags override config file only when explicitly provided
+    effective_host = host if host is not None else api_config.bind_host
+    effective_port = port if port is not None else api_config.bind_port
+    effective_credentials = (
+        allow_credentials if allow_credentials is not None else api_config.allow_credentials
+    )
 ```
 
-### 2. SnapshotCapture Signature (`sindri/replay/snapshot.py:39-57`)
+### 2. Env Vars as Complete Package (`sindri/web/server.py:510-527`)
+
 ```python
-async def capture(
-    self,
-    model: str,
-    inference_params: Optional[InferenceParams] = None,
-    primary_model: Optional[str] = None,
-    fallback_model_used: Optional[str] = None,
-    degradation_reason: Optional[str] = None,
-) -> EnvironmentSnapshot:
+# Env vars are a complete package - only used when SINDRI_CORS_ORIGINS is set
+# AND no explicit allowed_origins were passed. This prevents partial overrides.
+env_origins = os.getenv("SINDRI_CORS_ORIGINS")
+
+if env_origins is not None and allowed_origins is None:
+    # Reload mode: CLI set env vars, use them as a complete package
+    allowed_origins = [o.strip() for o in env_origins.split(",") if o.strip()]
+    env_credentials = os.getenv("SINDRI_CORS_CREDENTIALS")
+    if env_credentials is not None:
+        allow_credentials = env_credentials == "1"
+    # ...
 ```
 
-### 3. Hierarchical Loop Changes (`sindri/core/hierarchical.py:346-372`)
-```python
-# Fix: Use model_to_use instead of agent.model for new sessions
-session = await self.state.create_session(task.description, model_to_use)
+### 3. run_server() Config Integration (`sindri/web/server.py:2212-2255`)
 
-# Track degradation and pass to snapshot
-degraded = active_model is not None and active_model != agent.model
-if is_new_session:
-    snapshot = await self._snapshot_capture.capture(
-        session.model,
-        primary_model=agent.model if degraded else None,
-        fallback_model_used=active_model if degraded else None,
-        degradation_reason="insufficient_vram" if degraded else None,
+```python
+def run_server(
+    host: Optional[str] = None,  # None = use config
+    port: Optional[int] = None,  # None = use config
+    allow_credentials: Optional[bool] = None,  # None = use config
+    ...
+):
+    config = SindriConfig.load()
+    api_config = config.api
+
+    effective_host = host if host is not None else api_config.bind_host
+    effective_port = port if port is not None else api_config.bind_port
+    effective_credentials = (
+        allow_credentials if allow_credentials is not None else api_config.allow_credentials
     )
 ```
 
 ## Tests Run
 
 ```bash
-.venv/bin/pytest tests/test_model_degradation.py tests/test_replay.py -v --tb=short
-# 65 passed in 1.42s
-
-.venv/bin/pytest tests/ -v --tb=short -q
-# 4019 passed, 13 skipped in 31.58s
+.venv/bin/pytest tests/test_web.py -v
+# 64 passed in 3.16s
 ```
 
-New tests added:
-- `TestEnvironmentSnapshotFallback::test_fallback_fields_exist`
-- `TestEnvironmentSnapshotFallback::test_fallback_fields_optional`
-- `TestEnvironmentSnapshotFallback::test_to_dict_with_fallback`
-- `TestEnvironmentSnapshotFallback::test_to_dict_without_fallback`
-- `TestEnvironmentSnapshotFallback::test_from_dict_with_fallback`
-- `TestEnvironmentSnapshotFallback::test_from_dict_backward_compatible`
-- `TestSnapshotCaptureFallback::test_capture_without_fallback`
-- `TestSnapshotCaptureFallback::test_capture_with_fallback`
-- `TestSnapshotCaptureFallback::test_capture_roundtrip`
-- `TestSnapshotStoreFallbackPersistence::test_fallback_fields_persist_roundtrip`
-- `TestSnapshotStoreFallbackPersistence::test_no_fallback_fields_persist_roundtrip`
+### Test Coverage (20 new tests)
 
-### 4. SnapshotStore Persistence Fix (`sindri/persistence/snapshots.py:197-235, 260-283`)
-```python
-# save_snapshot: Include fallback fields in config_snapshot_json
-config_with_fallback = dict(snapshot.config_snapshot)
-if snapshot.primary_model:
-    config_with_fallback["_fallback_primary_model"] = snapshot.primary_model
-if snapshot.fallback_model_used:
-    config_with_fallback["_fallback_model_used"] = snapshot.fallback_model_used
-if snapshot.degradation_reason:
-    config_with_fallback["_fallback_degradation_reason"] = snapshot.degradation_reason
+| Test Class | Tests | Coverage |
+|------------|-------|----------|
+| TestCORSConfiguration | 6 | Default origins, custom origins, wildcard rejection, credentials |
+| TestServerDefaults | 2 | Config defaults, None parameters |
+| TestApiConfigModel | 5 | Defaults, custom values, security validation, get_allowed_origins() |
+| TestCORSEnvironmentVariables | 4 | Env vars for origins, credentials, port; explicit args override |
+| TestRunServerConfigIntegration | 1 | run_server uses None defaults |
+| TestPortAwareDefaults | 2 | Port-aware defaults, both localhost and 127.0.0.1 |
 
-# load_snapshot: Extract fallback fields from config_snapshot
-config_data = json.loads(row["config_snapshot_json"])
-primary_model = config_data.pop("_fallback_primary_model", None)
-fallback_model_used = config_data.pop("_fallback_model_used", None)
-degradation_reason = config_data.pop("_fallback_degradation_reason", None)
-```
+## Review Findings Addressed (Round 2)
+
+### Finding 1: CLI options had non-None defaults (FIXED)
+
+**Problem:** `--host`, `--port` had hardcoded defaults, ignoring sindri.toml.
+
+**Fix:**
+- Changed all config-related options to `default=None`
+- Changed `--allow-credentials` to `--allow-credentials/--no-allow-credentials` for tri-state
+- CLI now loads `SindriConfig.load()` and uses `config.api` when flags are None
+
+### Finding 2: Env vars could partially override explicit args (FIXED)
+
+**Problem:** `allow_credentials` from env could override explicit `allow_credentials=False`.
+
+**Fix:**
+- Env vars are now a complete package: only used when `SINDRI_CORS_ORIGINS` is set AND `allowed_origins is None`
+- If explicit origins are passed, no env vars are read
+
+### Finding 3: run_server() didn't pull from SindriConfig (FIXED)
+
+**Problem:** Direct callers of `run_server()` didn't get config-based CORS.
+
+**Fix:**
+- `run_server()` parameters now default to `None`
+- Loads `SindriConfig.load()` internally and uses `config.api` for defaults
 
 ## Backward Compatibility
 
-- New fields are Optional with None defaults
-- `to_dict()` only includes fallback fields when set (non-None)
-- `from_dict()` uses `.get()` so existing snapshots without these fields load correctly
-- No database schema migration needed (fallback fields stored in existing config_snapshot_json column)
-- Existing snapshots load cleanly (config_data.pop returns None for missing keys)
+- **Breaking change:** Default host changed from `0.0.0.0` to `127.0.0.1`
+  - Users relying on remote access must explicitly use `--host 0.0.0.0`
+- **Breaking change:** CORS no longer allows all origins by default
+  - Users need to specify `--allow-origin` for non-localhost origins
+- **Credential default:** Changed from `True` to `False` (more secure)
+
+## Usage Examples
+
+```bash
+# Local development (default - secure)
+sindri web
+
+# Custom port (defaults adapt automatically)
+sindri web --port 9000
+# CORS: http://localhost:9000, http://127.0.0.1:9000
+
+# Config file (sindri.toml)
+# [api]
+# bind_host = "0.0.0.0"
+# bind_port = 9000
+# allowed_origins = ["https://myapp.com"]
+# allow_credentials = true
+sindri web  # Uses ALL config file settings
+
+# CLI override of specific setting
+sindri web --host 127.0.0.1  # Overrides just host, port/credentials from config
+
+# Explicit disable credentials (overrides config)
+sindri web --no-allow-credentials
+
+# Reload mode (CORS config preserved via env vars)
+sindri web --port 8080 --allow-origin https://dev.local --reload
+```
+
+## PRD Epic A Checklist
+
+| Task | Status |
+|------|--------|
+| Update web CLI and server defaults to `127.0.0.1` | ✅ |
+| Add CORS config validation with hard error on wildcard+credentials | ✅ |
+| Add config schema for `api.allowed_origins` and `api.allow_credentials` | ✅ |
+| Update startup logs to include CORS/auth info | ✅ |
+| Add CLI flags `--allow-origin`, `--allow-credentials/--no-allow-credentials` | ✅ |
+| CLI options default to None for config integration | ✅ |
+| run_server() uses SindriConfig for defaults | ✅ |
+| Env vars only apply as complete package | ✅ |
+| Default origins include both localhost and 127.0.0.1 | ✅ |
+| Port-aware default origins | ✅ |
+| Tests for all new behavior | ✅ (20 tests) |
 
 ## Files for Focused Review
 
-1. `sindri/persistence/snapshots.py:86-141` - EnvironmentSnapshot class with new fields
-2. `sindri/persistence/snapshots.py:197-235` - SnapshotStore.save_snapshot() with fallback persistence
-3. `sindri/persistence/snapshots.py:260-283` - SnapshotStore.load_snapshot() with fallback extraction
-4. `sindri/replay/snapshot.py:39-90` - SnapshotCapture.capture() method
-5. `sindri/core/hierarchical.py:346-372` - Session creation and snapshot capture
-6. `tests/test_model_degradation.py:92-217` - New test classes including persistence tests
+1. `sindri/config.py:155-230` - ApiConfig model and get_allowed_origins()
+2. `sindri/web/server.py:500-560` - create_app CORS and env var handling
+3. `sindri/web/server.py:2212-2255` - run_server config integration
+4. `sindri/cli.py:3801-3965` - CLI web command with None defaults
+5. `tests/test_web.py:1245-1440` - New CORS/config tests
 
-## Next Features
+## Next Steps (Future Epics)
 
-Remaining junior tasks from ROADMAP:
-- Wire TelemetryCollector to the active orchestrator scheduler/model manager
-- Emit `MODEL_LOADED` events to populate telemetry agent to model tracking
+- **Epic B:** API Authentication (tokens, middleware, audit logging)
+- **Epic C:** API Work Dir and Path Guardrails
+- **Epic D:** Documentation and Migration notes

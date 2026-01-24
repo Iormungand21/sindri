@@ -153,6 +153,77 @@ class RoutingConfig(BaseModel):
     )
 
 
+class ApiConfig(BaseModel):
+    """Web API configuration (Web/API Hardening PRD - Epic A).
+
+    Controls the security defaults for the Sindri web server including
+    bind host and CORS settings.
+    """
+
+    bind_host: str = Field(
+        default="127.0.0.1",
+        description="Host to bind the web server to (default: localhost only)",
+    )
+    bind_port: int = Field(
+        default=8000,
+        ge=1,
+        le=65535,
+        description="Port to listen on",
+    )
+    allowed_origins: Optional[List[str]] = Field(
+        default=None,
+        description="CORS allowed origins (None = auto-generate from port; use specific origins, not '*' with credentials)",
+    )
+    allow_credentials: bool = Field(
+        default=False,
+        description="Allow credentials in CORS requests (cannot be True with wildcard origins)",
+    )
+
+    @field_validator("allowed_origins")
+    @classmethod
+    def validate_origins_not_empty(cls, v):
+        """Ensure allowed_origins is not empty if provided."""
+        if v is not None and len(v) == 0:
+            raise ValueError("allowed_origins cannot be empty if provided")
+        return v
+
+    def get_allowed_origins(self, port: Optional[int] = None) -> List[str]:
+        """Get allowed origins, generating defaults if not explicitly set.
+
+        Args:
+            port: Port to use for default origins (falls back to bind_port)
+
+        Returns:
+            List of allowed origins
+        """
+        if self.allowed_origins is not None:
+            return self.allowed_origins
+
+        # Generate defaults based on port
+        effective_port = port if port is not None else self.bind_port
+        return [
+            f"http://localhost:{effective_port}",
+            f"http://127.0.0.1:{effective_port}",
+        ]
+
+    def validate_cors_security(self, port: Optional[int] = None) -> None:
+        """Validate CORS configuration for security issues.
+
+        Args:
+            port: Port to use for resolving default origins
+
+        Raises:
+            ValueError: If wildcard origin is used with credentials enabled
+        """
+        origins = self.get_allowed_origins(port)
+        if self.allow_credentials and "*" in origins:
+            raise ValueError(
+                "CORS security error: allow_credentials=True cannot be used with "
+                "wildcard origin '*'. This combination is rejected by browsers and "
+                "indicates a misconfiguration. Use specific origins instead."
+            )
+
+
 class MemoryConfig(BaseModel):
     """Memory system configuration."""
 
@@ -202,6 +273,9 @@ class SindriConfig(BaseModel):
 
     # Model Routing (ROADMAP Item 10)
     routing: RoutingConfig = Field(default_factory=RoutingConfig)
+
+    # Web API (Web/API Hardening PRD)
+    api: ApiConfig = Field(default_factory=ApiConfig)
 
     # TUI
     tui: TUIConfig = Field(default_factory=TUIConfig)

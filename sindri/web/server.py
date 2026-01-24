@@ -480,16 +480,65 @@ class SindriAPI:
         log.info("sindri_api_shutdown")
 
 
-def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAPI:
+def create_app(
+    vram_gb: float = 16.0,
+    work_dir: Optional[Path] = None,
+    allowed_origins: Optional[list[str]] = None,
+    allow_credentials: bool = False,
+    port: int = 8000,
+) -> FastAPI:
     """Create and configure the FastAPI application.
 
     Args:
         vram_gb: Total VRAM available in GB
         work_dir: Working directory for file operations
+        allowed_origins: CORS allowed origins (default: localhost + 127.0.0.1 on given port)
+        allow_credentials: Allow credentials in CORS requests
+        port: Server port for generating default origins
 
     Returns:
         Configured FastAPI application
+
+    Raises:
+        ValueError: If CORS configuration is insecure (wildcard + credentials)
+
+    Environment Variables (for reload mode):
+        SINDRI_CORS_ORIGINS: Comma-separated list of allowed origins (triggers env var mode)
+        SINDRI_CORS_CREDENTIALS: "1" to enable credentials, "0" to disable
+        SINDRI_SERVER_PORT: Port for generating default origins
     """
+    # Check for environment variables (used in reload mode)
+    # Env vars are a complete package - only used when SINDRI_CORS_ORIGINS is set
+    # AND no explicit allowed_origins were passed. This prevents partial overrides.
+    env_origins = os.getenv("SINDRI_CORS_ORIGINS")
+
+    if env_origins is not None and allowed_origins is None:
+        # Reload mode: CLI set env vars, use them as a complete package
+        allowed_origins = [o.strip() for o in env_origins.split(",") if o.strip()]
+        env_credentials = os.getenv("SINDRI_CORS_CREDENTIALS")
+        if env_credentials is not None:
+            allow_credentials = env_credentials == "1"
+        env_port = os.getenv("SINDRI_SERVER_PORT")
+        if env_port is not None:
+            try:
+                port = int(env_port)
+            except ValueError:
+                pass
+
+    # Default CORS origins - both localhost and 127.0.0.1 for the actual port
+    if allowed_origins is None:
+        allowed_origins = [
+            f"http://localhost:{port}",
+            f"http://127.0.0.1:{port}",
+        ]
+
+    # Validate CORS security: reject wildcard with credentials
+    if allow_credentials and "*" in allowed_origins:
+        raise ValueError(
+            "CORS security error: allow_credentials=True cannot be used with "
+            "wildcard origin '*'. This combination is rejected by browsers and "
+            "indicates a misconfiguration. Use specific origins instead."
+        )
 
     api = SindriAPI(vram_gb=vram_gb, work_dir=work_dir)
 
@@ -499,6 +548,14 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         _ws_debug("lifespan: start")
         await api.initialize()
         _ws_debug("lifespan: initialized")
+
+        # Log startup configuration
+        log.info(
+            "sindri_api_cors_config",
+            allowed_origins=allowed_origins,
+            allow_credentials=allow_credentials,
+        )
+
         yield
         _ws_debug("lifespan: shutdown")
         await api.shutdown()
@@ -510,11 +567,11 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         lifespan=lifespan,
     )
 
-    # Add CORS middleware for frontend access
+    # Add CORS middleware with secure defaults (Web/API Hardening PRD - Epic A)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Configure for production
-        allow_credentials=True,
+        allow_origins=allowed_origins,
+        allow_credentials=allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -2153,20 +2210,48 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
 
 
 def run_server(
-    host: str = "0.0.0.0",
-    port: int = 8000,
+    host: Optional[str] = None,
+    port: Optional[int] = None,
     vram_gb: float = 16.0,
     work_dir: Optional[Path] = None,
+    allowed_origins: Optional[list[str]] = None,
+    allow_credentials: Optional[bool] = None,
 ):
     """Run the Sindri API server.
 
     Args:
-        host: Host to bind to
-        port: Port to listen on
+        host: Host to bind to (default: from config or 127.0.0.1)
+        port: Port to listen on (default: from config or 8000)
         vram_gb: Total VRAM available
         work_dir: Working directory for file operations
+        allowed_origins: CORS allowed origins (default: from config or localhost + 127.0.0.1)
+        allow_credentials: Allow credentials in CORS requests (default: from config or False)
+
+    Configuration is loaded from sindri.toml if available. Explicit arguments override config.
     """
     import uvicorn
+    from sindri.config import SindriConfig
 
-    app = create_app(vram_gb=vram_gb, work_dir=work_dir)
-    uvicorn.run(app, host=host, port=port, log_level="info")
+    # Load config for defaults
+    config = SindriConfig.load()
+    api_config = config.api
+
+    # Apply config defaults where args are None
+    effective_host = host if host is not None else api_config.bind_host
+    effective_port = port if port is not None else api_config.bind_port
+    effective_credentials = (
+        allow_credentials if allow_credentials is not None else api_config.allow_credentials
+    )
+
+    # Build CORS origins - use provided, config, or generate defaults
+    if allowed_origins is None:
+        allowed_origins = api_config.get_allowed_origins(effective_port)
+
+    app = create_app(
+        vram_gb=vram_gb,
+        work_dir=work_dir,
+        allowed_origins=allowed_origins,
+        allow_credentials=effective_credentials,
+        port=effective_port,
+    )
+    uvicorn.run(app, host=effective_host, port=effective_port, log_level="info")

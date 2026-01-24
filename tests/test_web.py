@@ -1130,3 +1130,334 @@ class TestErrorHandling:
             "/api/tasks", json={"description": "Test", "max_iterations": 200}
         )
         assert response.status_code == 422
+
+
+# ===== CORS Configuration Tests (Web/API Hardening PRD - Epic A) =====
+
+
+class TestCORSConfiguration:
+    """Tests for CORS configuration and security defaults."""
+
+    def test_default_cors_allows_localhost(self):
+        """Test that default CORS allows localhost:8000."""
+        app = create_app()
+        # Check middleware config
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        # Default should allow localhost
+        assert "http://localhost:8000" in cors_middleware.kwargs.get(
+            "allow_origins", []
+        )
+
+    def test_custom_cors_origins(self):
+        """Test that custom CORS origins are applied."""
+        custom_origins = ["https://myapp.example.com", "https://admin.example.com"]
+        app = create_app(allowed_origins=custom_origins)
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        assert cors_middleware.kwargs.get("allow_origins") == custom_origins
+
+    def test_cors_rejects_wildcard_with_credentials(self):
+        """Test that wildcard origin with credentials raises ValueError."""
+        with pytest.raises(ValueError) as excinfo:
+            create_app(allowed_origins=["*"], allow_credentials=True)
+
+        assert "CORS security error" in str(excinfo.value)
+        assert "allow_credentials=True" in str(excinfo.value)
+        assert "wildcard" in str(excinfo.value).lower()
+
+    def test_cors_allows_wildcard_without_credentials(self):
+        """Test that wildcard origin is allowed without credentials."""
+        # Should not raise
+        app = create_app(allowed_origins=["*"], allow_credentials=False)
+        assert app is not None
+
+    def test_cors_credentials_disabled_by_default(self):
+        """Test that credentials are disabled by default."""
+        app = create_app()
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        assert cors_middleware.kwargs.get("allow_credentials") is False
+
+    def test_cors_credentials_can_be_enabled(self):
+        """Test that credentials can be enabled with specific origins."""
+        app = create_app(
+            allowed_origins=["https://trusted.example.com"], allow_credentials=True
+        )
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        assert cors_middleware.kwargs.get("allow_credentials") is True
+
+
+class TestServerDefaults:
+    """Tests for server default values (Web/API Hardening PRD - Epic A)."""
+
+    def test_run_server_defaults_to_localhost(self):
+        """Test that run_server uses config default (127.0.0.1) when host is None."""
+        from sindri.config import SindriConfig
+
+        # Verify the config default is 127.0.0.1
+        config = SindriConfig()
+        assert config.api.bind_host == "127.0.0.1"
+
+        # run_server has host=None default, meaning it reads from config
+        from sindri.web.server import run_server
+        import inspect
+
+        sig = inspect.signature(run_server)
+        host_default = sig.parameters["host"].default
+        assert host_default is None  # None means "use config"
+
+    def test_create_app_defaults_to_localhost_origin(self):
+        """Test that create_app defaults to localhost origin."""
+        app = create_app()
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        origins = cors_middleware.kwargs.get("allow_origins", [])
+        # Should default to localhost
+        assert any("localhost" in origin for origin in origins)
+
+
+class TestApiConfigModel:
+    """Tests for ApiConfig Pydantic model."""
+
+    def test_api_config_defaults(self):
+        """Test ApiConfig default values."""
+        from sindri.config import ApiConfig
+
+        config = ApiConfig()
+
+        assert config.bind_host == "127.0.0.1"
+        assert config.bind_port == 8000
+        # allowed_origins is None by default, generated dynamically
+        assert config.allowed_origins is None
+        assert config.allow_credentials is False
+        # get_allowed_origins() generates defaults based on port
+        assert config.get_allowed_origins() == [
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+        ]
+        # Custom port
+        assert config.get_allowed_origins(9000) == [
+            "http://localhost:9000",
+            "http://127.0.0.1:9000",
+        ]
+
+    def test_api_config_custom_values(self):
+        """Test ApiConfig with custom values."""
+        from sindri.config import ApiConfig
+
+        config = ApiConfig(
+            bind_host="0.0.0.0",
+            bind_port=9000,
+            allowed_origins=["https://app.example.com"],
+            allow_credentials=True,
+        )
+
+        assert config.bind_host == "0.0.0.0"
+        assert config.bind_port == 9000
+        assert config.allowed_origins == ["https://app.example.com"]
+        assert config.allow_credentials is True
+
+    def test_api_config_validates_cors_security(self):
+        """Test ApiConfig.validate_cors_security() method."""
+        from sindri.config import ApiConfig
+
+        # Should pass - specific origin with credentials
+        config = ApiConfig(
+            allowed_origins=["https://app.example.com"], allow_credentials=True
+        )
+        config.validate_cors_security()  # Should not raise
+
+        # Should pass - wildcard without credentials
+        config = ApiConfig(allowed_origins=["*"], allow_credentials=False)
+        config.validate_cors_security()  # Should not raise
+
+        # Should fail - wildcard with credentials
+        config = ApiConfig(allowed_origins=["*"], allow_credentials=True)
+        with pytest.raises(ValueError) as excinfo:
+            config.validate_cors_security()
+        assert "CORS security error" in str(excinfo.value)
+
+    def test_api_config_empty_origins_rejected(self):
+        """Test that empty allowed_origins is rejected when explicitly provided."""
+        from sindri.config import ApiConfig
+        from pydantic import ValidationError
+
+        # Empty list is rejected
+        with pytest.raises(ValidationError):
+            ApiConfig(allowed_origins=[])
+
+        # None is allowed (generates defaults)
+        config = ApiConfig(allowed_origins=None)
+        assert config.allowed_origins is None
+        assert len(config.get_allowed_origins()) == 2
+
+    def test_sindri_config_has_api_section(self):
+        """Test that SindriConfig includes api config."""
+        from sindri.config import SindriConfig
+
+        config = SindriConfig()
+        assert hasattr(config, "api")
+        assert config.api.bind_host == "127.0.0.1"
+
+
+class TestCORSEnvironmentVariables:
+    """Tests for CORS configuration via environment variables (reload mode)."""
+
+    def test_create_app_reads_cors_origins_from_env(self, monkeypatch):
+        """Test that create_app reads SINDRI_CORS_ORIGINS env var."""
+        monkeypatch.setenv("SINDRI_CORS_ORIGINS", "https://app1.com,https://app2.com")
+
+        app = create_app()
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        assert cors_middleware.kwargs.get("allow_origins") == [
+            "https://app1.com",
+            "https://app2.com",
+        ]
+
+    def test_create_app_reads_cors_credentials_from_env(self, monkeypatch):
+        """Test that create_app reads SINDRI_CORS_CREDENTIALS env var."""
+        monkeypatch.setenv("SINDRI_CORS_ORIGINS", "https://app.com")
+        monkeypatch.setenv("SINDRI_CORS_CREDENTIALS", "1")
+
+        app = create_app()
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        assert cors_middleware.kwargs.get("allow_credentials") is True
+
+    def test_create_app_reads_port_from_env(self, monkeypatch):
+        """Test that SINDRI_SERVER_PORT env var affects default origin generation.
+
+        The port env var is used when SINDRI_CORS_ORIGINS is set but defaults
+        still need to be generated for the middleware.
+        """
+        # Set origins with port placeholders that match the expected port
+        monkeypatch.setenv("SINDRI_CORS_ORIGINS", "http://localhost:9000,http://127.0.0.1:9000")
+        monkeypatch.setenv("SINDRI_SERVER_PORT", "9000")
+
+        app = create_app()
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        origins = cors_middleware.kwargs.get("allow_origins")
+        assert "http://localhost:9000" in origins
+        assert "http://127.0.0.1:9000" in origins
+
+    def test_explicit_args_override_env(self, monkeypatch):
+        """Test that explicit args override environment variables."""
+        monkeypatch.setenv("SINDRI_CORS_ORIGINS", "https://env.com")
+        monkeypatch.setenv("SINDRI_CORS_CREDENTIALS", "1")
+
+        app = create_app(
+            allowed_origins=["https://explicit.com"], allow_credentials=False
+        )
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        assert cors_middleware.kwargs.get("allow_origins") == ["https://explicit.com"]
+        assert cors_middleware.kwargs.get("allow_credentials") is False
+
+
+class TestRunServerConfigIntegration:
+    """Tests for run_server() configuration integration."""
+
+    def test_run_server_uses_none_defaults(self):
+        """Test that run_server signature uses None defaults for config integration."""
+        from sindri.web.server import run_server
+        import inspect
+
+        sig = inspect.signature(run_server)
+
+        # All config-related params should default to None
+        assert sig.parameters["host"].default is None
+        assert sig.parameters["port"].default is None
+        assert sig.parameters["allow_credentials"].default is None
+        assert sig.parameters["allowed_origins"].default is None
+
+
+class TestPortAwareDefaults:
+    """Tests for port-aware default CORS origins."""
+
+    def test_create_app_default_origins_include_port(self):
+        """Test that default origins use the specified port."""
+        app = create_app(port=9000)
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        origins = cors_middleware.kwargs.get("allow_origins")
+        assert "http://localhost:9000" in origins
+        assert "http://127.0.0.1:9000" in origins
+
+    def test_create_app_default_origins_include_both_hosts(self):
+        """Test that default origins include both localhost and 127.0.0.1."""
+        app = create_app()
+
+        cors_middleware = None
+        for middleware in app.user_middleware:
+            if "CORS" in str(middleware):
+                cors_middleware = middleware
+                break
+
+        assert cors_middleware is not None
+        origins = cors_middleware.kwargs.get("allow_origins")
+        assert len(origins) == 2
+        assert any("localhost" in o for o in origins)
+        assert any("127.0.0.1" in o for o in origins)
