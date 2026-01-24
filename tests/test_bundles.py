@@ -427,6 +427,69 @@ class TestBundleValidator:
 
         assert any("VRAM" in w or "vram" in w.lower() for w in result.warnings)
 
+    @pytest.mark.asyncio
+    async def test_validate_warns_missing_dependency_models(self, temp_bundle_dir):
+        """Test validation warns about models in dependencies.models."""
+        bundle_dir = temp_bundle_dir / "dep_models"
+        bundle_dir.mkdir()
+
+        import toml
+
+        manifest = {
+            "bundle": {"schema_version": 1},
+            "agent": {
+                "name": "dep_models",
+                "role": "Test",
+                "model": "qwen2.5-coder:7b",
+            },
+            "dependencies": {
+                "models": ["qwen2.5-coder:7b", "extra-model:14b"],  # Extra model
+            },
+            "prompt": {"content": "Test"},
+        }
+
+        with open(bundle_dir / MANIFEST_FILENAME, "w") as f:
+            toml.dump(manifest, f)
+
+        validator = BundleValidator(
+            available_models={"qwen2.5-coder:7b"},  # Missing extra-model
+        )
+        result = await validator.validate(bundle_dir)
+
+        assert result.valid  # Still valid, just warnings
+        assert any("extra-model:14b" in w for w in result.warnings)
+
+    @pytest.mark.asyncio
+    async def test_validate_warns_plugin_dependencies(self, temp_bundle_dir):
+        """Test validation warns about plugin dependencies."""
+        bundle_dir = temp_bundle_dir / "plugin_deps"
+        bundle_dir.mkdir()
+
+        import toml
+
+        manifest = {
+            "bundle": {"schema_version": 1},
+            "agent": {
+                "name": "plugin_deps",
+                "role": "Test",
+                "model": "qwen2.5-coder:7b",
+            },
+            "dependencies": {
+                "plugins": ["my-plugin>=1.0", "other-plugin"],
+            },
+            "prompt": {"content": "Test"},
+        }
+
+        with open(bundle_dir / MANIFEST_FILENAME, "w") as f:
+            toml.dump(manifest, f)
+
+        validator = BundleValidator()
+        result = await validator.validate(bundle_dir)
+
+        assert result.valid  # Still valid, just warnings
+        assert any("my-plugin" in w for w in result.warnings)
+        assert any("other-plugin" in w for w in result.warnings)
+
 
 class TestAgentSDK:
     """Tests for AgentSDK."""

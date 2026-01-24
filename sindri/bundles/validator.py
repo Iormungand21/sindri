@@ -272,6 +272,24 @@ class BundleValidator:
                     f"Fallback model '{manifest.agent.fallback_model}' not available"
                 )
 
+        # Check all models in dependencies.models
+        for dep_model in manifest.dependencies.models:
+            if self.available_models and dep_model not in self.available_models:
+                result.add_warning(
+                    f"Dependency model '{dep_model}' not in available models. "
+                    "Ensure it's installed in Ollama."
+                )
+
+        # Check plugin dependencies
+        for plugin_spec in manifest.dependencies.plugins:
+            # Plugin specs can include version like "my-plugin>=1.0"
+            # Extract just the plugin name for checking
+            plugin_name = plugin_spec.split(">=")[0].split("<=")[0].split("==")[0].split(">")[0].split("<")[0].strip()
+            result.add_warning(
+                f"Plugin dependency '{plugin_spec}' declared. "
+                "Ensure plugin is installed before using this bundle."
+            )
+
         # Check version compatibility
         self._check_version_compatibility(manifest.metadata.sindri_version, result)
 
