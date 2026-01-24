@@ -12,7 +12,7 @@ Grouped by logical capability area.
 
 **Suggested sequencing:**
 - **Near-term (0–2 months):** items 1 ✅, 2 ✅, 3 ✅, 4 ✅, 5 ✅, 6 ✅, 7 ✅
-- **Mid-term (2–4 months):** items 8, 9 ✅
+- **Mid-term (2–4 months):** items 8 ✅, 9 ✅
 - **Long-term (4–6 months):** item 10
 
 ### Stability + Bugfixes
@@ -91,10 +91,14 @@ Grouped by logical capability area.
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Emit `MODEL_LOADED` events to populate telemetry agent→model tracking
 
 ### Extensibility + Automation
-8. **Agents as Plugins**
-   - SDK for packaging agents + prompts + tests
-   - Compatibility validation and versioned bundles
-   - Marketplace metadata for local-only distribution
+8. **Agents as Plugins** ✅ **COMPLETE**
+   - ✅ SDK for packaging agents + prompts + tests (AgentSDK with create_bundle, from_definition, scaffold)
+   - ✅ Compatibility validation and versioned bundles (BundleValidator with test execution)
+   - ✅ Marketplace metadata for local-only distribution (BundleMetadata with version, author, category, tags)
+   - ✅ Bundle directory format with sindri-agent.toml manifest
+   - ✅ CLI commands: `sindri bundle create/validate/install/export/test/list/info/uninstall`
+   - ✅ PluginManager integration for bundle discovery and registration
+   - ✅ +35 tests
 9. **Triggers & Automations** ✅ **COMPLETE**
    - ✅ Core trigger models (`TriggerDefinition`, `TriggerRun`, `NotificationHook`)
    - ✅ Database schema v9 with `triggers` and `trigger_runs` tables

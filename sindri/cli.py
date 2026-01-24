@@ -1223,6 +1223,371 @@ def plugins_dirs():
 
 
 # ============================================
+# Agent Bundle Commands
+# ============================================
+
+
+@cli.group()
+def bundle():
+    """Agent bundle management.
+
+    Bundles package agents with prompts, tests, and metadata for distribution.
+    """
+    pass
+
+
+@bundle.command("create")
+@click.argument("name")
+@click.option("--role", "-r", required=True, help="Agent role description")
+@click.option(
+    "--model", "-m", default="qwen2.5-coder:7b", help="Ollama model name"
+)
+@click.option("--output", "-o", type=click.Path(), help="Output directory")
+@click.option("--no-tests", is_flag=True, help="Skip test scaffolding")
+@click.option("--author", "-a", default="", help="Author name")
+def bundle_create(
+    name: str,
+    role: str,
+    model: str,
+    output: str,
+    no_tests: bool,
+    author: str,
+):
+    """Create a new agent bundle.
+
+    Creates a bundle directory with manifest, prompt file, and optional tests.
+    """
+    from pathlib import Path
+    from sindri.bundles.sdk import AgentSDK
+
+    output_dir = Path(output) if output else Path.cwd()
+
+    # Generate a placeholder prompt
+    prompt = f"""You are {name}, a specialized Sindri agent.
+
+Role: {role}
+
+Your task is to assist users with your area of expertise.
+Follow best practices and be thorough in your responses.
+"""
+
+    bundle_path = AgentSDK.create_bundle(
+        name=name,
+        role=role,
+        model=model,
+        prompt=prompt,
+        output_dir=output_dir,
+        include_tests=not no_tests,
+        author=author,
+    )
+
+    console.print(f"[green]Bundle created: {bundle_path}[/green]")
+    console.print(f"\n[dim]Edit {bundle_path}/prompt.txt to customize the system prompt[/dim]")
+    console.print(f"[dim]Edit {bundle_path}/sindri-agent.toml to configure the agent[/dim]")
+
+
+@bundle.command("validate")
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--run-tests/--no-tests", default=True, help="Run bundle tests")
+def bundle_validate(path: str, run_tests: bool):
+    """Validate an agent bundle.
+
+    Checks manifest, dependencies, and optionally runs tests.
+    """
+    import asyncio
+    from pathlib import Path
+    from sindri.bundles.validator import BundleValidator, ValidationError
+    from sindri.agents.registry import AGENTS
+    from sindri.tools.registry import ToolRegistry
+
+    bundle_path = Path(path)
+    console.print(f"[bold]Validating bundle: {bundle_path.name}[/bold]\n")
+
+    existing_tools = set(ToolRegistry.default()._tools.keys())
+    existing_agents = set(AGENTS.keys())
+
+    validator = BundleValidator(
+        existing_tools=existing_tools,
+        existing_agents=existing_agents,
+    )
+
+    result = asyncio.get_event_loop().run_until_complete(
+        validator.validate(bundle_path, run_tests=run_tests)
+    )
+
+    # Show errors
+    if result.errors:
+        console.print("[bold red]Errors:[/bold red]")
+        for error_type, message in result.errors:
+            console.print(f"  [red]✗[/red] {message}")
+
+    # Show warnings
+    if result.warnings:
+        console.print("\n[bold yellow]Warnings:[/bold yellow]")
+        for warning in result.warnings:
+            console.print(f"  [yellow]⚠[/yellow] {warning}")
+
+    # Show test results
+    if result.test_result:
+        tr = result.test_result
+        if tr.passed:
+            console.print(
+                f"\n[green]Tests passed: {tr.passed_count}/{tr.total}[/green]"
+            )
+        else:
+            console.print(
+                f"\n[red]Tests failed: {tr.failed_count}/{tr.total}[/red]"
+            )
+            for failure in tr.failures[:3]:
+                console.print(f"  [dim]{failure[:100]}...[/dim]")
+
+    # Summary
+    if result.valid:
+        console.print("\n[bold green]Bundle is valid![/bold green]")
+    else:
+        console.print("\n[bold red]Bundle validation failed.[/bold red]")
+        raise SystemExit(1)
+
+
+@bundle.command("install")
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--force", "-f", is_flag=True, help="Overwrite existing bundle")
+def bundle_install(path: str, force: bool):
+    """Install an agent bundle.
+
+    Copies the bundle to ~/.sindri/bundles/ for use.
+    """
+    from pathlib import Path
+    from sindri.bundles.loader import BundleLoader
+
+    bundle_path = Path(path)
+    loader = BundleLoader()
+
+    result = loader.install(bundle_path, force=force)
+
+    if result.success:
+        console.print(f"[green]Bundle installed: {result.bundle.name}[/green]")
+        console.print(f"[dim]Location: {result.installed_path}[/dim]")
+    else:
+        console.print(f"[red]Installation failed: {result.error}[/red]")
+        raise SystemExit(1)
+
+
+@bundle.command("uninstall")
+@click.argument("name")
+def bundle_uninstall(name: str):
+    """Uninstall an agent bundle."""
+    from sindri.bundles.loader import BundleLoader
+
+    loader = BundleLoader()
+    result = loader.uninstall(name)
+
+    if result.success:
+        console.print(f"[green]Bundle uninstalled: {name}[/green]")
+    else:
+        console.print(f"[red]Uninstall failed: {result.error}[/red]")
+        raise SystemExit(1)
+
+
+@bundle.command("export")
+@click.argument("agent_name")
+@click.argument("output_dir", type=click.Path())
+@click.option("--no-tests", is_flag=True, help="Skip test scaffolding")
+def bundle_export(agent_name: str, output_dir: str, no_tests: bool):
+    """Export a built-in agent as a bundle.
+
+    Creates a bundle from an existing agent definition.
+    """
+    from pathlib import Path
+    from sindri.agents.registry import AGENTS
+    from sindri.bundles.sdk import AgentSDK
+
+    if agent_name not in AGENTS:
+        console.print(f"[red]Agent not found: {agent_name}[/red]")
+        console.print(f"[dim]Available agents: {', '.join(sorted(AGENTS.keys())[:10])}...[/dim]")
+        raise SystemExit(1)
+
+    agent = AGENTS[agent_name]
+    output = Path(output_dir)
+
+    bundle_path = AgentSDK.from_definition(
+        agent=agent,
+        output_dir=output,
+        include_tests=not no_tests,
+    )
+
+    console.print(f"[green]Agent exported: {bundle_path}[/green]")
+
+
+@bundle.command("test")
+@click.argument("name_or_path")
+def bundle_test(name_or_path: str):
+    """Run tests for an agent bundle.
+
+    Accepts either a bundle name (installed) or path to bundle directory.
+    """
+    import asyncio
+    from pathlib import Path
+    from sindri.bundles.loader import BundleLoader
+    from sindri.bundles.validator import BundleValidator
+    from sindri.bundles.models import TestConfig
+
+    path = Path(name_or_path)
+
+    # Check if it's a path or name
+    if not path.exists():
+        # Try as installed bundle name
+        loader = BundleLoader()
+        bundle = loader.get_bundle(name_or_path)
+        if bundle:
+            path = bundle.path
+        else:
+            console.print(f"[red]Bundle not found: {name_or_path}[/red]")
+            raise SystemExit(1)
+
+    # Load bundle to get test config
+    loader = BundleLoader()
+    bundle = loader.load(path)
+
+    if not bundle.manifest:
+        console.print(f"[red]Invalid bundle: {bundle.error}[/red]")
+        raise SystemExit(1)
+
+    test_config = bundle.manifest.test_config or TestConfig()
+
+    console.print(f"[bold]Running tests for: {bundle.name}[/bold]\n")
+
+    validator = BundleValidator()
+    result = asyncio.get_event_loop().run_until_complete(
+        validator.run_tests(path, test_config)
+    )
+
+    console.print(result.output)
+
+    if result.passed:
+        console.print(f"\n[green]All tests passed ({result.passed_count}/{result.total})[/green]")
+    else:
+        console.print(f"\n[red]Tests failed ({result.failed_count}/{result.total})[/red]")
+        raise SystemExit(1)
+
+
+@bundle.command("list")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed information")
+def bundle_list(verbose: bool):
+    """List installed agent bundles."""
+    from rich.table import Table
+    from sindri.bundles.loader import BundleLoader
+    from sindri.bundles.models import BundleState
+
+    loader = BundleLoader()
+    bundles = loader.discover()
+
+    if not bundles:
+        console.print("[yellow]No bundles found.[/yellow]")
+        console.print(f"\n[dim]Bundles directory: {loader.bundles_dir}[/dim]")
+        console.print("[dim]Use 'sindri bundle create' to create a new bundle[/dim]")
+        return
+
+    table = Table(
+        title="Agent Bundles",
+        show_header=True,
+        header_style="bold cyan",
+    )
+    table.add_column("Name", style="cyan", width=15)
+    table.add_column("Version", width=10)
+    table.add_column("Model", style="yellow", width=20)
+    table.add_column("Role", width=35)
+    if verbose:
+        table.add_column("Path", style="dim", width=30)
+
+    for bundle in bundles:
+        if bundle.state == BundleState.FAILED:
+            row = [bundle.name, "[red]error[/red]", "", bundle.error or ""]
+            if verbose:
+                row.append(str(bundle.path))
+            table.add_row(*row)
+            continue
+
+        if bundle.manifest:
+            m = bundle.manifest
+            row = [
+                m.agent.name,
+                m.metadata.version,
+                m.agent.model,
+                m.agent.role[:35],
+            ]
+            if verbose:
+                row.append(str(bundle.path))
+            table.add_row(*row)
+
+    console.print(table)
+    console.print(f"\n[dim]Total: {len(bundles)} bundles[/dim]")
+
+
+@bundle.command("info")
+@click.argument("name_or_path")
+def bundle_info(name_or_path: str):
+    """Show detailed information about a bundle."""
+    from pathlib import Path
+    from sindri.bundles.loader import BundleLoader
+
+    path = Path(name_or_path)
+
+    # Check if it's a path or name
+    if not path.exists():
+        loader = BundleLoader()
+        bundle = loader.get_bundle(name_or_path)
+        if not bundle:
+            console.print(f"[red]Bundle not found: {name_or_path}[/red]")
+            raise SystemExit(1)
+    else:
+        loader = BundleLoader()
+        bundle = loader.load(path)
+
+    if not bundle.manifest:
+        console.print(f"[red]Invalid bundle: {bundle.error}[/red]")
+        raise SystemExit(1)
+
+    m = bundle.manifest
+
+    console.print(f"[bold cyan]{m.agent.name}[/bold cyan]\n")
+    console.print(f"[bold]Role:[/bold] {m.agent.role}")
+    console.print(f"[bold]Model:[/bold] {m.agent.model}")
+    console.print(f"[bold]Version:[/bold] {m.metadata.version}")
+
+    if m.metadata.author:
+        console.print(f"[bold]Author:[/bold] {m.metadata.author}")
+
+    if m.metadata.category:
+        console.print(f"[bold]Category:[/bold] {m.metadata.category}")
+
+    if m.metadata.tags:
+        console.print(f"[bold]Tags:[/bold] {', '.join(m.metadata.tags)}")
+
+    console.print(f"\n[bold]Configuration:[/bold]")
+    console.print(f"  VRAM: {m.agent.estimated_vram_gb} GB")
+    console.print(f"  Max iterations: {m.agent.max_iterations}")
+    console.print(f"  Temperature: {m.agent.temperature}")
+
+    if m.agent.fallback_model:
+        console.print(f"  Fallback model: {m.agent.fallback_model}")
+
+    if m.agent.tools:
+        console.print(f"\n[bold]Tools ({len(m.agent.tools)}):[/bold]")
+        for tool in m.agent.tools[:10]:
+            console.print(f"  - {tool}")
+        if len(m.agent.tools) > 10:
+            console.print(f"  ... and {len(m.agent.tools) - 10} more")
+
+    if m.agent.can_delegate and m.agent.delegate_to:
+        console.print(f"\n[bold]Delegates to:[/bold]")
+        for agent in m.agent.delegate_to[:5]:
+            console.print(f"  - {agent}")
+
+    console.print(f"\n[dim]Path: {bundle.path}[/dim]")
+
+
+# ============================================
 # Plugin Marketplace Commands
 # ============================================
 

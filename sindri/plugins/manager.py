@@ -1,6 +1,7 @@
 """Plugin manager for Sindri.
 
 Coordinates plugin discovery, validation, loading, and registration.
+Also handles agent bundle discovery and registration.
 """
 
 from dataclasses import dataclass
@@ -14,6 +15,8 @@ from sindri.plugins.validator import PluginValidator, ValidationResult
 from sindri.tools.base import Tool
 from sindri.tools.registry import ToolRegistry
 from sindri.agents.definitions import AgentDefinition
+from sindri.bundles.loader import BundleLoader
+from sindri.bundles.models import BundleInfo, BundleState
 
 log = structlog.get_logger()
 
@@ -75,6 +78,7 @@ class PluginManager:
         self,
         plugin_dir: Optional[Path] = None,
         agent_dir: Optional[Path] = None,
+        bundles_dir: Optional[Path] = None,
         strict_validation: bool = False,
     ):
         """Initialize the plugin manager.
@@ -82,11 +86,15 @@ class PluginManager:
         Args:
             plugin_dir: Directory for Python plugins
             agent_dir: Directory for agent configs
+            bundles_dir: Directory for agent bundles
             strict_validation: If True, treat validation warnings as errors
         """
         self.loader = PluginLoader(plugin_dir, agent_dir)
+        self.bundles_dir = bundles_dir or Path.home() / ".sindri" / "bundles"
+        self.bundle_loader = BundleLoader(self.bundles_dir)
         self.strict_validation = strict_validation
         self._plugins: dict[str, LoadedPlugin] = {}
+        self._bundles: dict[str, BundleInfo] = {}
         self._tool_names: Set[str] = set()
         self._agent_names: Set[str] = set()
 
@@ -375,48 +383,169 @@ class PluginManager:
         """
         return self._agent_names.copy()
 
+    # Bundle management methods
+
+    def discover_bundles(self) -> list[BundleInfo]:
+        """Discover all agent bundles.
+
+        Returns:
+            List of discovered BundleInfo objects
+        """
+        discovered = self.bundle_loader.discover()
+
+        for bundle in discovered:
+            self._bundles[bundle.name] = bundle
+
+        log.info(
+            "bundles_discovered",
+            count=len(discovered),
+            valid=len([b for b in discovered if b.state != BundleState.FAILED]),
+        )
+
+        return discovered
+
+    def register_bundles(self, agents: dict[str, AgentDefinition]) -> list[str]:
+        """Register discovered bundles as agents.
+
+        Args:
+            agents: Dict of agent definitions to add to
+
+        Returns:
+            List of registered agent names
+        """
+        registered = []
+
+        for bundle in self._bundles.values():
+            if bundle.state == BundleState.FAILED:
+                continue
+
+            if not bundle.manifest:
+                continue
+
+            # Skip if name conflicts with existing agent
+            if bundle.name in agents:
+                log.warning(
+                    "bundle_name_conflict",
+                    name=bundle.name,
+                    skipped=True,
+                )
+                continue
+
+            try:
+                config = bundle.manifest.agent
+                prompt = self.bundle_loader.get_prompt(bundle)
+
+                agent_def = AgentDefinition(
+                    name=config.name,
+                    role=config.role,
+                    model=config.model,
+                    system_prompt=prompt or "",
+                    tools=config.tools,
+                    can_delegate=config.can_delegate,
+                    delegate_to=config.delegate_to,
+                    estimated_vram_gb=config.estimated_vram_gb,
+                    priority=config.priority,
+                    max_iterations=config.max_iterations,
+                    max_context_tokens=config.max_context_tokens,
+                    temperature=config.temperature,
+                    fallback_model=config.fallback_model,
+                    fallback_vram_gb=config.fallback_vram_gb,
+                )
+
+                agents[config.name] = agent_def
+                bundle.state = BundleState.INSTALLED
+                registered.append(config.name)
+
+                log.info(
+                    "bundle_agent_registered",
+                    name=config.name,
+                    model=config.model,
+                    path=str(bundle.path),
+                )
+            except Exception as e:
+                bundle.state = BundleState.FAILED
+                bundle.error = f"Failed to register agent: {e}"
+                log.error(
+                    "bundle_agent_register_failed",
+                    name=bundle.name,
+                    error=str(e),
+                )
+
+        self._agent_names.update(registered)
+        return registered
+
+    def get_bundles(self) -> list[BundleInfo]:
+        """Get all discovered bundles.
+
+        Returns:
+            List of all BundleInfo objects
+        """
+        return list(self._bundles.values())
+
+    def get_bundle(self, name: str) -> Optional[BundleInfo]:
+        """Get a bundle by name.
+
+        Args:
+            name: Bundle name
+
+        Returns:
+            BundleInfo or None if not found
+        """
+        return self._bundles.get(name)
+
 
 def load_plugins(
     tool_registry: ToolRegistry,
     agents: dict[str, AgentDefinition],
     plugin_dir: Optional[Path] = None,
     agent_dir: Optional[Path] = None,
+    bundles_dir: Optional[Path] = None,
     strict: bool = False,
     available_models: Optional[Set[str]] = None,
 ) -> PluginManager:
     """Convenience function to discover, validate, and register all plugins.
+
+    Also discovers and registers agent bundles.
 
     Args:
         tool_registry: ToolRegistry to register tools with
         agents: Dict of agent definitions
         plugin_dir: Plugin directory
         agent_dir: Agent config directory
+        bundles_dir: Agent bundles directory
         strict: If True, treat warnings as errors
         available_models: Available model names
 
     Returns:
-        PluginManager with loaded plugins
+        PluginManager with loaded plugins and bundles
     """
     manager = PluginManager(
-        plugin_dir=plugin_dir, agent_dir=agent_dir, strict_validation=strict
+        plugin_dir=plugin_dir,
+        agent_dir=agent_dir,
+        bundles_dir=bundles_dir,
+        strict_validation=strict,
     )
 
-    # Discover
+    # Discover plugins
     manager.discover()
 
     # Get existing names
     existing_tools = set(tool_registry._tools.keys())
     existing_agents = set(agents.keys())
 
-    # Validate
+    # Validate plugins
     manager.validate_all(
         existing_tools=existing_tools,
         existing_agents=existing_agents,
         available_models=available_models,
     )
 
-    # Register
+    # Register plugins
     manager.register_tools(tool_registry, work_dir=tool_registry.work_dir)
     manager.register_agents(agents)
+
+    # Discover and register bundles
+    manager.discover_bundles()
+    manager.register_bundles(agents)
 
     return manager
