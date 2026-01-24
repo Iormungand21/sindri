@@ -1,131 +1,129 @@
-# Review Summary: Performance Telemetry Stream (ROADMAP Item 7)
+# Review Summary: Session Status Persistence on Cancel/Failure
 
 **Reviewer:** ChatGPT (Senior Reviewer)
-**Date:** 2026-01-21
-**Original Commit:** f90246a
-**Fix Commit:** ec11aaa
+**Date:** 2026-01-23
+**Original Commit:** 2ccad3f
+**Fix Commit:** 569ea62
 **Author:** Claude Opus 4.5
 
 ## Summary
 
-Implemented **Performance Telemetry Stream** - real-time telemetry streaming with SSE endpoint, rolling statistics for agents/tools, VRAM and concurrency time-series history, and exportable traces for profiling and regression checks.
+Implemented **Session Status Persistence on Cancel/Failure** - a stability fix that ensures sessions are properly marked as 'failed' or 'cancelled' instead of remaining 'active' when tasks fail or are cancelled.
 
-## Review Feedback & Fixes
+## Problem
 
-ChatGPT identified 4 integration issues (see NOTES.md). All fixed in commit ec11aaa:
+When a task failed (`TaskStatus.FAILED`) or was cancelled (`TaskStatus.CANCELLED`), the session remained with status "active" in the database. Only `complete_session()` was called on success. This led to stale sessions that relied on `cleanup_stale_sessions()` timeout (1 hour) for cleanup.
 
-| Issue | Status | Fix |
-|-------|--------|-----|
-| TelemetryCollector never started | **FIXED** | Start in `SindriAPI.initialize()`, stop in `shutdown()` |
-| ITERATION_END never emitted | **FIXED** | Emit with `duration_ms` after each iteration |
-| TOOL_CALLED lacks duration_ms | **FIXED** | Add `duration_ms` to event payload |
-| include_tool_outputs ignored | **FIXED** | Load from ToolOutputStore when flag is True |
+## Solution
+
+1. Added `fail_session()` and `cancel_session()` methods to `SessionState`
+2. Added `error` column to sessions table (schema v8) to store failure/cancellation reasons
+3. Updated all failure/cancellation points in `hierarchical.py` and `orchestrator.py` to call the new methods
 
 ## Files Changed
-
-### New Files
-| File | Purpose | Lines |
-|------|---------|-------|
-| `sindri/telemetry/__init__.py` | Package exports | 10 |
-| `sindri/telemetry/collector.py` | TelemetryCollector with EventBus subscription, rolling stats | 370 |
-| `sindri/telemetry/exporter.py` | TraceExporter for JSON export and regression comparison | 285 |
-| `tests/test_telemetry.py` | 39 unit tests | 550 |
 
 ### Modified Files
 | File | Changes |
 |------|---------|
-| `sindri/core/events.py` | Added `TELEMETRY_TICK`, `TELEMETRY_SNAPSHOT` event types |
-| `sindri/core/event_schemas.py` | Added 6 Pydantic models: `VRAMSnapshot`, `ConcurrencySnapshot`, `AgentTimingStats`, `ToolTimingStats`, `TelemetryTickData`, `TelemetrySnapshotData` |
-| `sindri/core/hierarchical.py` | Emit ITERATION_END with duration_ms, add duration_ms to TOOL_CALLED |
-| `sindri/web/server.py` | Added SSE endpoint `/api/metrics/live`, snapshot/history endpoints, TelemetryCollector lifecycle |
-| `sindri/cli.py` | Added `sindri telemetry` command group (stream/snapshot/export/compare) |
-| `STATUS.md` | Updated with feature and test count (4,036) |
-| `ROADMAP.md` | Marked Item 7 complete |
-| `FACTS.md` | Updated test count and capabilities |
+| `sindri/persistence/database.py` | Increment SCHEMA_VERSION to 8, add error column migration |
+| `sindri/persistence/state.py` | Add `Session.error` field, `fail_session()`, `cancel_session()` methods, update `load_session()` |
+| `sindri/core/hierarchical.py` | Call fail/cancel_session at 6 failure/cancel points |
+| `sindri/core/orchestrator.py` | Call fail/cancel_session at 4 failure/cancel points |
+| `tests/test_persistence.py` | Add 7 new tests for session status methods |
+| `tests/test_replay.py` | Update schema version test from v7 to v8 |
+| `STATUS.md` | Document feature, update test count |
+| `FACTS.md` | Update date and test count |
+| `ROADMAP.md` | Mark junior task as complete |
 
 ## Key Implementation Details
 
-### 1. TelemetryCollector (`sindri/telemetry/collector.py`)
-- Subscribes to EventBus: `ITERATION_START/END`, `TOOL_CALLED`, `MODEL_LOADED`, `TASK_STATUS_CHANGED`
-- `RollingStats` helper class: sliding 100-sample window for avg/p95/success_rate
-- Time-series history: 5 minutes of VRAM and concurrency snapshots (150 samples at 2s intervals)
-- Periodic `TELEMETRY_TICK` events emitted every 2 seconds via async loop
-- Callbacks for SSE streaming (`add_tick_callback()`, `remove_tick_callback()`)
-- **NEW:** Optional session_id in `start()`, `set_session()` method for later binding
+### 1. Session.error Field (`sindri/persistence/state.py`)
+```python
+@dataclass
+class Session:
+    # ... existing fields ...
+    error: Optional[str] = None  # Error reason for failed/cancelled sessions
+```
 
-### 2. TraceExporter (`sindri/telemetry/exporter.py`)
-- `export_session_trace()`: Exports metrics, environment snapshot, audit log to JSON
-- **NEW:** `include_tool_outputs=True` loads full tool outputs from ToolOutputStore
-- `compare_traces()`: Detects regressions (>20% slower) and improvements (>10% faster)
-- `get_trace_summary()`: Quick overview of trace contents
+### 2. New Methods (`sindri/persistence/state.py`)
+```python
+async def fail_session(self, session_id: str, error: Optional[str] = None):
+    """Mark a session as failed with optional error reason."""
+    # Sets status='failed', completed_at=now, error=error
 
-### 3. SSE Endpoint (`sindri/web/server.py`)
-- `GET /api/metrics/live`: Server-Sent Events stream for real-time telemetry
-- `GET /api/metrics/telemetry/snapshot`: On-demand full snapshot
-- `GET /api/metrics/vram/history`: VRAM time-series for charts
-- `GET /api/metrics/concurrency/history`: Concurrency time-series for charts
-- **NEW:** TelemetryCollector started on API init, uses real stats instead of synthetic
+async def cancel_session(self, session_id: str, reason: Optional[str] = None):
+    """Mark a session as cancelled."""
+    # Sets status='cancelled', completed_at=now, error=reason (default: "Cancelled by user")
+```
 
-### 4. Event Emission (`sindri/core/hierarchical.py`)
-- **NEW:** ITERATION_END emitted with `duration_ms` after each iteration
-- **NEW:** TOOL_CALLED includes `duration_ms` field
+### 3. Schema Migration (`sindri/persistence/database.py`)
+- Version 8: Added `error TEXT` column to sessions table
+- Safe migration using `PRAGMA table_info` check before ALTER TABLE
 
-### 5. CLI Commands (`sindri/cli.py`)
-- `sindri telemetry stream [--url URL] [--format table|json]` - Stream live telemetry
-- `sindri telemetry snapshot [--url URL]` - Get current snapshot
-- `sindri telemetry export <session_id> [-o FILE]` - Export trace to JSON
-- `sindri telemetry compare <baseline> <current>` - Regression checking
+### 4. Hierarchical Loop Updates (`sindri/core/hierarchical.py`)
+| Location | Failure Type | Method Called |
+|----------|--------------|---------------|
+| Line 446 | Task cancelled in loop | `cancel_session(session.id, "Task cancelled by user")` |
+| Line 502 | Policy violation (runtime) | `fail_session(session.id, f"Policy violation: {reason}")` |
+| Line 657 | Cancelled after LLM call | `cancel_session(session.id, "Task cancelled after LLM call")` |
+| Line 784 | Policy violation (tool limit) | `fail_session(session.id, f"Policy violation: {reason}")` |
+| Line 858 | Policy violation (file access) | `fail_session(session.id, f"Policy violation: {reason}")` |
+| Line 1270 | Agent stuck | `fail_session(session.id, f"Agent stuck: {reason}")` |
+| Line 1318 | Max iterations | `fail_session(session.id, "Max iterations reached")` |
+
+### 5. Orchestrator Updates (`sindri/core/orchestrator.py`)
+| Location | Failure Type | Method Called |
+|----------|--------------|---------------|
+| Line 336 | Root task cancelled | `cancel_session(root_task.session_id, "Task cancelled by user")` |
+| Line 434 | Task exception (single) | `fail_session(task.session_id, str(e))` |
+| Line 476 | Task exception (parallel) | `fail_session(task.session_id, str(result))` |
+| Line 553 | Task exception (sequential) | `fail_session(next_task.session_id, str(e))` |
+
+## Review Feedback & Fixes
+
+ChatGPT identified 1 issue (see NOTES.md). Fixed in commit 569ea62:
+
+| Issue | Status | Fix |
+|-------|--------|-----|
+| Model-load failure doesn't update existing session | **FIXED** | Added `fail_session()` call when `task.session_id` is set |
 
 ## Tests Run
 
 ```bash
-.venv/bin/pytest tests/test_telemetry.py -v
-# 39 passed in 2.33s
+.venv/bin/pytest tests/test_persistence.py -v
+# 10 passed in 1.73s
 
 .venv/bin/pytest tests/ -v --tb=no -q
-# 4036 passed, 13 skipped in 29.50s
+# 4008 passed, 13 skipped in 31.60s
 ```
 
-### Test Coverage Areas
-- `RollingStats`: add_sample, avg_ms, p95_ms, success_rate, rolling window
-- `TelemetryCollector`: start/stop, iteration tracking, tool tracking, tick emission, callbacks
-- Pydantic schemas: all 6 new models serialization
-- `TraceExporter`: export, compare, regression/improvement detection
-- EventBus: unsubscribe functionality
-- Event type registration
+### New Test Cases
+1. `test_fail_session_with_error` - Verify session marked as 'failed' with error message
+2. `test_fail_session_without_error` - Verify session marked as 'failed' without error
+3. `test_cancel_session_with_reason` - Verify session marked as 'cancelled' with reason
+4. `test_cancel_session_default_reason` - Verify default "Cancelled by user" reason
+5. `test_cleanup_stale_ignores_cancelled_sessions` - Verify cleanup doesn't re-mark cancelled sessions
+6. `test_cleanup_stale_ignores_failed_sessions` - Verify cleanup doesn't re-mark failed sessions
+7. `test_schema_version_8` - Verify schema v8 has error column
+8. `test_model_load_failure_marks_existing_session_failed` - Verify resumed task session is marked failed on model load failure
 
 ## Design Decisions
 
-1. **SSE over WebSocket**: Browser-friendly, works with `curl -N`, simpler client code
-2. **Rolling window (100 samples)**: Provides recent p95 while preserving total counts
-3. **2-second tick interval**: Balances responsiveness with overhead
-4. **Regression threshold**: 20% slowdown = regression, 10% speedup = improvement
-5. **Optional session_id**: Allows TelemetryCollector to start before any session begins
-
-## Usage Examples
-
-```bash
-# Stream live telemetry in table format
-sindri telemetry stream --url http://localhost:8000
-
-# Export session trace with full tool outputs
-sindri telemetry export abc12345 -o trace.json --include-outputs
-
-# Compare traces for regression
-sindri telemetry compare baseline.json current.json
-
-# curl SSE endpoint
-curl -N http://localhost:8000/api/metrics/live
-```
+1. **Separate status values**: Used distinct 'cancelled' and 'failed' statuses (frontend already supports this)
+2. **Error column**: Added nullable `error` column to store failure/cancellation reasons for debugging
+3. **Default cancellation reason**: "Cancelled by user" when no explicit reason provided
+4. **Session guards**: All calls check `if session:` before updating to handle early failures
 
 ## Files for Focused Review
 
-1. `sindri/telemetry/collector.py:134-170` - TelemetryCollector start/stop and set_session
-2. `sindri/telemetry/collector.py:182-220` - Tick loop and snapshot generation
-3. `sindri/telemetry/exporter.py:140-175` - include_tool_outputs implementation
-4. `sindri/web/server.py:287-297` - TelemetryCollector lifecycle in SindriAPI
-5. `sindri/core/hierarchical.py:1044-1060` - ITERATION_END emission
+1. `sindri/persistence/state.py:199-254` - New `fail_session()` and `cancel_session()` methods
+2. `sindri/persistence/database.py:375-378` - Schema v8 migration
+3. `sindri/core/hierarchical.py:446,502,657,784,858,1270,1318` - Session status updates
+4. `sindri/core/orchestrator.py:336,434,476,553` - Session status updates
+5. `tests/test_persistence.py:83-159` - New test cases
 
 ## Next Feature
 
-The next item on the ROADMAP is **Item 8: Agents as Plugins** - SDK for packaging agents + prompts + tests, compatibility validation, marketplace metadata.
+The next items on the ROADMAP are:
+- **Junior task:** Record fallback model in session metadata when model degradation occurs
+- **Item 8:** Agents as Plugins - SDK for packaging agents + prompts + tests

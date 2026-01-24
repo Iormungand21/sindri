@@ -10,7 +10,7 @@
 - Multi-project workspace index (background indexer, active contexts, per-project settings).
 - Performance telemetry stream (SSE endpoint, trace export, regression checking).
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 4,007 passing (100%).
+- Tests: 4,008 passing (100%).
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)
