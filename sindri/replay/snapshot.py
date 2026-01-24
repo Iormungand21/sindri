@@ -40,12 +40,18 @@ class SnapshotCapture:
         self,
         model: str,
         inference_params: Optional[InferenceParams] = None,
+        primary_model: Optional[str] = None,
+        fallback_model_used: Optional[str] = None,
+        degradation_reason: Optional[str] = None,
     ) -> EnvironmentSnapshot:
         """Capture full environment snapshot.
 
         Args:
-            model: Model name to capture metadata for
+            model: Model name to capture metadata for (the actual model used)
             inference_params: Optional inference parameters to record
+            primary_model: Original requested model (if degradation occurred)
+            fallback_model_used: Fallback model used (if degradation occurred)
+            degradation_reason: Why fallback was needed (e.g., "insufficient_vram")
 
         Returns:
             EnvironmentSnapshot with all captured data
@@ -77,6 +83,9 @@ class SnapshotCapture:
             inference_params=inference_params or InferenceParams(),
             config_snapshot=config_snapshot,
             captured_at=datetime.now(),
+            primary_model=primary_model,
+            fallback_model_used=fallback_model_used,
+            degradation_reason=degradation_reason,
         )
 
         log.info(
@@ -85,6 +94,7 @@ class SnapshotCapture:
             python_version=python_version,
             model=model,
             model_digest=model_metadata.digest[:12] if model_metadata.digest else None,
+            degraded=fallback_model_used is not None,
         )
 
         return snapshot
@@ -124,8 +134,9 @@ class SnapshotCapture:
             return None
 
         try:
-            # Use the underlying httpx client for the version endpoint
-            async with self.client._async_client._client as client:
+            # Use a fresh httpx client to avoid closing the shared client
+            import httpx
+            async with httpx.AsyncClient() as client:
                 response = await client.get(f"{self.client.host}/api/version")
                 if response.status_code == 200:
                     data = response.json()
@@ -206,17 +217,29 @@ async def capture_snapshot_for_session(
     ollama_client: Optional[OllamaClient] = None,
     config: Optional[SindriConfig] = None,
     inference_params: Optional[InferenceParams] = None,
+    primary_model: Optional[str] = None,
+    fallback_model_used: Optional[str] = None,
+    degradation_reason: Optional[str] = None,
 ) -> EnvironmentSnapshot:
     """Convenience function to capture a snapshot.
 
     Args:
-        model: Model name
+        model: Model name (the actual model used)
         ollama_client: Optional Ollama client
         config: Optional config
         inference_params: Optional inference parameters
+        primary_model: Original requested model (if degradation occurred)
+        fallback_model_used: Fallback model used (if degradation occurred)
+        degradation_reason: Why fallback was needed
 
     Returns:
         EnvironmentSnapshot
     """
     capture = SnapshotCapture(ollama_client, config)
-    return await capture.capture(model, inference_params)
+    return await capture.capture(
+        model,
+        inference_params,
+        primary_model=primary_model,
+        fallback_model_used=fallback_model_used,
+        degradation_reason=degradation_reason,
+    )

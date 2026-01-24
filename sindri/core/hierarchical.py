@@ -345,17 +345,29 @@ class HierarchicalAgentLoop:
                 is_new_session = True
         else:
             # Create new session for new task
-            log.info("creating_new_session", task_id=task.id)
-            session = await self.state.create_session(task.description, agent.model)
+            # Note: Use model_to_use which may be fallback model if degradation occurred
+            log.info("creating_new_session", task_id=task.id, model=model_to_use)
+            session = await self.state.create_session(task.description, model_to_use)
             task.session_id = session.id
             is_new_session = True
 
         # Reproducible Sessions: Capture environment snapshot for new sessions
+        # Include fallback tracking if model degradation occurred
+        degraded = active_model is not None and active_model != agent.model
         if is_new_session:
             try:
-                snapshot = await self._snapshot_capture.capture(session.model)
+                snapshot = await self._snapshot_capture.capture(
+                    session.model,
+                    primary_model=agent.model if degraded else None,
+                    fallback_model_used=active_model if degraded else None,
+                    degradation_reason="insufficient_vram" if degraded else None,
+                )
                 await self._snapshot_store.save_snapshot(session.id, snapshot)
-                log.info("session_snapshot_captured", session_id=session.id)
+                log.info(
+                    "session_snapshot_captured",
+                    session_id=session.id,
+                    degraded=degraded,
+                )
             except Exception as e:
                 log.warning("snapshot_capture_failed", session_id=session.id, error=str(e))
 

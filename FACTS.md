@@ -9,7 +9,7 @@ Status:
 Counts (authoritative):
 - Agents: 27 (see docs/AGENTS.md)
 - Tools: 268 (see README.md or sindri/tools/registry.py)
-- Tests passing: 4,008 (see STATUS.md)
+- Tests passing: 4,017 (see STATUS.md)
 
 Core architecture:
 - Execution: hierarchical Ralph loop with delegation and parallel batching

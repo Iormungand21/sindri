@@ -29,7 +29,9 @@ Grouped by logical capability area.
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Enforce system access levels for shell/filesystem tools (define RESTRICTED/SUPERVISED behavior)
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Add command timeout/cancellation support to shell tool to prevent hangs
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Persist session status on cancel/failure to avoid stale "active" sessions
-   - **Junior task (Owner: Claude, Reviewer: Codex):** Record fallback model in session metadata when model degradation occurs
+   - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Record fallback model in session metadata when model degradation occurs
+   - **Initial scan:** Consider VRAM-eviction-aware scheduling in `TaskScheduler.get_ready_batch` to avoid tasks stuck pending when eviction could free space
+   - **Initial scan:** Emit `TASK_STATUS_CHANGED` on model load failures so UI consumers observe terminal status
 
 ### API + Contract Stability
 1. **Event + API Contract v1** ✅ **COMPLETE (Phase 16)**
@@ -37,6 +39,7 @@ Grouped by logical capability area.
    - ✅ Expose `/api/schema` for clients and auto-generate TS types
    - ✅ Add contract tests and backward-compat flags
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Add `duration_ms` to `TOOL_CALLED` event schema and regenerate TS types
+   - **Initial scan:** Align `/api/tasks` request contract with actual agent selection (currently validated but unused)
 
 ### Execution Control + Reproducibility
 2. **Plan-First Execution** ✅ **COMPLETE**
@@ -70,6 +73,12 @@ Grouped by logical capability area.
    - ✅ Max files touched, max tool calls, max runtime
    - ✅ Per-agent escalation to supervised mode
    - ✅ CLI commands: `sindri policy show`, `sindri policy set-default`, `sindri policy violations`
+   - **Initial scan:** Clarify `file_scope` semantics for relative patterns (current matching uses absolute paths)
+   - **Initial scan:** Lock down web server defaults (bind host, CORS, authentication) to avoid unauthenticated remote task execution
+
+### Reproducibility + Observability
+11. **Session Metadata Accuracy** ✅ **COMPLETE**
+   - ✅ Record fallback model in session creation/metadata when model degradation occurs to keep snapshots and metrics accurate
 
 ### Observability + Performance
 7. **Performance Telemetry Stream** ✅ **COMPLETE**

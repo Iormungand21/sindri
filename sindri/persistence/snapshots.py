@@ -96,10 +96,14 @@ class EnvironmentSnapshot:
     ollama_version: Optional[str] = None
     inference_params: Optional[InferenceParams] = None
     captured_at: Optional[datetime] = None
+    # Fallback tracking for model degradation
+    primary_model: Optional[str] = None  # Original requested model (when degraded)
+    fallback_model_used: Optional[str] = None  # Fallback model used (when degraded)
+    degradation_reason: Optional[str] = None  # Why fallback was needed
 
     def to_dict(self) -> dict:
         """Convert to dictionary for JSON serialization."""
-        return {
+        result = {
             "sindri_version": self.sindri_version,
             "sindri_git_commit": self.sindri_git_commit,
             "python_version": self.python_version,
@@ -114,6 +118,14 @@ class EnvironmentSnapshot:
                 self.captured_at.isoformat() if self.captured_at else None
             ),
         }
+        # Include fallback tracking fields if degradation occurred
+        if self.primary_model:
+            result["primary_model"] = self.primary_model
+        if self.fallback_model_used:
+            result["fallback_model_used"] = self.fallback_model_used
+        if self.degradation_reason:
+            result["degradation_reason"] = self.degradation_reason
+        return result
 
     @classmethod
     def from_dict(cls, data: dict) -> "EnvironmentSnapshot":
@@ -138,6 +150,10 @@ class EnvironmentSnapshot:
                 if data.get("captured_at")
                 else None
             ),
+            # Fallback tracking fields (backward compatible - defaults to None)
+            primary_model=data.get("primary_model"),
+            fallback_model_used=data.get("fallback_model_used"),
+            degradation_reason=data.get("degradation_reason"),
         )
 
 

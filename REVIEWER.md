@@ -1,129 +1,125 @@
-# Review Summary: Session Status Persistence on Cancel/Failure
+# Review Summary: Record Fallback Model in Session Metadata
 
 **Reviewer:** ChatGPT (Senior Reviewer)
 **Date:** 2026-01-23
-**Original Commit:** 2ccad3f
-**Fix Commit:** 569ea62
 **Author:** Claude Opus 4.5
 
 ## Summary
 
-Implemented **Session Status Persistence on Cancel/Failure** - a stability fix that ensures sessions are properly marked as 'failed' or 'cancelled' instead of remaining 'active' when tasks fail or are cancelled.
+Implemented fallback model recording in session metadata when model degradation occurs. When an agent's primary model can't load due to VRAM constraints and falls back to a smaller model, the session snapshot now records the original model requested, the fallback model used, and the reason for degradation.
 
 ## Problem
 
-When a task failed (`TaskStatus.FAILED`) or was cancelled (`TaskStatus.CANCELLED`), the session remained with status "active" in the database. Only `complete_session()` was called on success. This led to stale sessions that relied on `cleanup_stale_sessions()` timeout (1 hour) for cleanup.
+When model degradation occurred, the session metadata didn't track:
+1. Whether fallback was used vs. primary model
+2. What the original primary model was
+3. Why fallback was needed (e.g., insufficient VRAM)
+
+Additionally, there was a bug in `hierarchical.py:349` where new sessions were created with `agent.model` instead of `model_to_use`, so degraded sessions recorded the wrong model name.
 
 ## Solution
 
-1. Added `fail_session()` and `cancel_session()` methods to `SessionState`
-2. Added `error` column to sessions table (schema v8) to store failure/cancellation reasons
-3. Updated all failure/cancellation points in `hierarchical.py` and `orchestrator.py` to call the new methods
+1. Added three optional fields to `EnvironmentSnapshot`:
+   - `primary_model`: Original requested model (when degradation occurred)
+   - `fallback_model_used`: Fallback model used (when degradation occurred)
+   - `degradation_reason`: Why fallback was needed
+
+2. Updated `SnapshotCapture.capture()` to accept the new fallback parameters
+
+3. Fixed session creation in `hierarchical.py` to use `model_to_use` instead of `agent.model`
+
+4. Updated snapshot capture call to pass fallback info when degradation detected
 
 ## Files Changed
 
-### Modified Files
 | File | Changes |
 |------|---------|
-| `sindri/persistence/database.py` | Increment SCHEMA_VERSION to 8, add error column migration |
-| `sindri/persistence/state.py` | Add `Session.error` field, `fail_session()`, `cancel_session()` methods, update `load_session()` |
-| `sindri/core/hierarchical.py` | Call fail/cancel_session at 6 failure/cancel points |
-| `sindri/core/orchestrator.py` | Call fail/cancel_session at 4 failure/cancel points |
-| `tests/test_persistence.py` | Add 7 new tests for session status methods |
-| `tests/test_replay.py` | Update schema version test from v7 to v8 |
-| `STATUS.md` | Document feature, update test count |
-| `FACTS.md` | Update date and test count |
-| `ROADMAP.md` | Mark junior task as complete |
+| `sindri/persistence/snapshots.py` | Add 3 fallback fields to `EnvironmentSnapshot`, update `to_dict()` and `from_dict()` |
+| `sindri/replay/snapshot.py` | Update `capture()` signature and implementation to accept fallback params |
+| `sindri/core/hierarchical.py` | Fix session creation (line 349), add degradation detection, pass fallback info to snapshot |
+| `tests/test_model_degradation.py` | Add 9 tests for fallback recording functionality |
+| `STATUS.md` | Add entry, update test count to 4,017 |
+| `ROADMAP.md` | Mark junior task and item 11 as complete |
+| `FACTS.md` | Update test count |
 
 ## Key Implementation Details
 
-### 1. Session.error Field (`sindri/persistence/state.py`)
+### 1. EnvironmentSnapshot Fields (`sindri/persistence/snapshots.py:95-100`)
 ```python
 @dataclass
-class Session:
+class EnvironmentSnapshot:
     # ... existing fields ...
-    error: Optional[str] = None  # Error reason for failed/cancelled sessions
+    # Fallback tracking for model degradation
+    primary_model: Optional[str] = None  # Original requested model (when degraded)
+    fallback_model_used: Optional[str] = None  # Fallback model used (when degraded)
+    degradation_reason: Optional[str] = None  # Why fallback was needed
 ```
 
-### 2. New Methods (`sindri/persistence/state.py`)
+### 2. SnapshotCapture Signature (`sindri/replay/snapshot.py:39-57`)
 ```python
-async def fail_session(self, session_id: str, error: Optional[str] = None):
-    """Mark a session as failed with optional error reason."""
-    # Sets status='failed', completed_at=now, error=error
-
-async def cancel_session(self, session_id: str, reason: Optional[str] = None):
-    """Mark a session as cancelled."""
-    # Sets status='cancelled', completed_at=now, error=reason (default: "Cancelled by user")
+async def capture(
+    self,
+    model: str,
+    inference_params: Optional[InferenceParams] = None,
+    primary_model: Optional[str] = None,
+    fallback_model_used: Optional[str] = None,
+    degradation_reason: Optional[str] = None,
+) -> EnvironmentSnapshot:
 ```
 
-### 3. Schema Migration (`sindri/persistence/database.py`)
-- Version 8: Added `error TEXT` column to sessions table
-- Safe migration using `PRAGMA table_info` check before ALTER TABLE
+### 3. Hierarchical Loop Changes (`sindri/core/hierarchical.py:346-372`)
+```python
+# Fix: Use model_to_use instead of agent.model for new sessions
+session = await self.state.create_session(task.description, model_to_use)
 
-### 4. Hierarchical Loop Updates (`sindri/core/hierarchical.py`)
-| Location | Failure Type | Method Called |
-|----------|--------------|---------------|
-| Line 446 | Task cancelled in loop | `cancel_session(session.id, "Task cancelled by user")` |
-| Line 502 | Policy violation (runtime) | `fail_session(session.id, f"Policy violation: {reason}")` |
-| Line 657 | Cancelled after LLM call | `cancel_session(session.id, "Task cancelled after LLM call")` |
-| Line 784 | Policy violation (tool limit) | `fail_session(session.id, f"Policy violation: {reason}")` |
-| Line 858 | Policy violation (file access) | `fail_session(session.id, f"Policy violation: {reason}")` |
-| Line 1270 | Agent stuck | `fail_session(session.id, f"Agent stuck: {reason}")` |
-| Line 1318 | Max iterations | `fail_session(session.id, "Max iterations reached")` |
-
-### 5. Orchestrator Updates (`sindri/core/orchestrator.py`)
-| Location | Failure Type | Method Called |
-|----------|--------------|---------------|
-| Line 336 | Root task cancelled | `cancel_session(root_task.session_id, "Task cancelled by user")` |
-| Line 434 | Task exception (single) | `fail_session(task.session_id, str(e))` |
-| Line 476 | Task exception (parallel) | `fail_session(task.session_id, str(result))` |
-| Line 553 | Task exception (sequential) | `fail_session(next_task.session_id, str(e))` |
-
-## Review Feedback & Fixes
-
-ChatGPT identified 1 issue (see NOTES.md). Fixed in commit 569ea62:
-
-| Issue | Status | Fix |
-|-------|--------|-----|
-| Model-load failure doesn't update existing session | **FIXED** | Added `fail_session()` call when `task.session_id` is set |
+# Track degradation and pass to snapshot
+degraded = active_model is not None and active_model != agent.model
+if is_new_session:
+    snapshot = await self._snapshot_capture.capture(
+        session.model,
+        primary_model=agent.model if degraded else None,
+        fallback_model_used=active_model if degraded else None,
+        degradation_reason="insufficient_vram" if degraded else None,
+    )
+```
 
 ## Tests Run
 
 ```bash
-.venv/bin/pytest tests/test_persistence.py -v
-# 10 passed in 1.73s
+.venv/bin/pytest tests/test_model_degradation.py tests/test_replay.py -v --tb=short
+# 63 passed in 1.39s
 
-.venv/bin/pytest tests/ -v --tb=no -q
-# 4008 passed, 13 skipped in 31.60s
+.venv/bin/pytest tests/ -v --tb=short -q
+# 4017 passed, 13 skipped in 31.59s
 ```
 
-### New Test Cases
-1. `test_fail_session_with_error` - Verify session marked as 'failed' with error message
-2. `test_fail_session_without_error` - Verify session marked as 'failed' without error
-3. `test_cancel_session_with_reason` - Verify session marked as 'cancelled' with reason
-4. `test_cancel_session_default_reason` - Verify default "Cancelled by user" reason
-5. `test_cleanup_stale_ignores_cancelled_sessions` - Verify cleanup doesn't re-mark cancelled sessions
-6. `test_cleanup_stale_ignores_failed_sessions` - Verify cleanup doesn't re-mark failed sessions
-7. `test_schema_version_8` - Verify schema v8 has error column
-8. `test_model_load_failure_marks_existing_session_failed` - Verify resumed task session is marked failed on model load failure
+New tests added:
+- `TestEnvironmentSnapshotFallback::test_fallback_fields_exist`
+- `TestEnvironmentSnapshotFallback::test_fallback_fields_optional`
+- `TestEnvironmentSnapshotFallback::test_to_dict_with_fallback`
+- `TestEnvironmentSnapshotFallback::test_to_dict_without_fallback`
+- `TestEnvironmentSnapshotFallback::test_from_dict_with_fallback`
+- `TestEnvironmentSnapshotFallback::test_from_dict_backward_compatible`
+- `TestSnapshotCaptureFallback::test_capture_without_fallback`
+- `TestSnapshotCaptureFallback::test_capture_with_fallback`
+- `TestSnapshotCaptureFallback::test_capture_roundtrip`
 
-## Design Decisions
+## Backward Compatibility
 
-1. **Separate status values**: Used distinct 'cancelled' and 'failed' statuses (frontend already supports this)
-2. **Error column**: Added nullable `error` column to store failure/cancellation reasons for debugging
-3. **Default cancellation reason**: "Cancelled by user" when no explicit reason provided
-4. **Session guards**: All calls check `if session:` before updating to handle early failures
+- New fields are Optional with None defaults
+- `to_dict()` only includes fallback fields when set (non-None)
+- `from_dict()` uses `.get()` so existing snapshots without these fields load correctly
+- No database schema migration needed (stored in JSON)
 
 ## Files for Focused Review
 
-1. `sindri/persistence/state.py:199-254` - New `fail_session()` and `cancel_session()` methods
-2. `sindri/persistence/database.py:375-378` - Schema v8 migration
-3. `sindri/core/hierarchical.py:446,502,657,784,858,1270,1318` - Session status updates
-4. `sindri/core/orchestrator.py:336,434,476,553` - Session status updates
-5. `tests/test_persistence.py:83-159` - New test cases
+1. `sindri/persistence/snapshots.py:86-141` - EnvironmentSnapshot class with new fields
+2. `sindri/replay/snapshot.py:39-90` - SnapshotCapture.capture() method
+3. `sindri/core/hierarchical.py:346-372` - Session creation and snapshot capture
+4. `tests/test_model_degradation.py:92-180` - New test classes
 
-## Next Feature
+## Next Features
 
-The next items on the ROADMAP are:
-- **Junior task:** Record fallback model in session metadata when model degradation occurs
-- **Item 8:** Agents as Plugins - SDK for packaging agents + prompts + tests
+Remaining junior tasks from ROADMAP:
+- Wire TelemetryCollector to the active orchestrator scheduler/model manager
+- Emit `MODEL_LOADED` events to populate telemetry agent to model tracking
