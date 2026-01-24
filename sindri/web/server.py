@@ -775,6 +775,7 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
             enable_memory=request.enable_memory,
             work_dir=work_path,
             event_bus=api.event_bus,
+            telemetry_collector=api.telemetry_collector,
         )
 
         # Generate task ID
@@ -806,6 +807,9 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
                 api.active_tasks[task_id]["status"] = "failed"
                 api.active_tasks[task_id]["error"] = str(e)
                 log.error("task_execution_failed", task_id=task_id, error=str(e))
+            finally:
+                # Unregister from telemetry on task completion
+                await orchestrator.cleanup()
 
         background_tasks.add_task(run_task)
 

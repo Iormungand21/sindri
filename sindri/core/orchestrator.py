@@ -3,9 +3,12 @@
 import asyncio
 import structlog
 from pathlib import Path
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sindri.llm.client import OllamaClient
+
+if TYPE_CHECKING:
+    from sindri.telemetry.collector import TelemetryCollector
 from sindri.llm.manager import ModelManager
 from sindri.tools.registry import ToolRegistry
 from sindri.persistence.state import SessionState
@@ -36,6 +39,7 @@ class Orchestrator:
         enable_memory: bool = True,
         event_bus: Optional[EventBus] = None,
         work_dir: Optional[Path] = None,
+        telemetry_collector: Optional["TelemetryCollector"] = None,
     ):
         self.client = client or OllamaClient()
         self.config = config or LoopConfig()
@@ -46,6 +50,12 @@ class Orchestrator:
         self.model_manager = ModelManager(total_vram_gb=total_vram_gb)
         self.scheduler = TaskScheduler(self.model_manager)
         self.state = SessionState()
+
+        # Register with telemetry collector for live metrics
+        self._telemetry_collector = telemetry_collector
+        if telemetry_collector:
+            telemetry_collector.register_model_manager(self.model_manager)
+            telemetry_collector.register_scheduler(self.scheduler)
         # Phase 6.2: Pass model_manager for pre-warming during delegation
         self.delegation = DelegationManager(
             self.scheduler,
@@ -206,6 +216,24 @@ class Orchestrator:
         log.info("cancel_all_tasks_requested")
         for task_id in list(self.scheduler.tasks.keys()):
             self.cancel_task(task_id)
+
+    async def cleanup(self) -> None:
+        """Clean up orchestrator resources.
+
+        Unregisters from telemetry and stops background indexer.
+        Should be called when the orchestrator is no longer needed.
+        """
+        # Unregister from telemetry collector
+        if self._telemetry_collector:
+            self._telemetry_collector.unregister_model_manager(self.model_manager)
+            self._telemetry_collector.unregister_scheduler(self.scheduler)
+            log.debug("orchestrator_unregistered_from_telemetry")
+
+        # Stop background indexer if running
+        if self.background_indexer and self.background_indexer.is_running:
+            await self.background_indexer.stop()
+
+        log.info("orchestrator_cleanup_complete")
 
     async def configure_for_model(self, model: str) -> None:
         """Configure memory system based on model's context length.

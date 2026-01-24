@@ -3,6 +3,11 @@
 Phase 8.3: Tests for FastAPI-based Web API server.
 """
 
+import json
+import os
+import socket
+import threading
+import time
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -12,6 +17,8 @@ from httpx import ASGITransport, AsyncClient
 from sindri.web.server import create_app, SindriAPI
 from sindri.agents.registry import AGENTS
 from sindri.persistence.state import Session, Turn
+import uvicorn
+from websockets.sync.client import connect as ws_connect
 
 
 # ===== Fixtures =====
@@ -36,6 +43,42 @@ async def async_client(app):
         transport=ASGITransport(app=app), base_url="http://test"
     ) as client:
         yield client
+
+
+@pytest.fixture
+def live_server(monkeypatch):
+    """Start a live Uvicorn server for WebSocket tests."""
+    monkeypatch.setenv("SINDRI_SKIP_DB_INIT", "1")
+
+    app = create_app(vram_gb=16.0)
+
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.bind(("127.0.0.1", 0))
+        _, port = sock.getsockname()
+        sock.close()
+    except PermissionError:
+        pytest.skip("Socket access not permitted in this environment")
+
+    config = uvicorn.Config(
+        app,
+        host="127.0.0.1",
+        port=port,
+        log_level="warning",
+        lifespan="on",
+    )
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+
+    timeout = time.time() + 5
+    while not server.started and time.time() < timeout:
+        time.sleep(0.05)
+
+    yield {"ws_url": f"ws://127.0.0.1:{port}/ws", "app": app}
+
+    server.should_exit = True
+    thread.join(timeout=5)
 
 
 # ===== Health Endpoint Tests =====
@@ -792,6 +835,7 @@ class TestTaskEndpoints:
             mock_instance.run = AsyncMock(
                 return_value={"success": True, "result": "Done"}
             )
+            mock_instance.cleanup = AsyncMock()
             mock_orchestrator.return_value = mock_instance
 
             response = client.post(
@@ -813,6 +857,7 @@ class TestTaskEndpoints:
         with patch("sindri.core.orchestrator.Orchestrator") as mock_orchestrator:
             mock_instance = MagicMock()
             mock_instance.run = AsyncMock(return_value={"success": True})
+            mock_instance.cleanup = AsyncMock()
             mock_orchestrator.return_value = mock_instance
 
             response = client.post("/api/tasks", json={"description": "Do something"})
@@ -967,26 +1012,43 @@ class TestSindriAPI:
 class TestWebSocket:
     """Tests for WebSocket functionality."""
 
-    def test_websocket_connection(self, client):
+    def test_websocket_connection(self, live_server):
         """Test WebSocket connection."""
-        with client.websocket_connect("/ws") as websocket:
-            # Should receive initial connection message
-            data = websocket.receive_json()
+        with ws_connect(live_server["ws_url"]) as websocket:
+            data = json.loads(websocket.recv())
             assert data["type"] == "connected"
             assert "message" in data["data"]
 
-    def test_websocket_heartbeat(self, client):
+    def test_websocket_heartbeat(self, live_server):
         """Test WebSocket heartbeat/ping-pong."""
-        with client.websocket_connect("/ws") as websocket:
-            # Receive connection message
-            websocket.receive_json()
-
-            # Send ping
-            websocket.send_json({"type": "ping"})
-
-            # Should receive pong
-            data = websocket.receive_json()
+        with ws_connect(live_server["ws_url"]) as websocket:
+            websocket.recv()
+            websocket.send(json.dumps({"type": "ping"}))
+            data = json.loads(websocket.recv())
             assert data["type"] == "pong"
+            assert "timestamp" in data
+
+    def test_websocket_event_contract(self, live_server):
+        """Test WebSocket event payload shape."""
+        from sindri.core.events import Event, EventType
+
+        app = live_server["app"]
+
+        with ws_connect(live_server["ws_url"]) as websocket:
+            websocket.recv()
+
+            event = Event(
+                type=EventType.TASK_CREATED,
+                data={"task_id": "task-123", "task": "Test task"},
+                task_id="task-123",
+            )
+            app.state.api.event_bus.emit(event)
+
+            data = json.loads(websocket.recv())
+            assert data["type"] == "TASK_CREATED"
+            assert data["data"]["task_id"] == "task-123"
+            assert data["data"]["task"] == "Test task"
+            assert data["task_id"] == "task-123"
             assert "timestamp" in data
 
 

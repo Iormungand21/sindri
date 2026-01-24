@@ -760,3 +760,217 @@ class TestEventBusUnsubscribe:
         bus.unsubscribe_event(handler)
         bus.emit(Event(type=EventType.TOOL_CALLED, data={"test": 2}))
         assert len(calls) == 1  # Should not have received second event
+
+
+class TestTelemetryRegistration:
+    """Tests for TelemetryCollector registration pattern (ROADMAP Item 7 Junior Task)."""
+
+    @pytest.fixture
+    def event_bus(self):
+        """Create an EventBus for testing."""
+        return EventBus()
+
+    @pytest.fixture
+    def collector(self, event_bus):
+        """Create a TelemetryCollector for testing."""
+        return TelemetryCollector(event_bus=event_bus, tick_interval=0.1)
+
+    @pytest.fixture
+    def mock_model_manager(self):
+        """Create a mock ModelManager."""
+        mm = Mock()
+        mm.get_vram_stats.return_value = {
+            "total": 16.0,
+            "used": 8.0,
+            "free": 8.0,
+            "loaded_models": ["model-a"],
+        }
+        mm.get_cache_stats.return_value = {
+            "hits": 10,
+            "misses": 5,
+            "hit_rate": 0.67,
+        }
+        mm.metrics = Mock()
+        mm.metrics.hits = 10
+        mm.metrics.misses = 5
+        return mm
+
+    @pytest.fixture
+    def mock_scheduler(self):
+        """Create a mock TaskScheduler."""
+        sched = Mock()
+        sched.get_running_count.return_value = 2
+        sched.get_pending_count.return_value = 3
+        return sched
+
+    def test_register_model_manager(self, collector, mock_model_manager):
+        """Test registering a ModelManager adds it to the list."""
+        assert len(collector._model_managers) == 0
+
+        collector.register_model_manager(mock_model_manager)
+
+        assert len(collector._model_managers) == 1
+        assert mock_model_manager in collector._model_managers
+
+    def test_register_model_manager_deduplication(self, collector, mock_model_manager):
+        """Test that registering the same manager twice doesn't duplicate."""
+        collector.register_model_manager(mock_model_manager)
+        collector.register_model_manager(mock_model_manager)
+
+        assert len(collector._model_managers) == 1
+
+    def test_unregister_model_manager(self, collector, mock_model_manager):
+        """Test unregistering a ModelManager removes it."""
+        collector.register_model_manager(mock_model_manager)
+        assert len(collector._model_managers) == 1
+
+        collector.unregister_model_manager(mock_model_manager)
+
+        assert len(collector._model_managers) == 0
+
+    def test_unregister_nonexistent_model_manager(self, collector, mock_model_manager):
+        """Test unregistering a non-existent manager doesn't crash."""
+        collector.unregister_model_manager(mock_model_manager)
+        # Should not raise an exception
+        assert len(collector._model_managers) == 0
+
+    def test_register_scheduler(self, collector, mock_scheduler):
+        """Test registering a TaskScheduler adds it to the list."""
+        assert len(collector._schedulers) == 0
+
+        collector.register_scheduler(mock_scheduler)
+
+        assert len(collector._schedulers) == 1
+        assert mock_scheduler in collector._schedulers
+
+    def test_register_scheduler_deduplication(self, collector, mock_scheduler):
+        """Test that registering the same scheduler twice doesn't duplicate."""
+        collector.register_scheduler(mock_scheduler)
+        collector.register_scheduler(mock_scheduler)
+
+        assert len(collector._schedulers) == 1
+
+    def test_unregister_scheduler(self, collector, mock_scheduler):
+        """Test unregistering a TaskScheduler removes it."""
+        collector.register_scheduler(mock_scheduler)
+        assert len(collector._schedulers) == 1
+
+        collector.unregister_scheduler(mock_scheduler)
+
+        assert len(collector._schedulers) == 0
+
+    def test_unregister_nonexistent_scheduler(self, collector, mock_scheduler):
+        """Test unregistering a non-existent scheduler doesn't crash."""
+        collector.unregister_scheduler(mock_scheduler)
+        # Should not raise an exception
+        assert len(collector._schedulers) == 0
+
+    def test_vram_snapshot_aggregation(self, collector):
+        """Test VRAM snapshot aggregates from multiple managers."""
+        mm1 = Mock()
+        mm1.get_vram_stats.return_value = {
+            "total": 16.0,
+            "used": 4.0,
+            "free": 12.0,
+            "loaded_models": ["model-a"],
+        }
+        mm1.get_cache_stats.return_value = {"hits": 10, "misses": 5}
+        mm1.metrics = Mock()
+        mm1.metrics.hits = 10
+        mm1.metrics.misses = 5
+
+        mm2 = Mock()
+        mm2.get_vram_stats.return_value = {
+            "total": 16.0,
+            "used": 8.0,
+            "free": 8.0,
+            "loaded_models": ["model-b"],
+        }
+        mm2.get_cache_stats.return_value = {"hits": 20, "misses": 10}
+        mm2.metrics = Mock()
+        mm2.metrics.hits = 20
+        mm2.metrics.misses = 10
+
+        collector.register_model_manager(mm1)
+        collector.register_model_manager(mm2)
+
+        snapshot = collector._get_vram_snapshot()
+
+        # Should use max total (same GPU)
+        assert snapshot.total_gb == 16.0
+        # Should use max used (they share the GPU)
+        assert snapshot.used_gb == 8.0
+        assert snapshot.free_gb == 8.0
+        # Should aggregate loaded models (deduped)
+        assert set(snapshot.loaded_models) == {"model-a", "model-b"}
+        # Weighted average hit rate: (10+20)/(10+5+20+10) = 30/45 = 0.67
+        assert abs(snapshot.cache_hit_rate - 0.67) < 0.01
+
+    def test_vram_snapshot_empty(self, collector):
+        """Test VRAM snapshot with no registered managers returns defaults."""
+        snapshot = collector._get_vram_snapshot()
+
+        assert snapshot.total_gb == 16.0
+        assert snapshot.used_gb == 0.0
+        assert snapshot.free_gb == 16.0
+        assert snapshot.loaded_models == []
+
+    def test_concurrency_snapshot_aggregation(self, collector):
+        """Test concurrency snapshot sums from multiple schedulers."""
+        sched1 = Mock()
+        sched1.get_running_count.return_value = 2
+        sched1.get_pending_count.return_value = 3
+
+        sched2 = Mock()
+        sched2.get_running_count.return_value = 1
+        sched2.get_pending_count.return_value = 2
+
+        collector.register_scheduler(sched1)
+        collector.register_scheduler(sched2)
+
+        snapshot = collector._get_concurrency_snapshot()
+
+        # Should sum running and pending
+        assert snapshot.running_tasks == 3  # 2 + 1
+        assert snapshot.pending_tasks == 5  # 3 + 2
+
+    def test_concurrency_snapshot_empty(self, collector):
+        """Test concurrency snapshot with no registered schedulers returns defaults."""
+        snapshot = collector._get_concurrency_snapshot()
+
+        assert snapshot.running_tasks == 0
+        assert snapshot.pending_tasks == 0
+        assert snapshot.waiting_tasks == 0
+
+    def test_constructor_with_initial_manager_and_scheduler(self, event_bus):
+        """Test constructor registers initial model_manager and scheduler."""
+        mm = Mock()
+        mm.get_vram_stats.return_value = {"total": 16.0, "used": 5.0, "free": 11.0, "loaded_models": []}
+        mm.get_cache_stats.return_value = {"hits": 0, "misses": 0}
+        mm.metrics = Mock()
+        mm.metrics.hits = 0
+        mm.metrics.misses = 0
+
+        sched = Mock()
+        sched.get_running_count.return_value = 1
+        sched.get_pending_count.return_value = 0
+
+        collector = TelemetryCollector(
+            event_bus=event_bus,
+            model_manager=mm,
+            scheduler=sched,
+            tick_interval=0.1,
+        )
+
+        # Should have been registered via constructor
+        assert len(collector._model_managers) == 1
+        assert mm in collector._model_managers
+        assert len(collector._schedulers) == 1
+        assert sched in collector._schedulers
+
+        # And should work for snapshots
+        vram = collector._get_vram_snapshot()
+        assert vram.used_gb == 5.0
+
+        conc = collector._get_concurrency_snapshot()
+        assert conc.running_tasks == 1

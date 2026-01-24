@@ -103,9 +103,17 @@ class TelemetryCollector:
             tick_interval: Seconds between telemetry tick emissions
         """
         self.event_bus = event_bus
-        self.model_manager = model_manager
-        self.scheduler = scheduler
         self.tick_interval = tick_interval
+
+        # Registration lists for multiple orchestrators
+        self._model_managers: list["ModelManager"] = []
+        self._schedulers: list["TaskScheduler"] = []
+
+        # Keep backward compat: add initial instances if provided
+        if model_manager:
+            self._model_managers.append(model_manager)
+        if scheduler:
+            self._schedulers.append(scheduler)
 
         # State tracking
         self._session_id: Optional[str] = None
@@ -355,29 +363,58 @@ class TelemetryCollector:
         )
 
     def _get_vram_snapshot(self) -> VRAMSnapshot:
-        """Get current VRAM state from ModelManager."""
-        if self.model_manager:
-            stats = self.model_manager.get_vram_stats()
-            cache_stats = self.model_manager.get_cache_stats()
-            return VRAMSnapshot(
-                total_gb=stats.get("total", 16.0),
-                used_gb=stats.get("used", 0.0),
-                free_gb=stats.get("free", 16.0),
-                loaded_models=stats.get("loaded_models", []),
-                cache_hit_rate=cache_stats.get("hit_rate", 0.0),
-            )
-        return VRAMSnapshot(total_gb=16.0, used_gb=0.0, free_gb=16.0)
+        """Get current VRAM state aggregated from all registered ModelManagers."""
+        if not self._model_managers:
+            return VRAMSnapshot(total_gb=16.0, used_gb=0.0, free_gb=16.0)
+
+        # Aggregate from all registered managers
+        # For VRAM: max total (same GPU), max used (they share GPU)
+        # Models: union of all loaded models
+        total_gb = 16.0
+        used_gb = 0.0
+        all_loaded_models: list[str] = []
+        total_hits = 0
+        total_ops = 0
+
+        for mm in self._model_managers:
+            stats = mm.get_vram_stats()
+            cache_stats = mm.get_cache_stats()
+
+            total_gb = max(total_gb, stats.get("total", 16.0))
+            used_gb = max(used_gb, stats.get("used", 0.0))  # Use max, not sum - same GPU
+            all_loaded_models.extend(stats.get("loaded_models", []))
+
+            # Aggregate cache stats for weighted average
+            hits = cache_stats.get("hits", 0)
+            misses = cache_stats.get("misses", 0)
+            total_hits += hits
+            total_ops += hits + misses
+
+        hit_rate = total_hits / total_ops if total_ops > 0 else 0.0
+
+        return VRAMSnapshot(
+            total_gb=total_gb,
+            used_gb=used_gb,
+            free_gb=total_gb - used_gb,
+            loaded_models=list(set(all_loaded_models)),  # Dedupe
+            cache_hit_rate=hit_rate,
+        )
 
     def _get_concurrency_snapshot(self) -> ConcurrencySnapshot:
-        """Get current task concurrency state from scheduler."""
-        if self.scheduler:
-            return ConcurrencySnapshot(
-                running_tasks=self.scheduler.get_running_count(),
-                pending_tasks=self.scheduler.get_pending_count(),
-                waiting_tasks=0,
-                batch_size=0,
-            )
-        return ConcurrencySnapshot(running_tasks=0, pending_tasks=0, waiting_tasks=0)
+        """Get current task concurrency state aggregated from all registered schedulers."""
+        if not self._schedulers:
+            return ConcurrencySnapshot(running_tasks=0, pending_tasks=0, waiting_tasks=0)
+
+        # Sum counts from all registered schedulers
+        running = sum(s.get_running_count() for s in self._schedulers)
+        pending = sum(s.get_pending_count() for s in self._schedulers)
+
+        return ConcurrencySnapshot(
+            running_tasks=running,
+            pending_tasks=pending,
+            waiting_tasks=0,
+            batch_size=0,
+        )
 
     def get_vram_history(self) -> list[tuple[float, VRAMSnapshot]]:
         """Get VRAM time-series data for charts.
@@ -421,3 +458,44 @@ class TelemetryCollector:
     def session_id(self) -> Optional[str]:
         """Get the current session ID."""
         return self._session_id
+
+    # Registration methods for dynamic component management
+    def register_model_manager(self, manager: "ModelManager") -> None:
+        """Register a ModelManager for VRAM metrics aggregation.
+
+        Args:
+            manager: ModelManager instance to register
+        """
+        if manager not in self._model_managers:
+            self._model_managers.append(manager)
+            log.debug("model_manager_registered", count=len(self._model_managers))
+
+    def unregister_model_manager(self, manager: "ModelManager") -> None:
+        """Unregister a ModelManager.
+
+        Args:
+            manager: ModelManager instance to unregister
+        """
+        if manager in self._model_managers:
+            self._model_managers.remove(manager)
+            log.debug("model_manager_unregistered", count=len(self._model_managers))
+
+    def register_scheduler(self, scheduler: "TaskScheduler") -> None:
+        """Register a TaskScheduler for concurrency metrics aggregation.
+
+        Args:
+            scheduler: TaskScheduler instance to register
+        """
+        if scheduler not in self._schedulers:
+            self._schedulers.append(scheduler)
+            log.debug("scheduler_registered", count=len(self._schedulers))
+
+    def unregister_scheduler(self, scheduler: "TaskScheduler") -> None:
+        """Unregister a TaskScheduler.
+
+        Args:
+            scheduler: TaskScheduler instance to unregister
+        """
+        if scheduler in self._schedulers:
+            self._schedulers.remove(scheduler)
+            log.debug("scheduler_unregistered", count=len(self._schedulers))
