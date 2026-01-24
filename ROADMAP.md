@@ -88,7 +88,7 @@ Grouped by logical capability area.
    - ✅ `TraceExporter` for JSON trace export and regression comparison
    - ✅ CLI commands: `sindri telemetry stream/snapshot/export/compare`
    - **Junior task (Owner: Claude, Reviewer: Codex):** Wire TelemetryCollector to the active orchestrator scheduler/model manager so API metrics reflect real workloads
-   - **Junior task (Owner: Claude, Reviewer: Codex):** Emit `MODEL_LOADED` events to populate telemetry agent→model tracking
+   - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Emit `MODEL_LOADED` events to populate telemetry agent→model tracking
 
 ### Extensibility + Automation
 8. **Agents as Plugins**

@@ -588,6 +588,134 @@ class TestEventTypeRegistration:
         assert EVENT_PAYLOAD_MODELS["TELEMETRY_SNAPSHOT"] == TelemetrySnapshotData
 
 
+class TestModelLoadedEvent:
+    """Tests for MODEL_LOADED event handling by TelemetryCollector."""
+
+    @pytest.fixture
+    def event_bus(self):
+        """Create an EventBus for testing."""
+        return EventBus()
+
+    @pytest.fixture
+    def collector(self, event_bus):
+        """Create a TelemetryCollector for testing."""
+        return TelemetryCollector(event_bus=event_bus, tick_interval=0.1)
+
+    @pytest.mark.asyncio
+    async def test_model_loaded_populates_agent_models(self, collector, event_bus):
+        """MODEL_LOADED event should populate agent→model tracking."""
+        await collector.start("test-session")
+
+        # Emit MODEL_LOADED event
+        event_bus.emit(
+            Event(
+                type=EventType.MODEL_LOADED,
+                data={
+                    "model": "qwen2.5-coder:14b",
+                    "task_id": "task-123",
+                    "agent": "huginn",
+                    "vram_gb": 9.0,
+                },
+            )
+        )
+
+        # Verify agent→model is tracked
+        assert collector._agent_models.get("huginn") == "qwen2.5-coder:14b"
+
+        await collector.stop()
+
+    @pytest.mark.asyncio
+    async def test_model_loaded_reflects_in_snapshot(self, collector, event_bus):
+        """MODEL_LOADED event should be reflected in snapshot agent stats."""
+        await collector.start("test-session")
+
+        # Emit MODEL_LOADED event
+        event_bus.emit(
+            Event(
+                type=EventType.MODEL_LOADED,
+                data={
+                    "model": "qwen2.5-coder:7b",
+                    "task_id": "task-456",
+                    "agent": "brokkr",
+                    "vram_gb": 5.0,
+                },
+            )
+        )
+
+        # Also emit an iteration to have stats for this agent
+        event_bus.emit(
+            Event(
+                type=EventType.ITERATION_END,
+                data={"agent": "brokkr", "duration_ms": 1000.0},
+            )
+        )
+
+        snapshot = await collector.stop()
+
+        # Verify model_name is in agent stats
+        brokkr_stats = next(
+            (s for s in snapshot.agent_stats if s.agent_name == "brokkr"), None
+        )
+        assert brokkr_stats is not None
+        assert brokkr_stats.model_name == "qwen2.5-coder:7b"
+
+    @pytest.mark.asyncio
+    async def test_model_loaded_without_agent(self, collector, event_bus):
+        """MODEL_LOADED event without agent should not crash."""
+        await collector.start("test-session")
+
+        # Emit MODEL_LOADED event without agent field
+        event_bus.emit(
+            Event(
+                type=EventType.MODEL_LOADED,
+                data={
+                    "model": "qwen2.5-coder:14b",
+                    "task_id": "task-789",
+                    # No "agent" field
+                },
+            )
+        )
+
+        # Should not crash and agent_models should be empty
+        assert len(collector._agent_models) == 0
+
+        await collector.stop()
+
+    @pytest.mark.asyncio
+    async def test_model_loaded_updates_existing_agent(self, collector, event_bus):
+        """MODEL_LOADED for same agent should update the tracked model."""
+        await collector.start("test-session")
+
+        # First model load
+        event_bus.emit(
+            Event(
+                type=EventType.MODEL_LOADED,
+                data={
+                    "model": "qwen2.5-coder:14b",
+                    "agent": "huginn",
+                    "vram_gb": 9.0,
+                },
+            )
+        )
+        assert collector._agent_models.get("huginn") == "qwen2.5-coder:14b"
+
+        # Second model load (e.g., fallback)
+        event_bus.emit(
+            Event(
+                type=EventType.MODEL_LOADED,
+                data={
+                    "model": "qwen2.5-coder:7b",
+                    "agent": "huginn",
+                    "vram_gb": 5.0,
+                },
+            )
+        )
+        # Should be updated to new model
+        assert collector._agent_models.get("huginn") == "qwen2.5-coder:7b"
+
+        await collector.stop()
+
+
 class TestEventBusUnsubscribe:
     """Tests for EventBus unsubscribe functionality."""
 

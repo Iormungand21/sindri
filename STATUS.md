@@ -10,10 +10,11 @@
 - Multi-project workspace index (background indexer, active contexts, per-project settings).
 - Performance telemetry stream (SSE endpoint, trace export, regression checking).
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 4,019 passing (100%).
+- Tests: 4,023 passing (100%).
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)
+- 2026-01-23: **MODEL_LOADED Event Emission** - Added `MODEL_LOADED` event emission in `hierarchical.py` when models are successfully loaded; emits for both primary and fallback models; enables `TelemetryCollector` to track agent→model relationships; event schema and handler already existed but were not being populated; +4 tests.
 - 2026-01-23: **Fallback Model Recording in Session Metadata** - Added `primary_model`, `fallback_model_used`, and `degradation_reason` fields to `EnvironmentSnapshot`; updated `SnapshotCapture.capture()` to accept fallback info; fixed session creation bug in `hierarchical.py` (was using `agent.model` instead of `model_to_use`); snapshots now record when model degradation occurs; fixed persistence in `SnapshotStore` to save/load fallback fields via config_snapshot_json; +11 tests.
 - 2026-01-23: **TOOL_CALLED Event Schema duration_ms** - Added `duration_ms` field to `ToolCalledData` schema in event_schemas.py; regenerated TypeScript types; updated contract tests. Formalizes timing field already being emitted and consumed by telemetry.
 - 2026-01-23: **Session Status Persistence on Cancel/Failure** - Added `fail_session()` and `cancel_session()` methods to SessionState; sessions now properly marked as 'failed' or 'cancelled' instead of remaining 'active'; added error column to sessions table (schema v8); updated hierarchical.py and orchestrator.py failure/cancel paths; +7 tests.

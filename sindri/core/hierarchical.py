@@ -101,6 +101,21 @@ class HierarchicalAgentLoop:
             agent.model, agent.estimated_vram_gb
         )
 
+        # Emit MODEL_LOADED event for telemetry tracking
+        if loaded:
+            self.event_bus.emit(
+                Event(
+                    type=EventType.MODEL_LOADED,
+                    data={
+                        "model": agent.model,
+                        "task_id": task.id,
+                        "agent": agent.name,
+                        "vram_gb": agent.estimated_vram_gb,
+                    },
+                    task_id=task.id,
+                )
+            )
+
         # Phase 5.6: Try fallback model if primary fails and fallback is available
         active_model = agent.model
         if not loaded and agent.fallback_model:
@@ -135,6 +150,20 @@ class HierarchicalAgentLoop:
                             "primary_model": agent.model,
                             "fallback_model": agent.fallback_model,
                             "reason": "insufficient_vram",
+                        },
+                        task_id=task.id,
+                    )
+                )
+
+                # Emit MODEL_LOADED for fallback model (telemetry tracking)
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.MODEL_LOADED,
+                        data={
+                            "model": agent.fallback_model,
+                            "task_id": task.id,
+                            "agent": agent.name,
+                            "vram_gb": agent.fallback_vram_gb or 3.0,
                         },
                         task_id=task.id,
                     )
