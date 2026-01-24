@@ -307,6 +307,20 @@ class Orchestrator:
             priority=0,
         )
 
+        # Emit task created event for UI clients
+        self.event_bus.emit(
+            Event(
+                type=EventType.TASK_CREATED,
+                data={
+                    "task_id": root_task.id,
+                    "description": root_task.description,
+                    "status": root_task.status.value,
+                    "parent_id": None,
+                    "agent": root_task.assigned_agent,
+                },
+            )
+        )
+
         # Add to scheduler
         self.scheduler.add_task(root_task)
 
@@ -316,6 +330,11 @@ class Orchestrator:
             if root_task.cancel_requested:
                 log.info("orchestrator_cancelled", task_id=root_task.id)
                 root_task.status = TaskStatus.CANCELLED
+                # Update session status to cancelled
+                if root_task.session_id:
+                    await self.state.cancel_session(
+                        root_task.session_id, "Task cancelled by user"
+                    )
                 return {
                     "success": False,
                     "task_id": root_task.id,
@@ -409,6 +428,10 @@ class Orchestrator:
                 task.status = TaskStatus.FAILED
                 task.error = str(e)
 
+                # Update session status to failed
+                if task.session_id:
+                    await self.state.fail_session(task.session_id, str(e))
+
                 # Notify parent task of failure (if this is a child task)
                 await self.delegation.child_failed(task)
 
@@ -444,6 +467,10 @@ class Orchestrator:
                     log.error("task_exception", task_id=task.id, error=str(result))
                     task.status = TaskStatus.FAILED
                     task.error = str(result)
+
+                    # Update session status to failed
+                    if task.session_id:
+                        await self.state.fail_session(task.session_id, str(result))
 
                     # Notify parent task of failure (if this is a child task)
                     await self.delegation.child_failed(task)
@@ -516,6 +543,10 @@ class Orchestrator:
             log.error("task_exception", task_id=next_task.id, error=str(e))
             next_task.status = TaskStatus.FAILED
             next_task.error = str(e)
+
+            # Update session status to failed
+            if next_task.session_id:
+                await self.state.fail_session(next_task.session_id, str(e))
 
             # Notify parent task of failure (if this is a child task)
             await self.delegation.child_failed(next_task)

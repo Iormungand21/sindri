@@ -15,7 +15,8 @@ log = structlog.get_logger()
 # Version 5: Added tool_audit_log table for granular tool permissions
 # Version 6: Added execution_plans and plan_steps tables for Plan-First Execution
 # Version 7: Added session_snapshots and session_tool_outputs for Reproducible Sessions
-SCHEMA_VERSION = 7
+# Version 8: Added error column to sessions table for failure/cancellation reasons
+SCHEMA_VERSION = 8
 
 
 def _db_debug(message: str):
@@ -366,6 +367,12 @@ class Database:
                 ON session_tool_outputs(session_id, turn_index, tool_index)
             """
             )
+
+            # Version 8: Add error column to sessions table if it doesn't exist
+            async with db.execute("PRAGMA table_info(sessions)") as cursor:
+                columns = [row[1] async for row in cursor]
+            if "error" not in columns:
+                await db.execute("ALTER TABLE sessions ADD COLUMN error TEXT")
 
             # Update schema version
             await self._set_schema_version(db, SCHEMA_VERSION)

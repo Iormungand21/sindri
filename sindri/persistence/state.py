@@ -61,6 +61,7 @@ class Session:
     iterations: int = 0
     created_at: datetime = field(default_factory=datetime.now)
     completed_at: Optional[datetime] = None
+    error: Optional[str] = None  # Error reason for failed/cancelled sessions
 
     def add_turn(self, role: str, content: str, tool_calls: Optional[list] = None):
         """Add a turn to the session."""
@@ -160,6 +161,7 @@ class SessionState:
                     created_at=datetime.fromisoformat(row[4]),
                     completed_at=datetime.fromisoformat(row[5]) if row[5] else None,
                     iterations=row[6],
+                    error=row[7] if len(row) > 7 else None,
                 )
 
             # Load turns
@@ -195,6 +197,50 @@ class SessionState:
             await conn.commit()
 
         log.info("session_completed", session_id=session_id)
+
+    async def fail_session(self, session_id: str, error: Optional[str] = None):
+        """Mark a session as failed with optional error reason.
+
+        Args:
+            session_id: The session to mark as failed.
+            error: Optional error message/reason for the failure.
+        """
+        async with self.db.get_connection() as conn:
+            await conn.execute(
+                """
+                UPDATE sessions
+                SET status = 'failed', completed_at = ?, error = ?
+                WHERE id = ?
+                """,
+                (datetime.now(), error, session_id),
+            )
+            await conn.commit()
+
+        log.info(
+            "session_failed",
+            session_id=session_id,
+            error=error[:100] if error else None,
+        )
+
+    async def cancel_session(self, session_id: str, reason: Optional[str] = None):
+        """Mark a session as cancelled.
+
+        Args:
+            session_id: The session to mark as cancelled.
+            reason: Optional reason for cancellation.
+        """
+        async with self.db.get_connection() as conn:
+            await conn.execute(
+                """
+                UPDATE sessions
+                SET status = 'cancelled', completed_at = ?, error = ?
+                WHERE id = ?
+                """,
+                (datetime.now(), reason or "Cancelled by user", session_id),
+            )
+            await conn.commit()
+
+        log.info("session_cancelled", session_id=session_id, reason=reason)
 
     async def list_sessions(self, limit: int = 10) -> list[dict[str, Any]]:
         """List recent sessions."""

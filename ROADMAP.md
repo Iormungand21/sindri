@@ -28,12 +28,15 @@ Grouped by logical capability area.
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Tighten ModelManager.can_load scheduling check to avoid false positives when VRAM is insufficient
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Enforce system access levels for shell/filesystem tools (define RESTRICTED/SUPERVISED behavior)
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Add command timeout/cancellation support to shell tool to prevent hangs
+   - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Persist session status on cancel/failure to avoid stale "active" sessions
+   - **Junior task (Owner: Claude, Reviewer: Codex):** Record fallback model in session metadata when model degradation occurs
 
 ### API + Contract Stability
 1. **Event + API Contract v1** ✅ **COMPLETE (Phase 16)**
    - ✅ Publish versioned JSON schema for REST + WebSocket events
    - ✅ Expose `/api/schema` for clients and auto-generate TS types
    - ✅ Add contract tests and backward-compat flags
+   - **Junior task (Owner: Claude, Reviewer: Codex):** Add `duration_ms` to `TOOL_CALLED` event schema and regenerate TS types
 
 ### Execution Control + Reproducibility
 2. **Plan-First Execution** ✅ **COMPLETE**
@@ -75,6 +78,8 @@ Grouped by logical capability area.
    - ✅ VRAM + concurrency time-series history for dashboards
    - ✅ `TraceExporter` for JSON trace export and regression comparison
    - ✅ CLI commands: `sindri telemetry stream/snapshot/export/compare`
+   - **Junior task (Owner: Claude, Reviewer: Codex):** Wire TelemetryCollector to the active orchestrator scheduler/model manager so API metrics reflect real workloads
+   - **Junior task (Owner: Claude, Reviewer: Codex):** Emit `MODEL_LOADED` events to populate telemetry agent→model tracking
 
 ### Extensibility + Automation
 8. **Agents as Plugins**

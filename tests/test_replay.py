@@ -770,11 +770,11 @@ class TestDatabaseSchema:
     """Tests for database schema changes."""
 
     @pytest.mark.asyncio
-    async def test_schema_version_7(self, tmp_path):
-        """Test that schema version 7 creates new tables."""
+    async def test_schema_version_8(self, tmp_path):
+        """Test that schema version 8 adds error column to sessions."""
         from sindri.persistence.database import Database, SCHEMA_VERSION
 
-        assert SCHEMA_VERSION == 7
+        assert SCHEMA_VERSION == 8
 
         db = Database(db_path=tmp_path / "test.db")
         await db.initialize()
@@ -796,10 +796,15 @@ class TestDatabaseSchema:
                 row = await cursor.fetchone()
                 assert row is not None, "session_tool_outputs table not created"
 
+            # Check that sessions table has error column (v8)
+            async with conn.execute("PRAGMA table_info(sessions)") as cursor:
+                columns = [row[1] async for row in cursor]
+                assert "error" in columns, "error column not added to sessions table"
+
             # Verify schema version
             async with conn.execute("PRAGMA user_version") as cursor:
                 row = await cursor.fetchone()
-                assert row[0] == 7
+                assert row[0] == 8
 
 
 # ==============================================================================

@@ -1,6 +1,6 @@
 # Sindri Status
 
-**Date:** 2026-01-21
+**Date:** 2026-01-23
 **Status:** Internal-only, single-user mode complete
 
 ## TL;DR
@@ -10,10 +10,12 @@
 - Multi-project workspace index (background indexer, active contexts, per-project settings).
 - Performance telemetry stream (SSE endpoint, trace export, regression checking).
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 4,036 passing (100%).
+- Tests: 4,007 passing (100%).
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)
+- 2026-01-23: **Session Status Persistence on Cancel/Failure** - Added `fail_session()` and `cancel_session()` methods to SessionState; sessions now properly marked as 'failed' or 'cancelled' instead of remaining 'active'; added error column to sessions table (schema v8); updated hierarchical.py and orchestrator.py failure/cancel paths; +7 tests.
+- 2026-01-21: **Go TUI Migration** - Replaced Textual TUI with Go/Bubble Tea client over Unix socket event gateway; added gateway server, TASK_CREATED emission, and removed Textual-only tests/deps.
 - 2026-01-21: **Performance Telemetry Stream** (ROADMAP Item 7) - Real-time telemetry via `/api/metrics/live` SSE endpoint, `TelemetryCollector` with rolling statistics, VRAM and concurrency time-series history, `TraceExporter` for JSON trace export and regression comparison, CLI commands (`sindri telemetry stream/snapshot/export/compare`); +39 tests.
 - 2026-01-21: **Multi-Project Workspace Index** (ROADMAP Item 4) - Background indexer with priority queue, incremental MD5-based indexing, active/pinned projects for context injection, per-project embedder settings (chunk size, exclude patterns), CLI commands (`sindri projects activate/deactivate/settings/index-incremental/active`); +47 tests.
 - 2026-01-21: Reproducible Sessions (snapshots, tool output recording, `sindri replay`, session comparison; +44 tests).

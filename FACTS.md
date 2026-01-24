@@ -4,12 +4,12 @@ Purpose: Local-first, single-user LLM orchestration system for code + ops on one
 
 Status:
 - Mode: internal-only, single-user
-- Date: 2026-01-21 (see STATUS.md)
+- Date: 2026-01-23 (see STATUS.md)
 
 Counts (authoritative):
 - Agents: 27 (see docs/AGENTS.md)
 - Tools: 268 (see README.md or sindri/tools/registry.py)
-- Tests passing: 4,036 (see STATUS.md)
+- Tests passing: 4,007 (see STATUS.md)
 
 Core architecture:
 - Execution: hierarchical Ralph loop with delegation and parallel batching

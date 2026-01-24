@@ -436,6 +436,10 @@ class HierarchicalAgentLoop:
                     iteration=iteration + 1,
                 )
 
+                # Update session status to cancelled
+                if session:
+                    await self.state.cancel_session(session.id, "Task cancelled by user")
+
                 return LoopResult(success=False, iterations=iteration + 1)
 
             # Policy + Guardrails: Check runtime limit at start of each iteration
@@ -481,6 +485,11 @@ class HierarchicalAgentLoop:
                     if runtime_check.escalation_mode == EscalationMode.DENY:
                         task.status = TaskStatus.FAILED
                         task.error = f"Policy violation: {runtime_check.reason}"
+                        # Update session status to failed
+                        if session:
+                            await self.state.fail_session(
+                                session.id, f"Policy violation: {runtime_check.reason}"
+                            )
                         return LoopResult(
                             success=False,
                             iterations=iteration + 1,
@@ -631,6 +640,10 @@ class HierarchicalAgentLoop:
                     iteration=iteration + 1,
                 )
 
+                # Update session status to cancelled
+                if session:
+                    await self.state.cancel_session(session.id, "Task cancelled after LLM call")
+
                 return LoopResult(success=False, iterations=iteration + 1)
 
             # assistant_content is already set by streaming or non-streaming path
@@ -754,6 +767,11 @@ class HierarchicalAgentLoop:
                         if tool_check.escalation_mode == EscalationMode.DENY:
                             task.status = TaskStatus.FAILED
                             task.error = f"Policy violation: {tool_check.reason}"
+                            # Update session status to failed
+                            if session:
+                                await self.state.fail_session(
+                                    session.id, f"Policy violation: {tool_check.reason}"
+                                )
                             return LoopResult(
                                 success=False,
                                 iterations=iteration + 1,
@@ -822,6 +840,11 @@ class HierarchicalAgentLoop:
                                 if file_check.escalation_mode == EscalationMode.DENY:
                                     task.status = TaskStatus.FAILED
                                     task.error = f"Policy violation: {file_check.reason}"
+                                    # Update session status to failed
+                                    if session:
+                                        await self.state.fail_session(
+                                            session.id, f"Policy violation: {file_check.reason}"
+                                        )
                                     return LoopResult(
                                         success=False,
                                         iterations=iteration + 1,
@@ -1235,6 +1258,12 @@ class HierarchicalAgentLoop:
                         },
                     )
 
+                    # Update session status to failed
+                    if session:
+                        await self.state.fail_session(
+                            session.id, f"Agent stuck: {stuck_reason}"
+                        )
+
                     # Phase 5.5: Save session metrics on stuck failure
                     if metrics_collector and self._metrics_store:
                         try:
@@ -1276,6 +1305,10 @@ class HierarchicalAgentLoop:
             iteration=agent.max_iterations,
             error_context={"max_iterations": agent.max_iterations},
         )
+
+        # Update session status to failed
+        if session:
+            await self.state.fail_session(session.id, "Max iterations reached")
 
         # Phase 5.5: Save session metrics on max iterations
         if metrics_collector and self._metrics_store:
