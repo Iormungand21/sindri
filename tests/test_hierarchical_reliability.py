@@ -235,6 +235,52 @@ class TestModelLoadFailurePropagation:
             assert len(error_events) >= 1
             assert error_events[0].data["error_type"] == "model_load_failure"
 
+    @pytest.mark.asyncio
+    async def test_model_load_failure_marks_existing_session_failed(self):
+        """Test that model load failure marks existing session as failed.
+
+        When resuming a task with an existing session_id, model load failure
+        should update the session status to 'failed' instead of leaving it 'active'.
+        """
+        import tempfile
+        from pathlib import Path
+        from sindri.persistence.database import Database
+        from sindri.persistence.state import SessionState
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = Path(tmpdir) / "test.db"
+            db = Database(db_path)
+            state = SessionState(db)
+
+            # Create a session first (simulating a resumed task)
+            session = await state.create_session("Resumed task", "huginn:model")
+            assert session.status == "active"
+
+            with patch("sindri.llm.manager.ModelManager.ensure_loaded") as mock_load:
+                mock_load.return_value = False
+
+                orchestrator = Orchestrator(enable_memory=False)
+                # Inject our state into the loop
+                orchestrator.loop.state = state
+
+                # Create a task with the existing session_id (simulating resume)
+                task = Task(description="Resumed task", assigned_agent="huginn")
+                task.session_id = session.id
+                orchestrator.scheduler.add_task(task)
+
+                # Run the task - should fail due to model load failure
+                result = await orchestrator.loop.run_task(task)
+
+                assert result.success == False
+                assert task.status == TaskStatus.FAILED
+                assert "Could not load model" in task.error
+
+                # Verify the session was marked as failed
+                loaded_session = await state.load_session(session.id)
+                assert loaded_session.status == "failed"
+                assert loaded_session.error is not None
+                assert "Could not load model" in loaded_session.error
+
 
 # =============================================================================
 # Issue 3: Parallel Exception Propagation Tests

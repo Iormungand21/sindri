@@ -180,6 +180,10 @@ class HierarchicalAgentLoop:
                 },
             )
 
+            # Update session status to failed (for resumed tasks with existing session)
+            if task.session_id:
+                await self.state.fail_session(task.session_id, error_reason)
+
             return LoopResult(success=False, iterations=0, reason=error_reason)
 
         task.status = TaskStatus.RUNNING
