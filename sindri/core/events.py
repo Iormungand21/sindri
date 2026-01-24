@@ -77,6 +77,8 @@ class EventType(Enum):
     # Performance Telemetry Stream (ROADMAP Item 7)
     TELEMETRY_TICK = auto()  # Periodic telemetry snapshot (every 2 seconds)
     TELEMETRY_SNAPSHOT = auto()  # Full telemetry dump (on-demand or session end)
+    # Model-Aware Routing (ROADMAP Item 10)
+    MODEL_ROUTED = auto()  # Router selected a model for task
     # Triggers & Automations (ROADMAP Item 9)
     TRIGGER_CREATED = auto()  # Trigger definition created
     TRIGGER_UPDATED = auto()  # Trigger definition updated

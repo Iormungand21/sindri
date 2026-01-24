@@ -113,6 +113,19 @@ class ModelDegradedData(BaseModel):
     reason: Optional[str] = Field(None, description="Reason for degradation")
 
 
+class ModelRoutedData(BaseModel):
+    """Payload for MODEL_ROUTED event (ROADMAP Item 10: Model-Aware Routing)."""
+
+    task_id: str = Field(..., description="Task identifier")
+    agent: str = Field(..., description="Agent name")
+    routed_model: str = Field(..., description="Model selected by router")
+    original_model: str = Field(..., description="Agent's default model")
+    category: Optional[str] = Field(None, description="Task category (e.g., code_generation)")
+    reason: str = Field(..., description="Routing reason (e.g., routed:code_generation)")
+    score: Optional[float] = Field(None, description="Routing confidence score (0.0-1.0)")
+    already_loaded: bool = Field(False, description="Whether model was already loaded")
+
+
 class ErrorData(BaseModel):
     """Payload for ERROR event."""
 
@@ -736,6 +749,8 @@ EVENT_PAYLOAD_MODELS: dict[str, type[BaseModel]] = {
     "TRIGGER_RATE_LIMITED": TriggerRateLimitedData,
     "TRIGGER_SCHEDULER_STARTED": TriggerSchedulerStartedData,
     "TRIGGER_SCHEDULER_STOPPED": TriggerSchedulerStoppedData,
+    # Model-Aware Routing (ROADMAP Item 10)
+    "MODEL_ROUTED": ModelRoutedData,
 }
 
 

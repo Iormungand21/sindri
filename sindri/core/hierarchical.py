@@ -9,6 +9,7 @@ import structlog
 from sindri.llm.client import OllamaClient
 from sindri.llm.tool_parser import ToolCallParser
 from sindri.llm.streaming import StreamingBuffer
+from sindri.llm.router import ModelRouter
 from sindri.tools.registry import ToolRegistry
 from sindri.tools.delegation import DelegateTool
 from sindri.persistence.state import SessionState
@@ -65,6 +66,9 @@ class HierarchicalAgentLoop:
         self._indexed_projects = set()  # Track indexed projects
         # Context length for Ollama num_ctx option (set by orchestrator.configure_for_model)
         self.model_context_length: Optional[int] = None
+        # ROADMAP Item 10: Model-aware routing
+        self.router: Optional[ModelRouter] = None
+        self._routing_enabled: bool = False
         # Phase 5.5: Performance metrics
         self.enable_metrics = enable_metrics
         self._metrics_store = MetricsStore() if enable_metrics else None
@@ -96,9 +100,58 @@ class HierarchicalAgentLoop:
             event_bus=self.event_bus,
         )
 
+        # ROADMAP Item 10: Model-aware routing
+        # Determine which model to use (router or agent defaults)
+        if self.router and self._routing_enabled:
+            routing_decision = self.router.route(
+                task_description=task.description or "",
+                agent_default_model=agent.model,
+                agent_default_vram=agent.estimated_vram_gb,
+                agent_fallback_model=agent.fallback_model,
+                agent_fallback_vram=agent.fallback_vram_gb,
+                context={"agent": agent.name, "task_type": task.task_type},
+            )
+            primary_model = routing_decision.primary_model
+            primary_vram = routing_decision.primary_vram
+            fallback_model = routing_decision.fallback_model
+            fallback_vram = routing_decision.fallback_vram
+
+            # Emit MODEL_ROUTED event if router changed the model
+            if primary_model != agent.model:
+                self.event_bus.emit(
+                    Event(
+                        type=EventType.MODEL_ROUTED,
+                        data={
+                            "task_id": task.id,
+                            "agent": agent.name,
+                            "routed_model": primary_model,
+                            "original_model": agent.model,
+                            "category": routing_decision.category.value if routing_decision.category else None,
+                            "reason": routing_decision.reason,
+                            "score": routing_decision.score,
+                            "already_loaded": routing_decision.already_loaded,
+                        },
+                        task_id=task.id,
+                    )
+                )
+                log.info(
+                    "model_routed",
+                    task_id=task.id,
+                    agent=agent.name,
+                    routed_model=primary_model,
+                    original_model=agent.model,
+                    reason=routing_decision.reason,
+                )
+        else:
+            # Use agent defaults
+            primary_model = agent.model
+            primary_vram = agent.estimated_vram_gb
+            fallback_model = agent.fallback_model
+            fallback_vram = agent.fallback_vram_gb
+
         # Ensure model is loaded (Phase 5.6: with fallback support)
         loaded = await self.scheduler.model_manager.ensure_loaded(
-            agent.model, agent.estimated_vram_gb
+            primary_model, primary_vram
         )
 
         # Emit MODEL_LOADED event for telemetry tracking
@@ -107,32 +160,32 @@ class HierarchicalAgentLoop:
                 Event(
                     type=EventType.MODEL_LOADED,
                     data={
-                        "model": agent.model,
+                        "model": primary_model,
                         "task_id": task.id,
                         "agent": agent.name,
-                        "vram_gb": agent.estimated_vram_gb,
+                        "vram_gb": primary_vram,
                     },
                     task_id=task.id,
                 )
             )
 
         # Phase 5.6: Try fallback model if primary fails and fallback is available
-        active_model = agent.model
-        if not loaded and agent.fallback_model:
+        active_model = primary_model
+        if not loaded and fallback_model:
             log.warning(
                 "model_degradation_attempt",
                 task_id=task.id,
                 agent=agent.name,
-                primary_model=agent.model,
-                fallback_model=agent.fallback_model,
+                primary_model=primary_model,
+                fallback_model=fallback_model,
             )
 
             loaded = await self.scheduler.model_manager.ensure_loaded(
-                agent.fallback_model, agent.fallback_vram_gb or 3.0
+                fallback_model, fallback_vram or 3.0
             )
 
             if loaded:
-                active_model = agent.fallback_model
+                active_model = fallback_model
                 log.info(
                     "model_degradation_success",
                     task_id=task.id,
@@ -147,8 +200,8 @@ class HierarchicalAgentLoop:
                         data={
                             "task_id": task.id,
                             "agent": agent.name,
-                            "primary_model": agent.model,
-                            "fallback_model": agent.fallback_model,
+                            "primary_model": primary_model,
+                            "fallback_model": fallback_model,
                             "reason": "insufficient_vram",
                         },
                         task_id=task.id,
@@ -160,10 +213,10 @@ class HierarchicalAgentLoop:
                     Event(
                         type=EventType.MODEL_LOADED,
                         data={
-                            "model": agent.fallback_model,
+                            "model": fallback_model,
                             "task_id": task.id,
                             "agent": agent.name,
-                            "vram_gb": agent.fallback_vram_gb or 3.0,
+                            "vram_gb": fallback_vram or 3.0,
                         },
                         task_id=task.id,
                     )
@@ -171,11 +224,11 @@ class HierarchicalAgentLoop:
 
         if not loaded:
             fallback_info = (
-                f" (fallback {agent.fallback_model} also failed)"
-                if agent.fallback_model
+                f" (fallback {fallback_model} also failed)"
+                if fallback_model
                 else ""
             )
-            error_reason = f"Could not load model {agent.model}{fallback_info}"
+            error_reason = f"Could not load model {primary_model}{fallback_info}"
 
             # Mark task as failed and notify parent
             task.status = TaskStatus.FAILED
@@ -193,8 +246,8 @@ class HierarchicalAgentLoop:
                         "error": error_reason,
                         "error_type": "model_load_failure",
                         "agent": agent.name,
-                        "model": agent.model,
-                        "fallback_model": agent.fallback_model,
+                        "model": primary_model,
+                        "fallback_model": fallback_model,
                     },
                 )
             )

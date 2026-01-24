@@ -56,6 +56,39 @@ class ProjectEmbedderSettings:
 
 
 @dataclass
+class ProjectRoutingPreferences:
+    """Per-project model routing preferences (ROADMAP Item 10).
+
+    Allows customization of how models are selected for tasks in a project,
+    including category-based overrides and agent-specific locks.
+    """
+
+    # Override models for specific task categories (category name -> model name)
+    model_overrides: Dict[str, str] = field(default_factory=dict)
+    # Lock specific agents to specific models (agent name -> model name)
+    locked_models: Dict[str, str] = field(default_factory=dict)
+    # Speed vs quality preference (None = use global setting)
+    speed_preference: Optional[float] = None
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "model_overrides": self.model_overrides,
+            "locked_models": self.locked_models,
+            "speed_preference": self.speed_preference,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "ProjectRoutingPreferences":
+        """Create from dictionary."""
+        return cls(
+            model_overrides=data.get("model_overrides", {}),
+            locked_models=data.get("locked_models", {}),
+            speed_preference=data.get("speed_preference"),
+        )
+
+
+@dataclass
 class ProjectConfig:
     """Configuration for a registered project.
 
@@ -64,6 +97,7 @@ class ProjectConfig:
     - auto_index: Include in background indexer queue
     - index_priority: Priority in indexer queue (1=highest, 10=lowest)
     - embedder_settings: Per-project indexing configuration
+    - routing_preferences: Per-project model routing preferences
     """
 
     path: str
@@ -79,6 +113,8 @@ class ProjectConfig:
     auto_index: bool = True  # Include in background indexer
     index_priority: int = 5  # Priority: 1=highest, 10=lowest
     embedder_settings: Optional[ProjectEmbedderSettings] = None  # Per-project config
+    # Model Routing fields (ROADMAP Item 10)
+    routing_preferences: Optional[ProjectRoutingPreferences] = None  # Per-project routing
 
     def __post_init__(self):
         if not self.name:
@@ -107,6 +143,10 @@ class ProjectConfig:
             "embedder_settings": (
                 self.embedder_settings.to_dict() if self.embedder_settings else None
             ),
+            # Model Routing fields (ROADMAP Item 10)
+            "routing_preferences": (
+                self.routing_preferences.to_dict() if self.routing_preferences else None
+            ),
         }
 
     @classmethod
@@ -116,6 +156,11 @@ class ProjectConfig:
         embedder_settings = None
         if data.get("embedder_settings"):
             embedder_settings = ProjectEmbedderSettings.from_dict(data["embedder_settings"])
+
+        # Parse routing preferences if present (ROADMAP Item 10)
+        routing_preferences = None
+        if data.get("routing_preferences"):
+            routing_preferences = ProjectRoutingPreferences.from_dict(data["routing_preferences"])
 
         return cls(
             path=data["path"],
@@ -139,6 +184,8 @@ class ProjectConfig:
             auto_index=data.get("auto_index", True),
             index_priority=data.get("index_priority", 5),
             embedder_settings=embedder_settings,
+            # Model Routing fields (ROADMAP Item 10)
+            routing_preferences=routing_preferences,
         )
 
     def matches_tag(self, tag: str) -> bool:

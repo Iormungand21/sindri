@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Optional, TYPE_CHECKING
 
 from sindri.llm.client import OllamaClient
+from sindri.llm.router import ModelRouter
+from sindri.llm.routing import RoutingPreferences, RoutingTaskCategory
 
 if TYPE_CHECKING:
     from sindri.telemetry.collector import TelemetryCollector
@@ -140,6 +142,22 @@ class Orchestrator:
             event_bus=self.event_bus,
         )
 
+        # ROADMAP Item 10: Model-aware routing
+        self.router: Optional[ModelRouter] = None
+        if self._sindri_config.routing.enabled:
+            preferences = self._load_routing_preferences()
+            self.router = ModelRouter(
+                model_manager=self.model_manager,
+                preferences=preferences,
+            )
+            # Pass router to the loop
+            self.loop.router = self.router
+            self.loop._routing_enabled = True
+            log.info(
+                "model_router_enabled",
+                speed_preference=preferences.speed_preference,
+            )
+
         # Plan-First Execution: Subscribe to plan approval/rejection events
         self.event_bus.subscribe(EventType.PLAN_APPROVED, self._handle_plan_approved)
         self.event_bus.subscribe(EventType.PLAN_REJECTED, self._handle_plan_rejected)
@@ -199,6 +217,47 @@ class Orchestrator:
         reason = data.get("reason")
         if task_id and plan_id:
             asyncio.create_task(self.delegation.plan_rejected(task_id, plan_id, reason))
+
+    def _load_routing_preferences(self) -> RoutingPreferences:
+        """Load routing preferences from config and active project.
+
+        Combines global config settings with per-project overrides.
+
+        Returns:
+            RoutingPreferences for the router
+        """
+        # Start with global config defaults
+        prefs = RoutingPreferences(
+            speed_preference=self._sindri_config.routing.speed_preference,
+            min_quality_score=self._sindri_config.routing.min_quality_score,
+        )
+
+        # Overlay project-specific preferences if work_dir is set
+        if self.project_registry and self.work_dir:
+            project = self.project_registry.get_project(str(self.work_dir))
+            if project and project.routing_preferences:
+                proj_prefs = project.routing_preferences
+                # Merge model overrides
+                for category_str, model in proj_prefs.model_overrides.items():
+                    try:
+                        category = RoutingTaskCategory(category_str)
+                        prefs.model_overrides[category] = model
+                    except ValueError:
+                        log.warning("unknown_routing_category", category=category_str)
+                # Merge locked models
+                prefs.locked_models.update(proj_prefs.locked_models)
+                # Override speed preference if set
+                if proj_prefs.speed_preference is not None:
+                    prefs.speed_preference = proj_prefs.speed_preference
+
+                log.debug(
+                    "routing_preferences_loaded",
+                    project=project.name,
+                    overrides=len(prefs.model_overrides),
+                    locked=len(prefs.locked_models),
+                )
+
+        return prefs
 
     def cancel_task(self, task_id: str):
         """Request cancellation of a task and its subtasks."""

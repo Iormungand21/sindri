@@ -115,10 +115,15 @@ Grouped by logical capability area.
    - Event triggers via EventBus subscription (deferred to future enhancement)
 
 ### Model Strategy
-10. **Model-Aware Routing**
-    - Lightweight router for model selection by task type
-    - VRAM-aware fallback + cost/latency heuristics
-    - Per-project model preferences
+10. **Model-Aware Routing** ✅ **COMPLETE**
+    - ✅ Lightweight router for model selection by task type (`TaskClassifier`, `ModelRouter`)
+    - ✅ VRAM-aware fallback + cost/latency heuristics (prefer loaded models, filter by VRAM)
+    - ✅ Per-project model preferences (`ProjectRoutingPreferences`, category overrides, agent locks)
+    - ✅ `ModelCapabilities` registry with 13 models and per-category strength scores
+    - ✅ `RoutingConfig` in SindriConfig (opt-in via `routing.enabled`)
+    - ✅ `MODEL_ROUTED` event type and schema
+    - ✅ CLI commands: `sindri routing status/configure/capabilities/override/lock/unlock`
+    - ✅ +41 tests
 
 ## Architecture Transformation
 

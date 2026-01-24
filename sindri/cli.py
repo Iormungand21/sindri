@@ -9104,5 +9104,288 @@ def triggers_stats():
     asyncio.run(execute())
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# Model-Aware Routing Commands (ROADMAP Item 10)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+@cli.group()
+def routing():
+    """Model-aware routing configuration and status.
+
+    Configure how models are selected for tasks based on task type,
+    VRAM availability, and performance characteristics.
+
+    Examples:
+        sindri routing status
+
+        sindri routing configure --speed 0.7
+
+        sindri routing capabilities
+
+        sindri routing override code_generation qwen2.5-coder:14b
+
+        sindri routing lock heimdall qwen3:14b
+    """
+    pass
+
+
+@routing.command("status")
+def routing_status():
+    """Show routing status and current configuration."""
+    from rich.table import Table
+    from sindri.config import SindriConfig
+    from sindri.llm.capabilities import MODEL_CAPABILITIES
+    from sindri.llm.routing import RoutingPreferences
+
+    config = SindriConfig.load()
+
+    console.print(Panel("[bold]Model Routing Status[/]"))
+
+    # Status
+    status_color = "green" if config.routing.enabled else "red"
+    console.print(
+        f"[bold]Enabled:[/] [{status_color}]{config.routing.enabled}[/{status_color}]"
+    )
+
+    # Configuration
+    console.print(f"\n[bold]Configuration:[/]")
+    console.print(f"  Speed Preference: {config.routing.speed_preference:.2f} (0=quality, 1=speed)")
+    console.print(f"  Prefer Loaded Models: {config.routing.prefer_loaded_models}")
+    console.print(f"  Min Quality Score: {config.routing.min_quality_score:.2f}")
+
+    # Model count
+    console.print(f"\n[bold]Registered Models:[/] {len(MODEL_CAPABILITIES)}")
+
+    # Sample capabilities
+    console.print(f"\n[bold]Sample Model Capabilities:[/]")
+    table = Table(show_header=True)
+    table.add_column("Model", style="cyan")
+    table.add_column("VRAM", style="yellow")
+    table.add_column("Quality", style="green")
+    table.add_column("Specialization", style="magenta")
+
+    # Show top 5 models by quality
+    sorted_models = sorted(
+        MODEL_CAPABILITIES.items(),
+        key=lambda x: x[1].quality_score,
+        reverse=True,
+    )[:5]
+
+    for name, caps in sorted_models:
+        specializations = ", ".join(c.value for c in caps.specialized_for) or "General"
+        table.add_row(
+            name,
+            f"{caps.vram_gb:.1f} GB",
+            f"{caps.quality_score:.2f}",
+            specializations,
+        )
+
+    console.print(table)
+
+
+@routing.command("configure")
+@click.option("--speed", type=float, help="Speed preference (0.0=quality, 1.0=speed)")
+@click.option("--min-quality", type=float, help="Minimum quality score (0.0-1.0)")
+@click.option("--enable/--disable", default=None, help="Enable or disable routing")
+def routing_configure(speed: float, min_quality: float, enable: bool):
+    """Configure global routing preferences."""
+    from pathlib import Path
+    from sindri.config import SindriConfig
+
+    config = SindriConfig.load()
+    updated = False
+
+    if enable is not None:
+        config.routing.enabled = enable
+        console.print(f"[green]Routing {'enabled' if enable else 'disabled'}[/]")
+        updated = True
+
+    if speed is not None:
+        if not 0.0 <= speed <= 1.0:
+            console.print("[red]Speed must be between 0.0 and 1.0[/]")
+            return
+        config.routing.speed_preference = speed
+        console.print(f"[green]Speed preference set to {speed:.2f}[/]")
+        updated = True
+
+    if min_quality is not None:
+        if not 0.0 <= min_quality <= 1.0:
+            console.print("[red]Min quality must be between 0.0 and 1.0[/]")
+            return
+        config.routing.min_quality_score = min_quality
+        console.print(f"[green]Min quality score set to {min_quality:.2f}[/]")
+        updated = True
+
+    if updated:
+        # Save to user config
+        config_path = Path.home() / ".sindri" / "config.toml"
+        config.save(str(config_path))
+        console.print(f"[dim]Saved to {config_path}[/]")
+    else:
+        console.print("[yellow]No changes made. Use --help to see options.[/]")
+
+
+@routing.command("capabilities")
+@click.option("--category", help="Filter by task category")
+@click.option("--min-score", type=float, default=0.0, help="Minimum strength score")
+def routing_capabilities(category: str, min_score: float):
+    """List model capabilities for routing decisions."""
+    from rich.table import Table
+    from sindri.llm.capabilities import MODEL_CAPABILITIES, get_models_for_category
+    from sindri.llm.routing import RoutingTaskCategory
+
+    if category:
+        # Filter by category
+        try:
+            cat = RoutingTaskCategory(category)
+        except ValueError:
+            console.print(f"[red]Unknown category: {category}[/]")
+            console.print(f"Valid categories: {[c.value for c in RoutingTaskCategory]}")
+            return
+
+        models = get_models_for_category(cat, min_score)
+
+        console.print(Panel(f"[bold]Models for {category}[/]"))
+
+        table = Table(show_header=True)
+        table.add_column("Model", style="cyan")
+        table.add_column("Score", style="green")
+        table.add_column("VRAM", style="yellow")
+
+        for name, score in models:
+            caps = MODEL_CAPABILITIES[name]
+            table.add_row(name, f"{score:.2f}", f"{caps.vram_gb:.1f} GB")
+
+        console.print(table)
+    else:
+        # Show all categories
+        console.print(Panel("[bold]Model Capabilities by Category[/]"))
+
+        for cat in RoutingTaskCategory:
+            models = get_models_for_category(cat, min_score)
+            if not models:
+                continue
+
+            console.print(f"\n[bold cyan]{cat.value}[/]")
+            for name, score in models[:3]:  # Top 3
+                caps = MODEL_CAPABILITIES[name]
+                spec = " (specialized)" if cat in caps.specialized_for else ""
+                console.print(f"  {name}: {score:.2f}{spec}")
+
+
+@routing.command("override")
+@click.argument("category")
+@click.argument("model")
+@click.option("--project", help="Apply to specific project path")
+def routing_override(category: str, model: str, project: str):
+    """Set model override for a task category.
+
+    CATEGORY is the task type (e.g., code_generation, reasoning)
+    MODEL is the model name (e.g., qwen2.5-coder:14b)
+    """
+    from sindri.llm.capabilities import MODEL_CAPABILITIES
+    from sindri.llm.routing import RoutingTaskCategory
+    from sindri.memory.projects import ProjectRegistry, ProjectRoutingPreferences
+
+    # Validate category
+    try:
+        cat = RoutingTaskCategory(category)
+    except ValueError:
+        console.print(f"[red]Unknown category: {category}[/]")
+        console.print(f"Valid categories: {[c.value for c in RoutingTaskCategory]}")
+        return
+
+    # Validate model
+    if model not in MODEL_CAPABILITIES:
+        console.print(f"[yellow]Warning: Model '{model}' not in capabilities registry[/]")
+
+    if project:
+        # Apply to project
+        registry = ProjectRegistry()
+        proj = registry.get_project(project)
+        if not proj:
+            console.print(f"[red]Project not found: {project}[/]")
+            return
+
+        if not proj.routing_preferences:
+            proj.routing_preferences = ProjectRoutingPreferences()
+
+        proj.routing_preferences.model_overrides[category] = model
+        registry.update_project(proj)
+        console.print(
+            f"[green]Override set:[/] {category} -> {model} [dim](project: {proj.name})[/]"
+        )
+    else:
+        console.print("[yellow]Per-project overrides require --project flag[/]")
+        console.print("Use 'sindri routing configure' for global settings")
+
+
+@routing.command("lock")
+@click.argument("agent")
+@click.argument("model")
+@click.option("--project", help="Apply to specific project path")
+def routing_lock(agent: str, model: str, project: str):
+    """Lock an agent to a specific model.
+
+    AGENT is the agent name (e.g., heimdall, odin)
+    MODEL is the model name (e.g., qwen3:14b)
+    """
+    from sindri.agents.registry import AGENTS
+    from sindri.llm.capabilities import MODEL_CAPABILITIES
+    from sindri.memory.projects import ProjectRegistry, ProjectRoutingPreferences
+
+    # Validate agent
+    if agent not in AGENTS:
+        console.print(f"[red]Unknown agent: {agent}[/]")
+        return
+
+    # Validate model
+    if model not in MODEL_CAPABILITIES:
+        console.print(f"[yellow]Warning: Model '{model}' not in capabilities registry[/]")
+
+    if project:
+        # Apply to project
+        registry = ProjectRegistry()
+        proj = registry.get_project(project)
+        if not proj:
+            console.print(f"[red]Project not found: {project}[/]")
+            return
+
+        if not proj.routing_preferences:
+            proj.routing_preferences = ProjectRoutingPreferences()
+
+        proj.routing_preferences.locked_models[agent] = model
+        registry.update_project(proj)
+        console.print(
+            f"[green]Lock set:[/] {agent} -> {model} [dim](project: {proj.name})[/]"
+        )
+    else:
+        console.print("[yellow]Per-project locks require --project flag[/]")
+        console.print("Locked models are project-specific settings")
+
+
+@routing.command("unlock")
+@click.argument("agent")
+@click.option("--project", required=True, help="Project path to unlock")
+def routing_unlock(agent: str, project: str):
+    """Remove model lock from an agent."""
+    from sindri.memory.projects import ProjectRegistry
+
+    registry = ProjectRegistry()
+    proj = registry.get_project(project)
+    if not proj:
+        console.print(f"[red]Project not found: {project}[/]")
+        return
+
+    if not proj.routing_preferences or agent not in proj.routing_preferences.locked_models:
+        console.print(f"[yellow]No lock found for agent: {agent}[/]")
+        return
+
+    del proj.routing_preferences.locked_models[agent]
+    registry.update_project(proj)
+    console.print(f"[green]Lock removed for {agent}[/]")
+
+
 if __name__ == "__main__":
     cli()

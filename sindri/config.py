@@ -124,6 +124,35 @@ class TriggerConfig(BaseModel):
     )
 
 
+class RoutingConfig(BaseModel):
+    """Model routing configuration (ROADMAP Item 10).
+
+    Controls the behavior of the model-aware routing system which
+    selects optimal models based on task type and VRAM availability.
+    """
+
+    enabled: bool = Field(
+        default=False,
+        description="Enable model-aware routing (opt-in feature)",
+    )
+    speed_preference: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Speed vs quality tradeoff (0.0=quality, 1.0=speed)",
+    )
+    prefer_loaded_models: bool = Field(
+        default=True,
+        description="Prefer already-loaded models for latency optimization",
+    )
+    min_quality_score: float = Field(
+        default=0.3,
+        ge=0.0,
+        le=1.0,
+        description="Minimum acceptable model quality score",
+    )
+
+
 class MemoryConfig(BaseModel):
     """Memory system configuration."""
 
@@ -170,6 +199,9 @@ class SindriConfig(BaseModel):
 
     # Triggers & Automations (ROADMAP Item 9)
     triggers: TriggerConfig = Field(default_factory=TriggerConfig)
+
+    # Model Routing (ROADMAP Item 10)
+    routing: RoutingConfig = Field(default_factory=RoutingConfig)
 
     # TUI
     tui: TUIConfig = Field(default_factory=TUIConfig)

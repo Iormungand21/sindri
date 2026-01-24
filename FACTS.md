@@ -9,7 +9,7 @@ Status:
 Counts (authoritative):
 - Agents: 27 (see docs/AGENTS.md)
 - Tools: 268 (see README.md or sindri/tools/registry.py)
-- Tests passing: 4,154 (see STATUS.md)
+- Tests passing: 4,201 (see STATUS.md)
 
 Core architecture:
 - Execution: hierarchical Ralph loop with delegation and parallel batching
@@ -22,6 +22,7 @@ Key capabilities:
 - Reproducible sessions (snapshots + tool output replay)
 - Policy + guardrails (tool/file/runtime limits)
 - Performance telemetry stream (SSE endpoint, trace export)
+- Model-aware routing (task-based model selection, per-project preferences)
 
 Primary documents:
 - STATUS.md (current state)
