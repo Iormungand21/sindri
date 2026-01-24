@@ -175,6 +175,27 @@ class TestGetTrigger:
             assert response.status_code == 404
             assert "not found" in response.json()["detail"]
 
+    def test_get_trigger_excludes_webhook_secret(self, client):
+        """Test that webhook_secret is not exposed in responses."""
+        trigger_with_secret = TriggerDefinition(
+            id="test-trigger-secret",
+            name="Secret Trigger",
+            trigger_type=TriggerType.WEBHOOK,
+            task_description="Handle webhook",
+            webhook_secret="super-secret-key-123",
+        )
+
+        with patch("sindri.triggers.store.TriggerStore") as MockStore:
+            mock_instance = MagicMock()
+            mock_instance.load_trigger = AsyncMock(return_value=trigger_with_secret)
+            MockStore.return_value = mock_instance
+
+            response = client.get("/api/triggers/test-trigger-secret")
+            assert response.status_code == 200
+            data = response.json()
+            # webhook_secret should NOT be in the response
+            assert "webhook_secret" not in data
+
 
 # ===== Create Trigger Tests =====
 
@@ -371,6 +392,21 @@ class TestUpdateTrigger:
 
             assert response.status_code == 400
             assert "No fields to update" in response.json()["detail"]
+
+    def test_update_trigger_invalid_notifications(self, client, sample_trigger):
+        """Test updating with invalid notifications."""
+        with patch("sindri.triggers.store.TriggerStore") as MockStore:
+            mock_instance = MagicMock()
+            mock_instance.load_trigger = AsyncMock(return_value=sample_trigger)
+            MockStore.return_value = mock_instance
+
+            response = client.put(
+                "/api/triggers/test-trigger-123",
+                json={"notifications": [{"target": "invalid_target"}]},
+            )
+
+            assert response.status_code == 400
+            assert "Invalid notification config" in response.json()["detail"]
 
 
 # ===== Delete Trigger Tests =====

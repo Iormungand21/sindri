@@ -30,7 +30,7 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 import structlog
 
 from sindri.agents.registry import get_agent, list_agents
@@ -298,7 +298,12 @@ class TriggerRunRequest(BaseModel):
 
 
 class TriggerResponse(BaseModel):
-    """Trigger information response."""
+    """Trigger information response.
+
+    Note: webhook_secret is intentionally excluded to prevent leaking secrets.
+    """
+
+    model_config = ConfigDict(extra="ignore")
 
     id: str
     name: str
@@ -311,7 +316,7 @@ class TriggerResponse(BaseModel):
     work_dir: Optional[str]
     cron_expression: Optional[str]
     timezone: str
-    webhook_secret: Optional[str]
+    # webhook_secret intentionally excluded - sensitive data
     rate_limit_per_minute: int
     event_types: list[str]
     event_filters: dict[str, Any]
@@ -1858,6 +1863,20 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
                 raise HTTPException(
                     status_code=400, detail=f"Invalid cron expression: {error}"
                 )
+
+        # Validate notifications if provided
+        if "notifications" in updates:
+            from sindri.triggers.models import NotificationHook
+
+            validated_notifications = []
+            for n in updates["notifications"]:
+                try:
+                    validated_notifications.append(NotificationHook(**n))
+                except Exception as e:
+                    raise HTTPException(
+                        status_code=400, detail=f"Invalid notification config: {e}"
+                    )
+            updates["notifications"] = validated_notifications
 
         # Apply updates
         await store.update_trigger(trigger_id, updates)

@@ -11,7 +11,7 @@
 - Performance telemetry stream (SSE endpoint, trace export, regression checking).
 - **Triggers & Automations** (ROADMAP Item 9) - cron triggers, CLI commands, notification hooks, **REST API endpoints**.
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 4,117 passing (100%).
+- Tests: 4,119 passing (100%).
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)
