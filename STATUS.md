@@ -9,12 +9,13 @@
 - Plan-first execution (approval gates) and reproducible sessions (snapshots + replay).
 - Multi-project workspace index (background indexer, active contexts, per-project settings).
 - Performance telemetry stream (SSE endpoint, trace export, regression checking).
-- **Triggers & Automations** (ROADMAP Item 9) - cron triggers, CLI commands, notification hooks.
+- **Triggers & Automations** (ROADMAP Item 9) - cron triggers, CLI commands, notification hooks, **REST API endpoints**.
 - Event + API Contract v1 shipped; schema endpoints live.
-- Tests: 4,086 passing (100%).
+- Tests: 4,117 passing (100%).
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)
+- 2026-01-24: **Triggers REST API** (ROADMAP Item 9 completion) - 11 REST API endpoints for trigger management via HTTP: `GET/POST /api/triggers`, `GET/PUT/DELETE /api/triggers/{id}`, `POST /api/triggers/{id}/enable`, `POST /api/triggers/{id}/disable`, `POST /api/triggers/{id}/run`, `GET /api/triggers/{id}/runs`, `GET /api/triggers/{id}/runs/{run_id}`, `GET /api/triggers/stats`; Pydantic request/response models; event emission on state changes; cron validation; +31 tests.
 - 2026-01-24: **Triggers & Automations** (ROADMAP Item 9) - Core foundation for scheduled task automation via cron expressions; `TriggerStore` for SQLite persistence (schema v9); `TriggerScheduler` background service with cron evaluation using croniter; `TriggerExecutor` for task creation via Orchestrator; `NotificationService` for desktop (notify-send) and log notifications; 11 `TRIGGER_*` event types; `TriggerConfig` in SindriConfig; CLI commands (`sindri triggers list/create/show/delete/enable/disable/run/history/stats`); +50 tests.
 - 2026-01-23: **Telemetry Wiring to Active Orchestrator** - TelemetryCollector now uses registration pattern to aggregate VRAM/concurrency metrics from all active Orchestrators; Orchestrator registers its ModelManager and TaskScheduler on init and unregisters on cleanup; web API metrics now reflect real workloads; +13 tests.
 - 2026-01-23: **MODEL_LOADED Event Emission** - Added `MODEL_LOADED` event emission in `hierarchical.py` when models are successfully loaded; emits for both primary and fallback models; enables `TelemetryCollector` to track agent→model relationships; event schema and handler already existed but were not being populated; +4 tests.

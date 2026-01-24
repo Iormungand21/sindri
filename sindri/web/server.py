@@ -241,6 +241,124 @@ class CoverageStatsResponse(BaseModel):
     total_covered: int
 
 
+# ===== Trigger Models =====
+
+
+class TriggerCreateRequest(BaseModel):
+    """Request to create a new trigger."""
+
+    name: str = Field(..., min_length=1, max_length=100)
+    description: str = Field(default="")
+    trigger_type: str = Field(..., description="Type: cron, webhook, or event")
+    task_description: str = Field(..., min_length=1)
+    agent: str = Field(default="brokkr")
+    max_iterations: int = Field(default=30, ge=1, le=100)
+    work_dir: Optional[str] = None
+
+    # Cron-specific fields
+    cron_expression: Optional[str] = None
+    timezone: str = Field(default="UTC")
+
+    # Webhook-specific fields
+    webhook_secret: Optional[str] = None
+    rate_limit_per_minute: int = Field(default=10, ge=1, le=100)
+
+    # Event-specific fields
+    event_types: list[str] = Field(default_factory=list)
+    event_filters: dict[str, Any] = Field(default_factory=dict)
+
+    # Notifications
+    notifications: list[dict] = Field(default_factory=list)
+
+
+class TriggerUpdateRequest(BaseModel):
+    """Request to update a trigger (all fields optional for PATCH-style updates)."""
+
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    description: Optional[str] = None
+    task_description: Optional[str] = None
+    agent: Optional[str] = None
+    max_iterations: Optional[int] = Field(None, ge=1, le=100)
+    work_dir: Optional[str] = None
+    cron_expression: Optional[str] = None
+    timezone: Optional[str] = None
+    webhook_secret: Optional[str] = None
+    rate_limit_per_minute: Optional[int] = Field(None, ge=1, le=100)
+    event_types: Optional[list[str]] = None
+    event_filters: Optional[dict[str, Any]] = None
+    notifications: Optional[list[dict]] = None
+
+
+class TriggerRunRequest(BaseModel):
+    """Request to manually run a trigger."""
+
+    context: Optional[dict[str, Any]] = Field(
+        default=None, description="Context data for execution"
+    )
+
+
+class TriggerResponse(BaseModel):
+    """Trigger information response."""
+
+    id: str
+    name: str
+    description: str
+    trigger_type: str
+    status: str
+    task_description: str
+    agent: str
+    max_iterations: int
+    work_dir: Optional[str]
+    cron_expression: Optional[str]
+    timezone: str
+    webhook_secret: Optional[str]
+    rate_limit_per_minute: int
+    event_types: list[str]
+    event_filters: dict[str, Any]
+    notifications: list[dict]
+    created_at: str
+    updated_at: str
+    last_run_at: Optional[str]
+    next_run_at: Optional[str]
+    run_count: int
+    failure_count: int
+    consecutive_failures: int
+
+
+class TriggerRunResponse(BaseModel):
+    """Trigger run record response."""
+
+    id: str
+    trigger_id: str
+    trigger_name: str
+    task_id: Optional[str]
+    session_id: Optional[str]
+    started_at: str
+    completed_at: Optional[str]
+    duration_ms: Optional[float]
+    success: bool
+    error: Optional[str]
+    result_summary: Optional[str]
+    webhook_payload: Optional[dict]
+    webhook_headers: Optional[dict]
+    event_type: Optional[str]
+    event_data: Optional[dict]
+
+
+class TriggerStatsResponse(BaseModel):
+    """Aggregate trigger statistics response."""
+
+    total_triggers: int
+    enabled_triggers: int
+    disabled_triggers: int
+    paused_triggers: int
+    total_runs: int
+    successful_runs: int
+    failed_runs: int
+    success_rate: float
+    by_type: dict[str, int]
+
+
 class SindriAPI:
     """Sindri API application state."""
 
@@ -1460,6 +1578,445 @@ def create_app(vram_gb: float = 16.0, work_dir: Optional[Path] = None) -> FastAP
         store = CoverageStore(api.state.db)
         stats = await store.get_aggregate_stats()
         return CoverageStatsResponse(**stats)
+
+    # ===== Trigger Endpoints =====
+
+    @app.get("/api/triggers", response_model=list[TriggerResponse], tags=["Triggers"])
+    async def list_triggers(
+        trigger_type: Optional[str] = Query(
+            default=None,
+            description="Filter by type (cron, webhook, event)",
+        ),
+        status: Optional[str] = Query(
+            default=None,
+            description="Filter by status (enabled, disabled, paused)",
+        ),
+        limit: int = Query(
+            default=50,
+            ge=1,
+            le=200,
+            description="Maximum triggers to return",
+        ),
+    ):
+        """List all triggers with optional filtering."""
+        from sindri.triggers.store import TriggerStore
+        from sindri.triggers.models import TriggerType, TriggerStatus
+
+        store = TriggerStore(database=api.state.db)
+
+        type_filter = None
+        if trigger_type:
+            try:
+                type_filter = TriggerType(trigger_type)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid trigger_type: {trigger_type}. Must be cron, webhook, or event",
+                )
+
+        status_filter = None
+        if status:
+            try:
+                status_filter = TriggerStatus(status)
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Invalid status: {status}. Must be enabled, disabled, or paused",
+                )
+
+        triggers = await store.list_triggers(
+            trigger_type=type_filter,
+            status=status_filter,
+            limit=limit,
+        )
+
+        return [TriggerResponse(**t.to_dict()) for t in triggers]
+
+    @app.get(
+        "/api/triggers/stats", response_model=TriggerStatsResponse, tags=["Triggers"]
+    )
+    async def get_trigger_stats():
+        """Get aggregate trigger statistics."""
+        from sindri.triggers.store import TriggerStore
+        from sindri.triggers.models import TriggerStatus
+
+        store = TriggerStore(database=api.state.db)
+        triggers = await store.list_triggers(limit=1000)
+
+        # Aggregate counts
+        enabled = sum(1 for t in triggers if t.status == TriggerStatus.ENABLED)
+        disabled = sum(1 for t in triggers if t.status == TriggerStatus.DISABLED)
+        paused = sum(1 for t in triggers if t.status == TriggerStatus.PAUSED)
+
+        total_runs = sum(t.run_count for t in triggers)
+        total_failures = sum(t.failure_count for t in triggers)
+        successful_runs = total_runs - total_failures
+
+        by_type: dict[str, int] = {}
+        for t in triggers:
+            by_type[t.trigger_type.value] = by_type.get(t.trigger_type.value, 0) + 1
+
+        return TriggerStatsResponse(
+            total_triggers=len(triggers),
+            enabled_triggers=enabled,
+            disabled_triggers=disabled,
+            paused_triggers=paused,
+            total_runs=total_runs,
+            successful_runs=successful_runs,
+            failed_runs=total_failures,
+            success_rate=successful_runs / total_runs if total_runs > 0 else 0.0,
+            by_type=by_type,
+        )
+
+    @app.get(
+        "/api/triggers/{trigger_id}",
+        response_model=TriggerResponse,
+        tags=["Triggers"],
+    )
+    async def get_trigger(trigger_id: str):
+        """Get details for a specific trigger."""
+        from sindri.triggers.store import TriggerStore
+
+        store = TriggerStore(database=api.state.db)
+        trigger = await store.load_trigger(trigger_id)
+
+        if not trigger:
+            raise HTTPException(
+                status_code=404, detail=f"Trigger '{trigger_id}' not found"
+            )
+
+        return TriggerResponse(**trigger.to_dict())
+
+    @app.get(
+        "/api/triggers/{trigger_id}/runs",
+        response_model=list[TriggerRunResponse],
+        tags=["Triggers"],
+    )
+    async def get_trigger_runs(
+        trigger_id: str,
+        limit: int = Query(default=50, ge=1, le=200),
+    ):
+        """Get run history for a trigger."""
+        from sindri.triggers.store import TriggerStore
+
+        store = TriggerStore(database=api.state.db)
+
+        # Verify trigger exists
+        trigger = await store.load_trigger(trigger_id)
+        if not trigger:
+            raise HTTPException(
+                status_code=404, detail=f"Trigger '{trigger_id}' not found"
+            )
+
+        runs = await store.list_runs(trigger_id, limit=limit)
+        return [TriggerRunResponse(**r.to_dict()) for r in runs]
+
+    @app.get(
+        "/api/triggers/{trigger_id}/runs/{run_id}",
+        response_model=TriggerRunResponse,
+        tags=["Triggers"],
+    )
+    async def get_trigger_run(trigger_id: str, run_id: str):
+        """Get a specific trigger run."""
+        from sindri.triggers.store import TriggerStore
+
+        store = TriggerStore(database=api.state.db)
+
+        # Verify trigger exists
+        trigger = await store.load_trigger(trigger_id)
+        if not trigger:
+            raise HTTPException(
+                status_code=404, detail=f"Trigger '{trigger_id}' not found"
+            )
+
+        run = await store.load_run(run_id)
+        if not run or run.trigger_id != trigger_id:
+            raise HTTPException(status_code=404, detail=f"Run '{run_id}' not found")
+
+        return TriggerRunResponse(**run.to_dict())
+
+    @app.post("/api/triggers", response_model=TriggerResponse, tags=["Triggers"])
+    async def create_trigger(request: TriggerCreateRequest):
+        """Create a new trigger."""
+        from sindri.triggers.store import TriggerStore
+        from sindri.triggers.models import (
+            TriggerDefinition,
+            TriggerType,
+            NotificationHook,
+        )
+        from sindri.triggers.scheduler import TriggerScheduler
+
+        store = TriggerStore(database=api.state.db)
+
+        # Validate trigger type
+        try:
+            trigger_type = TriggerType(request.trigger_type)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid trigger type: {request.trigger_type}. Must be cron, webhook, or event",
+            )
+
+        # Validate cron expression if cron type
+        if trigger_type == TriggerType.CRON:
+            if not request.cron_expression:
+                raise HTTPException(
+                    status_code=400,
+                    detail="cron_expression is required for cron triggers",
+                )
+            scheduler = TriggerScheduler(store, None)
+            valid, error = scheduler.validate_cron_expression(request.cron_expression)
+            if not valid:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid cron expression: {error}"
+                )
+
+        # Build notification hooks
+        notifications = []
+        for n in request.notifications:
+            try:
+                notifications.append(NotificationHook(**n))
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid notification config: {e}"
+                )
+
+        # Create trigger
+        trigger = TriggerDefinition(
+            name=request.name,
+            description=request.description,
+            trigger_type=trigger_type,
+            task_description=request.task_description,
+            agent=request.agent,
+            max_iterations=request.max_iterations,
+            work_dir=request.work_dir,
+            cron_expression=request.cron_expression,
+            timezone=request.timezone,
+            webhook_secret=request.webhook_secret,
+            rate_limit_per_minute=request.rate_limit_per_minute,
+            event_types=request.event_types,
+            event_filters=request.event_filters,
+            notifications=notifications,
+        )
+
+        # Calculate next_run for cron triggers
+        if trigger_type == TriggerType.CRON:
+            scheduler = TriggerScheduler(store, None)
+            trigger.next_run_at = scheduler._calculate_next_run(trigger)
+
+        # Save trigger
+        await store.save_trigger(trigger)
+
+        # Emit event
+        api.event_bus.emit(
+            Event(
+                type=EventType.TRIGGER_CREATED,
+                data={
+                    "trigger_id": trigger.id,
+                    "name": trigger.name,
+                    "trigger_type": trigger_type.value,
+                },
+                timestamp=time.time(),
+            )
+        )
+
+        return TriggerResponse(**trigger.to_dict())
+
+    @app.put(
+        "/api/triggers/{trigger_id}",
+        response_model=TriggerResponse,
+        tags=["Triggers"],
+    )
+    async def update_trigger(trigger_id: str, request: TriggerUpdateRequest):
+        """Update a trigger."""
+        from sindri.triggers.store import TriggerStore
+        from sindri.triggers.models import TriggerType
+        from sindri.triggers.scheduler import TriggerScheduler
+
+        store = TriggerStore(database=api.state.db)
+
+        # Verify trigger exists
+        existing = await store.load_trigger(trigger_id)
+        if not existing:
+            raise HTTPException(
+                status_code=404, detail=f"Trigger '{trigger_id}' not found"
+            )
+
+        # Build updates dict, excluding None values
+        updates = {k: v for k, v in request.model_dump().items() if v is not None}
+
+        if not updates:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        # Validate new cron expression if provided
+        if "cron_expression" in updates:
+            scheduler = TriggerScheduler(store, None)
+            valid, error = scheduler.validate_cron_expression(
+                updates["cron_expression"]
+            )
+            if not valid:
+                raise HTTPException(
+                    status_code=400, detail=f"Invalid cron expression: {error}"
+                )
+
+        # Apply updates
+        await store.update_trigger(trigger_id, updates)
+
+        # Recalculate next_run if cron expression or timezone changed
+        if "cron_expression" in updates or "timezone" in updates:
+            updated_trigger = await store.load_trigger(trigger_id)
+            if updated_trigger and updated_trigger.trigger_type == TriggerType.CRON:
+                scheduler = TriggerScheduler(store, None)
+                next_run = scheduler._calculate_next_run(updated_trigger)
+                if next_run:
+                    await store.update_next_run(trigger_id, next_run)
+
+        # Load updated trigger
+        trigger = await store.load_trigger(trigger_id)
+
+        # Emit event
+        api.event_bus.emit(
+            Event(
+                type=EventType.TRIGGER_UPDATED,
+                data={
+                    "trigger_id": trigger_id,
+                    "name": trigger.name if trigger else existing.name,
+                    "fields_updated": list(updates.keys()),
+                },
+                timestamp=time.time(),
+            )
+        )
+
+        return TriggerResponse(**trigger.to_dict())
+
+    @app.delete("/api/triggers/{trigger_id}", tags=["Triggers"])
+    async def delete_trigger(trigger_id: str):
+        """Delete a trigger and its run history."""
+        from sindri.triggers.store import TriggerStore
+
+        store = TriggerStore(database=api.state.db)
+
+        # Load trigger for event data before deleting
+        trigger = await store.load_trigger(trigger_id)
+        if not trigger:
+            raise HTTPException(
+                status_code=404, detail=f"Trigger '{trigger_id}' not found"
+            )
+
+        trigger_name = trigger.name
+        deleted = await store.delete_trigger(trigger_id)
+
+        if not deleted:
+            raise HTTPException(status_code=500, detail="Failed to delete trigger")
+
+        # Emit event
+        api.event_bus.emit(
+            Event(
+                type=EventType.TRIGGER_DELETED,
+                data={"trigger_id": trigger_id, "name": trigger_name},
+                timestamp=time.time(),
+            )
+        )
+
+        return {"message": "Trigger deleted", "trigger_id": trigger_id}
+
+    @app.post(
+        "/api/triggers/{trigger_id}/enable",
+        response_model=TriggerResponse,
+        tags=["Triggers"],
+    )
+    async def enable_trigger(trigger_id: str):
+        """Enable a trigger."""
+        from sindri.triggers.store import TriggerStore
+        from sindri.triggers.models import TriggerStatus
+
+        store = TriggerStore(database=api.state.db)
+
+        trigger = await store.load_trigger(trigger_id)
+        if not trigger:
+            raise HTTPException(
+                status_code=404, detail=f"Trigger '{trigger_id}' not found"
+            )
+
+        await store.update_trigger(
+            trigger_id, {"status": TriggerStatus.ENABLED, "consecutive_failures": 0}
+        )
+
+        # Emit event
+        api.event_bus.emit(
+            Event(
+                type=EventType.TRIGGER_ENABLED,
+                data={"trigger_id": trigger_id, "name": trigger.name},
+                timestamp=time.time(),
+            )
+        )
+
+        trigger = await store.load_trigger(trigger_id)
+        return TriggerResponse(**trigger.to_dict())
+
+    @app.post(
+        "/api/triggers/{trigger_id}/disable",
+        response_model=TriggerResponse,
+        tags=["Triggers"],
+    )
+    async def disable_trigger(trigger_id: str):
+        """Disable a trigger."""
+        from sindri.triggers.store import TriggerStore
+        from sindri.triggers.models import TriggerStatus
+
+        store = TriggerStore(database=api.state.db)
+
+        trigger = await store.load_trigger(trigger_id)
+        if not trigger:
+            raise HTTPException(
+                status_code=404, detail=f"Trigger '{trigger_id}' not found"
+            )
+
+        await store.update_trigger(trigger_id, {"status": TriggerStatus.DISABLED})
+
+        # Emit event
+        api.event_bus.emit(
+            Event(
+                type=EventType.TRIGGER_DISABLED,
+                data={"trigger_id": trigger_id, "name": trigger.name},
+                timestamp=time.time(),
+            )
+        )
+
+        trigger = await store.load_trigger(trigger_id)
+        return TriggerResponse(**trigger.to_dict())
+
+    @app.post(
+        "/api/triggers/{trigger_id}/run",
+        response_model=TriggerRunResponse,
+        tags=["Triggers"],
+    )
+    async def run_trigger(
+        trigger_id: str,
+        request: Optional[TriggerRunRequest] = None,
+    ):
+        """Manually execute a trigger."""
+        from sindri.triggers.store import TriggerStore
+        from sindri.triggers.executor import TriggerExecutor
+
+        store = TriggerStore(database=api.state.db)
+
+        trigger = await store.load_trigger(trigger_id)
+        if not trigger:
+            raise HTTPException(
+                status_code=404, detail=f"Trigger '{trigger_id}' not found"
+            )
+
+        executor = TriggerExecutor(
+            store=store,
+            event_bus=api.event_bus,
+            vram_gb=api.vram_gb,
+        )
+
+        context = request.context if request else None
+        run = await executor.execute_trigger(trigger, context=context)
+
+        return TriggerRunResponse(**run.to_dict())
 
     # ===== WebSocket Endpoint =====
 
