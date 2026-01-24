@@ -104,14 +104,20 @@ class TriggerExecutor:
                 event_bus=self.event_bus,
             )
 
-            # Run the task
-            result = await orchestrator.run(task_description)
+            # Run the task with the trigger's specified agent
+            result = await orchestrator.run(
+                task_description, root_agent=trigger.agent
+            )
 
             # Extract result data
             run.task_id = result.get("task_id")
             run.session_id = result.get("session_id")
             run.success = result.get("success", False)
-            run.result_summary = self._truncate(result.get("result", ""), 500)
+            # Normalize result to string (may be dict or other type)
+            raw_result = result.get("result", "")
+            if not isinstance(raw_result, str):
+                raw_result = json.dumps(raw_result)
+            run.result_summary = self._truncate(raw_result, 500)
             run.error = result.get("error")
 
         except Exception as e:

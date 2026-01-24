@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
+from zoneinfo import ZoneInfo
 
 import structlog
 
@@ -304,7 +305,7 @@ class TriggerScheduler:
             trigger: The trigger with cron_expression
 
         Returns:
-            Next run datetime, or None if unable to calculate
+            Next run datetime in UTC, or None if unable to calculate
         """
         if not trigger.cron_expression:
             return None
@@ -312,17 +313,30 @@ class TriggerScheduler:
         try:
             from croniter import croniter
 
-            # Get base time (now in trigger's timezone)
-            base_time = datetime.now(timezone.utc)
+            # Get base time in trigger's timezone for correct cron evaluation
+            try:
+                tz = ZoneInfo(trigger.timezone) if trigger.timezone else timezone.utc
+            except Exception:
+                log.warning(
+                    "invalid_timezone_using_utc",
+                    trigger_id=trigger.id,
+                    timezone=trigger.timezone,
+                )
+                tz = timezone.utc
+
+            base_time = datetime.now(tz)
 
             cron = croniter(trigger.cron_expression, base_time)
             next_run = cron.get_next(datetime)
 
-            # Ensure timezone awareness
+            # Ensure timezone awareness (croniter returns naive datetime)
             if next_run.tzinfo is None:
-                next_run = next_run.replace(tzinfo=timezone.utc)
+                next_run = next_run.replace(tzinfo=tz)
 
-            return next_run
+            # Convert to UTC for storage
+            next_run_utc = next_run.astimezone(timezone.utc)
+
+            return next_run_utc
 
         except ImportError:
             log.error("croniter_not_installed")

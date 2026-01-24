@@ -299,18 +299,29 @@ class Orchestrator:
 
         self._context_configured = True
 
-    async def run(self, user_request: str, parallel: bool = True) -> dict:
+    async def run(
+        self,
+        user_request: str,
+        parallel: bool = True,
+        root_agent: str = "brokkr",
+    ) -> dict:
         """Run a user request through the hierarchical system.
 
         Args:
             user_request: The task to execute.
             parallel: If True, execute independent tasks concurrently (Phase 6.1).
                      If False, use sequential execution (legacy behavior).
+            root_agent: Agent to use for root task (default: brokkr).
 
         Returns:
             Dict with success status, task_id, result, and subtask count.
         """
-        log.info("orchestrator_started", request=user_request[:100], parallel=parallel)
+        log.info(
+            "orchestrator_started",
+            request=user_request[:100],
+            parallel=parallel,
+            root_agent=root_agent,
+        )
 
         # ROADMAP Item 4: Auto-start background indexer if configured
         if (
@@ -320,18 +331,18 @@ class Orchestrator:
         ):
             await self.start_background_indexer()
 
-        # Auto-configure memory for the default model's context size
+        # Auto-configure memory for the root agent's model context size
         # This prevents context overflow with small-context models
         from sindri.agents.registry import AGENTS
-        default_model = AGENTS.get("brokkr", {})
-        if hasattr(default_model, "model"):
-            await self.configure_for_model(default_model.model)
+        agent_def = AGENTS.get(root_agent, AGENTS.get("brokkr", {}))
+        if hasattr(agent_def, "model"):
+            await self.configure_for_model(agent_def.model)
 
-        # Create root task assigned to Brokkr (orchestrator)
+        # Create root task assigned to specified agent
         root_task = Task(
             description=user_request,
             task_type="orchestration",
-            assigned_agent="brokkr",
+            assigned_agent=root_agent,
             priority=0,
         )
 

@@ -1027,3 +1027,114 @@ class TestTriggersIntegration:
         # Verify deleted
         loaded = await trigger_store.load_trigger(trigger_id)
         assert loaded is None
+
+
+# ==============================================================================
+# Regression Tests (from review)
+# ==============================================================================
+
+
+class TestTriggerRegressions:
+    """Regression tests for bugs found during review."""
+
+    @pytest.mark.asyncio
+    async def test_executor_uses_trigger_agent(self, trigger_store):
+        """Test that executor passes trigger.agent to orchestrator.run()."""
+        trigger = TriggerDefinition(
+            name="custom-agent-trigger",
+            trigger_type=TriggerType.CRON,
+            task_description="Test with custom agent",
+            agent="odin",  # Not the default "brokkr"
+        )
+        await trigger_store.save_trigger(trigger)
+
+        executor = TriggerExecutor(trigger_store)
+
+        with patch("sindri.core.orchestrator.Orchestrator") as MockOrchestrator:
+            mock_instance = AsyncMock()
+            mock_instance.run.return_value = {
+                "success": True,
+                "task_id": "task-123",
+                "result": "Completed",
+            }
+            MockOrchestrator.return_value = mock_instance
+
+            await executor.execute_trigger(trigger)
+
+            # Verify run was called with root_agent parameter
+            mock_instance.run.assert_called_once()
+            call_kwargs = mock_instance.run.call_args.kwargs
+            assert call_kwargs.get("root_agent") == "odin"
+
+    @pytest.mark.asyncio
+    async def test_executor_serializes_dict_result(self, trigger_store):
+        """Test that executor handles dict results without SQLite errors."""
+        trigger = TriggerDefinition(
+            name="dict-result-trigger",
+            trigger_type=TriggerType.CRON,
+            task_description="Test with dict result",
+        )
+        await trigger_store.save_trigger(trigger)
+
+        executor = TriggerExecutor(trigger_store)
+
+        with patch("sindri.core.orchestrator.Orchestrator") as MockOrchestrator:
+            mock_instance = AsyncMock()
+            # Return a dict result (not a string)
+            mock_instance.run.return_value = {
+                "success": True,
+                "task_id": "task-123",
+                "result": {"data": "complex", "nested": {"value": 123}},
+            }
+            MockOrchestrator.return_value = mock_instance
+
+            run = await executor.execute_trigger(trigger)
+
+            # result_summary should be a JSON string, not a dict
+            assert isinstance(run.result_summary, str)
+            assert "complex" in run.result_summary
+
+    def test_scheduler_uses_trigger_timezone(self):
+        """Test that scheduler uses trigger's timezone for cron evaluation."""
+        from zoneinfo import ZoneInfo
+
+        store = MagicMock()
+        scheduler = TriggerScheduler(store, MagicMock())
+
+        # Create trigger with US/Eastern timezone (UTC-5 or UTC-4 depending on DST)
+        trigger = TriggerDefinition(
+            name="timezone-trigger",
+            trigger_type=TriggerType.CRON,
+            task_description="Test timezone",
+            cron_expression="0 9 * * *",  # 9 AM
+            timezone="US/Eastern",
+        )
+
+        next_run = scheduler._calculate_next_run(trigger)
+        assert next_run is not None
+
+        # Result should be in UTC
+        assert next_run.tzinfo == timezone.utc
+
+        # The hour in US/Eastern should be 9
+        eastern = ZoneInfo("US/Eastern")
+        next_run_eastern = next_run.astimezone(eastern)
+        assert next_run_eastern.hour == 9
+
+    def test_scheduler_invalid_timezone_fallback(self):
+        """Test scheduler falls back to UTC for invalid timezone."""
+        store = MagicMock()
+        scheduler = TriggerScheduler(store, MagicMock())
+
+        trigger = TriggerDefinition(
+            name="bad-tz-trigger",
+            trigger_type=TriggerType.CRON,
+            task_description="Test invalid timezone",
+            cron_expression="0 12 * * *",
+            timezone="Invalid/Timezone",
+        )
+
+        # Should not raise, should fall back to UTC
+        next_run = scheduler._calculate_next_run(trigger)
+        assert next_run is not None
+        assert next_run.tzinfo == timezone.utc
