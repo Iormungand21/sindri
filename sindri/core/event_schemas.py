@@ -52,6 +52,9 @@ class ToolCalledData(BaseModel):
     name: str = Field(..., description="Tool name that was called")
     success: bool = Field(..., description="Whether the tool call succeeded")
     result: Optional[str] = Field(None, description="Tool output or error message")
+    duration_ms: Optional[float] = Field(
+        None, description="Tool execution duration in milliseconds"
+    )
 
 
 class DelegationStartData(BaseModel):

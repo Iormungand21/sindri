@@ -75,7 +75,7 @@ class TestEventSchemaValidation:
             ("TASK_CREATED", {"task_id": "t1", "task": "Do something"}),
             ("TASK_STATUS_CHANGED", {"task_id": "t1", "status": "running"}),
             ("AGENT_OUTPUT", {"task_id": "t1", "agent": "huginn", "text": "Hello"}),
-            ("TOOL_CALLED", {"task_id": "t1", "name": "read_file", "success": True}),
+            ("TOOL_CALLED", {"task_id": "t1", "name": "read_file", "success": True, "duration_ms": 42.5}),
             (
                 "DELEGATION_START",
                 {

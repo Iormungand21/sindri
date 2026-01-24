@@ -14,6 +14,7 @@
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)
+- 2026-01-23: **TOOL_CALLED Event Schema duration_ms** - Added `duration_ms` field to `ToolCalledData` schema in event_schemas.py; regenerated TypeScript types; updated contract tests. Formalizes timing field already being emitted and consumed by telemetry.
 - 2026-01-23: **Session Status Persistence on Cancel/Failure** - Added `fail_session()` and `cancel_session()` methods to SessionState; sessions now properly marked as 'failed' or 'cancelled' instead of remaining 'active'; added error column to sessions table (schema v8); updated hierarchical.py and orchestrator.py failure/cancel paths; +7 tests.
 - 2026-01-21: **Go TUI Migration** - Replaced Textual TUI with Go/Bubble Tea client over Unix socket event gateway; added gateway server, TASK_CREATED emission, and removed Textual-only tests/deps.
 - 2026-01-21: **Performance Telemetry Stream** (ROADMAP Item 7) - Real-time telemetry via `/api/metrics/live` SSE endpoint, `TelemetryCollector` with rolling statistics, VRAM and concurrency time-series history, `TraceExporter` for JSON trace export and regression comparison, CLI commands (`sindri telemetry stream/snapshot/export/compare`); +39 tests.

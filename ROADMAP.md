@@ -36,7 +36,7 @@ Grouped by logical capability area.
    - ✅ Publish versioned JSON schema for REST + WebSocket events
    - ✅ Expose `/api/schema` for clients and auto-generate TS types
    - ✅ Add contract tests and backward-compat flags
-   - **Junior task (Owner: Claude, Reviewer: Codex):** Add `duration_ms` to `TOOL_CALLED` event schema and regenerate TS types
+   - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Add `duration_ms` to `TOOL_CALLED` event schema and regenerate TS types
 
 ### Execution Control + Reproducibility
 2. **Plan-First Execution** ✅ **COMPLETE**
