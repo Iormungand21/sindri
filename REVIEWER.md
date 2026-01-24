@@ -34,11 +34,11 @@ Additionally, there was a bug in `hierarchical.py:349` where new sessions were c
 
 | File | Changes |
 |------|---------|
-| `sindri/persistence/snapshots.py` | Add 3 fallback fields to `EnvironmentSnapshot`, update `to_dict()` and `from_dict()` |
+| `sindri/persistence/snapshots.py` | Add 3 fallback fields to `EnvironmentSnapshot`, update `to_dict()` and `from_dict()`, fix `save_snapshot()` and `load_snapshot()` persistence |
 | `sindri/replay/snapshot.py` | Update `capture()` signature and implementation to accept fallback params |
 | `sindri/core/hierarchical.py` | Fix session creation (line 349), add degradation detection, pass fallback info to snapshot |
-| `tests/test_model_degradation.py` | Add 9 tests for fallback recording functionality |
-| `STATUS.md` | Add entry, update test count to 4,017 |
+| `tests/test_model_degradation.py` | Add 11 tests for fallback recording and persistence |
+| `STATUS.md` | Add entry, update test count to 4,019 |
 | `ROADMAP.md` | Mark junior task and item 11 as complete |
 | `FACTS.md` | Update test count |
 
@@ -87,10 +87,10 @@ if is_new_session:
 
 ```bash
 .venv/bin/pytest tests/test_model_degradation.py tests/test_replay.py -v --tb=short
-# 63 passed in 1.39s
+# 65 passed in 1.42s
 
 .venv/bin/pytest tests/ -v --tb=short -q
-# 4017 passed, 13 skipped in 31.59s
+# 4019 passed, 13 skipped in 31.58s
 ```
 
 New tests added:
@@ -103,20 +103,43 @@ New tests added:
 - `TestSnapshotCaptureFallback::test_capture_without_fallback`
 - `TestSnapshotCaptureFallback::test_capture_with_fallback`
 - `TestSnapshotCaptureFallback::test_capture_roundtrip`
+- `TestSnapshotStoreFallbackPersistence::test_fallback_fields_persist_roundtrip`
+- `TestSnapshotStoreFallbackPersistence::test_no_fallback_fields_persist_roundtrip`
+
+### 4. SnapshotStore Persistence Fix (`sindri/persistence/snapshots.py:197-235, 260-283`)
+```python
+# save_snapshot: Include fallback fields in config_snapshot_json
+config_with_fallback = dict(snapshot.config_snapshot)
+if snapshot.primary_model:
+    config_with_fallback["_fallback_primary_model"] = snapshot.primary_model
+if snapshot.fallback_model_used:
+    config_with_fallback["_fallback_model_used"] = snapshot.fallback_model_used
+if snapshot.degradation_reason:
+    config_with_fallback["_fallback_degradation_reason"] = snapshot.degradation_reason
+
+# load_snapshot: Extract fallback fields from config_snapshot
+config_data = json.loads(row["config_snapshot_json"])
+primary_model = config_data.pop("_fallback_primary_model", None)
+fallback_model_used = config_data.pop("_fallback_model_used", None)
+degradation_reason = config_data.pop("_fallback_degradation_reason", None)
+```
 
 ## Backward Compatibility
 
 - New fields are Optional with None defaults
 - `to_dict()` only includes fallback fields when set (non-None)
 - `from_dict()` uses `.get()` so existing snapshots without these fields load correctly
-- No database schema migration needed (stored in JSON)
+- No database schema migration needed (fallback fields stored in existing config_snapshot_json column)
+- Existing snapshots load cleanly (config_data.pop returns None for missing keys)
 
 ## Files for Focused Review
 
 1. `sindri/persistence/snapshots.py:86-141` - EnvironmentSnapshot class with new fields
-2. `sindri/replay/snapshot.py:39-90` - SnapshotCapture.capture() method
-3. `sindri/core/hierarchical.py:346-372` - Session creation and snapshot capture
-4. `tests/test_model_degradation.py:92-180` - New test classes
+2. `sindri/persistence/snapshots.py:197-235` - SnapshotStore.save_snapshot() with fallback persistence
+3. `sindri/persistence/snapshots.py:260-283` - SnapshotStore.load_snapshot() with fallback extraction
+4. `sindri/replay/snapshot.py:39-90` - SnapshotCapture.capture() method
+5. `sindri/core/hierarchical.py:346-372` - Session creation and snapshot capture
+6. `tests/test_model_degradation.py:92-217` - New test classes including persistence tests
 
 ## Next Features
 

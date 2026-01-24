@@ -195,6 +195,16 @@ class SnapshotStore:
         """
         await self.db.initialize()
 
+        # Include fallback fields in config_snapshot for persistence
+        # (avoids schema changes while preserving all snapshot data)
+        config_with_fallback = dict(snapshot.config_snapshot)
+        if snapshot.primary_model:
+            config_with_fallback["_fallback_primary_model"] = snapshot.primary_model
+        if snapshot.fallback_model_used:
+            config_with_fallback["_fallback_model_used"] = snapshot.fallback_model_used
+        if snapshot.degradation_reason:
+            config_with_fallback["_fallback_degradation_reason"] = snapshot.degradation_reason
+
         async with self.db.get_connection() as conn:
             await conn.execute(
                 """
@@ -217,12 +227,12 @@ class SnapshotStore:
                         if snapshot.inference_params
                         else None
                     ),
-                    json.dumps(snapshot.config_snapshot),
+                    json.dumps(config_with_fallback),
                 ),
             )
             await conn.commit()
 
-        log.info("snapshot_saved", session_id=session_id)
+        log.info("snapshot_saved", session_id=session_id, degraded=snapshot.fallback_model_used is not None)
 
     async def load_snapshot(self, session_id: str) -> Optional[EnvironmentSnapshot]:
         """Load snapshot for a session.
@@ -248,6 +258,12 @@ class SnapshotStore:
         if not row:
             return None
 
+        # Extract config and fallback fields
+        config_data = json.loads(row["config_snapshot_json"])
+        primary_model = config_data.pop("_fallback_primary_model", None)
+        fallback_model_used = config_data.pop("_fallback_model_used", None)
+        degradation_reason = config_data.pop("_fallback_degradation_reason", None)
+
         return EnvironmentSnapshot(
             sindri_version=row["sindri_version"],
             sindri_git_commit=row["sindri_git_commit"],
@@ -262,8 +278,11 @@ class SnapshotStore:
                 if row["inference_params_json"]
                 else None
             ),
-            config_snapshot=json.loads(row["config_snapshot_json"]),
+            config_snapshot=config_data,
             captured_at=datetime.fromisoformat(row["created_at"]),
+            primary_model=primary_model,
+            fallback_model_used=fallback_model_used,
+            degradation_reason=degradation_reason,
         )
 
     async def has_snapshot(self, session_id: str) -> bool:

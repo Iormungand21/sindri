@@ -240,3 +240,84 @@ class TestSnapshotCaptureFallback:
         assert restored.primary_model == original.primary_model
         assert restored.fallback_model_used == original.fallback_model_used
         assert restored.degradation_reason == original.degradation_reason
+
+
+class TestSnapshotStoreFallbackPersistence:
+    """Test SnapshotStore persistence of fallback fields."""
+
+    @pytest.mark.asyncio
+    async def test_fallback_fields_persist_roundtrip(self, tmp_path):
+        """Fallback fields should survive database persistence roundtrip."""
+        from sindri.persistence.database import Database
+        from sindri.persistence.snapshots import SnapshotStore
+        from sindri.persistence.state import SessionState
+
+        db = Database(db_path=tmp_path / "test.db")
+        await db.initialize()
+
+        # Create a session first (required for foreign key)
+        state = SessionState(database=db)
+        session = await state.create_session("Test task", "qwen2.5-coder:7b")
+
+        # Create snapshot with fallback fields
+        snapshot = EnvironmentSnapshot(
+            sindri_version="1.0.0",
+            python_version="3.11.0",
+            ollama_host="http://localhost:11434",
+            model_metadata=ModelMetadata(name="qwen2.5-coder:7b"),
+            config_snapshot={"total_vram_gb": 16.0},
+            primary_model="qwen2.5-coder:14b",
+            fallback_model_used="qwen2.5-coder:7b",
+            degradation_reason="insufficient_vram",
+        )
+
+        # Save and load
+        store = SnapshotStore(database=db)
+        await store.save_snapshot(session.id, snapshot)
+        loaded = await store.load_snapshot(session.id)
+
+        # Verify fallback fields were persisted
+        assert loaded is not None
+        assert loaded.primary_model == "qwen2.5-coder:14b"
+        assert loaded.fallback_model_used == "qwen2.5-coder:7b"
+        assert loaded.degradation_reason == "insufficient_vram"
+        # Also verify config_snapshot is clean (no internal _fallback_ keys)
+        assert "_fallback_primary_model" not in loaded.config_snapshot
+        assert "_fallback_model_used" not in loaded.config_snapshot
+        assert "_fallback_degradation_reason" not in loaded.config_snapshot
+        assert loaded.config_snapshot.get("total_vram_gb") == 16.0
+
+    @pytest.mark.asyncio
+    async def test_no_fallback_fields_persist_roundtrip(self, tmp_path):
+        """Snapshot without fallback should persist cleanly."""
+        from sindri.persistence.database import Database
+        from sindri.persistence.snapshots import SnapshotStore
+        from sindri.persistence.state import SessionState
+
+        db = Database(db_path=tmp_path / "test.db")
+        await db.initialize()
+
+        # Create a session first
+        state = SessionState(database=db)
+        session = await state.create_session("Test task", "qwen2.5-coder:14b")
+
+        # Create snapshot without fallback fields
+        snapshot = EnvironmentSnapshot(
+            sindri_version="1.0.0",
+            python_version="3.11.0",
+            ollama_host="http://localhost:11434",
+            model_metadata=ModelMetadata(name="qwen2.5-coder:14b"),
+            config_snapshot={"total_vram_gb": 16.0},
+        )
+
+        # Save and load
+        store = SnapshotStore(database=db)
+        await store.save_snapshot(session.id, snapshot)
+        loaded = await store.load_snapshot(session.id)
+
+        # Verify no fallback fields
+        assert loaded is not None
+        assert loaded.primary_model is None
+        assert loaded.fallback_model_used is None
+        assert loaded.degradation_reason is None
+        assert loaded.config_snapshot.get("total_vram_gb") == 16.0
