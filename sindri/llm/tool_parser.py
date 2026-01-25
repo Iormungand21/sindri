@@ -25,11 +25,11 @@ class ToolCallParser:
     """Extracts tool calls from model text output."""
 
     # Improved pattern - matches greedy to get full JSON block
-    # Handles multiline and nested structures
-    JSON_BLOCK_PATTERN = re.compile(r"```json\s*(\{.+?\})\s*```", re.DOTALL)
+    # Handles multiline and nested structures (objects or arrays)
+    JSON_BLOCK_PATTERN = re.compile(r"```json\s*([\{\[].*?[\}\]])\s*```", re.DOTALL)
 
     # Alternative pattern without json marker
-    CODE_BLOCK_PATTERN = re.compile(r"```\s*(\{.+?\})\s*```", re.DOTALL)
+    CODE_BLOCK_PATTERN = re.compile(r"```\s*([\{\[].*?[\}\]])\s*```", re.DOTALL)
 
     def _find_json_objects(self, text: str) -> list[str]:
         """Find JSON objects in text, handling nesting and strings properly."""
@@ -90,6 +90,66 @@ class ToolCallParser:
 
         return results
 
+    def _find_json_arrays(self, text: str) -> list[str]:
+        """Find JSON arrays in text that might contain tool calls."""
+        results = []
+        bracket_count = 0
+        start_pos = None
+        in_string = False
+        escape_next = False
+
+        for i, char in enumerate(text):
+            if escape_next:
+                escape_next = False
+                continue
+
+            if char == "\\":
+                escape_next = True
+                continue
+
+            if char == '"' and not escape_next:
+                in_string = not in_string
+                continue
+
+            if not in_string:
+                if char == "[":
+                    if bracket_count == 0:
+                        start_pos = i
+                    bracket_count += 1
+                elif char == "]":
+                    bracket_count -= 1
+                    if bracket_count == 0 and start_pos is not None:
+                        json_str = text[start_pos : i + 1]
+                        # Check if it looks like it contains tool calls
+                        if any(
+                            key in json_str
+                            for key in ['"name"', '"function"', '"tool"']
+                        ):
+                            results.append(json_str)
+                        start_pos = None
+
+        return results
+
+    def _append_calls(
+        self, tool_calls: list[ParsedToolCall], result, source: str
+    ) -> None:
+        """Append extraction result(s) to tool_calls list.
+
+        Args:
+            tool_calls: List to append to (mutated in place)
+            result: Single ParsedToolCall, list of them, or None
+            source: Description of where the call came from (for logging)
+        """
+        if result is None:
+            return
+        if isinstance(result, list):
+            for call in result:
+                tool_calls.append(call)
+                log.info(f"parsed_tool_call_from_{source}", call=call.name)
+        else:
+            tool_calls.append(result)
+            log.info(f"parsed_tool_call_from_{source}", call=result.name)
+
     def parse(self, text: str) -> list[ParsedToolCall]:
         """Extract tool calls from text with multiple strategies."""
 
@@ -99,10 +159,8 @@ class ToolCallParser:
         for match in self.JSON_BLOCK_PATTERN.finditer(text):
             try:
                 data = json.loads(match.group(1))
-                call = self._extract_from_json(data)
-                if call:
-                    tool_calls.append(call)
-                    log.info("parsed_tool_call_from_json_block", call=call.name)
+                result = self._extract_from_json(data)
+                self._append_calls(tool_calls, result, "json_block")
             except json.JSONDecodeError as e:
                 log.warning(
                     "json_block_decode_failed",
@@ -118,27 +176,23 @@ class ToolCallParser:
         for match in self.CODE_BLOCK_PATTERN.finditer(text):
             try:
                 data = json.loads(match.group(1))
-                call = self._extract_from_json(data)
-                if call:
-                    tool_calls.append(call)
-                    log.info("parsed_tool_call_from_code_block", call=call.name)
+                result = self._extract_from_json(data)
+                self._append_calls(tool_calls, result, "code_block")
             except json.JSONDecodeError:
                 continue
 
         if tool_calls:
             return tool_calls
 
-        # Strategy 3: Inline JSON (find all JSON objects with brace matching)
+        # Strategy 3: Inline JSON objects (find all JSON objects with brace matching)
         json_objects = self._find_json_objects(text)
         log.debug("found_json_objects", count=len(json_objects))
 
         for i, json_str in enumerate(json_objects):
             try:
                 data = json.loads(json_str)
-                call = self._extract_from_json(data)
-                if call:
-                    tool_calls.append(call)
-                    log.info("parsed_tool_call_from_inline_json", call=call.name)
+                result = self._extract_from_json(data)
+                self._append_calls(tool_calls, result, "inline_json")
             except json.JSONDecodeError as e:
                 log.warning(
                     "inline_json_decode_failed",
@@ -151,12 +205,31 @@ class ToolCallParser:
                 if fixed_json:
                     try:
                         data = json.loads(fixed_json)
-                        call = self._extract_from_json(data)
-                        if call:
-                            tool_calls.append(call)
-                            log.info("parsed_tool_call_after_fix", call=call.name)
+                        result = self._extract_from_json(data)
+                        self._append_calls(tool_calls, result, "fixed_json")
                     except json.JSONDecodeError:
                         continue
+
+        if tool_calls:
+            return tool_calls
+
+        # Strategy 4: Inline JSON arrays (find arrays that might contain tool calls)
+        json_arrays = self._find_json_arrays(text)
+        log.debug("found_json_arrays", count=len(json_arrays))
+
+        for i, json_str in enumerate(json_arrays):
+            try:
+                data = json.loads(json_str)
+                result = self._extract_from_json(data)
+                self._append_calls(tool_calls, result, "inline_array")
+            except json.JSONDecodeError as e:
+                log.warning(
+                    "inline_array_decode_failed",
+                    attempt=i + 1,
+                    error=str(e),
+                    json_preview=json_str[:150],
+                )
+                continue
 
         if not tool_calls:
             log.warning(
@@ -193,8 +266,26 @@ class ToolCallParser:
 
         return fixed if fixed != json_str else None
 
-    def _extract_from_json(self, data: dict) -> Optional[ParsedToolCall]:
-        """Extract tool call from JSON object."""
+    def _extract_array(self, data: list) -> list[ParsedToolCall]:
+        """Extract tool calls from an array of tool call objects.
+
+        Args:
+            data: List of tool call dictionaries
+
+        Returns:
+            List of parsed tool calls (preserves order)
+        """
+        results = []
+        for i, item in enumerate(data):
+            if isinstance(item, dict):
+                call = self._extract_single(item)
+                if call:
+                    results.append(call)
+                    log.debug("extracted_from_array", index=i, call=call.name)
+        return results
+
+    def _extract_single(self, data: dict) -> Optional[ParsedToolCall]:
+        """Extract a single tool call from a JSON object (no recursion)."""
 
         # Format 1: {"name": "tool_name", "arguments": {...}}
         if "name" in data and "arguments" in data:
@@ -215,6 +306,32 @@ class ToolCallParser:
                 return ParsedToolCall(name=func["name"], arguments=func["arguments"])
 
         return None
+
+    def _extract_from_json(self, data) -> Optional[ParsedToolCall] | list[ParsedToolCall]:
+        """Extract tool call(s) from JSON data.
+
+        Handles:
+        - Single tool call objects
+        - Wrapped format: {"tool_calls": [...]}
+        - Top-level arrays: [{...}, {...}]
+
+        Returns:
+            Single ParsedToolCall, list of ParsedToolCalls, or None
+        """
+        # Handle top-level array
+        if isinstance(data, list):
+            return self._extract_array(data)
+
+        if not isinstance(data, dict):
+            return None
+
+        # Handle wrapped format: {"tool_calls": [...]}
+        if "tool_calls" in data and isinstance(data["tool_calls"], list):
+            log.debug("unwrapping_tool_calls_array", count=len(data["tool_calls"]))
+            return self._extract_array(data["tool_calls"])
+
+        # Handle single tool call
+        return self._extract_single(data)
 
     def has_completion_marker(
         self, text: str, marker: str = "<sindri:complete/>"
