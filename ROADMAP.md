@@ -31,7 +31,7 @@ Grouped by logical capability area.
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Persist session status on cancel/failure to avoid stale "active" sessions
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Record fallback model in session metadata when model degradation occurs
    - **Initial scan:** Consider VRAM-eviction-aware scheduling in `TaskScheduler.get_ready_batch` to avoid tasks stuck pending when eviction could free space
-   - **Initial scan:** Emit `TASK_STATUS_CHANGED` on model load failures so UI consumers observe terminal status
+   - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Emit `TASK_STATUS_CHANGED` on model load failures so UI consumers observe terminal status
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Extend `ToolCallParser` to handle wrapped/array tool-call payloads (e.g., `{ "tool_calls": [...] }`)
 
 ### API + Contract Stability

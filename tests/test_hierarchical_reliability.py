@@ -236,6 +236,41 @@ class TestModelLoadFailurePropagation:
             assert error_events[0].data["error_type"] == "model_load_failure"
 
     @pytest.mark.asyncio
+    async def test_model_load_failure_emits_status_changed_event(self, event_bus):
+        """Test that model load failure emits TASK_STATUS_CHANGED event."""
+        events_received = []
+
+        def on_event(event):
+            events_received.append(event)
+
+        event_bus.subscribe_event(on_event)
+
+        with patch("sindri.llm.manager.ModelManager.ensure_loaded") as mock_load:
+            mock_load.return_value = False
+
+            orchestrator = Orchestrator(enable_memory=False, event_bus=event_bus)
+
+            task = Task(description="Test task", assigned_agent="huginn")
+            orchestrator.scheduler.add_task(task)
+
+            await orchestrator.loop.run_task(task)
+
+            # Should have received a status changed event
+            status_events = [
+                e for e in events_received
+                if e.type == EventType.TASK_STATUS_CHANGED
+            ]
+            assert len(status_events) >= 1
+
+            # Find the FAILED status event
+            failed_events = [
+                e for e in status_events
+                if e.data.get("status") == "failed"
+            ]
+            assert len(failed_events) == 1
+            assert failed_events[0].data["task_id"] == task.id
+
+    @pytest.mark.asyncio
     async def test_model_load_failure_marks_existing_session_failed(self):
         """Test that model load failure marks existing session as failed.
 

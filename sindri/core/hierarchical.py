@@ -237,6 +237,14 @@ class HierarchicalAgentLoop:
             # Notify parent task of failure (if this is a child task)
             await self.delegation.child_failed(task)
 
+            # Emit task status change event for UI consumers
+            self.event_bus.emit(
+                Event(
+                    type=EventType.TASK_STATUS_CHANGED,
+                    data={"task_id": task.id, "status": TaskStatus.FAILED.value},
+                )
+            )
+
             # Emit error event for TUI/logging
             self.event_bus.emit(
                 Event(
