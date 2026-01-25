@@ -1,23 +1,26 @@
 # Sindri 🔨
 
-**Local-first LLM orchestration for code generation**
+**Local-first LLM orchestration for code + ops**
 
-Forge code with local LLMs via Ollama, using a hierarchical multi-agent system inspired by Norse mythology. Like the legendary dwarf smith who forged Mjolnir, Sindri crafts your code through iterative refinement.
+Forge code with local LLMs via Ollama, using a hierarchical multi-agent system inspired by Norse mythology. Like the legendary dwarf smith who forged Mjolnir, Sindri crafts your work through iterative refinement.
 
-> **Status:** Production Ready (v0.1.0) - 20 agents, 161+ tools, 2887 tests passing. See [STATUS.md](STATUS.md) for details.
+> **Status:** Internal-only, single-user mode complete. See [STATUS.md](STATUS.md) and [FACTS.md](FACTS.md) for current counts.
 
 ## Features
 
-- 🏛️ **Hierarchical Multi-Agent System** - 20 specialized agents delegate tasks to experts
+- 🏛️ **Hierarchical Multi-Agent System** - 27 specialized agents delegate tasks to experts
 - 🧠 **Five-Tier Memory System** - Working, episodic, semantic, pattern, and analysis memory
 - 🎨 **Rich Terminal UI** - Monitor agent activity, task trees, and VRAM usage in real-time
 - 🌐 **Web UI** - React dashboard with agent graph, session replay, and code diff viewer
+- 🗣️ **Voice Interface** - Local STT/TTS integration for hands-free workflows
 - ⚡ **Parallel Execution** - Independent tasks run concurrently with VRAM-aware batching
 - 💾 **Crash Recovery** - Automatic checkpointing and session restoration
 - 🔄 **Error Recovery** - Classification, retry, stuck detection, and model fallback
 - 📊 **VRAM Management** - Intelligent model loading with LRU eviction and pre-warming
 - 🗄️ **Vector Search** - Semantic codebase search with sqlite-vec and local embeddings
-- 🔌 **Plugin System** - Custom tools and agents without modifying Sindri
+- 🛡️ **System Access Controls** - Restricted/supervised/full modes with approvals
+- 🧰 **Self-Management & Scheduling** - Service control, cron/systemd timers, model management
+- 🔌 **Plugin System + Local Marketplace** - Extend tools/agents from local paths
 
 ## Installation
 
@@ -25,6 +28,7 @@ Forge code with local LLMs via Ollama, using a hierarchical multi-agent system i
 
 - Python 3.11+
 - [Ollama](https://ollama.ai) installed and running
+- Go 1.22+ (for the TUI)
 - 16GB VRAM recommended (works with 8GB+ using smaller models)
 
 ### Install Sindri
@@ -34,8 +38,12 @@ Forge code with local LLMs via Ollama, using a hierarchical multi-agent system i
 git clone https://github.com/Iormungand21/sindri.git
 cd sindri
 
-# Install with all dependencies
-pip install -e ".[dev,tui,web]"
+# Install with core + dev tools
+pip install -e ".[dev,web]"
+
+# Optional extras
+# voice, ast, media, profiling, browser, network
+pip install -e ".[voice,ast,media,profiling,browser,network]"
 
 # Verify installation
 sindri --version
@@ -50,6 +58,7 @@ ollama pull qwen2.5-coder:14b       # Orchestrator (Brokkr)
 ollama pull qwen2.5-coder:7b        # Coder (Huginn), Tester (Skald)
 ollama pull qwen2.5-coder:3b        # Executor (Ratatoskr)
 ollama pull llama3.1:8b             # Reviewer (Mimir), Docs (Idunn)
+ollama pull qwen3:14b               # Security (Heimdall)
 
 # Memory system
 ollama pull nomic-embed-text        # Embeddings
@@ -57,7 +66,9 @@ ollama pull nomic-embed-text        # Embeddings
 # Optional specialized models
 ollama pull deepseek-r1:14b         # Planner (Odin), Debugger (Baldr)
 ollama pull sqlcoder:7b             # SQL Expert (Fenrir)
-ollama pull codestral:22b           # Multi-language (Vidar)
+ollama pull codestral:22b-v0.1-q4_K_M  # Multi-language (Vidar)
+ollama pull mathstral:7b            # Math/Scientific (Nidhogg)
+ollama pull granite3.2-vision:2b    # Vision docs (Groa)
 ```
 
 ## Quick Start
@@ -78,12 +89,26 @@ sindri orchestrate "Create a blog API" --work-dir ./my_project
 ### Interactive Interfaces
 
 ```bash
-# Terminal UI
+# Terminal UI (Go + Bubble Tea)
+cd tui && go build -o bin/sindri-tui ./cmd/sindri-tui
 sindri tui
+
+# Gateway-only mode (debugging)
+sindri tui --gateway-only --gateway-timeout 5
 
 # Web UI (React dashboard)
 sindri web --port 8000
 # Visit http://localhost:8000
+
+# Web UI with authentication (recommended for shared networks)
+sindri web --token my-secret-token
+
+# Web UI for remote access (use with caution)
+sindri web --host 0.0.0.0 --token my-secret-token \
+    --allow-origin https://myapp.example.com
+
+# Voice interface
+sindri voice
 ```
 
 ### Session Management
@@ -104,56 +129,23 @@ sindri metrics
 
 ## Agent Hierarchy
 
-Sindri uses 18 Norse mythology-themed specialized agents. Core agents:
+Sindri uses 27 Norse-themed specialized agents with a master orchestrator (Brokkr) delegating to experts (coding, testing, review, security, SQL, docs, etc.). See [docs/AGENTS.md](docs/AGENTS.md) for the full roster and models.
 
-| Agent | Role | Model | VRAM |
-|-------|------|-------|------|
-| **Brokkr** | Master Orchestrator | qwen2.5-coder:14b | ~9GB |
-| **Huginn** | Code Implementation | qwen2.5-coder:7b | ~5GB |
-| **Mimir** | Code Review | llama3.1:8b | ~5GB |
-| **Ratatoskr** | Fast Executor | qwen2.5-coder:3b | ~2GB |
-| **Skald** | Test Writer | qwen2.5-coder:7b | ~5GB |
-| **Fenrir** | SQL Specialist | sqlcoder:7b | ~5GB |
-| **Odin** | Strategic Planner | deepseek-r1:14b | ~9GB |
-| **Heimdall** | Security Auditor | qwen3:14b | ~10GB |
-| **Baldr** | Debugger | deepseek-r1:14b | ~9GB |
-| **Idunn** | Documentation | llama3.1:8b | ~5GB |
-| **Vidar** | Multi-language | codestral:22b | ~14GB |
+## Tools (268 total)
 
-### Delegation Flow
+Tooling spans code, infra, and creative domains:
 
-```
-User Task
-    ↓
-┌───────────┐
-│  Brokkr   │ ─ Plans and delegates
-└─────┬─────┘
-      │
-      ├──→ Huginn ──→ Writes implementation ──→ Delegates to Ratatoskr
-      │
-      ├──→ Mimir ───→ Reviews code quality
-      │
-      ├──→ Skald ───→ Generates tests ──→ Delegates to Ratatoskr
-      │
-      ├──→ Fenrir ──→ Handles SQL/database tasks
-      │
-      ├──→ Heimdall ─→ Security audit
-      │
-      └──→ Idunn ───→ Documentation
-```
-
-## Tools (32 total)
-
-**Filesystem:** read_file, write_file, edit_file, list_directory, read_tree
-**Search:** search_code, find_symbol
-**Git:** git_status, git_diff, git_log, git_branch
-**HTTP:** http_request, http_get, http_post
-**Testing:** run_tests, check_syntax
-**Formatting:** format_code, lint_code
-**Refactoring:** rename_symbol, extract_function, inline_variable, move_file, batch_rename, split_file, merge_files
-**SQL:** execute_query, describe_schema, explain_query
-**CI/CD:** generate_workflow, validate_workflow
-**Core:** shell, delegate, propose_plan
+- **Filesystem + Search + Git:** read/write/edit, tree, search, git status/diff/log/branch, git automation
+- **Testing + Docs + Formatting:** run tests, test generation, docstrings/readme/api docs, lint/format
+- **Refactoring + AST:** rename/extract/move/split/merge, AST parsing and refactors
+- **Data + SQL:** query/plan/seed, SQL optimization, schema diff/index analysis, backups
+- **CI/CD + Dependencies:** workflow gen/validation, SBOM, vulnerability scan, outdated deps
+- **Infra + Ops:** Docker (build/run/compose), Terraform/Pulumi, migrations, services, scheduling
+- **Networking + Web:** HTTP, DNS, TLS analysis, scraping, browser automation
+- **Media + Docs + Images:** PDFs, OCR, spreadsheets, image ops, audio/video tools, TTS/STT
+- **Math + Crypto + Compression:** symbolic math, stats/plots, hashing/encoding, archives
+- **Diagrams + LaTeX + OpenSCAD + Dataviz:** Mermaid/PlantUML/D2, LaTeX, 3D modeling, charts
+- **Creative/Domain:** music composition, game level design, Blender automation, KiCad design
 
 ## Memory System (Muninn)
 
@@ -183,15 +175,21 @@ sindri orchestrate "Simple task" --no-memory
 | `sindri orchestrate <task>` | Execute with hierarchical agents |
 | `sindri tui [task]` | Launch terminal UI |
 | `sindri web` | Launch web UI server |
+| `sindri voice` | Launch voice interface |
 | `sindri agents` | List all agents |
 | `sindri sessions` | Show past sessions |
 | `sindri resume <id>` | Resume a session |
 | `sindri export <id>` | Export session to markdown |
 | `sindri metrics` | View performance metrics |
 | `sindri doctor` | System health check |
-| `sindri plugins list` | List installed plugins |
-| `sindri projects add <path>` | Register project for cross-project search |
-| `sindri feedback <session> <rating>` | Rate session for fine-tuning |
+| `sindri access ...` | Configure system access mode |
+| `sindri service ...` | Manage local services |
+| `sindri schedule ...` | Cron/systemd scheduling helpers |
+| `sindri self ...` | Self-management (models, version, VRAM) |
+| `sindri plugins ...` | Manage plugins |
+| `sindri marketplace ...` | Local-only plugin marketplace |
+| `sindri finetune ...` | Fine-tuning workflows |
+| `sindri feedback ...` | Collect training feedback |
 
 ### Options
 
@@ -219,9 +217,6 @@ episodic_limit = 5
 semantic_limit = 10
 max_context_tokens = 32768
 
-[tui]
-theme = "dark"
-refresh_rate_ms = 100
 ```
 
 See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full options.
@@ -231,8 +226,10 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full options.
 | Document | Purpose |
 |----------|---------|
 | [ONBOARDING.md](ONBOARDING.md) | Quick start for new contributors |
+| [docs/LLM_INDEX.md](docs/LLM_INDEX.md) | LLM agent entrypoint and workflow |
 | [STATUS.md](STATUS.md) | Current state and recent changes |
 | [ROADMAP.md](ROADMAP.md) | Future plans and priorities |
+| [docs/prds/README.md](docs/prds/README.md) | Detailed PRDs and epics |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Technical design and patterns |
 | [docs/QUICKSTART.md](docs/QUICKSTART.md) | User quick start guide |
 | [docs/AGENTS.md](docs/AGENTS.md) | Agent capabilities and usage |
@@ -243,9 +240,9 @@ See [docs/CONFIGURATION.md](docs/CONFIGURATION.md) for full options.
 
 ```bash
 # Install dev dependencies
-pip install -e ".[dev,tui,web]"
+pip install -e ".[dev,web]"
 
-# Run tests (2887 backend + 104 frontend)
+# Run tests (3713 backend + 104 frontend)
 pytest tests/ -v
 cd sindri/web/static && npm test -- --run
 
@@ -291,7 +288,7 @@ MIT License - see [LICENSE](LICENSE)
 
 - Inspired by Ralph Loop pattern
 - Norse mythology for agent naming
-- Built with [Ollama](https://ollama.ai), [Textual](https://textual.textualize.io), [FastAPI](https://fastapi.tiangolo.com), [React](https://react.dev), and [sqlite-vec](https://github.com/asg017/sqlite-vec)
+- Built with [Ollama](https://ollama.ai), [Bubble Tea](https://github.com/charmbracelet/bubbletea), [FastAPI](https://fastapi.tiangolo.com), [React](https://react.dev), and [sqlite-vec](https://github.com/asg017/sqlite-vec)
 
 ---
 

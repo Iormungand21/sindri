@@ -2,7 +2,16 @@
 
 **Technical design documentation for developers**
 
-This document explains the internal architecture, design patterns, and technical decisions behind Sindri. For feature planning, see [ROADMAP.md](ROADMAP.md). For current status, see [STATUS.md](STATUS.md).
+This document explains the internal architecture, design patterns, and technical decisions behind Sindri. For feature planning, see [ROADMAP.md](ROADMAP.md) and the detailed PRDs in [docs/prds/README.md](docs/prds/README.md). For current status, see [STATUS.md](STATUS.md).
+
+## Quick Reference
+
+- Entry points: `sindri/cli.py`, `sindri/__main__.py`
+- Core loop: `sindri/core/loop.py`, `sindri/core/hierarchical.py`
+- Orchestration: `sindri/core/orchestrator.py`, `sindri/core/scheduler.py`, `sindri/core/delegation.py`
+- Memory system: `sindri/memory/system.py`
+- Tools: `sindri/tools/registry.py`
+- LLM client: `sindri/llm/client.py`, `sindri/llm/manager.py`
 
 ---
 
@@ -151,8 +160,8 @@ Five-tier memory architecture:
           +--------------+--------------+
           |                             |
 +---------v----------+    +-------------v-----------+
-|   TUI (Textual)    |    |    Web UI (FastAPI)     |
-|  sindri/tui/       |    |  sindri/web/            |
+| TUI (Go/Bubble Tea)|    |    Web UI (FastAPI)     |
+| tui/ + gateway     |    |  sindri/web/            |
 +---------+----------+    +-------------+-----------+
           |                             |
           +-------------+---------------+
@@ -268,17 +277,10 @@ sindri/
 │   ├── validator.py          # Safety validation
 │   └── manager.py            # PluginManager lifecycle
 │
-├── tui/                      # Terminal UI (Textual)
-│   ├── app.py                # SindriApp (main Textual app)
-│   └── widgets/
-│       ├── header.py         # Header with VRAM gauge, metrics
-│       ├── task_tree.py      # Task list (left panel)
-│       ├── output.py         # Output viewer (right panel)
-│       ├── input.py          # Task input (bottom)
-│       └── history.py        # Task history panel
+├── tui_gateway.py            # Unix socket event gateway for TUI
 │
 └── web/                      # Web UI
-    ├── server.py             # FastAPI server (REST + WebSocket)
+    ├── server.py             # FastAPI server (REST + WebSocket + Auth)
     └── static/               # React frontend
         ├── src/
         │   ├── components/   # Dashboard, AgentList, SessionDetail, etc.
@@ -286,6 +288,17 @@ sindri/
         │   ├── hooks/        # useApi, useWebSocket
         │   └── api/          # API client
         └── package.json      # React + Vite + TailwindCSS
+
+**Web API Security:**
+- Binds to `127.0.0.1` by default (localhost only)
+- Optional token auth via `X-Sindri-Token` or `Authorization: Bearer` headers
+- CORS validation rejects wildcard origins with credentials
+- Path guardrails restrict API task directories to configured base
+- See `docs/CONFIGURATION.md` for `[api]` config options
+
+tui/                           # Go TUI (Bubble Tea)
+├── cmd/sindri-tui/main.go     # Entry point
+└── go.mod                     # Go module + deps
 ```
 
 ---

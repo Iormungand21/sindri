@@ -33,9 +33,13 @@ episodic_limit = 5
 semantic_limit = 10
 max_context_tokens = 32768
 
-[tui]
-theme = "dark"
-refresh_rate_ms = 100
+[api]
+bind_host = "127.0.0.1"
+bind_port = 8000
+auth_enabled = false
+# static_tokens = ["your-secret-token"]
+# base_work_dir = "/home/user/projects"
+
 ```
 
 ## Configuration Sections
@@ -90,14 +94,39 @@ Memory system configuration:
 - Episodic memory: 20%
 - Semantic memory: 20%
 
-### TUI
+### API
 
-Terminal UI settings:
+Web server and API security settings:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `theme` | string | `dark` | TUI theme (dark/light) |
-| `refresh_rate_ms` | int | `100` | UI refresh rate in milliseconds |
+| `bind_host` | string | `127.0.0.1` | Host to bind (use `0.0.0.0` for remote access) |
+| `bind_port` | int | `8000` | Port to listen on |
+| `allowed_origins` | list | auto | CORS allowed origins (auto-generates localhost URLs) |
+| `allow_credentials` | bool | `false` | Allow credentials in CORS requests |
+| `auth_enabled` | bool | `false` | Enable API authentication for mutation endpoints |
+| `static_tokens` | list | `null` | Valid API tokens for authentication |
+| `base_work_dir` | path | `null` | Restrict API task directories to this base path |
+
+**Security Notes:**
+
+- By default, the web server binds to `127.0.0.1` (localhost only)
+- For remote access, set `bind_host = "0.0.0.0"` and enable authentication
+- CORS does not allow wildcard origins (`*`) when `allow_credentials = true`
+- Tokens are checked via `X-Sindri-Token` header or `Authorization: Bearer <token>`
+
+**Example - Secure Remote Access:**
+
+```toml
+[api]
+bind_host = "0.0.0.0"
+bind_port = 8000
+allowed_origins = ["https://myapp.example.com"]
+allow_credentials = true
+auth_enabled = true
+static_tokens = ["your-secret-token-here"]
+base_work_dir = "/home/user/projects"
+```
 
 ## Model Configuration
 
@@ -157,6 +186,7 @@ Override config with environment variables:
 | `SINDRI_DATA_DIR` | `general.data_dir` | `/data/sindri` |
 | `SINDRI_OLLAMA_HOST` | `general.ollama_host` | `http://192.168.1.100:11434` |
 | `SINDRI_VRAM_GB` | `hardware.total_vram_gb` | `12.0` |
+| `SINDRI_API_TOKENS` | `api.static_tokens` | `token1,token2` (comma-separated) |
 
 ## Validation
 
@@ -268,11 +298,16 @@ SindriConfig(
         max_context_tokens=32768
     ),
 
-    # TUI
-    tui=TUIConfig(
-        theme="dark",
-        refresh_rate_ms=100
-    )
+    # API (Web Server)
+    api=ApiConfig(
+        bind_host="127.0.0.1",
+        bind_port=8000,
+        allowed_origins=None,  # Auto-generated
+        allow_credentials=False,
+        auth_enabled=False,
+        static_tokens=None,
+        base_work_dir=None,
+    ),
 )
 ```
 
