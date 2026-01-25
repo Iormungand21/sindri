@@ -3820,6 +3820,17 @@ def validate_api_spec(file_path: str):
     default=None,
     help="Allow credentials in CORS requests (default: from config or disabled)",
 )
+@click.option(
+    "--token",
+    "-t",
+    multiple=True,
+    help="API authentication token (can be repeated). Enables auth if provided.",
+)
+@click.option(
+    "--auth-enabled/--no-auth",
+    default=None,
+    help="Enable/disable API authentication (default: from config or disabled)",
+)
 @click.option("--reload", is_flag=True, help="Enable auto-reload for development")
 def web(
     host: str,
@@ -3828,6 +3839,8 @@ def web(
     work_dir: str = None,
     allow_origin: tuple = (),
     allow_credentials: bool = None,
+    token: tuple = (),
+    auth_enabled: bool = None,
     reload: bool = False,
 ):
     """Start the Sindri Web API server.
@@ -3841,6 +3854,7 @@ def web(
     - Binds to localhost (127.0.0.1) by default
     - CORS allows localhost + 127.0.0.1 by default
     - Credentials disabled by default
+    - API authentication disabled by default
 
     Configuration can be set via sindri.toml [api] section or CLI flags.
     CLI flags override config file settings.
@@ -3848,8 +3862,11 @@ def web(
     Example:
         sindri web --port 8080
 
+    With authentication:
+        sindri web --token my-secret-token
+
     For remote access (use with caution):
-        sindri web --host 0.0.0.0 --allow-origin https://myapp.example.com
+        sindri web --host 0.0.0.0 --token my-secret-token --allow-origin https://myapp.example.com
 
     Then visit http://localhost:8080/docs for API documentation.
     """
@@ -3894,17 +3911,60 @@ def web(
         console.print(f"[red]✗ CORS configuration error:[/red] {e}")
         return
 
+    # Build authentication configuration (Web/API Hardening PRD - Epic B)
+    # Precedence: CLI --token > config file > env var (same as create_app)
+    if token:
+        # Explicit CLI tokens override everything
+        static_tokens = list(token)
+    elif api_config.static_tokens:
+        # Config file tokens override env var
+        static_tokens = list(api_config.static_tokens)
+    else:
+        # Fall back to environment variable
+        env_tokens = os.getenv("SINDRI_API_TOKENS")
+        if env_tokens:
+            static_tokens = [t.strip() for t in env_tokens.split(",") if t.strip()]
+        else:
+            static_tokens = []
+
+    # Determine effective auth_enabled
+    # If tokens provided via CLI, enable auth implicitly
+    if auth_enabled is not None:
+        effective_auth_enabled = auth_enabled
+    elif token:
+        # Tokens provided via CLI, enable auth
+        effective_auth_enabled = True
+    else:
+        effective_auth_enabled = api_config.auth_enabled
+
+    # Validate auth configuration
+    if effective_auth_enabled and not static_tokens:
+        console.print(
+            "[red]✗ Auth configuration error:[/red] auth_enabled=True but no tokens configured. "
+            "Provide at least one --token, set SINDRI_API_TOKENS env var, or configure [api].static_tokens in sindri.toml"
+        )
+        return
+
     # Security warning for non-localhost binding
     if effective_host != "127.0.0.1" and effective_host != "localhost":
         console.print(
             "[yellow]⚠ Warning: Binding to non-localhost address. "
             "Ensure proper network security is in place.[/yellow]"
         )
+        if not effective_auth_enabled:
+            console.print(
+                "[yellow]⚠ Warning: API is exposed without authentication. "
+                "Consider adding --token for security.[/yellow]"
+            )
 
-    # Build info panel with CORS details
+    # Build info panel with CORS and auth details
     cors_info = ", ".join(allowed_origins[:3])
     if len(allowed_origins) > 3:
         cors_info += f" (+{len(allowed_origins) - 3} more)"
+
+    auth_info = "enabled" if effective_auth_enabled else "disabled"
+    if effective_auth_enabled and static_tokens:
+        auth_info += f" ({len(static_tokens)} token{'s' if len(static_tokens) > 1 else ''})"
 
     console.print(
         Panel(
@@ -3913,7 +3973,8 @@ def web(
             f"Port: {effective_port}\n"
             f"VRAM: {vram_gb}GB\n"
             f"CORS Origins: {cors_info}\n"
-            f"CORS Credentials: {effective_credentials}",
+            f"CORS Credentials: {effective_credentials}\n"
+            f"Auth: {auth_info}",
             title="🌐 Starting Server",
         )
     )
@@ -3928,10 +3989,13 @@ def web(
 
     if reload:
         # Development mode with auto-reload
-        # Pass CORS config via environment variables so create_app can read them
+        # Pass config via environment variables so create_app can read them
         os.environ["SINDRI_CORS_ORIGINS"] = ",".join(allowed_origins)
         os.environ["SINDRI_CORS_CREDENTIALS"] = "1" if effective_credentials else "0"
         os.environ["SINDRI_SERVER_PORT"] = str(effective_port)
+        os.environ["SINDRI_AUTH_ENABLED"] = "1" if effective_auth_enabled else "0"
+        if static_tokens:
+            os.environ["SINDRI_API_TOKENS"] = ",".join(static_tokens)
 
         uvicorn.run(
             "sindri.web:create_app",
@@ -3949,6 +4013,8 @@ def web(
             allowed_origins=allowed_origins,
             allow_credentials=effective_credentials,
             port=effective_port,
+            auth_enabled=effective_auth_enabled,
+            static_tokens=static_tokens,
         )
         uvicorn.run(app, host=effective_host, port=effective_port, log_level="info")
 

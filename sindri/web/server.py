@@ -11,6 +11,7 @@ Features:
 import asyncio
 import json
 import os
+import secrets
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -26,6 +27,7 @@ from fastapi import (
     Header,
     BackgroundTasks,
     Request,
+    Depends,
 )
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -43,8 +45,73 @@ from sindri.core.event_schemas import (
 )
 from sindri.llm.manager import ModelManager
 from sindri.telemetry.collector import TelemetryCollector
+from sindri.config import ApiConfig
 
 log = structlog.get_logger()
+
+# Global reference to api_config for auth dependency
+# Set by create_app() during initialization
+_api_config: Optional[ApiConfig] = None
+
+
+def _get_api_config() -> ApiConfig:
+    """Get the current API configuration."""
+    if _api_config is None:
+        return ApiConfig()  # Return defaults if not initialized
+    return _api_config
+
+
+def verify_auth_token(
+    x_sindri_token: Optional[str] = Header(None, alias="X-Sindri-Token"),
+    authorization: Optional[str] = Header(None),
+) -> Optional[str]:
+    """Verify API token from request headers.
+
+    Checks X-Sindri-Token header first, then Authorization: Bearer.
+
+    Args:
+        x_sindri_token: Token from X-Sindri-Token header
+        authorization: Authorization header value
+
+    Returns:
+        The valid token if authentication succeeded, None if auth disabled
+
+    Raises:
+        HTTPException: 401 if no token provided when auth enabled
+        HTTPException: 403 if token is invalid
+    """
+    api_config = _get_api_config()
+
+    if not api_config.auth_enabled:
+        return None  # Auth disabled, allow request
+
+    # Extract token from headers
+    token = x_sindri_token
+    if not token and authorization:
+        if authorization.startswith("Bearer "):
+            token = authorization[7:]
+
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required. Provide X-Sindri-Token header or Authorization: Bearer <token>",
+        )
+
+    # Verify against configured tokens
+    valid_tokens = api_config.get_effective_tokens()
+    for valid_token in valid_tokens:
+        if secrets.compare_digest(token, valid_token):
+            return token
+
+    raise HTTPException(
+        status_code=403,
+        detail="Invalid API token",
+    )
+
+
+def require_auth():
+    """Dependency for endpoints requiring authentication."""
+    return Depends(verify_auth_token)
 
 
 def _ws_debug(message: str):
@@ -486,6 +553,8 @@ def create_app(
     allowed_origins: Optional[list[str]] = None,
     allow_credentials: bool = False,
     port: int = 8000,
+    auth_enabled: Optional[bool] = None,
+    static_tokens: Optional[list[str]] = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application.
 
@@ -495,18 +564,25 @@ def create_app(
         allowed_origins: CORS allowed origins (default: localhost + 127.0.0.1 on given port)
         allow_credentials: Allow credentials in CORS requests
         port: Server port for generating default origins
+        auth_enabled: Enable API authentication for mutation endpoints
+        static_tokens: List of valid API tokens for authentication
 
     Returns:
         Configured FastAPI application
 
     Raises:
         ValueError: If CORS configuration is insecure (wildcard + credentials)
+        ValueError: If auth is enabled but no tokens are configured
 
     Environment Variables (for reload mode):
         SINDRI_CORS_ORIGINS: Comma-separated list of allowed origins (triggers env var mode)
         SINDRI_CORS_CREDENTIALS: "1" to enable credentials, "0" to disable
         SINDRI_SERVER_PORT: Port for generating default origins
+        SINDRI_AUTH_ENABLED: "1" to enable auth, "0" to disable
+        SINDRI_API_TOKENS: Comma-separated list of valid tokens
     """
+    global _api_config
+
     # Check for environment variables (used in reload mode)
     # Env vars are a complete package - only used when SINDRI_CORS_ORIGINS is set
     # AND no explicit allowed_origins were passed. This prevents partial overrides.
@@ -525,6 +601,19 @@ def create_app(
             except ValueError:
                 pass
 
+    # Check for auth environment variables (reload mode)
+    # Only use env vars when explicit args are None (same pattern as CORS)
+    env_auth = os.getenv("SINDRI_AUTH_ENABLED")
+    if env_auth is not None and auth_enabled is None:
+        auth_enabled = env_auth == "1"
+    env_tokens = os.getenv("SINDRI_API_TOKENS")
+    if env_tokens is not None and static_tokens is None:
+        static_tokens = [t.strip() for t in env_tokens.split(",") if t.strip()]
+
+    # Default auth_enabled to False if still None
+    if auth_enabled is None:
+        auth_enabled = False
+
     # Default CORS origins - both localhost and 127.0.0.1 for the actual port
     if allowed_origins is None:
         allowed_origins = [
@@ -539,6 +628,19 @@ def create_app(
             "wildcard origin '*'. This combination is rejected by browsers and "
             "indicates a misconfiguration. Use specific origins instead."
         )
+
+    # Build and validate API config (Web/API Hardening PRD - Epic B)
+    _api_config = ApiConfig(
+        bind_port=port,
+        allowed_origins=allowed_origins,
+        allow_credentials=allow_credentials,
+        auth_enabled=auth_enabled,
+        static_tokens=static_tokens,
+    )
+
+    # Validate auth configuration
+    if auth_enabled:
+        _api_config.validate_auth_config()
 
     api = SindriAPI(vram_gb=vram_gb, work_dir=work_dir)
 
@@ -555,6 +657,15 @@ def create_app(
             allowed_origins=allowed_origins,
             allow_credentials=allow_credentials,
         )
+
+        # Log auth configuration (Web/API Hardening PRD - Epic B)
+        log.info(
+            "sindri_api_auth_config",
+            auth_enabled=auth_enabled,
+            token_count=len(_api_config.get_effective_tokens()) if auth_enabled else 0,
+        )
+        # Note: Non-localhost binding warnings are handled by the CLI since
+        # create_app doesn't know the actual bind host (that's passed to uvicorn)
 
         yield
         _ws_debug("lifespan: shutdown")
@@ -929,7 +1040,9 @@ def create_app(
 
     @app.post("/api/tasks", response_model=TaskResponse, tags=["Tasks"])
     async def create_task(
-        request: TaskCreateRequest, background_tasks: BackgroundTasks
+        request: TaskCreateRequest,
+        background_tasks: BackgroundTasks,
+        _auth: Optional[str] = Depends(verify_auth_token),
     ):
         """Create and start a new task."""
         from sindri.core.orchestrator import Orchestrator
@@ -1063,7 +1176,10 @@ def create_app(
         return plan.to_dict()
 
     @app.post("/api/plans/{plan_id}/approve", tags=["Plans"])
-    async def approve_plan(plan_id: str):
+    async def approve_plan(
+        plan_id: str,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Approve a plan for execution.
 
         This updates the plan status and emits a PLAN_APPROVED event.
@@ -1091,7 +1207,11 @@ def create_app(
         return {"status": "approved", "plan_id": plan_id, "task_id": task_id}
 
     @app.post("/api/plans/{plan_id}/reject", tags=["Plans"])
-    async def reject_plan(plan_id: str, reason: Optional[str] = None):
+    async def reject_plan(
+        plan_id: str,
+        reason: Optional[str] = None,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Reject a plan.
 
         This updates the plan status and emits a PLAN_REJECTED event.
@@ -1140,7 +1260,11 @@ def create_app(
         return step.to_dict()
 
     @app.post("/api/plans/{plan_id}/steps/{step_number}/approve", tags=["Plans"])
-    async def approve_step(plan_id: str, step_number: int):
+    async def approve_step(
+        plan_id: str,
+        step_number: int,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Approve a step to start execution."""
         from sindri.persistence.plans import PlanStore
         from sindri.core.plan_execution import StepStatus, ApprovalStatus
@@ -1161,7 +1285,12 @@ def create_app(
         return {"status": "approved", "step_number": step_number}
 
     @app.post("/api/plans/{plan_id}/steps/{step_number}/reject", tags=["Plans"])
-    async def reject_step(plan_id: str, step_number: int, reason: Optional[str] = None):
+    async def reject_step(
+        plan_id: str,
+        step_number: int,
+        reason: Optional[str] = None,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Reject a step (skip it)."""
         from sindri.persistence.plans import PlanStore
         from sindri.core.plan_execution import StepStatus, ApprovalStatus
@@ -1181,7 +1310,11 @@ def create_app(
         return {"status": "rejected", "step_number": step_number}
 
     @app.post("/api/plans/{plan_id}/steps/{step_number}/accept", tags=["Plans"])
-    async def accept_step_result(plan_id: str, step_number: int):
+    async def accept_step_result(
+        plan_id: str,
+        step_number: int,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Accept a step's result and proceed."""
         from sindri.persistence.plans import PlanStore
         from sindri.core.plan_executor import PlanExecutor
@@ -1201,7 +1334,11 @@ def create_app(
         return {"status": "accepted", "step_number": step_number}
 
     @app.post("/api/plans/{plan_id}/steps/{step_number}/rerun", tags=["Plans"])
-    async def rerun_step(plan_id: str, step_number: int):
+    async def rerun_step(
+        plan_id: str,
+        step_number: int,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Request re-run of a step."""
         from sindri.persistence.plans import PlanStore
         from sindri.core.plan_executor import PlanExecutor
@@ -1578,7 +1715,11 @@ def create_app(
         response_model=CoverageSummaryResponse,
         tags=["Coverage"],
     )
-    async def import_session_coverage(session_id: str, request: CoverageImportRequest):
+    async def import_session_coverage(
+        session_id: str,
+        request: CoverageImportRequest,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Import coverage data from a file for a session.
 
         Supports Cobertura XML (coverage.xml), LCOV (lcov.info), and JSON formats.
@@ -1607,7 +1748,10 @@ def create_app(
             )
 
     @app.delete("/api/sessions/{session_id}/coverage", tags=["Coverage"])
-    async def delete_session_coverage(session_id: str):
+    async def delete_session_coverage(
+        session_id: str,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Delete coverage data for a session."""
         from sindri.persistence.coverage import CoverageStore
 
@@ -1798,7 +1942,10 @@ def create_app(
         return TriggerRunResponse(**run.to_dict())
 
     @app.post("/api/triggers", response_model=TriggerResponse, tags=["Triggers"])
-    async def create_trigger(request: TriggerCreateRequest):
+    async def create_trigger(
+        request: TriggerCreateRequest,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Create a new trigger."""
         from sindri.triggers.store import TriggerStore
         from sindri.triggers.models import (
@@ -1889,7 +2036,11 @@ def create_app(
         response_model=TriggerResponse,
         tags=["Triggers"],
     )
-    async def update_trigger(trigger_id: str, request: TriggerUpdateRequest):
+    async def update_trigger(
+        trigger_id: str,
+        request: TriggerUpdateRequest,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Update a trigger."""
         from sindri.triggers.store import TriggerStore
         from sindri.triggers.models import TriggerType
@@ -1966,7 +2117,10 @@ def create_app(
         return TriggerResponse(**trigger.to_dict())
 
     @app.delete("/api/triggers/{trigger_id}", tags=["Triggers"])
-    async def delete_trigger(trigger_id: str):
+    async def delete_trigger(
+        trigger_id: str,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Delete a trigger and its run history."""
         from sindri.triggers.store import TriggerStore
 
@@ -2001,7 +2155,10 @@ def create_app(
         response_model=TriggerResponse,
         tags=["Triggers"],
     )
-    async def enable_trigger(trigger_id: str):
+    async def enable_trigger(
+        trigger_id: str,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Enable a trigger."""
         from sindri.triggers.store import TriggerStore
         from sindri.triggers.models import TriggerStatus
@@ -2035,7 +2192,10 @@ def create_app(
         response_model=TriggerResponse,
         tags=["Triggers"],
     )
-    async def disable_trigger(trigger_id: str):
+    async def disable_trigger(
+        trigger_id: str,
+        _auth: Optional[str] = Depends(verify_auth_token),
+    ):
         """Disable a trigger."""
         from sindri.triggers.store import TriggerStore
         from sindri.triggers.models import TriggerStatus
@@ -2070,6 +2230,7 @@ def create_app(
     async def run_trigger(
         trigger_id: str,
         request: Optional[TriggerRunRequest] = None,
+        _auth: Optional[str] = Depends(verify_auth_token),
     ):
         """Manually execute a trigger."""
         from sindri.triggers.store import TriggerStore
@@ -2098,8 +2259,35 @@ def create_app(
 
     @app.websocket("/ws")
     async def websocket_endpoint(websocket: WebSocket):
-        """WebSocket endpoint for real-time event streaming."""
+        """WebSocket endpoint for real-time event streaming.
+
+        When auth is enabled, requires token via query parameter:
+            ws://localhost:8000/ws?token=your-api-token
+
+        WebSocket custom headers are not well-supported in browser APIs,
+        so we accept the token as a query parameter instead.
+        """
         _ws_debug("websocket_endpoint: start")
+
+        # Check auth if enabled (Web/API Hardening PRD - Epic B)
+        if _api_config and _api_config.auth_enabled:
+            token = websocket.query_params.get("token")
+
+            if not token:
+                _ws_debug("websocket_endpoint: auth required but no token")
+                await websocket.close(code=4001, reason="Authentication required")
+                return
+
+            valid_tokens = _api_config.get_effective_tokens()
+            is_valid = any(
+                secrets.compare_digest(token, valid_token)
+                for valid_token in valid_tokens
+            )
+            if not is_valid:
+                _ws_debug("websocket_endpoint: invalid token")
+                await websocket.close(code=4003, reason="Invalid token")
+                return
+
         await websocket.accept()
         api.websocket_connections.append(websocket)
         _ws_debug(

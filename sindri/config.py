@@ -154,10 +154,10 @@ class RoutingConfig(BaseModel):
 
 
 class ApiConfig(BaseModel):
-    """Web API configuration (Web/API Hardening PRD - Epic A).
+    """Web API configuration (Web/API Hardening PRD - Epic A & B).
 
     Controls the security defaults for the Sindri web server including
-    bind host and CORS settings.
+    bind host, CORS settings, and API authentication.
     """
 
     bind_host: str = Field(
@@ -177,6 +177,15 @@ class ApiConfig(BaseModel):
     allow_credentials: bool = Field(
         default=False,
         description="Allow credentials in CORS requests (cannot be True with wildcard origins)",
+    )
+    # API Authentication (Web/API Hardening PRD - Epic B)
+    auth_enabled: bool = Field(
+        default=False,
+        description="Enable API authentication for mutation endpoints",
+    )
+    static_tokens: Optional[List[str]] = Field(
+        default=None,
+        description="List of valid API tokens for authentication",
     )
 
     @field_validator("allowed_origins")
@@ -222,6 +231,39 @@ class ApiConfig(BaseModel):
                 "wildcard origin '*'. This combination is rejected by browsers and "
                 "indicates a misconfiguration. Use specific origins instead."
             )
+
+    def validate_auth_config(self) -> None:
+        """Validate authentication configuration.
+
+        Raises:
+            ValueError: If auth is enabled but no tokens are configured
+        """
+        if self.auth_enabled:
+            if not self.static_tokens:
+                raise ValueError(
+                    "API auth error: auth_enabled=True but no static_tokens configured. "
+                    "Provide at least one token in the [api] section or via --token flag."
+                )
+            # Warn about short tokens
+            for token in self.static_tokens:
+                if len(token) < 16:
+                    log.warning(
+                        "api_token_short",
+                        message="API token is shorter than 16 characters, consider using a longer token",
+                    )
+                    break
+
+    def get_effective_tokens(self) -> List[str]:
+        """Get the list of valid tokens.
+
+        Note: Environment variable tokens (SINDRI_API_TOKENS) are resolved
+        at initialization time in create_app() or CLI, not at runtime.
+        This method just returns the configured static_tokens.
+
+        Returns:
+            List of valid tokens
+        """
+        return list(self.static_tokens or [])
 
 
 class MemoryConfig(BaseModel):
