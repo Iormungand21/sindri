@@ -555,6 +555,7 @@ def create_app(
     port: int = 8000,
     auth_enabled: Optional[bool] = None,
     static_tokens: Optional[list[str]] = None,
+    base_work_dir: Optional[Path] = None,
 ) -> FastAPI:
     """Create and configure the FastAPI application.
 
@@ -566,6 +567,7 @@ def create_app(
         port: Server port for generating default origins
         auth_enabled: Enable API authentication for mutation endpoints
         static_tokens: List of valid API tokens for authentication
+        base_work_dir: Base directory constraint for API tasks (Epic C). None = no restriction.
 
     Returns:
         Configured FastAPI application
@@ -580,6 +582,7 @@ def create_app(
         SINDRI_SERVER_PORT: Port for generating default origins
         SINDRI_AUTH_ENABLED: "1" to enable auth, "0" to disable
         SINDRI_API_TOKENS: Comma-separated list of valid tokens
+        SINDRI_API_BASE_WORK_DIR: Base directory constraint for API tasks (Epic C)
     """
     global _api_config
 
@@ -610,6 +613,11 @@ def create_app(
     if env_tokens is not None and static_tokens is None:
         static_tokens = [t.strip() for t in env_tokens.split(",") if t.strip()]
 
+    # Check for base_work_dir environment variable (Epic C)
+    env_base_work_dir = os.getenv("SINDRI_API_BASE_WORK_DIR")
+    if env_base_work_dir is not None and base_work_dir is None:
+        base_work_dir = Path(env_base_work_dir)
+
     # Default auth_enabled to False if still None
     if auth_enabled is None:
         auth_enabled = False
@@ -629,13 +637,14 @@ def create_app(
             "indicates a misconfiguration. Use specific origins instead."
         )
 
-    # Build and validate API config (Web/API Hardening PRD - Epic B)
+    # Build and validate API config (Web/API Hardening PRD - Epic B & C)
     _api_config = ApiConfig(
         bind_port=port,
         allowed_origins=allowed_origins,
         allow_credentials=allow_credentials,
         auth_enabled=auth_enabled,
         static_tokens=static_tokens,
+        base_work_dir=base_work_dir,
     )
 
     # Validate auth configuration
@@ -663,6 +672,13 @@ def create_app(
             "sindri_api_auth_config",
             auth_enabled=auth_enabled,
             token_count=len(_api_config.get_effective_tokens()) if auth_enabled else 0,
+        )
+
+        # Log path guardrails configuration (Web/API Hardening PRD - Epic C)
+        log.info(
+            "sindri_api_path_guardrails_config",
+            base_work_dir=str(base_work_dir) if base_work_dir else None,
+            path_restriction_enabled=base_work_dir is not None,
         )
         # Note: Non-localhost binding warnings are handled by the CLI since
         # create_app doesn't know the actual bind host (that's passed to uvicorn)
@@ -1058,9 +1074,40 @@ def create_app(
 
         # Create orchestrator
         config = LoopConfig(max_iterations=request.max_iterations)
-        work_path = (
-            Path(request.work_dir).resolve() if request.work_dir else api.work_dir
-        )
+
+        # Epic C: Determine work_path with base_work_dir awareness
+        api_base_work_dir = None
+        if _api_config and _api_config.base_work_dir:
+            api_base_work_dir = _api_config.get_resolved_base_work_dir()
+
+            if request.work_dir:
+                # Explicit work_dir provided - validate it's within base
+                work_path = Path(request.work_dir).resolve()
+                allowed, reason = _api_config.validate_path_within_base(work_path)
+                if not allowed:
+                    log.warning(
+                        "api_work_dir_denied",
+                        work_dir=str(work_path),
+                        base=str(api_base_work_dir),
+                        reason=reason,
+                    )
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Invalid work_dir: {reason}",
+                    )
+            else:
+                # No work_dir provided - default to base_work_dir (not cwd)
+                work_path = api_base_work_dir
+                log.info(
+                    "api_work_dir_defaulted",
+                    work_dir=str(work_path),
+                    reason="No work_dir provided, defaulting to base_work_dir",
+                )
+        else:
+            # No guardrails - use request.work_dir or api.work_dir
+            work_path = (
+                Path(request.work_dir).resolve() if request.work_dir else api.work_dir
+            )
 
         orchestrator = Orchestrator(
             config=config,
@@ -1069,6 +1116,7 @@ def create_app(
             work_dir=work_path,
             event_bus=api.event_bus,
             telemetry_collector=api.telemetry_collector,
+            api_base_work_dir=api_base_work_dir,
         )
 
         # Generate task ID
@@ -2404,6 +2452,9 @@ def run_server(
     work_dir: Optional[Path] = None,
     allowed_origins: Optional[list[str]] = None,
     allow_credentials: Optional[bool] = None,
+    auth_enabled: Optional[bool] = None,
+    static_tokens: Optional[list[str]] = None,
+    base_work_dir: Optional[Path] = None,
 ):
     """Run the Sindri API server.
 
@@ -2414,6 +2465,9 @@ def run_server(
         work_dir: Working directory for file operations
         allowed_origins: CORS allowed origins (default: from config or localhost + 127.0.0.1)
         allow_credentials: Allow credentials in CORS requests (default: from config or False)
+        auth_enabled: Enable API authentication (default: from config or False)
+        static_tokens: API tokens for authentication (default: from config)
+        base_work_dir: Base directory constraint for API tasks (Epic C, default: from config)
 
     Configuration is loaded from sindri.toml if available. Explicit arguments override config.
     """
@@ -2430,6 +2484,15 @@ def run_server(
     effective_credentials = (
         allow_credentials if allow_credentials is not None else api_config.allow_credentials
     )
+    effective_auth_enabled = (
+        auth_enabled if auth_enabled is not None else api_config.auth_enabled
+    )
+    effective_static_tokens = (
+        static_tokens if static_tokens is not None else api_config.static_tokens
+    )
+    effective_base_work_dir = (
+        base_work_dir if base_work_dir is not None else api_config.base_work_dir
+    )
 
     # Build CORS origins - use provided, config, or generate defaults
     if allowed_origins is None:
@@ -2441,5 +2504,8 @@ def run_server(
         allowed_origins=allowed_origins,
         allow_credentials=effective_credentials,
         port=effective_port,
+        auth_enabled=effective_auth_enabled,
+        static_tokens=effective_static_tokens,
+        base_work_dir=effective_base_work_dir,
     )
     uvicorn.run(app, host=effective_host, port=effective_port, log_level="info")

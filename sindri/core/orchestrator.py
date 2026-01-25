@@ -42,6 +42,7 @@ class Orchestrator:
         event_bus: Optional[EventBus] = None,
         work_dir: Optional[Path] = None,
         telemetry_collector: Optional["TelemetryCollector"] = None,
+        api_base_work_dir: Optional[Path] = None,
     ):
         self.client = client or OllamaClient()
         self.config = config or LoopConfig()
@@ -66,7 +67,12 @@ class Orchestrator:
             event_bus=self.event_bus,
         )
         # Plan-First Execution: Pass event_bus to enable plan events
-        self.tools = ToolRegistry.default(work_dir=work_dir, event_bus=self.event_bus)
+        # Epic C: Pass api_base_work_dir for path guardrails
+        self.tools = ToolRegistry.default(
+            work_dir=work_dir,
+            event_bus=self.event_bus,
+            api_base_work_dir=api_base_work_dir,
+        )
 
         # Initialize memory system if enabled (with default config)
         # Context budget will be adjusted on first run based on model

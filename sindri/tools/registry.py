@@ -376,20 +376,46 @@ class ToolRetryConfig:
 class ToolRegistry:
     """Manages available tools with retry support."""
 
+    # Known path argument names for validation (Epic C)
+    # Comprehensive list covering various naming patterns across tools
+    PATH_ARG_NAMES = frozenset({
+        # Common single path args
+        "path", "file", "file_path", "filepath",
+        "directory", "dir", "folder",
+        "target", "destination", "dest", "dst",
+        "source", "src", "input", "output",
+        "filename", "name",
+        # Compound path args
+        "source_path", "target_path", "input_path", "output_path",
+        "source_file", "target_file", "input_file", "output_file",
+        "src_path", "dst_path", "dest_path",
+        "working_directory", "work_dir", "workdir",
+        "base_path", "root_path", "base_dir", "root_dir",
+        "config_path", "config_file",
+        "log_path", "log_file",
+        # Plural forms for list arguments
+        "paths", "files", "directories", "dirs", "folders",
+        "sources", "targets", "destinations", "inputs", "outputs",
+    })
+
     def __init__(
         self,
         work_dir: Optional[Path] = None,
         retry_config: Optional[ToolRetryConfig] = None,
+        api_base_work_dir: Optional[Path] = None,
     ):
         """Initialize registry with optional working directory and retry config.
 
         Args:
             work_dir: Working directory for file operations. None = current directory.
             retry_config: Retry configuration for transient failures.
+            api_base_work_dir: Base directory constraint for API-invoked tools (Epic C).
+                              None = no restriction (CLI/TUI mode).
         """
         self._tools: dict[str, Tool] = {}
         self.work_dir = work_dir
         self.retry_config = retry_config or ToolRetryConfig()
+        self.api_base_work_dir = api_base_work_dir
 
     def register(self, tool: Tool):
         """Register a tool."""
@@ -432,6 +458,110 @@ class ToolRegistry:
                     session_id=session_id,
                     event_bus=event_bus,
                 )
+
+    def _extract_path_arguments(
+        self, tool_name: str, arguments: dict
+    ) -> dict[str, list[str]]:
+        """Extract path arguments from tool arguments (Epic C).
+
+        Handles both single string paths and list-based path arguments.
+
+        Args:
+            tool_name: Name of the tool being executed
+            arguments: Tool arguments dict
+
+        Returns:
+            Dict of argument_name -> list of path values for path arguments
+        """
+        path_args: dict[str, list[str]] = {}
+        for arg_name, arg_value in arguments.items():
+            if arg_name not in self.PATH_ARG_NAMES:
+                continue
+
+            if isinstance(arg_value, str):
+                path_args[arg_name] = [arg_value]
+            elif isinstance(arg_value, list):
+                # Handle list-based path arguments (e.g., paths=["file1.txt", "dir/"])
+                string_paths = [p for p in arg_value if isinstance(p, str)]
+                if string_paths:
+                    path_args[arg_name] = string_paths
+
+        return path_args
+
+    def _resolve_path_for_validation(self, path_str: str) -> Path:
+        """Resolve a path string for validation (Epic C).
+
+        When API guardrails are enabled, relative paths are resolved against
+        work_dir or api_base_work_dir (in that order), never against cwd.
+
+        Args:
+            path_str: Path string from tool arguments
+
+        Returns:
+            Resolved Path object
+        """
+        file_path = Path(path_str).expanduser()
+
+        # If path is absolute, resolve it directly
+        if file_path.is_absolute():
+            return file_path.resolve()
+
+        # Resolve relative paths against work_dir first
+        if self.work_dir:
+            return (self.work_dir / file_path).resolve()
+
+        # If API guardrails are enabled but no work_dir, use api_base_work_dir
+        if self.api_base_work_dir:
+            return (self.api_base_work_dir / file_path).resolve()
+
+        # Fallback to current directory (only for non-API usage)
+        return file_path.resolve()
+
+    def _is_path_within_base(self, resolved_path: Path, base: Path) -> bool:
+        """Check if a resolved path is within the base directory (Epic C).
+
+        Args:
+            resolved_path: Already-resolved path to check
+            base: Base directory (must also be resolved)
+
+        Returns:
+            True if path is within base, False otherwise
+        """
+        try:
+            resolved_path.relative_to(base)
+            return True
+        except ValueError:
+            return False
+
+    async def _log_path_violation(
+        self, tool_name: str, arg_name: str, path_value: str, resolved: Path
+    ):
+        """Log a path violation to the audit store (Epic C).
+
+        Args:
+            tool_name: Name of the tool
+            arg_name: Name of the path argument
+            path_value: Original path value from request
+            resolved: Resolved path that was denied
+        """
+        try:
+            audit_store = AuditStore()
+            await audit_store.log_tool_execution(AuditEntry(
+                tool_name=tool_name,
+                arguments=json.dumps({arg_name: path_value}),
+                success=False,
+                error=f"Path outside allowed base: {resolved}",
+            ))
+            log.warning(
+                "api_path_violation",
+                tool=tool_name,
+                arg=arg_name,
+                path=path_value,
+                resolved=str(resolved),
+                base=str(self.api_base_work_dir),
+            )
+        except Exception as e:
+            log.warning("audit_log_failed", tool=tool_name, error=str(e))
 
     async def execute(self, name: str, arguments: dict | str) -> ToolResult:
         """Execute a tool by name with automatic retry for transient errors.
@@ -498,6 +628,24 @@ class ToolRegistry:
             except Exception as e:
                 log.warning("audit_log_failed", tool=name, error=str(e))
             return denial_result
+
+        # API path guardrails (Epic C) - only when api_base_work_dir is set
+        if self.api_base_work_dir is not None:
+            resolved_base = self.api_base_work_dir.resolve()
+            path_args = self._extract_path_arguments(name, arguments)
+            for arg_name, path_values in path_args.items():
+                for path_value in path_values:
+                    resolved = self._resolve_path_for_validation(path_value)
+                    if not self._is_path_within_base(resolved, resolved_base):
+                        await self._log_path_violation(name, arg_name, path_value, resolved)
+                        return ToolResult(
+                            success=False,
+                            output="",
+                            error=f"Path argument '{arg_name}' is outside allowed base directory. "
+                                  f"Resolved path: {resolved}, Base: {resolved_base}",
+                            error_category=ErrorCategory.FATAL,
+                            suggestion=f"Use paths within {resolved_base}",
+                        )
 
         # Block tools that require confirmation (no interactive prompt available)
         if permission.needs_confirmation:
@@ -682,6 +830,7 @@ class ToolRegistry:
         event_bus: Optional[EventBus] = None,
         task_id: Optional[str] = None,
         session_id: Optional[str] = None,
+        api_base_work_dir: Optional[Path] = None,
     ) -> "ToolRegistry":
         """Create a registry with default tools.
 
@@ -691,11 +840,13 @@ class ToolRegistry:
             event_bus: Optional EventBus for plan events.
             task_id: Optional task ID for plan association.
             session_id: Optional session ID for plan association.
+            api_base_work_dir: Base directory constraint for API-invoked tools (Epic C).
+                              None = no restriction (CLI/TUI mode).
 
         Returns:
             ToolRegistry with default filesystem and shell tools registered.
         """
-        registry = cls(work_dir=work_dir)
+        registry = cls(work_dir=work_dir, api_base_work_dir=api_base_work_dir)
         registry.register(ReadFileTool(work_dir=work_dir))
         registry.register(WriteFileTool(work_dir=work_dir))
         registry.register(EditFileTool(work_dir=work_dir))

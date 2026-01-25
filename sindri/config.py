@@ -154,10 +154,10 @@ class RoutingConfig(BaseModel):
 
 
 class ApiConfig(BaseModel):
-    """Web API configuration (Web/API Hardening PRD - Epic A & B).
+    """Web API configuration (Web/API Hardening PRD - Epic A, B & C).
 
     Controls the security defaults for the Sindri web server including
-    bind host, CORS settings, and API authentication.
+    bind host, CORS settings, API authentication, and path guardrails.
     """
 
     bind_host: str = Field(
@@ -186,6 +186,11 @@ class ApiConfig(BaseModel):
     static_tokens: Optional[List[str]] = Field(
         default=None,
         description="List of valid API tokens for authentication",
+    )
+    # Path Guardrails (Web/API Hardening PRD - Epic C)
+    base_work_dir: Optional[Path] = Field(
+        default=None,
+        description="Base directory for API task work_dir. None = no restriction.",
     )
 
     @field_validator("allowed_origins")
@@ -264,6 +269,38 @@ class ApiConfig(BaseModel):
             List of valid tokens
         """
         return list(self.static_tokens or [])
+
+    def validate_path_within_base(self, path: Path) -> tuple[bool, str]:
+        """Validate a path is within base_work_dir (Epic C).
+
+        Args:
+            path: Path to validate
+
+        Returns:
+            Tuple of (allowed, reason). If allowed is True, reason is empty.
+            If allowed is False, reason contains the denial message.
+        """
+        if self.base_work_dir is None:
+            return True, ""
+
+        try:
+            resolved = path.resolve()
+            base = self.base_work_dir.resolve()
+            # Check if resolved path starts with base path
+            resolved.relative_to(base)
+            return True, ""
+        except ValueError:
+            return False, f"Path '{path}' is outside allowed base directory '{base}'"
+
+    def get_resolved_base_work_dir(self) -> Optional[Path]:
+        """Get the resolved base_work_dir path.
+
+        Returns:
+            Resolved Path if base_work_dir is set, None otherwise.
+        """
+        if self.base_work_dir is None:
+            return None
+        return self.base_work_dir.resolve()
 
 
 class MemoryConfig(BaseModel):
