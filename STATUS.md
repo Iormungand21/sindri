@@ -1,6 +1,6 @@
 # Sindri Status
 
-**Date:** 2026-01-24
+**Date:** 2026-02-01
 **Status:** Internal-only, single-user mode complete
 
 ## TL;DR
@@ -17,6 +17,7 @@
 - Canonical facts: see `FACTS.md` and `docs/LLM_INDEX.md`.
 
 ## Recent Changes (latest first)
+- 2026-02-01: **Capability Registry + Doctor VRAM Fix** - Added ModelCapabilities entries for installed models (`codestral:22b`, `mistral-nemo:12b`, `gemma2:27b`, `qwen2.5:32b`) with verified context lengths via `ollama show`; fixed `check_gpu_vram()` to correctly parse rocm-smi byte output (was treating bytes as MB, reporting ~33M GB instead of ~32 GB).
 - 2026-01-24: **Model-Aware Routing** (ROADMAP Item 10) - Lightweight router for task-based model selection; `TaskClassifier` for categorizing tasks (code_generation, reasoning, data, etc.); `ModelCapabilities` registry with 13 models and per-category strength scores; `ModelRouter` with VRAM-aware candidate filtering, latency optimization (prefer loaded models), and per-project preferences; `RoutingPreferences` for speed vs quality tradeoff, category overrides, and agent model locks; `RoutingConfig` in SindriConfig (opt-in via `routing.enabled`); `ProjectRoutingPreferences` for per-project customization; `MODEL_ROUTED` event type and schema; integration in `HierarchicalAgentLoop.run_task()` and `Orchestrator`; CLI commands (`sindri routing status/configure/capabilities/override/lock/unlock`); +41 tests.
 - 2026-01-24: **Agents as Plugins** (ROADMAP Item 8) - SDK for packaging agents with prompts, tests, and metadata as distributable bundles; `AgentSDK` with `create_bundle()`, `from_definition()`, and `scaffold()` methods; `BundleValidator` with manifest validation, dependency checking, and pytest test execution; `BundleLoader` for bundle discovery and installation; `sindri-agent.toml` manifest format with schema versioning; `BundleMetadata` with version, sindri_version compatibility, author, category, tags; PluginManager integration for bundle discovery and registration; CLI commands (`sindri bundle create/validate/install/uninstall/export/test/list/info`); +35 tests.
 - 2026-01-24: **Triggers REST API** (ROADMAP Item 9 completion) - 11 REST API endpoints for trigger management via HTTP: `GET/POST /api/triggers`, `GET/PUT/DELETE /api/triggers/{id}`, `POST /api/triggers/{id}/enable`, `POST /api/triggers/{id}/disable`, `POST /api/triggers/{id}/run`, `GET /api/triggers/{id}/runs`, `GET /api/triggers/{id}/runs/{run_id}`, `GET /api/triggers/stats`; Pydantic request/response models; event emission on state changes; cron validation; +31 tests.

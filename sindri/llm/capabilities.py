@@ -224,6 +224,95 @@ MODEL_CAPABILITIES: dict[str, ModelCapabilities] = {
             RoutingTaskCategory.CODE_REVIEW,
         ],
     ),
+    # codestral:22b - default quantization variant (same capabilities as q4_K_M)
+    "codestral:22b": ModelCapabilities(
+        name="codestral:22b",
+        vram_gb=14.0,
+        context_length=32768,  # Verified via ollama show
+        strengths={
+            RoutingTaskCategory.CODE_GENERATION: 0.95,
+            RoutingTaskCategory.CODE_REVIEW: 0.85,
+            RoutingTaskCategory.DEBUGGING: 0.85,
+            RoutingTaskCategory.TESTING: 0.85,
+            RoutingTaskCategory.DOCUMENTATION: 0.75,
+            RoutingTaskCategory.REASONING: 0.75,
+            RoutingTaskCategory.CREATIVE: 0.60,
+            RoutingTaskCategory.DATA: 0.75,
+            RoutingTaskCategory.DOMAIN_SPECIFIC: 0.70,
+            RoutingTaskCategory.GENERAL: 0.80,
+        },
+        quality_score=0.90,
+        specialized_for=[
+            RoutingTaskCategory.CODE_GENERATION,
+            RoutingTaskCategory.CODE_REVIEW,
+        ],
+    ),
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Mistral Nemo - General purpose mid-size model
+    # ═══════════════════════════════════════════════════════════════════════════════
+    "mistral-nemo:12b": ModelCapabilities(
+        name="mistral-nemo:12b",
+        vram_gb=8.0,
+        context_length=1024000,  # Verified via ollama show
+        strengths={
+            RoutingTaskCategory.CODE_GENERATION: 0.80,
+            RoutingTaskCategory.CODE_REVIEW: 0.80,
+            RoutingTaskCategory.DEBUGGING: 0.75,
+            RoutingTaskCategory.TESTING: 0.70,
+            RoutingTaskCategory.DOCUMENTATION: 0.85,
+            RoutingTaskCategory.REASONING: 0.80,
+            RoutingTaskCategory.CREATIVE: 0.75,
+            RoutingTaskCategory.DATA: 0.70,
+            RoutingTaskCategory.DOMAIN_SPECIFIC: 0.70,
+            RoutingTaskCategory.GENERAL: 0.85,
+        },
+        quality_score=0.82,
+        specialized_for=[RoutingTaskCategory.DOCUMENTATION, RoutingTaskCategory.GENERAL],
+    ),
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Gemma 2 - Google's efficient large model
+    # ═══════════════════════════════════════════════════════════════════════════════
+    "gemma2:27b": ModelCapabilities(
+        name="gemma2:27b",
+        vram_gb=18.0,
+        context_length=8192,  # Verified via ollama show
+        strengths={
+            RoutingTaskCategory.CODE_GENERATION: 0.85,
+            RoutingTaskCategory.CODE_REVIEW: 0.85,
+            RoutingTaskCategory.DEBUGGING: 0.80,
+            RoutingTaskCategory.TESTING: 0.75,
+            RoutingTaskCategory.DOCUMENTATION: 0.85,
+            RoutingTaskCategory.REASONING: 0.90,
+            RoutingTaskCategory.CREATIVE: 0.80,
+            RoutingTaskCategory.DATA: 0.80,
+            RoutingTaskCategory.DOMAIN_SPECIFIC: 0.75,
+            RoutingTaskCategory.GENERAL: 0.90,
+        },
+        quality_score=0.88,
+        specialized_for=[RoutingTaskCategory.REASONING, RoutingTaskCategory.GENERAL],
+    ),
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Qwen 2.5 Large - High-capability general purpose
+    # ═══════════════════════════════════════════════════════════════════════════════
+    "qwen2.5:32b": ModelCapabilities(
+        name="qwen2.5:32b",
+        vram_gb=20.0,
+        context_length=32768,  # Verified via ollama show
+        strengths={
+            RoutingTaskCategory.CODE_GENERATION: 0.90,
+            RoutingTaskCategory.CODE_REVIEW: 0.90,
+            RoutingTaskCategory.DEBUGGING: 0.85,
+            RoutingTaskCategory.TESTING: 0.80,
+            RoutingTaskCategory.DOCUMENTATION: 0.90,
+            RoutingTaskCategory.REASONING: 0.95,
+            RoutingTaskCategory.CREATIVE: 0.80,
+            RoutingTaskCategory.DATA: 0.85,
+            RoutingTaskCategory.DOMAIN_SPECIFIC: 0.80,
+            RoutingTaskCategory.GENERAL: 0.92,
+        },
+        quality_score=0.92,
+        specialized_for=[RoutingTaskCategory.REASONING, RoutingTaskCategory.GENERAL],
+    ),
     # ═══════════════════════════════════════════════════════════════════════════════
     # Specialized Models
     # ═══════════════════════════════════════════════════════════════════════════════

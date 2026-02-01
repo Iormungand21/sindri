@@ -135,16 +135,29 @@ def check_gpu_vram() -> HealthCheck:
 
         if result.returncode == 0:
             # Parse rocm-smi output to get total VRAM
-            # This is a simple approach - rocm-smi output varies
+            # Output format: "GPU[0] : VRAM Total Memory (B): 34342961152"
             lines = result.stdout.split("\n")
             for line in lines:
                 if "Total VRAM" in line or "VRAM Total" in line:
-                    # Try to extract number
+                    # Detect unit from line - (B) means bytes, (MB) means megabytes
+                    is_bytes = "(B)" in line
+                    # Try to extract number (last numeric value on the line)
                     parts = line.split()
-                    for i, part in enumerate(parts):
+                    for part in reversed(parts):
                         if part.isdigit() or (part.replace(".", "").isdigit()):
-                            vram_mb = int(float(part))
-                            vram_gb = vram_mb / 1024 if vram_mb > 1000 else vram_mb
+                            value = int(float(part))
+                            if is_bytes:
+                                # Convert bytes to GB
+                                vram_gb = value / (1024 * 1024 * 1024)
+                            elif value > 1000000:
+                                # Large value without unit marker - assume bytes
+                                vram_gb = value / (1024 * 1024 * 1024)
+                            elif value > 1000:
+                                # Assume MB
+                                vram_gb = value / 1024
+                            else:
+                                # Already in GB
+                                vram_gb = value
                             return HealthCheck(
                                 name="GPU/VRAM",
                                 passed=True,
