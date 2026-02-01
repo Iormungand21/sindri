@@ -76,16 +76,48 @@ def check_required_models() -> Tuple[HealthCheck, List[str], List[str]]:
         # Get available model names, handling both "model:tag" and "model" formats
         available_raw = {m.model for m in models_response.get("models", [])}
 
-        # Create a normalized set (without tags) for matching
+        # Create a normalized set for matching
+        # Include: full name, base name, and "model:size" format (e.g., codestral:22b)
         available_normalized = set()
         for model in available_raw:
-            # Add both the full name and the base name (without tag)
             available_normalized.add(model)
             if ":" in model:
-                available_normalized.add(model.split(":")[0])
+                parts = model.split(":")
+                base_name = parts[0]
+                available_normalized.add(base_name)
+                # Also add "model:size" format for variant matching
+                # e.g., "codestral:22b" matches "codestral:22b-v0.1-q4_K_M"
+                tag = parts[1]
+                # Extract size portion (everything before first hyphen in tag)
+                if "-" in tag:
+                    size_part = tag.split("-")[0]
+                    available_normalized.add(f"{base_name}:{size_part}")
 
-        missing = required_models - available_normalized
-        available_required = required_models & available_normalized
+        # Also normalize required models to match available
+        # For each required model, check if it matches any available model
+        missing = set()
+        available_required = set()
+        for req_model in required_models:
+            matched = False
+            # Check exact match first
+            if req_model in available_normalized:
+                matched = True
+            elif ":" in req_model:
+                req_base = req_model.split(":")[0]
+                req_tag = req_model.split(":")[1]
+                # Try "model:size" match for variant tags (e.g., codestral:22b matches codestral:22b-v0.1-q4_K_M)
+                # Only use this matching when the required tag has a variant suffix (contains hyphen)
+                if "-" in req_tag:
+                    req_size = req_tag.split("-")[0]
+                    if f"{req_base}:{req_size}" in available_normalized:
+                        matched = True
+                # Note: We intentionally do NOT fall back to base-name-only matching
+                # because that would incorrectly match different model sizes
+                # (e.g., qwen2.5:3b would match qwen2.5:32b which is wrong)
+            if matched:
+                available_required.add(req_model)
+            else:
+                missing.add(req_model)
 
         if not missing:
             return (

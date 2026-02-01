@@ -15,6 +15,17 @@ Grouped by logical capability area.
 - **Mid-term (2–4 months):** items 8 ✅, 9 ✅
 - **Long-term (4–6 months):** item 10
 
+### Migration + Operational Readiness (New Hardware) ✅ **COMPLETE (2026-02-01)**
+- **Planned execution (Owner: Claude, Reviewer: Codex):**
+  - ✅ **Step 1:** Environment readiness (install dev deps, confirm `sindri doctor` runs)
+  - ✅ **Step 2:** Ollama connectivity (CLI + HTTP API from same shell)
+  - ✅ **Step 3:** Health checks + targeted tests (`tests/test_doctor.py`, `tests/test_routing.py`) - 48/48 passed
+  - ✅ **Step 4:** GPU/VRAM sanity - AMD GPU ~32GB VRAM via ROCm confirmed
+  - ✅ **Step 5:** Model capability registry updates - Added qwen2:0.5b, improved doctor model variant matching
+  - ✅ **Step 6:** Task complete - capability registry + doctor normalization fix implemented and tested
+- **Installed models (9):** codestral:22b, mistral-nemo:12b, gemma2:27b, qwen2.5:32b, qwen2.5-coder:14b, qwen2.5-coder:7b, deepseek-r1:14b, llama3.1:8b, qwen2:0.5b
+- **Note:** 6 agent-required models still missing (granite3.2-vision:2b, mathstral:7b, nomic-embed-text, qwen2.5:3b-instruct-q8_0, qwen3:14b, sqlcoder:7b) - pull as needed or update agent defaults in follow-up
+
 ### Stability + Bugfixes
 0. **Hierarchical Execution Reliability** ✅ **COMPLETE (Phase 15)**
    - ✅ Fix delegation wait handling so parent tasks resume instead of failing
@@ -875,6 +886,7 @@ cd sindri/web/static && npm test -- --run
 
 | Date | Feature | Tests |
 |------|---------|-------|
+| 2026-02-01 | **Migration + Operational Readiness** - New hardware validation (32GB VRAM), added qwen2:0.5b to capability registry, fixed doctor model variant matching (codestral:22b now matches codestral:22b-v0.1-q4_K_M) | +0 (existing tests) |
 | 2026-01-21 | **Multi-Project Workspace Index (ROADMAP Item 4)** - BackgroundIndexer with priority queue, incremental MD5-based indexing, active/pinned projects, per-project embedder settings (ProjectEmbedderSettings), CLI commands (activate/deactivate/settings/index-incremental/active), INDEX_* events | +47 |
 | 2026-01-21 | **Reproducible Sessions (ROADMAP Item 3)** - Environment snapshots (Sindri/Python/Ollama versions, model metadata, inference params), tool output recording, `sindri replay` CLI (info/list/run/compare), session comparison, database schema v7 | +44 |
 | 2026-01-21 | **Plan-First Execution (ROADMAP Item 2)** - Persistent plans with approval gates, step-level checkpointing, step re-run, PlanStore persistence, PlanExecutor orchestration, REST API endpoints for plan/step management, 15 new event types with schemas | +30 |
@@ -945,11 +957,11 @@ cd sindri/web/static && npm test -- --run
 ## Target Platform
 
 - **OS:** Linux (Arch/EndeavourOS)
-- **GPU:** AMD Radeon 6950XT (16GB VRAM)
+- **GPU:** AMD GPU (~32GB VRAM via ROCm)
 - **Python:** 3.11+
 - **LLM Backend:** Ollama with ROCm
 
 ---
 
-**Last Updated:** 2026-01-21
+**Last Updated:** 2026-02-01
 **Maintained By:** Project contributors

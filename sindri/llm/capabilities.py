@@ -373,6 +373,31 @@ MODEL_CAPABILITIES: dict[str, ModelCapabilities] = {
         quality_score=0.60,
         specialized_for=[RoutingTaskCategory.DOMAIN_SPECIFIC],
     ),
+    # ═══════════════════════════════════════════════════════════════════════════════
+    # Qwen 2 Small - Minimal VRAM, quick responses
+    # Verified: ollama show qwen2:0.5b (context_length=32768, 494M params, Q4_0)
+    # VRAM estimate: ~0.5GB based on 352MB disk size + runtime overhead
+    # Strength scores: estimates based on 0.5B parameter size (very limited capability)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    "qwen2:0.5b": ModelCapabilities(
+        name="qwen2:0.5b",
+        vram_gb=0.5,
+        context_length=32768,  # Verified via ollama show
+        strengths={
+            RoutingTaskCategory.CODE_GENERATION: 0.35,
+            RoutingTaskCategory.CODE_REVIEW: 0.25,
+            RoutingTaskCategory.DEBUGGING: 0.30,
+            RoutingTaskCategory.TESTING: 0.30,
+            RoutingTaskCategory.DOCUMENTATION: 0.35,
+            RoutingTaskCategory.REASONING: 0.25,
+            RoutingTaskCategory.CREATIVE: 0.25,
+            RoutingTaskCategory.DATA: 0.30,
+            RoutingTaskCategory.DOMAIN_SPECIFIC: 0.20,
+            RoutingTaskCategory.GENERAL: 0.35,
+        },
+        quality_score=0.25,
+        specialized_for=[],  # Too small to specialize
+    ),
 }
 
 
