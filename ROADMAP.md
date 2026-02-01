@@ -23,8 +23,8 @@ Grouped by logical capability area.
   - ✅ **Step 4:** GPU/VRAM sanity - AMD GPU ~32GB VRAM via ROCm confirmed
   - ✅ **Step 5:** Model capability registry updates - Added qwen2:0.5b, improved doctor model variant matching
   - ✅ **Step 6:** Task complete - capability registry + doctor normalization fix implemented and tested
-- **Installed models (9):** codestral:22b, mistral-nemo:12b, gemma2:27b, qwen2.5:32b, qwen2.5-coder:14b, qwen2.5-coder:7b, deepseek-r1:14b, llama3.1:8b, qwen2:0.5b
-- **Note:** 6 agent-required models still missing (granite3.2-vision:2b, mathstral:7b, nomic-embed-text, qwen2.5:3b-instruct-q8_0, qwen3:14b, sqlcoder:7b) - pull as needed or update agent defaults in follow-up
+- **Installed models (15):** codestral:22b, mistral-nemo:12b, gemma2:27b, qwen2.5:32b, qwen2.5-coder:14b, qwen2.5-coder:7b, deepseek-r1:14b, llama3.1:8b, qwen2:0.5b, granite3.2-vision:2b, mathstral:7b, nomic-embed-text, qwen2.5:3b-instruct-q8_0, qwen3:14b, sqlcoder:7b
+- **Note:** All 11 agent-required models now installed and verified (2026-02-01)
 
 ### Stability + Bugfixes
 0. **Hierarchical Execution Reliability** ✅ **COMPLETE (Phase 15)**
@@ -51,7 +51,7 @@ Grouped by logical capability area.
    - ✅ Expose `/api/schema` for clients and auto-generate TS types
    - ✅ Add contract tests and backward-compat flags
    - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Add `duration_ms` to `TOOL_CALLED` event schema and regenerate TS types
-   - **Initial scan:** Align `/api/tasks` request contract with actual agent selection (currently validated but unused)
+   - ✅ **Junior task (Owner: Claude, Reviewer: Codex):** Align `/api/tasks` request contract with actual agent selection - now passes `root_agent` to orchestrator.run()
 
 ### Execution Control + Reproducibility
 2. **Plan-First Execution** ✅ **COMPLETE**

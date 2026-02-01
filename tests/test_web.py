@@ -865,6 +865,32 @@ class TestTaskEndpoints:
             assert response.status_code == 200
             # Default agent should be brokkr (no error)
 
+    def test_create_task_passes_agent_to_orchestrator(self, client):
+        """Test that specified agent is passed to orchestrator.run() as root_agent.
+
+        This verifies the fix for ROADMAP 'Initial scan' item:
+        'Align /api/tasks request contract with actual agent selection'
+        """
+        with patch("sindri.core.orchestrator.Orchestrator") as mock_orchestrator:
+            mock_instance = MagicMock()
+            mock_instance.run = AsyncMock(return_value={"success": True})
+            mock_instance.cleanup = AsyncMock()
+            mock_orchestrator.return_value = mock_instance
+
+            # Request with non-default agent
+            response = client.post(
+                "/api/tasks",
+                json={"description": "Write tests", "agent": "huginn"},
+            )
+
+            assert response.status_code == 200
+
+            # FastAPI TestClient runs background tasks synchronously, so we can
+            # assert immediately without waiting
+            mock_instance.run.assert_called_once_with(
+                "Write tests", root_agent="huginn"
+            )
+
     def test_list_tasks_empty(self, client):
         """Test listing tasks when empty."""
         response = client.get("/api/tasks")

@@ -1137,7 +1137,9 @@ def create_app(
         # Run task in background
         async def run_task():
             try:
-                result = await orchestrator.run(request.description)
+                result = await orchestrator.run(
+                    request.description, root_agent=request.agent
+                )
                 api.active_tasks[task_id]["status"] = (
                     "completed" if result.get("success") else "failed"
                 )
